@@ -30,6 +30,10 @@
     },
     "test": {
       "dependsOn": ["^build"]
+    },
+    "test:db": {
+      "dependsOn": ["^build"],
+      "cache": false
     }
   }
 }

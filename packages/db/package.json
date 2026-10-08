@@ -1,0 +1,43 @@
+{
+  "name": "@ballot/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Database access for the API and worker: Kysely, generated types and withActor",
+  "type": "module",
+  "exports": {
+    "./*": {
+      "import": "./dist/*.js",
+      "types": "./dist/*.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:watch": "tsc --watch -p tsconfig.build.json",
+    "build:check": "tsc --noEmit",
+    "lint": "oxlint --type-aware --max-warnings 0 .",
+    "lint:fix": "oxlint --type-aware --fix --max-warnings 0 .",
+    "test": "vitest --run --pass-with-no-tests",
+    "test:db": "vitest --run --config vitest.db.config.js"
+  },
+  "dependencies": {
+    "kysely": "0.29.6",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@ballot/domain": "workspace:*",
+    "@slango.configs/lint-staged": "2.0.8",
+    "@slango.configs/oxlint": "0.1.12",
+    "@slango.configs/typescript": "3.0.0",
+    "@slango.configs/vitest": "2.0.67",
+    "@types/node": "26.6.4",
+    "@types/pg": "8.23.1",
+    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/ui": "5.0.3",
+    "dbmate": "2.36.0",
+    "kysely-codegen": "0.20.0",
+    "oxlint": "1.87.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}
