@@ -358,11 +358,11 @@ These are smaller choices. Each has a default we'll use unless the owner objects
   - kysely-codegen with `--default-schema app` needs `search_path=app` on runtime connections.
   - oxlint's type-aware rules need a root `tsconfig.json` that references the project configs. Without it they
     silently report nothing.
-- **Fixed upstream in `@slango.configs/typescript` 2.1.0:**
-  - a new `node.json` preset (`types: ["node"]`, ES2022 lib, no DOM) for Node packages, because TS 7 no longer
-    loads `@types/*` automatically;
-  - `paths`, and the `include`/`exclude` of `next.json` and `react.json`, now resolve against the consuming
-    tsconfig through `${configDir}`;
-  - `next.json` and `react.json` no longer emit declarations or set `composite`, which fixes TS2883 in Next apps.
-
-  Our `apps/api` and the Node packages extend `node.json`; the Next apps extend `next.json`.
+- **Fixed upstream in slango** (`@slango.configs/typescript` 3.0.0, `@slango.configs/vitest` 2.1.0):
+  - a `node.json` preset (`types: ["node"]`, ES2022 lib, no DOM), because TS 7 no longer loads `@types/*`
+    automatically. `apps/api` and the Node packages extend it; the Next apps extend `next.json`;
+  - no path aliases in the presets: Next's Turbopack doesn't resolve `${configDir}` in `paths`, so each app declares
+    its own aliases relative to its tsconfig;
+  - no `composite` or `incremental`: Turbo caches `dist/` but not TypeScript's `.tsbuildinfo`, and the two can drift
+    into stale declarations;
+  - the vitest presets are written in TypeScript and ship declarations, so configs are `vitest.config.ts`.

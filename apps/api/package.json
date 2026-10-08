@@ -22,8 +22,8 @@
   "devDependencies": {
     "@slango.configs/lint-staged": "2.0.8",
     "@slango.configs/oxlint": "0.1.12",
-    "@slango.configs/typescript": "2.1.0",
-    "@slango.configs/vitest": "2.0.67",
+    "@slango.configs/typescript": "3.0.0",
+    "@slango.configs/vitest": "2.1.0",
     "@types/node": "26.6.4",
     "@vitest/coverage-v8": "5.0.3",
     "@vitest/ui": "5.0.3",
