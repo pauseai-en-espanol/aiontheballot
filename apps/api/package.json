@@ -1,0 +1,35 @@
+{
+  "name": "@ballot/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Fastify API and worker: the only code that talks to Postgres",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:watch": "tsc --watch -p tsconfig.build.json",
+    "build:check": "tsc --noEmit",
+    "dev": "node --watch dist/server.js",
+    "start": "node dist/server.js",
+    "lint": "oxlint --type-aware --max-warnings 0 .",
+    "lint:fix": "oxlint --type-aware --fix --max-warnings 0 .",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --run --coverage"
+  },
+  "dependencies": {
+    "fastify": "5.12.5"
+  },
+  "devDependencies": {
+    "@slango.configs/lint-staged": "2.0.8",
+    "@slango.configs/oxlint": "0.1.12",
+    "@slango.configs/typescript": "2.1.0",
+    "@slango.configs/vitest": "2.0.67",
+    "@types/node": "26.6.4",
+    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/ui": "5.0.3",
+    "oxlint": "1.87.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}
