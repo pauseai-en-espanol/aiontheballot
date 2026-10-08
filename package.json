@@ -1,0 +1,57 @@
+{
+  "name": "aiontheballot",
+  "private": true,
+  "description": "Multi-tenant platform for sourced comparisons of party positions on frontier-AI risk",
+  "license": "AGPL-3.0-or-later",
+  "repository": "https://github.com/pauseai-en-espanol/aiontheballot",
+  "type": "module",
+  "scripts": {
+    "clean:node-modules": "clean-node-modules",
+    "clean:cache": "clean-cache-artifacts",
+    "clean:build": "clean-build-artifacts",
+    "clean": "clean-build-artifacts && clean-cache-artifacts && clean-node-modules",
+    "clean+install": "pnpm clean && pnpm install",
+    "dev": "turbo dev build:watch",
+    "build": "turbo build",
+    "build:check": "turbo build:check",
+    "lint": "turbo lint && oxlint --disable-nested-config --max-warnings 0 . && pnpm lint:md",
+    "lint:fix": "turbo lint:fix && oxlint --disable-nested-config --fix --max-warnings 0 .",
+    "lint:md": "markdownlint-cli2",
+    "test": "turbo test",
+    "test:serial": "turbo test --concurrency=1",
+    "format": "prettier --ignore-unknown --write .",
+    "format:check": "prettier --ignore-unknown --check .",
+    "check": "turbo check",
+    "release:note": "changeset add",
+    "release:empty": "changeset add --empty",
+    "release:bump": "changeset version",
+    "release:check": "changeset status --since=origin/main",
+    "prepare": "[ \"$PACKAGED\" = true ] && echo 'Skipping prepare for packaged production dependencies install' || husky"
+  },
+  "devDependencies": {
+    "@changesets/cli": "3.0.3",
+    "@slango.configs/lint-staged": "2.0.8",
+    "@slango.configs/oxlint": "0.1.12",
+    "@slango.configs/prettier": "1.0.35",
+    "@slango.configs/scripts": "1.2.7",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.0",
+    "markdownlint-cli2": "0.23.3",
+    "oxlint": "1.87.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "prettier": "3.9.9",
+    "turbo": "2.11.7"
+  },
+  "engines": {
+    "node": "^26.10.0",
+    "pnpm": "^12.10.1"
+  },
+  "packageManager": "pnpm@12.10.1",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.10.1",
+      "onFail": "download"
+    }
+  }
+}

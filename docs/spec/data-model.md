@@ -5,19 +5,19 @@
   [ADR-0003](../adr/0003-application-stack.md) (dbmate, Kysely), BRIEF §2–§5
 
 This spec is the source of truth for the M1 migrations. Once they exist, the migrations and `db/schema.sql` become
-authoritative, and this document is kept in sync. ADR-0002 says *what* must hold; this spec says *where* each rule
+authoritative, and this document is kept in sync. ADR-0002 says _what_ must hold; this spec says _where_ each rule
 lives. Any example data here is fictional.
 
 ## 1. Conventions
 
 **Schemas:**
 
-| Schema | Holds | Notes |
-|---|---|---|
-| `app` | All tables | |
-| `private` | Helper functions | Not granted broadly |
-| `auth` | Better Auth's tables | See [open item 2](#9-open-items) |
-| `pgboss` | The job queue | Created by the migration Job (owner), not at runtime |
+| Schema    | Holds                | Notes                                                |
+| --------- | -------------------- | ---------------------------------------------------- |
+| `app`     | All tables           |                                                      |
+| `private` | Helper functions     | Not granted broadly                                  |
+| `auth`    | Better Auth's tables | See [open item 2](#9-open-items)                     |
+| `pgboss`  | The job queue        | Created by the migration Job (owner), not at runtime |
 
 **Columns and constraints:**
 
@@ -43,26 +43,26 @@ triggers, which the [enforcement map](#6-enforcement-map) covers.
 
 ## 2. Enumerations
 
-| Type | Values | Notes |
-|---|---|---|
-| `tenant_role` | `country_admin`, `editor`, `reviewer` | `platform_admin` is a separate table |
-| `org_role` | `operator`, `endorser` | |
-| `election_type` | `general`, `european`, `regional`, `municipal`, `other` | |
-| `election_status` | `draft`, `live`, `archived` | |
-| `methodology_kind` | `demands`, `descriptive` | |
-| `rating` | `meets`, `partially_meets`, `does_not_meet`, `green`, `yellow`, `red`, `not_mentioned` | Which values are valid depends on the methodology kind (see below) |
-| `assessment_state` | `draft`, `in_review`, `published` | The working state of a cell |
-| `change_kind` | `initial`, `update`, `correction`, `withdrawal` | |
-| `source_kind` | `pdf`, `web_page`, `social_post`, `video`, `audio`, `party_submission` | |
-| `match_status` | `unmatched`, `matched`, `attested` | |
-| `extraction_status` | `pending`, `done`, `failed`, `not_applicable` | |
-| `programme_status` | `pending`, `published` | |
-| `file_bucket` | `public_assets`, `sources` | |
-| `review_event_kind` | `submitted`, `approved`, `rejected`, `withdrawn`, `commented` | |
-| `change_request_state` | `pending`, `approved`, `rejected` | |
-| `report_kind` | `error_report`, `party_response` | |
-| `report_status` | `new`, `triaged`, `accepted`, `rejected`, `spam` | |
-| `suggestion_state` | `open`, `accepted`, `rejected` | |
+| Type                   | Values                                                                                 | Notes                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `tenant_role`          | `country_admin`, `editor`, `reviewer`                                                  | `platform_admin` is a separate table                               |
+| `org_role`             | `operator`, `endorser`                                                                 |                                                                    |
+| `election_type`        | `general`, `european`, `regional`, `municipal`, `other`                                |                                                                    |
+| `election_status`      | `draft`, `live`, `archived`                                                            |                                                                    |
+| `methodology_kind`     | `demands`, `descriptive`                                                               |                                                                    |
+| `rating`               | `meets`, `partially_meets`, `does_not_meet`, `green`, `yellow`, `red`, `not_mentioned` | Which values are valid depends on the methodology kind (see below) |
+| `assessment_state`     | `draft`, `in_review`, `published`                                                      | The working state of a cell                                        |
+| `change_kind`          | `initial`, `update`, `correction`, `withdrawal`                                        |                                                                    |
+| `source_kind`          | `pdf`, `web_page`, `social_post`, `video`, `audio`, `party_submission`                 |                                                                    |
+| `match_status`         | `unmatched`, `matched`, `attested`                                                     |                                                                    |
+| `extraction_status`    | `pending`, `done`, `failed`, `not_applicable`                                          |                                                                    |
+| `programme_status`     | `pending`, `published`                                                                 |                                                                    |
+| `file_bucket`          | `public_assets`, `sources`                                                             |                                                                    |
+| `review_event_kind`    | `submitted`, `approved`, `rejected`, `withdrawn`, `commented`                          |                                                                    |
+| `change_request_state` | `pending`, `approved`, `rejected`                                                      |                                                                    |
+| `report_kind`          | `error_report`, `party_response`                                                       |                                                                    |
+| `report_status`        | `new`, `triaged`, `accepted`, `rejected`, `spam`                                       |                                                                    |
+| `suggestion_state`     | `open`, `accepted`, `rejected`                                                         |                                                                    |
 
 **Valid ratings per methodology kind:**
 
@@ -468,9 +468,9 @@ create table app.revision_internal (                   -- private: who signed of
 **Derived views** (all `security_invoker`, so the reader's RLS applies):
 
 - `app.current_revisions`: the latest revision per assessment (`distinct on (assessment_id) … order by revision_no
-  desc`). A cell with no row, or whose latest revision is a withdrawal, shows as *pending*.
+desc`). A cell with no row, or whose latest revision is a withdrawal, shows as _pending_.
 - `app.corrections_log`: per election, every non-initial revision, plus approved change requests, newest first.
-  This replaces the `corrections` *table* that ADR-0002 listed; the log is derived, never written to directly.
+  This replaces the `corrections` _table_ that ADR-0002 listed; the log is derived, never written to directly.
 
 ### 3.7 Change control for live elections
 
@@ -621,17 +621,17 @@ transaction.
 
 ## 5. Public read model (what `ballot_web` can read)
 
-| Relation | Visible rows |
-|---|---|
-| `tenants` | Active tenants |
-| `tenant_hostnames` | Verified hostnames of active tenants |
-| `organizations`, `tenant_organizations`, `core_criteria` | All, for active tenants |
-| `brand_assets` | Unrestricted assets, and restricted ones selected by an eligible active tenant |
-| `elections`, `methodologies`, `methodology_reviewers`, `parties`, `criteria` | Rows of `live` or `archived` elections of active tenants |
-| `assessment_revisions`, `revision_evidence`, `revision_checked_documents` | Same; the full revision history is public |
-| `source_documents` | Metadata only (title, URL, dates, archive URL, kind) for the same elections |
-| `files` and `file_blobs` | Only the `public_assets` bucket (logos) |
-| `current_revisions`, `corrections_log` | Through the rules above (`security_invoker`) |
+| Relation                                                                     | Visible rows                                                                   |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `tenants`                                                                    | Active tenants                                                                 |
+| `tenant_hostnames`                                                           | Verified hostnames of active tenants                                           |
+| `organizations`, `tenant_organizations`, `core_criteria`                     | All, for active tenants                                                        |
+| `brand_assets`                                                               | Unrestricted assets, and restricted ones selected by an eligible active tenant |
+| `elections`, `methodologies`, `methodology_reviewers`, `parties`, `criteria` | Rows of `live` or `archived` elections of active tenants                       |
+| `assessment_revisions`, `revision_evidence`, `revision_checked_documents`    | Same; the full revision history is public                                      |
+| `source_documents`                                                           | Metadata only (title, URL, dates, archive URL, kind) for the same elections    |
+| `files` and `file_blobs`                                                     | Only the `public_assets` bucket (logos)                                        |
+| `current_revisions`, `corrections_log`                                       | Through the rules above (`security_invoker`)                                   |
 
 **Never readable by `ballot_web`:**
 
@@ -645,27 +645,27 @@ The only write available to `ballot_web` is calling `app.submit_report()`.
 
 ## 6. Enforcement map
 
-| Rule (ADR-0002 / BRIEF) | Mechanism | Where |
-|---|---|---|
-| Tenant id never changes | `BEFORE UPDATE` trigger | Every tenant-owned table |
-| No cross-tenant references | Composite foreign keys | Every child table |
-| Exactly one operator | Partial unique index, plus a deferred check when a tenant becomes active | `tenant_organizations`, `tenants` |
-| Only platform admins change the operator, the methodology kind or `is_pauseai_chapter` | Trigger, plus an audit row | `tenant_organizations`, `methodologies`, `organizations` |
-| A demands methodology names its owner | `CHECK` | `methodologies` |
-| Restricted assets only for eligible tenants | Trigger on selection, with re-check when grants or the operator change | `tenant_brand_selections`, `brand_asset_grants`, `tenant_organizations` |
-| Hostname rules | Checks, partial index, no-delete trigger, platform-host rejection | `tenant_hostnames` |
-| Ratings must be valid for the kind | Trigger | `assessments`, `assessment_revisions`, `llm_suggestions` |
-| Verbatim match | Trigger computes `match_status` against `source_texts.normalized` | `draft_evidence` |
-| Only admissible source kinds | Trigger checks `methodologies.admissible_source_kinds` | `draft_evidence`, `revision_evidence` |
-| The evidence requirement | Deferred constraint trigger on revision insert | `assessment_revisions` |
-| Four-eyes; publisher identity | Trigger: `reviewer_id = current_user_id()` and not among contributors; role check | `revision_internal` |
-| Legal state transitions | Trigger | `assessments`, `elections`, `change_requests`, `reports` |
-| Published data is immutable | `UPDATE`, `DELETE` and `TRUNCATE` triggers, honouring only `app.purge` | `assessment_revisions`, `revision_*`, `audit_log`, `purge_log` |
-| Live-election structural edits need an approved change request | Trigger allows them only while `app.applying_change_request` is set by the approval function | `criteria`, `parties`, `methodologies` |
-| Publishing freeze | Trigger | `assessment_revisions` |
-| Archived elections are read-only | Trigger | Every election-scoped table |
-| Default-locale text is present when public | Trigger on publish and on going live | `assessment_revisions`, `elections` |
-| Report cap and status | `submit_report()`, using the daily counts | `reports`, `report_daily_counts` |
+| Rule (ADR-0002 / BRIEF)                                                                | Mechanism                                                                                    | Where                                                                   |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Tenant id never changes                                                                | `BEFORE UPDATE` trigger                                                                      | Every tenant-owned table                                                |
+| No cross-tenant references                                                             | Composite foreign keys                                                                       | Every child table                                                       |
+| Exactly one operator                                                                   | Partial unique index, plus a deferred check when a tenant becomes active                     | `tenant_organizations`, `tenants`                                       |
+| Only platform admins change the operator, the methodology kind or `is_pauseai_chapter` | Trigger, plus an audit row                                                                   | `tenant_organizations`, `methodologies`, `organizations`                |
+| A demands methodology names its owner                                                  | `CHECK`                                                                                      | `methodologies`                                                         |
+| Restricted assets only for eligible tenants                                            | Trigger on selection, with re-check when grants or the operator change                       | `tenant_brand_selections`, `brand_asset_grants`, `tenant_organizations` |
+| Hostname rules                                                                         | Checks, partial index, no-delete trigger, platform-host rejection                            | `tenant_hostnames`                                                      |
+| Ratings must be valid for the kind                                                     | Trigger                                                                                      | `assessments`, `assessment_revisions`, `llm_suggestions`                |
+| Verbatim match                                                                         | Trigger computes `match_status` against `source_texts.normalized`                            | `draft_evidence`                                                        |
+| Only admissible source kinds                                                           | Trigger checks `methodologies.admissible_source_kinds`                                       | `draft_evidence`, `revision_evidence`                                   |
+| The evidence requirement                                                               | Deferred constraint trigger on revision insert                                               | `assessment_revisions`                                                  |
+| Four-eyes; publisher identity                                                          | Trigger: `reviewer_id = current_user_id()` and not among contributors; role check            | `revision_internal`                                                     |
+| Legal state transitions                                                                | Trigger                                                                                      | `assessments`, `elections`, `change_requests`, `reports`                |
+| Published data is immutable                                                            | `UPDATE`, `DELETE` and `TRUNCATE` triggers, honouring only `app.purge`                       | `assessment_revisions`, `revision_*`, `audit_log`, `purge_log`          |
+| Live-election structural edits need an approved change request                         | Trigger allows them only while `app.applying_change_request` is set by the approval function | `criteria`, `parties`, `methodologies`                                  |
+| Publishing freeze                                                                      | Trigger                                                                                      | `assessment_revisions`                                                  |
+| Archived elections are read-only                                                       | Trigger                                                                                      | Every election-scoped table                                             |
+| Default-locale text is present when public                                             | Trigger on publish and on going live                                                         | `assessment_revisions`, `elections`                                     |
+| Report cap and status                                                                  | `submit_report()`, using the daily counts                                                    | `reports`, `report_daily_counts`                                        |
 
 Each row has a matching test, either in the data-rule list or in the matrix (ADR-0002).
 

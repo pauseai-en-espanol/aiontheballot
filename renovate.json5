@@ -1,0 +1,38 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: ['config:best-practices'],
+  rangeStrategy: 'bump',
+  dependencyDashboard: true,
+  timezone: 'Europe/Madrid',
+  // Supply-chain delay: keep in sync with minimumReleaseAge in pnpm-workspace.yaml
+  minimumReleaseAge: '3 days',
+  internalChecksFilter: 'strict',
+  // Security fixes bypass minimumReleaseAge and are raised immediately; OSV
+  // scanning broadens vulnerability detection beyond the platform's native alerts.
+  osvVulnerabilityAlerts: true,
+  packageRules: [
+    {
+      groupName: 'Patch and pin updates',
+      matchUpdateTypes: ['patch', 'pin'],
+      automerge: false,
+      groupSlug: 'patch-n-pin-updates',
+      labels: ['dependencies', 'patch+pin'],
+    },
+    {
+      groupName: 'Minor updates',
+      matchUpdateTypes: ['minor'],
+      automerge: false,
+      groupSlug: 'minor-updates',
+      labels: ['dependencies', 'minor'],
+    },
+    {
+      matchUpdateTypes: ['major'],
+      automerge: false,
+      labels: ['dependencies', 'major'],
+    },
+    {
+      matchManagers: ['github-actions'],
+      labels: ['github-actions'],
+    },
+  ],
+}

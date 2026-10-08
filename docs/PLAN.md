@@ -6,7 +6,7 @@ on the brief. Scope comes from [BRIEF.md](BRIEF.md); decisions are recorded in [
 ## Goal
 
 - **Launch:** the Spain pilot is public before the official campaign starts (BRIEF §10).
-- **Preview:** earlier, with real parties and criteria and every cell shown as *pending*.
+- **Preview:** earlier, with real parties and criteria and every cell shown as _pending_.
 
 Election facts live only in docs and data, never in code.
 
@@ -25,11 +25,11 @@ If review falls behind, the cut list below is applied at the preview go/no-go.
 
 Each spec is reviewed by Dani before the milestone that builds it starts:
 
-| Spec | Ready before | Status |
-|---|---|---|
-| [Data model](spec/data-model.md) | M1 | Draft for review |
-| Editorial workflow (user stories and acceptance criteria per role) | M2 | Written during M1 |
-| Public site (page content, mobile layouts, display states, share-image layouts, performance budgets) | M3 | Written during M2, with chapter input on public wording |
+| Spec                                                                                                 | Ready before | Status                                                  |
+| ---------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- |
+| [Data model](spec/data-model.md)                                                                     | M1           | Draft for review                                        |
+| Editorial workflow (user stories and acceptance criteria per role)                                   | M2           | Written during M1                                       |
+| Public site (page content, mobile layouts, display states, share-image layouts, performance budgets) | M3           | Written during M2, with chapter input on public wording |
 
 ## Milestones
 
@@ -90,8 +90,7 @@ demo, recorded in [Tracking](#tracking).
 **Demo:**
 
 - CI shows the matrix test count, all green.
-- `curl` against staging: an unknown host returns 404, an alias returns 301, the internal path prefix returns
-  404.
+- `curl` against staging: an unknown host returns 404, an alias returns 301, the internal path prefix returns 404.
 - A data-rule test that should fail is shown failing.
 - A dump is restored successfully.
 
@@ -124,7 +123,7 @@ demo, recorded in [Tracking](#tracking).
 - **Pages:**
   - party, criterion and cell detail;
   - methodology, about the operator, corrections log;
-  - *aviso legal* (legal notice), privacy policy;
+  - _aviso legal_ (legal notice), privacy policy;
   - contact and report-an-error form.
 - **Platform invariants:** the "An initiative of {operator}" line and the methodology link in the shared layout.
 - **Share images** in four sizes.
@@ -140,7 +139,7 @@ demo, recorded in [Tracking](#tracking).
 
 ### Preview
 
-**Ships:** real parties and criteria, every cell *pending*, live on `iaenlasurnas.es` with the
+**Ships:** real parties and criteria, every cell _pending_, live on `iaenlasurnas.es` with the
 `elecciones.pauseai.es` alias redirecting to it.
 
 **Gate:** a preview go/no-go. That is also where the cut list is applied if we're behind.
@@ -178,22 +177,22 @@ is done and M2 is on track.
 
 ### Gates
 
-| Gate | Check |
-|---|---|
-| During M1 | The isolation matrix runs in CI |
-| During M2 | M4 go/no-go before launch; content from the chapter on track |
-| Preview go/no-go | Ready to show the preview; apply the cut list if behind |
-| Launch go/no-go | Launch checklist signed off |
+| Gate             | Check                                                        |
+| ---------------- | ------------------------------------------------------------ |
+| During M1        | The isolation matrix runs in CI                              |
+| During M2        | M4 go/no-go before launch; content from the chapter on track |
+| Preview go/no-go | Ready to show the preview; apply the cut list if behind      |
+| Launch go/no-go  | Launch checklist signed off                                  |
 
 ## Content we need from the chapter
 
-| What | Needed for |
-|---|---|
-| Legal-notice data: legal name, NIF, address, registry entry, contact | M3 legal pages |
-| Criteria wording, methodology text, named external reviewers | Preview |
-| Rule for which parties are included, plus the party list (after candidacies are proclaimed) | Preview |
-| Privacy policy and right-of-reply policy texts | Preview |
-| Editors and reviewers invited and set up with TOTP | Preview |
+| What                                                                                        | Needed for     |
+| ------------------------------------------------------------------------------------------- | -------------- |
+| Legal-notice data: legal name, NIF, address, registry entry, contact                        | M3 legal pages |
+| Criteria wording, methodology text, named external reviewers                                | Preview        |
+| Rule for which parties are included, plus the party list (after candidacies are proclaimed) | Preview        |
+| Privacy policy and right-of-reply policy texts                                              | Preview        |
+| Editors and reviewers invited and set up with TOTP                                          | Preview        |
 
 ## If launch is at risk, cut in this order
 
@@ -240,9 +239,9 @@ as the LLM pipeline:
 
 D1 and D3–D5 are decided (see [Answered](#answered)).
 
-| # | Decision | Recommendation |
-|---|---|---|
-| D2 | Where off-node backups go | An app-owned, encrypted `pg_dump` (hourly during the campaign), sent to whichever off-node target the cluster backup plan uses (MinIO on the Mac, or Google Drive via rclone-crypt). It must work before the preview. |
+| #   | Decision                  | Recommendation                                                                                                                                                                                                        |
+| --- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D2  | Where off-node backups go | An app-owned, encrypted `pg_dump` (hourly during the campaign), sent to whichever off-node target the cluster backup plan uses (MinIO on the Mac, or Google Drive via rclone-crypt). It must work before the preview. |
 
 ## Questions for the chapter
 
@@ -254,7 +253,7 @@ D1 and D3–D5 are decided (see [Answered](#answered)).
   with counsel.
 - **Q7. Personal data.** How long should right-of-reply submissions be kept, and who is the privacy contact?
 - **Q8. Electoral law.** Has the association had advice on publishing or updating the table during the campaign,
-  and on **reflection day**? There will be a per-election *freeze* switch; whether and when to use it is the
+  and on **reflection day**? There will be a per-election _freeze_ switch; whether and when to use it is the
   chapter's call.
 - **Q9. Admissible sources.** Which kinds of source can back a rating? Options: official programmes and documents
   only, or also web pages, debate and interview statements, and social posts. The platform supports all of them
@@ -289,32 +288,32 @@ My default is in brackets.
   - the association owns the repo, domain, DNS zone, mail sender, error-tracking account and LLM key;
   - deployment is fully declarative;
   - a runbook for moving to another host ships in M5.
-  Revisit after the election.]
+    Revisit after the election.]
 - **P13. Preview deployments.** There are no per-PR previews (§8 asks for them). A staging instance built from
   `main`, plus a temporary stack spun up in CI for end-to-end tests, replaces them. [Yes.]
 
 ## Answered
 
-| Topic | Answer |
-|---|---|
-| Who builds it | Side project: Claude implements, Dani reviews |
-| Hosting | `danilupion-com`, following the gifcept pattern; Cloudflare for DNS only |
-| Domain | `iaenlasurnas.es` is already registered |
-| Licence | AGPL-3.0-or-later for code, CC BY 4.0 for our content. Party quotes are not ours to license. Names and logos are excluded. |
-| Tooling | Use the `@slango.configs` packages, and `@slango` packages where useful |
-| D3: admin host | One central host, `admin.iaenlasurnas.es`, configurable. Tenant context comes from the path; per-tenant admin hosts can be added later; platform admins stay central. |
-| D4: repo | `pauseai-en-espanol/aiontheballot` |
-| D5: stack ([ADR-0003](adr/0003-application-stack.md)) | Next.js web and admin, plus a Fastify API and worker that own all data access. Better Auth with mandatory TOTP. dbmate and Kysely, no ORM. Latest stable dependency versions. |
-| D1: non-owner DB roles | halyard `postgresql` chart 1.1.0 adds `databases[].extraRoles`: login roles that own nothing, forced `NOSUPERUSER … NOBYPASSRLS`, with `CONNECT` on their database. Our migrations (as owner) grant them table privileges. |
+| Topic                                                 | Answer                                                                                                                                                                                                                     |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Who builds it                                         | Side project: Claude implements, Dani reviews                                                                                                                                                                              |
+| Hosting                                               | `danilupion-com`, following the gifcept pattern; Cloudflare for DNS only                                                                                                                                                   |
+| Domain                                                | `iaenlasurnas.es` is already registered                                                                                                                                                                                    |
+| Licence                                               | AGPL-3.0-or-later for code, CC BY 4.0 for our content. Party quotes are not ours to license. Names and logos are excluded.                                                                                                 |
+| Tooling                                               | Use the `@slango.configs` packages, and `@slango` packages where useful                                                                                                                                                    |
+| D3: admin host                                        | One central host, `admin.iaenlasurnas.es`, configurable. Tenant context comes from the path; per-tenant admin hosts can be added later; platform admins stay central.                                                      |
+| D4: repo                                              | `pauseai-en-espanol/aiontheballot`                                                                                                                                                                                         |
+| D5: stack ([ADR-0003](adr/0003-application-stack.md)) | Next.js web and admin, plus a Fastify API and worker that own all data access. Better Auth with mandatory TOTP. dbmate and Kysely, no ORM. Latest stable dependency versions.                                              |
+| D1: non-owner DB roles                                | halyard `postgresql` chart 1.1.0 adds `databases[].extraRoles`: login roles that own nothing, forced `NOSUPERUSER … NOBYPASSRLS`, with `CONNECT` on their database. Our migrations (as owner) grant them table privileges. |
 
 ## Tracking
 
-| Milestone | Status | Demo note |
-|---|---|---|
-| M0 | In progress: plan, ADRs and data model spec drafted; TS 7 spike passed | Spike: every library type-checks under TS 7.0.2 (ADR-0003) |
-| M1 | Not started | — |
-| M2 | Not started | — |
-| M3 | Not started | — |
-| Preview | Not started | — |
-| M5 | Not started | — |
-| M4 | Gated | — |
+| Milestone | Status                                                                 | Demo note                                                  |
+| --------- | ---------------------------------------------------------------------- | ---------------------------------------------------------- |
+| M0        | In progress: plan, ADRs and data model spec drafted; TS 7 spike passed | Spike: every library type-checks under TS 7.0.2 (ADR-0003) |
+| M1        | Not started                                                            | —                                                          |
+| M2        | Not started                                                            | —                                                          |
+| M3        | Not started                                                            | —                                                          |
+| Preview   | Not started                                                            | —                                                          |
+| M5        | Not started                                                            | —                                                          |
+| M4        | Gated                                                                  | —                                                          |

@@ -36,12 +36,12 @@ cross-country views and an open-data export.
 
 **Deployables:**
 
-| Deployable | Framework | What it does | Database access |
-|---|---|---|---|
-| `apps/web` | Next.js 16 | Public site | **None**: no DB credentials, no sessions, no cookies |
-| `apps/admin` | Next.js 16 | Editorial UI | None; calls the API, forwarding the user's cookie for server-side rendering |
-| `apps/api` | Fastify | **All** data access (admin and public routes), auth, report intake, future public and open-data endpoints | Yes |
-| `apps/api` worker | Same codebase, second entrypoint | Background jobs from a Postgres-backed queue (no Redis) | Yes |
+| Deployable        | Framework                        | What it does                                                                                              | Database access                                                             |
+| ----------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `apps/web`        | Next.js 16                       | Public site                                                                                               | **None**: no DB credentials, no sessions, no cookies                        |
+| `apps/admin`      | Next.js 16                       | Editorial UI                                                                                              | None; calls the API, forwarding the user's cookie for server-side rendering |
+| `apps/api`        | Fastify                          | **All** data access (admin and public routes), auth, report intake, future public and open-data endpoints | Yes                                                                         |
+| `apps/api` worker | Same codebase, second entrypoint | Background jobs from a Postgres-backed queue (no Redis)                                                   | Yes                                                                         |
 
 **Routing (HTTPRoute path split, as in gifcept):**
 
@@ -211,12 +211,12 @@ cross-country views and an open-data export.
 
 **The four sizes (BRIEF §6):**
 
-| Size | Used for |
-|---|---|
-| 1200×630 | The `og:image` link preview |
-| 1080×1080 | Square feed posts (download button) |
+| Size      | Used for                              |
+| --------- | ------------------------------------- |
+| 1200×630  | The `og:image` link preview           |
+| 1080×1080 | Square feed posts (download button)   |
 | 1080×1350 | Portrait feed posts (download button) |
-| 1080×1920 | Stories and status (download button) |
+| 1080×1920 | Stories and status (download button)  |
 
 **Rendering:**
 
@@ -295,28 +295,29 @@ committed, since fixtures stay fictional. The spike checks reading order on real
 
 These are smaller choices. Each has a default we'll use unless the owner objects.
 
-| Topic | Default | Alternative |
-|---|---|---|
-| Job queue | pg-boss (Postgres-backed) | graphile-worker |
-| Postgres in tests | `postgres:18` container on the self-hosted runner (it already runs Docker) | `embedded-postgres` binaries |
-| Keeping the public cache fresh | An in-app cache keyed by the published version. On publish the API calls an internal revalidate endpoint on each web replica, and a cheap version check every ≤60 s is the safety net. | Next ISR with a shared cache handler |
-| Host rewrite | Next `proxy.ts`, excluding `/_next/*` and static paths | — |
-| CSP | No nonces on the cached public site; nonces only in admin | — |
-| Image architecture | Match gifcept's build approach (the runner is arm64) | — |
-| Forms and validation | zod (shared API and UI schemas) plus react-hook-form, as in gifcept | Ark field components with plain server validation |
-| Admin data fetching | Server components plus TanStack Query for interactive views, as in gifcept | Server components only |
+| Topic                          | Default                                                                                                                                                                                | Alternative                                       |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Job queue                      | pg-boss (Postgres-backed)                                                                                                                                                              | graphile-worker                                   |
+| Postgres in tests              | `postgres:18` container on the self-hosted runner (it already runs Docker)                                                                                                             | `embedded-postgres` binaries                      |
+| Keeping the public cache fresh | An in-app cache keyed by the published version. On publish the API calls an internal revalidate endpoint on each web replica, and a cheap version check every ≤60 s is the safety net. | Next ISR with a shared cache handler              |
+| Host rewrite                   | Next `proxy.ts`, excluding `/_next/*` and static paths                                                                                                                                 | —                                                 |
+| CSP                            | No nonces on the cached public site; nonces only in admin                                                                                                                              | —                                                 |
+| Image architecture             | Match gifcept's build approach (the runner is arm64)                                                                                                                                   | —                                                 |
+| Forms and validation           | zod (shared API and UI schemas) plus react-hook-form, as in gifcept                                                                                                                    | Ark field components with plain server validation |
+| Admin data fetching            | Server components plus TanStack Query for interactive views, as in gifcept                                                                                                             | Server components only                            |
 
 ## Evidence (checked when this ADR was written)
 
 - **Latest stable versions in the npm registry when this ADR was written:**
 
-  | Area | Packages |
-  |---|---|
-  | Frontend | `next` 16.4.0, `react` 19.3.0, `@pandacss/dev` 2.1.2, `@ark-ui/react` 5.39.3, `next-intl` 4.14.9 |
-  | API and data | `fastify` 5.12.5, `kysely` 0.29.6, `kysely-codegen` 0.20.0, `pg` 8.23.1, `dbmate` 2.36.0 |
-  | Auth and jobs | `better-auth` 1.7.7, `pg-boss` 12.37.0 |
-  | Testing | `@playwright/test` 1.64.0, `vitest` 5.0.3 |
-  | Toolchain | `typescript` 7.0.2, `oxlint` 1.87.0, `turbo` 2.11.7 |
+  | Area          | Packages                                                                                         |
+  | ------------- | ------------------------------------------------------------------------------------------------ |
+  | Frontend      | `next` 16.4.0, `react` 19.3.0, `@pandacss/dev` 2.1.2, `@ark-ui/react` 5.39.3, `next-intl` 4.14.9 |
+  | API and data  | `fastify` 5.12.5, `kysely` 0.29.6, `kysely-codegen` 0.20.0, `pg` 8.23.1, `dbmate` 2.36.0         |
+  | Auth and jobs | `better-auth` 1.7.7, `pg-boss` 12.37.0                                                           |
+  | Testing       | `@playwright/test` 1.64.0, `vitest` 5.0.3                                                        |
+  | Toolchain     | `typescript` 7.0.2, `oxlint` 1.87.0, `turbo` 2.11.7                                              |
+
 - **Next.js security:** the `next/og` RCE that OpenNext's release notes report affected 16.2.0–16.3.5. Any current
   16.x release is past it.
 - **Next.js 16 routing:** the old `middleware.ts` is replaced by `proxy.ts`, which runs only on Node.js.

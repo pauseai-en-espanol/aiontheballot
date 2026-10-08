@@ -25,12 +25,12 @@ ADR-0003.
 
 **What that cluster runs today** (from the `gitops` repo):
 
-| Area | Components |
-|---|---|
-| Cluster | kubeadm 1.36, **one node** (8 threads, 64 GiB), shared with Mailu, Jitsi and other apps |
-| Delivery | Argo CD (ApplicationSets), SealedSecrets, Harbor (`harbor.danilupion.com`) |
+| Area               | Components                                                                                                                               |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Cluster            | kubeadm 1.36, **one node** (8 threads, 64 GiB), shared with Mailu, Jitsi and other apps                                                  |
+| Delivery           | Argo CD (ApplicationSets), SealedSecrets, Harbor (`harbor.danilupion.com`)                                                               |
 | Networking and TLS | Envoy Gateway (`gateway-public` on `176.9.123.86`, plus a private tier), cert-manager (DNS-01 via Cloudflare), external-dns (Cloudflare) |
-| Shared services | Postgres 18.6, Mailu (with Brevo and SMTP2GO relays), Plausible |
+| Shared services    | Postgres 18.6, Mailu (with Brevo and SMTP2GO relays), Plausible                                                                          |
 
 **Gaps relevant to this project:**
 
@@ -90,14 +90,14 @@ Prices and terms were checked against official pages when this ADR was written (
   - A certificate SAN for `iaenlasurnas.es`.
 - **Risks:** a single shared node with a **bus factor of one**.
 
-| Criterion | A | B | C |
-|---|---|---|---|
-| Custom domains and TLS | Strong | Strong for zones we own; weak for tenant apexes | A gitops PR per verified host, not dynamic |
-| Share images | Good, with caps | Unverified | Good, no caps |
-| RLS ergonomics and testability | Good (Supabase stack) | Good (Supabase stack) | Best (plain Postgres, no public API) |
-| Cost and plan terms | About $50/month | About $30/month | About €0/month |
-| Volunteer maintainability | Vendor-managed | Adapter churn | Known pipeline; bus factor of one |
-| Speed to pilot | Fast, but new accounts and billing | Adapter and image risk | Fast; pipeline already exists |
+| Criterion                      | A                                  | B                                               | C                                          |
+| ------------------------------ | ---------------------------------- | ----------------------------------------------- | ------------------------------------------ |
+| Custom domains and TLS         | Strong                             | Strong for zones we own; weak for tenant apexes | A gitops PR per verified host, not dynamic |
+| Share images                   | Good, with caps                    | Unverified                                      | Good, no caps                              |
+| RLS ergonomics and testability | Good (Supabase stack)              | Good (Supabase stack)                           | Best (plain Postgres, no public API)       |
+| Cost and plan terms            | About $50/month                    | About $30/month                                 | About €0/month                             |
+| Volunteer maintainability      | Vendor-managed                     | Adapter churn                                   | Known pipeline; bus factor of one          |
+| Speed to pilot                 | Fast, but new accounts and billing | Adapter and image risk                          | Fast; pipeline already exists              |
 
 ## Decision
 

@@ -1,0 +1,19 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Wait 3 days (4320 min) after a version is published before installing it
+# (supply-chain hardening); keep in sync with minimumReleaseAge in renovate.json5.
+minimumReleaseAge: 4320
+
+minimumReleaseAgeExclude:
+  - '@slango/*'
+  - '@slango.configs/*'
+
+injectWorkspacePackages: true
+linkWorkspacePackages: true
+syncInjectedDepsAfterScripts:
+  - build
+
+# Packages allowed to run install scripts; add entries deliberately, one by one.
+allowBuilds: {}
