@@ -1,0 +1,21 @@
+{
+  "layout": {
+    "initiativeOf": "Una iniciativa de {operator}",
+    "methodology": "Metodología"
+  },
+  "rating": {
+    "meets": "Cumple",
+    "partially_meets": "Cumple parcialmente",
+    "does_not_meet": "No cumple",
+    "green": "Propuesta concreta",
+    "yellow": "Menciona la IA sin propuestas",
+    "red": "Sin posición",
+    "not_mentioned": "No lo menciona"
+  },
+  "cell": {
+    "pending": "Pendiente de evaluar"
+  },
+  "party": {
+    "programmePending": "Programa aún no publicado (comprobado el {checkedAt, date, long})"
+  }
+}

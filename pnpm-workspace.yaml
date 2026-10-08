@@ -16,4 +16,8 @@ syncInjectedDepsAfterScripts:
   - build
 
 # Packages allowed to run install scripts; add entries deliberately, one by one.
-allowBuilds: {}
+allowBuilds:
+  # native file watcher, pulled in by next-intl (same as gifcept)
+  '@parcel/watcher': true
+  # native SWC binary, pulled in by next-intl (same as gifcept)
+  '@swc/core': true

@@ -1,0 +1,21 @@
+{
+  "layout": {
+    "initiativeOf": "An initiative of {operator}",
+    "methodology": "Methodology"
+  },
+  "rating": {
+    "meets": "Meets",
+    "partially_meets": "Partially meets",
+    "does_not_meet": "Does not meet",
+    "green": "Concrete proposal",
+    "yellow": "Mentions AI, no proposals",
+    "red": "No position",
+    "not_mentioned": "Not mentioned"
+  },
+  "cell": {
+    "pending": "Pending assessment"
+  },
+  "party": {
+    "programmePending": "Programme not yet published (checked on {checkedAt, date, long})"
+  }
+}
