@@ -123,6 +123,8 @@ fix them rather than copy them.
   - Runs on the `pauseai-en-espanol` self-hosted runner, with actions pinned by SHA.
   - Changesets bump versions, `turbo docker:push` pushes images, and a pinned `yq` writes the image tags into the
     umbrella chart's `values.yaml`.
+  - One release workflow runs after CI passes on `main`, on the exact commit CI tested. It rebuilds each deployable
+    whose package version is ahead of its tag in the chart, so a failed or skipped release is picked up by the next.
   - No `pull_request_target` workflows.
   - **CI never holds cluster credentials;** Argo CD pulls.
 - **Promotion:**

@@ -1,0 +1,8 @@
+name: Install dependencies
+description: Install pnpm dependencies from the lockfile
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile --prefer-offline

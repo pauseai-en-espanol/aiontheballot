@@ -1,0 +1,17 @@
+name: Setup Node
+description: Install Node.js (version from .nvmrc)
+runs:
+  using: composite
+  steps:
+    # Node 26's prebuilt Linux binary links libatomic.so.1, which the summerwind runner image doesn't ship
+    # (same workaround as gifcept). Drop once the runner image bakes it in.
+    - name: Ensure libatomic is present
+      shell: bash
+      run: |
+        if ! ldconfig -p | grep -q libatomic.so.1; then
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libatomic1
+        fi
+    # No `cache: pnpm`: the self-hosted runners keep the pnpm store on a persistent volume.
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: .nvmrc

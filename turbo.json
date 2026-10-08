@@ -33,7 +33,8 @@
     },
     "test:db": {
       "dependsOn": ["^build"],
-      "cache": false
+      "cache": false,
+      "passThroughEnv": ["TEST_DATABASE_URL", "TEST_SUPERUSER_DATABASE_URL"]
     },
     "docker:build": {
       "cache": false

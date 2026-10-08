@@ -1,0 +1,7 @@
+name: Setup pnpm
+description: Install pnpm (the version pinned in package.json packageManager)
+runs:
+  using: composite
+  steps:
+    # Run after setup-node: without Node >= 22.13 on PATH, pnpm/action-setup bootstraps a broken binary.
+    - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
