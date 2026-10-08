@@ -17,7 +17,8 @@
     "lint": "oxlint --type-aware --max-warnings 0 .",
     "lint:fix": "oxlint --type-aware --fix --max-warnings 0 .",
     "test": "vitest --run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepare": "[ \"$PACKAGED\" = true ] && echo 'Skipping prepare for packaged production dependencies install' || tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@pandacss/dev": "2.1.1"
