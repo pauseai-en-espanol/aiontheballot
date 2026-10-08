@@ -17,5 +17,8 @@
   },
   "party": {
     "programmePending": "Programme not yet published (checked on {checkedAt, date, long})"
+  },
+  "home": {
+    "comingSoon": "Coming soon"
   }
 }
