@@ -36,6 +36,11 @@
       "cache": false,
       "passThroughEnv": ["TEST_DATABASE_URL", "TEST_SUPERUSER_DATABASE_URL"]
     },
+    "test:e2e": {
+      "dependsOn": ["^build", "@ballot/web#build", "@ballot/admin#build", "@ballot/api#build"],
+      "cache": false,
+      "passThroughEnv": ["CI", "PLAYWRIGHT_*"]
+    },
     "docker:build": {
       "cache": false
     },

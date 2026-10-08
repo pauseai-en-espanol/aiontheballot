@@ -150,13 +150,58 @@ jobs:
             exit 1
           fi
 
+  e2e:
+    name: E2E smoke
+    # After the checks, so the production builds come from the Turborepo cache they just saved.
+    needs: checks
+    runs-on: [self-hosted, juggernaut]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/install-pnpm-dependencies
+
+      - name: Cache Turborepo
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('e2e/package.json') }}
+
+      # Headless Chromium only, plus the system libraries it needs (apt, every run; the browser itself is cached).
+      - name: Install Chromium
+        run: pnpm --filter @ballot/e2e exec playwright install --with-deps --only-shell chromium
+
+      - name: E2E smoke tests
+        run: pnpm test:e2e
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
+
   # Renovate doesn't write changesets. Once the checks pass, add a patch changeset for each package the PR touches
   # and amend it into the PR (same approach as gifcept, without pull_request_target: Renovate branches live in this
   # repository, so a pull_request run can get a write token). A push made with GITHUB_TOKEN doesn't trigger
   # workflows, so the amended head has no check runs of its own; its code is what the checks above just tested.
   renovate-changeset:
     name: Renovate changeset
-    needs: [checks, database]
+    needs: [checks, database, e2e]
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login == 'renovate[bot]' &&

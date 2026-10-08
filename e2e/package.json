@@ -1,0 +1,25 @@
+{
+  "name": "@ballot/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright end-to-end tests, run against production builds of the apps",
+  "type": "module",
+  "scripts": {
+    "build:check": "tsc --noEmit",
+    "lint": "oxlint --type-aware --max-warnings 0 .",
+    "lint:fix": "oxlint --type-aware --fix --max-warnings 0 .",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@ballot/i18n": "workspace:*",
+    "@playwright/test": "1.63.0",
+    "@slango.configs/lint-staged": "2.0.8",
+    "@slango.configs/oxlint": "0.1.12",
+    "@slango.configs/typescript": "3.0.0",
+    "@types/node": "26.6.4",
+    "oxlint": "1.87.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "typescript": "7.0.2"
+  }
+}

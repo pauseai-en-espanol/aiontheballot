@@ -14,6 +14,9 @@ the checklists.
    pnpm build:check
    ```
 
+   For changes to the apps, also run `pnpm test:e2e` (Playwright, against production builds). Install its browser
+   once with `pnpm --filter @ballot/e2e exec playwright install chromium`.
+
 3. Add a changeset for any change that affects a package (`pnpm release:note`). Use `pnpm release:empty` for docs or
    CI-only changes. The pre-push hook checks for one.
 4. Keep PRs focused on one topic, and include what you ran and what it showed.

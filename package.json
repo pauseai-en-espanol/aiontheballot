@@ -20,6 +20,7 @@
     "test": "turbo test",
     "test:serial": "turbo test --concurrency=1",
     "test:db": "turbo test:db",
+    "test:e2e": "turbo test:e2e",
     "format": "prettier --ignore-unknown --write .",
     "format:check": "prettier --ignore-unknown --check .",
     "check": "turbo check",
