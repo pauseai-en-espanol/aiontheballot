@@ -7,7 +7,7 @@
 
 The brief asked for one ADR covering stack and hosting. The owner wants to choose the application stack a little
 later, so this ADR covers **hosting and delivery** only. The framework, auth library and tooling choices are in
-ADR-0003, which is still *Pending*.
+ADR-0003.
 
 ## Context
 
@@ -106,9 +106,9 @@ fix them rather than copy them.
 
 ### Repository, chart and CD
 
-- **Repository:** decision D4; proposed home is the `pauseai-en-espanol` GitHub org.
-- **Umbrella chart:** `helm-charts/ballot`, with one subchart per deployable (`apps/*/helm-chart`), a PreSync
-  migration Job, and the backup CronJob.
+- **Repository:** `pauseai-en-espanol/aiontheballot`.
+- **Umbrella chart:** `helm-charts/ballot`, with one subchart per deployable (`apps/*/helm-chart`: web, admin,
+  API, worker), a PreSync migration Job, and the backup CronJob.
 - **Routes:** the halyard `route:` convention (`enabled`/`parentRefs`/`hostnames`/`annotations`) on
   `gateway-public`.
 - **Pods:**
@@ -179,7 +179,8 @@ fix them rather than copy them.
 - Public pages are served from an in-app cache keyed by the published version. A page view never queries
   Postgres.
 - `Cache-Control` with `stale-while-revalidate` for browsers. Images use content-hash URLs marked `immutable`.
-- The public app runs at least 2 replicas (`pauseai-es` precedent) with explicit resource requests and limits.
+- The public web and the API each run at least 2 replicas (`pauseai-es` precedent), with explicit resource
+  requests and limits. Background jobs run in the separate worker (ADR-0003).
 - An Envoy Gateway `BackendTrafficPolicy` applies a per-IP rate limit to the report and image endpoints. Client
   IPs reach the gateway intact through Cilium.
 - An M5 load test on staging measures requests per second for HTML and for images, and how much uplink headroom
@@ -204,7 +205,8 @@ The dashboard toggle alone is not enough, because:
   - UptimeRobot Free allows commercial use and gives 50 monitors at 5-minute intervals.
     ([terms](https://uptimerobot.com/terms/))
   - One monitor per public hostname, including aliases (which should return 301). Alerts go to Telegram.
-- **Error tracking:** decided in ADR-0003.
+- **Error tracking:** self-hosted GlitchTip, using the Sentry SDKs. The apps are instrumented with OpenTelemetry
+  from day one, ready for a future cluster-wide OTel backend (ADR-0003).
 - **LLM extraction (M4):** the Anthropic API behind an `Extractor` interface.
   - Default model `claude-opus-5-5`, at $4 / $20 per million tokens.
   - The programme text is prompt-cached across criteria.

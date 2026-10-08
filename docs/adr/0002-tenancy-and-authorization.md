@@ -37,21 +37,23 @@ The UI repeats some checks, but only for user experience.
 | Role | Used by | Notes |
 |---|---|---|
 | `ballot_owner` | Migration and backup jobs only | Owns the schemas; never used by the running apps |
-| `ballot_admin` | Admin app | Runtime role |
-| `ballot_web` | Public app | Runtime role |
+| `ballot_admin` | API admin routes and the worker | Runtime role |
+| `ballot_web` | API public routes (read-only) | Runtime role |
+| `ballot_worker` | Background worker | Runtime role; only job tables, scoped to the job's tenant |
 
-Both runtime roles are `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB` and own nothing. A catalog
+All runtime roles are `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB` and own nothing. A catalog
 meta-test fails if this ever changes.
 
 ### 3. Actor context per transaction
 
-- The admin server verifies the session, then runs every database transaction through `withActor(actor, fn)`.
+- Only the API (ADR-0003) talks to Postgres. It verifies the session, then runs every database transaction through
+  `withActor(actor, fn)`.
 - `withActor` sets `SET LOCAL app.user_id` and `SET LOCAL app.aal`.
 - `private.current_user_id()` returns NULL when no actor is set, so every member policy **denies by default**.
 - `ballot_web` never sets an actor.
 
-**Trust boundary:** the admin server is trusted to establish *who* the user is. It is never trusted to decide
-*what* they may do. A compromised admin server could impersonate users. We accept that risk; the immutable audit
+**Trust boundary:** the API is trusted to establish *who* the user is. It is never trusted to decide
+*what* they may do. A compromised API could impersonate users. We accept that risk; the immutable audit
 log makes it visible (T23).
 
 ### 4. Tenant identity
@@ -131,8 +133,9 @@ A revision with `change_kind='withdrawal'` returns the cell to *pending* and log
 
 ### 14. Immutability, with one purge path
 
-- Triggers reject `UPDATE`, `DELETE` and `TRUNCATE` on revisions, revision evidence, corrections and
-  `audit_log`. These triggers fire even for the owner role.
+- Triggers reject `UPDATE`, `DELETE` and `TRUNCATE` on revisions and their child tables, `audit_log` and
+  `purge_log`. These triggers fire even for the owner role. The corrections log is a view derived from revisions
+  and approved change requests, so it can't be edited either.
 - The only exception is `private.purge_tenant(tenant_id)`:
   - Only `ballot_owner` can execute it.
   - It sets a transaction-local `app.purge` flag that the triggers honour, and writes a platform-level purge record.
@@ -141,9 +144,11 @@ A revision with `change_kind='withdrawal'` returns the cell to *pending* and log
 
 ### 15. The Host header never authorizes
 
-- The public app has no session code and sets no cookies.
-- The admin app runs on one central host and uses host-only `__Host-` cookies with
-  `Secure; HttpOnly; SameSite=Lax`.
+- The public web app has no session code, no DB credentials and sets no cookies.
+- The admin runs on one central host (ADR-0003), with the API under `/api/*` on the same host. Sessions use
+  host-only `__Host-` cookies with `Secure; HttpOnly; SameSite=Lax`.
+- The tenant being administered comes from the URL path (`/t/{slug}/…`), never from the host. Per-tenant admin
+  hosts may be added later for that tenant's members; platform admins only ever use the central host.
 
 ## Capabilities by role
 
@@ -194,6 +199,19 @@ These platform-wide rows are also public: active `tenants`, verified `tenant_hos
 - A TypeScript port of the function is tested against the same fixture file, so the UI and the database agree.
 - **Exception:** sources with no extractable text (scans, video) can use `match_status='attested'`. That requires a
   stored file, and the attester must be someone other than the publisher.
+
+**Evidence source kinds**
+
+- Each source document has a `kind`: `pdf`, `web_page`, `social_post`, `video`, `audio` or `party_submission`.
+- Each piece of evidence has a generic **locator**:
+  - a page or section for documents;
+  - an anchor for web pages;
+  - a start and end timestamp for video and audio.
+- `pdf` and `web_page` sources are **verbatim-matched** automatically against their extracted text.
+- Social posts, video and audio use the **attested** path: a stored screenshot or clip, plus a second person.
+- The public page shows whether each quote was matched or attested.
+- `party_submission` is for the future party questionnaire. The schema supports it now; the feature comes later.
+- Which kinds a tenant's table accepts is a **methodology setting**, chosen by the operator.
 
 **Four-eyes review**
 
@@ -289,7 +307,7 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 | A7 | Attacker with control over DNS or a domain |
 | A8 | Hostile content: party PDFs and HTML, including prompt injection |
 | A9 | Supply chain or CI compromise |
-| A10 | Compromised admin server |
+| A10 | Compromised API |
 
 **Threats**
 
@@ -317,7 +335,7 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 | T20 | Report spam or denial of service | A1 | A single function as the only write path; per-tenant cap; honeypot; Envoy per-IP rate limit | Integration tests |
 | T21 | A retired or alias domain expires and someone else buys it | A7 | Association-owned registrar with auto-renew; hostnames never deleted or detached; uptime monitor per hostname | Ops checklist |
 | T22 | Per-tenant export or purge touches another tenant | — | Owner-only `purge_tenant`; tenant-scoped export | Integration tests |
-| T23 | Compromised admin server impersonates users | A10 | Accepted. Small admin surface; immutable audit log; MFA; alert on unusual publish volume | Audit review |
+| T23 | Compromised API impersonates users | A10 | Accepted. Small admin surface; immutable audit log; MFA; alert on unusual publish volume | Audit review |
 | T24 | A live criterion is reworded, changing what already-published ratings mean | A5 | Change requests need four-eyes and create a corrections entry | DB-rule tests |
 
 ## Test matrix (BRIEF §8)
@@ -359,7 +377,7 @@ Expected outcomes are written as data in `db/tests/rls/matrix.ts`, and the indiv
 from it.
 
 - **Principals:**
-  - `ballot_web` (the public app);
+  - `ballot_web` (the API's public routes);
   - `ballot_admin` with no actor set;
   - a user with no membership;
   - editor@A, reviewer@A, country_admin@A and platform_admin, **each at aal2 and at aal1**;
@@ -371,16 +389,9 @@ from it.
   - select, insert, update and delete;
   - plus **column-level updates** of sensitive columns: `status`, `author_id`, `published_by`, `tenant_id`,
     `tenants.active` and `methodologies.kind`.
-- **Relations:** every table in `app.*`, plus **every function a runtime role can execute**. The tables are:
-  - tenants, tenant_hostnames, hostname_verifications, organizations, tenant_organizations, platform_admins,
-  - memberships, invitations,
-  - elections, methodologies, methodology_reviewers, parties, criteria, core_criteria,
-  - assessments, draft_evidence, review_events, assessment_revisions, revision_evidence,
-    revision_checked_documents, change_requests, corrections,
-  - source_documents, source_texts, files, file_blobs,
-  - reports, llm_runs, llm_suggestions,
-  - brand_assets, brand_asset_grants, tenant_brand_selections,
-  - audit_log.
+- **Relations:** every table and view in `app.*`, plus **every function a runtime role can execute**. The
+  authoritative list is [the data model spec](../spec/data-model.md) (and, once they exist, the migrations). The
+  catalog meta-test fails if `matrix.ts` and the database disagree.
 
 ### Expected outcomes by table class
 

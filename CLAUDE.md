@@ -3,8 +3,8 @@
 A multi-tenant platform that publishes sourced comparisons of political parties' positions on frontier-AI risk.
 
 - Scope and constraints: `docs/BRIEF.md` (source of truth)
-- Decisions: `docs/adr/` (0001 hosting, 0002 tenancy and authorization, 0003 application stack, pending)
-- Milestones, cut list and open decisions: `docs/PLAN.md`
+- Decisions: `docs/adr/` (0001 hosting, 0002 tenancy and authorization, 0003 application stack)
+- Milestones, cut list and open decisions: `docs/PLAN.md` · Specs (data model, workflows, pages): `docs/spec/`
 
 ## Non-negotiables
 
@@ -21,6 +21,14 @@ A multi-tenant platform that publishes sourced comparisons of political parties'
   for user experience only.
 - **Accessibility:** ratings are never shown by colour alone (icon + text + colour). Target WCAG 2.2 AA.
 - **Git:** no commit, push or branch operations without explicit permission.
+
+## Layout
+
+- `apps/web`: public Next.js site (no DB access, no sessions) · `apps/admin`: admin Next.js UI
+- `apps/api`: Fastify API and worker; the only code that touches Postgres (via `packages/db`)
+- `packages/db`: Kysely, generated types, `withActor` · `packages/domain`: pure shared logic
+- `packages/ui`: Panda preset, Ark UI components, fixed rating visuals · `packages/og`: share-image templates
+- `db/migrations/*.sql` (dbmate) and `db/schema.sql` (generated dump, review it in every PR)
 
 ## Commands
 
@@ -41,9 +49,10 @@ These become available once the M0 skeleton lands.
 ## Conventions
 
 - **TypeScript:** version 7, strict, via `@slango.configs/*`. ESM. No `any`.
+- **Dependencies:** latest stable only (no alpha, beta, rc or canary), checked on npm when added.
 - **Migrations:** SQL only, forward-only (never edit one once merged), one concern each.
 - **Tests:** next to the code as `*.spec.ts`. Every new invariant or policy gets its test first.
-- **i18n:** UI strings go through the i18n package (Spanish first). Content fields are localized jsonb.
+- **i18n:** UI strings via `packages/i18n` (next-intl): English source, Spanish mandatory. Content is localized jsonb.
 - **Deployment (ADR-0001):** Helm chart in `helm-charts/ballot`, deployed by Argo CD on the `danilupion-com`
   cluster. Never tag images `:latest`. Every pod sets resource requests and limits and a securityContext.
 - **Docs:** Markdown lines under 120 characters. Any change to the stack, tenancy or security model needs a new

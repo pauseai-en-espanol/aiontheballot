@@ -21,6 +21,16 @@ This is a side project:
 
 If review falls behind, the cut list below is applied at the preview go/no-go.
 
+## Specs, written just in time
+
+Each spec is reviewed by Dani before the milestone that builds it starts:
+
+| Spec | Ready before | Status |
+|---|---|---|
+| [Data model](spec/data-model.md) | M1 | Draft for review |
+| Editorial workflow (user stories and acceptance criteria per role) | M2 | Written during M1 |
+| Public site (page content, mobile layouts, display states, share-image layouts, performance budgets) | M3 | Written during M2, with chapter input on public wording |
+
 ## Milestones
 
 The milestones run in order. M2 and M3 overlap, and M4 is gated. Every milestone ends with green CI and a short
@@ -30,7 +40,9 @@ demo, recorded in [Tracking](#tracking).
 
 **Ships:**
 
-- **Decisions:** ADRs merged, D2–D5 decided, ADR-0003 decided.
+- **First task: TypeScript 7 spike.** Confirm Kysely, kysely-codegen, Better Auth and Fastify type-check under
+  tsgo (ADR-0003).
+- **Decisions:** the remaining small choices in ADR-0003 settled, and D2 decided.
 - **Repo**, set up on the slango toolchain:
   - pnpm and Turbo, TypeScript 7, oxlint, Prettier, Vitest;
   - lint-staged and husky, Changesets;
@@ -56,7 +68,8 @@ demo, recorded in [Tracking](#tracking).
   - the ApplicationSet: production tracks the `production` branch, staging tracks `main`;
   - the AppProject entry and SealedSecrets;
   - DNS and a certificate SAN for `iaenlasurnas.es`;
-  - `ballot_web` and `ballot_admin` as `extraRoles` of the `ballot` database (D1).
+  - `ballot_web`, `ballot_admin` and `ballot_worker` as `extraRoles` of the `ballot` database (D1);
+  - GlitchTip (web, worker, and a database on the shared Postgres).
 
 **Demo:** a PR goes green in CI, and a hello-world page loads on the staging host over TLS through
 `gateway-public`.
@@ -88,8 +101,8 @@ demo, recorded in [Tracking](#tracking).
 
 - **Access:** sign-in by invitation plus TOTP; a tenant switcher.
 - **Content setup:** create and edit elections, methodology, external reviewers, parties and criteria.
-- **Sources:** upload into `app.files`, with PDF text extraction mapped to pages, a SHA-256 hash and an archive
-  URL.
+- **Sources:** PDFs and web pages, stored in `app.files` with extracted text (pages or sections), a SHA-256 hash
+  and an archive snapshot. Other kinds go through the attested path.
 - **Cell editing:** a cell editor that gives live feedback on whether each quote matches the source verbatim.
 - **Workflow:**
   - submit, review, publish, reject and withdraw;
@@ -204,6 +217,18 @@ is done and M2 is on track.
 - CSP and security headers.
 - Off-node backups and the restore drill.
 
+## Later: an MCP server for feeding in information
+
+An MCP server would let AI tools feed information into the platform, such as programme passages and draft
+evidence. It comes after launch, and after M4. It would be another client of the Fastify API, under the same rules
+as the LLM pipeline:
+
+- **It acts as a real actor:** through `withActor`, using a user-delegated token or a service account with a
+  membership.
+- **It can only create drafts and suggestions, never publish.** Four-eyes review and the verbatim-match triggers
+  apply.
+- **Everything it writes carries provenance** (tool, run) and goes to the audit log.
+
 ## During the campaign
 
 - Check for new party programmes and update cells as they appear.
@@ -213,14 +238,11 @@ is done and M2 is on track.
 
 ## Open decisions for Dani
 
-D1 is decided (see [Answered](#answered)).
+D1 and D3–D5 are decided (see [Answered](#answered)).
 
 | # | Decision | Recommendation |
 |---|---|---|
 | D2 | Where off-node backups go | An app-owned, encrypted `pg_dump` (hourly during the campaign), sent to whichever off-node target the cluster backup plan uses (MinIO on the Mac, or Google Drive via rclone-crypt). It must work before the preview. |
-| D3 | The central admin host | `admin.iaenlasurnas.es` (it's a config value, so it can change later) |
-| D4 | Where the repo lives | The `pauseai-en-espanol` GitHub org (owned by the association; its runner already reaches Harbor) |
-| D5 | The application stack ([ADR-0003](adr/0003-application-stack.md)) | Lean: Next.js only, plus Better Auth, SQL migrations and Kysely |
 
 ## Questions for the chapter
 
@@ -234,6 +256,10 @@ D1 is decided (see [Answered](#answered)).
 - **Q8. Electoral law.** Has the association had advice on publishing or updating the table during the campaign,
   and on **reflection day**? There will be a per-election *freeze* switch; whether and when to use it is the
   chapter's call.
+- **Q9. Admissible sources.** Which kinds of source can back a rating? Options: official programmes and documents
+  only, or also web pages, debate and interview statements, and social posts. The platform supports all of them
+  (PDFs and web pages are matched automatically; the rest need a second person to attest them). Restricting to
+  official documents is the most defensible.
 
 ## Pushback and clarifications on the brief
 
@@ -276,14 +302,16 @@ My default is in brackets.
 | Domain | `iaenlasurnas.es` is already registered |
 | Licence | AGPL-3.0-or-later for code, CC BY 4.0 for our content. Party quotes are not ours to license. Names and logos are excluded. |
 | Tooling | Use the `@slango.configs` packages, and `@slango` packages where useful |
-| Stack | Decided a little later ([ADR-0003](adr/0003-application-stack.md)) |
+| D3: admin host | One central host, `admin.iaenlasurnas.es`, configurable. Tenant context comes from the path; per-tenant admin hosts can be added later; platform admins stay central. |
+| D4: repo | `pauseai-en-espanol/aiontheballot` |
+| D5: stack ([ADR-0003](adr/0003-application-stack.md)) | Next.js web and admin, plus a Fastify API and worker that own all data access. Better Auth with mandatory TOTP. dbmate and Kysely, no ORM. Latest stable dependency versions. |
 | D1: non-owner DB roles | halyard `postgresql` chart 1.1.0 adds `databases[].extraRoles`: login roles that own nothing, forced `NOSUPERUSER … NOBYPASSRLS`, with `CONNECT` on their database. Our migrations (as owner) grant them table privileges. |
 
 ## Tracking
 
 | Milestone | Status | Demo note |
 |---|---|---|
-| M0 | In progress: plan and ADRs drafted | — |
+| M0 | In progress: plan, ADRs and data model spec drafted; TS 7 spike passed | Spike: every library type-checks under TS 7.0.2 (ADR-0003) |
 | M1 | Not started | — |
 | M2 | Not started | — |
 | M3 | Not started | — |
