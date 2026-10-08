@@ -14,7 +14,9 @@
     "lint:fix": "oxlint --type-aware --fix --max-warnings 0 .",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:coverage": "vitest --run --coverage"
+    "test:coverage": "vitest --run --coverage",
+    "docker:build": "docker buildx build ${DOCKER_PLATFORM:+--platform=$DOCKER_PLATFORM} -t \"${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}ballot/api:${npm_package_version}${DOCKER_TAG_SUFFIX:+.${DOCKER_TAG_SUFFIX}}\" -f Dockerfile ../..",
+    "docker:push": "docker push \"${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}ballot/api:${npm_package_version}${DOCKER_TAG_SUFFIX:+.${DOCKER_TAG_SUFFIX}}\""
   },
   "dependencies": {
     "fastify": "5.12.5"

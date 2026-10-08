@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - db
 
 # Wait 3 days (4320 min) after a version is published before installing it
 # (supply-chain hardening); keep in sync with minimumReleaseAge in renovate.json5.

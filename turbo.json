@@ -34,6 +34,14 @@
     "test:db": {
       "dependsOn": ["^build"],
       "cache": false
+    },
+    "docker:build": {
+      "cache": false
+    },
+    "docker:push": {
+      "dependsOn": ["docker:build"],
+      "cache": false
     }
-  }
+  },
+  "globalPassThroughEnv": ["DOCKER_REGISTRY", "DOCKER_PLATFORM", "DOCKER_TAG_SUFFIX"]
 }

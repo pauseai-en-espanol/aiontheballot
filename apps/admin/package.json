@@ -6,14 +6,16 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently 'next dev -p 3002' 'panda --watch'",
-    "build": "next build",
+    "build": "panda codegen && next build",
     "build:check": "next typegen && tsc --noEmit",
     "start": "next start -p 3002",
     "lint": "oxlint --type-aware --max-warnings 0 .",
     "lint:fix": "oxlint --type-aware --fix --max-warnings 0 .",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "prepare": "[ \"$PACKAGED\" = true ] && echo 'Skipping prepare for packaged production dependencies install' || panda codegen"
+    "prepare": "[ \"$PACKAGED\" = true ] && echo 'Skipping prepare for packaged production dependencies install' || panda codegen",
+    "docker:build": "docker buildx build ${DOCKER_PLATFORM:+--platform=$DOCKER_PLATFORM} -t \"${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}ballot/admin:${npm_package_version}${DOCKER_TAG_SUFFIX:+.${DOCKER_TAG_SUFFIX}}\" -f Dockerfile ../..",
+    "docker:push": "docker push \"${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}ballot/admin:${npm_package_version}${DOCKER_TAG_SUFFIX:+.${DOCKER_TAG_SUFFIX}}\""
   },
   "dependencies": {
     "@ballot/i18n": "workspace:*",

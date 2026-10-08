@@ -1,0 +1,10 @@
+{
+  "name": "@ballot/migrations",
+  "version": "0.0.0",
+  "private": true,
+  "description": "SQL migrations (dbmate), shipped as the image the chart's PreSync Job runs",
+  "scripts": {
+    "docker:build": "docker buildx build ${DOCKER_PLATFORM:+--platform=$DOCKER_PLATFORM} -t \"${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}ballot/migrations:${npm_package_version}${DOCKER_TAG_SUFFIX:+.${DOCKER_TAG_SUFFIX}}\" -f Dockerfile ..",
+    "docker:push": "docker push \"${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}ballot/migrations:${npm_package_version}${DOCKER_TAG_SUFFIX:+.${DOCKER_TAG_SUFFIX}}\""
+  }
+}

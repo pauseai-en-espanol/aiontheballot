@@ -34,7 +34,9 @@
     "release:empty": "changeset add --empty",
     "release:bump": "changeset version",
     "release:check": "changeset status --since=origin/main",
-    "prepare": "[ \"$PACKAGED\" = true ] && echo 'Skipping prepare for packaged production dependencies install' || husky"
+    "prepare": "[ \"$PACKAGED\" = true ] && echo 'Skipping prepare for packaged production dependencies install' || husky",
+    "docker:build": "turbo docker:build",
+    "docker:push": "turbo docker:push"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",

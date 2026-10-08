@@ -1,0 +1,19 @@
+# Keep build contexts small, and keep local state out of images.
+.git
+.husky
+.idea
+.turbo
+**/.DS_Store
+.pnpm-store
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/styled-system
+**/*.tsbuildinfo
+docs
+
+# Local env files must never reach an image build (next build would load them).
+.env
+**/.env*
+!.env.example
