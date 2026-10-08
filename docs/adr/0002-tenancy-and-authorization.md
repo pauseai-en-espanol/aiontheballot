@@ -469,7 +469,8 @@ And each of these must succeed:
 - Platform `/{slug}` → 301 when the tenant has a custom canonical host.
 - Edge cases: ports, mixed case, a trailing dot, IDNs, and `www.`
 
-**Integration tests** against staging:
+**Integration tests** in the CI end-to-end stack, which has the fictional seeds (there is no staging, ADR-0001).
+The cases that need no tenant data also run against production:
 
 - Status codes and `Location` headers are correct.
 - A spoofed `X-Forwarded-Host` has no effect.

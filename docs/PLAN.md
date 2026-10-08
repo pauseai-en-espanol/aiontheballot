@@ -65,13 +65,13 @@ demo, recorded in [Tracking](#tracking).
   - an umbrella Helm chart with `route:`;
   - a Harbor project with pull and push robots.
 - **A gitops PR** that adds:
-  - the ApplicationSet: production tracks the `production` branch, staging tracks `main`;
+  - the ApplicationSet: one environment, production, tracking `main` until the preview (no staging, ADR-0001);
   - the AppProject entry and SealedSecrets;
   - DNS and a certificate SAN for `iaenlasurnas.es`;
   - `ballot_web`, `ballot_admin` and `ballot_worker` as `extraRoles` of the `ballot` database (D1);
-  - GlitchTip (web, worker, and a database on the shared Postgres).
+  - GlitchTip (web, worker, and a database on the shared Postgres), in a follow-up gitops change.
 
-**Demo:** a PR goes green in CI, and a hello-world page loads on the staging host over TLS through
+**Demo:** a PR goes green in CI, and the hello-world page loads on `iaenlasurnas.es` over TLS through
 `gateway-public`.
 
 ### M1: Schema, RLS, routing and backups
@@ -84,13 +84,14 @@ demo, recorded in [Tracking](#tracking).
   - triggers for the data rules and platform invariants.
 - **Seeds:** fictional seed data, with a guard that refuses to run against production.
 - **Tests:** the generated isolation matrix and the catalog meta-tests (ADR-0002).
-- **Routing:** `resolve()`, plus integration tests on staging.
+- **Routing:** `resolve()`, plus integration tests in the CI end-to-end stack, which has the fictional seeds.
 - **Backups:** the backup CronJob (D2) **and a restore test**.
 
 **Demo:**
 
 - CI shows the matrix test count, all green.
-- `curl` against staging: an unknown host returns 404, an alias returns 301, the internal path prefix returns 404.
+- `curl` against production: an unknown host returns 404 and the internal path prefix returns 404. Alias 301s
+  need seeded tenants, so they are shown in the CI end-to-end stack.
 - A data-rule test that should fail is shown failing.
 - A dump is restored successfully.
 
@@ -142,6 +143,8 @@ demo, recorded in [Tracking](#tracking).
 **Ships:** real parties and criteria, every cell _pending_, live on `iaenlasurnas.es` with the
 `elecciones.pauseai.es` alias redirecting to it.
 
+**Before it:** production switches from `main` to the `production` branch (ADR-0001), and D6 is decided.
+
 **Gate:** a preview go/no-go. That is also where the cut list is applied if we're behind.
 
 ### M5: Hardening and launch
@@ -150,8 +153,8 @@ demo, recorded in [Tracking](#tracking).
 
 - **Review:** a second person reviews the RLS policies and the matrix.
 - **Security audit:** headers, CSP, dependencies and secrets.
-- **Load test on staging:** requests per second for HTML and for images, and how much of the uplink they use.
-- **Cloudflare-proxy contingency:** tested once on staging.
+- **Load test** (where: D6): requests per second for HTML and for images, and how much of the uplink they use.
+- **Cloudflare-proxy contingency:** tested once (where: D6).
 - **Accessibility:** a manual pass.
 - **Backups:** a full **restore drill**.
 - **Runbooks:** incidents, corrections, reflection-day freeze, moving to other hosting, domain renewal.
@@ -239,9 +242,10 @@ as the LLM pipeline:
 
 D1 and D3–D5 are decided (see [Answered](#answered)).
 
-| #   | Decision                  | Recommendation                                                                                                                                                                                                        |
-| --- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D2  | Where off-node backups go | An app-owned, encrypted `pg_dump` (hourly during the campaign), sent to whichever off-node target the cluster backup plan uses (MinIO on the Mac, or Google Drive via rclone-crypt). It must work before the preview. |
+| #   | Decision                                                      | Recommendation                                                                                                                                                                                                                                                |
+| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D2  | Where off-node backups go                                     | An app-owned, encrypted `pg_dump` (hourly during the campaign), sent to whichever off-node target the cluster backup plan uses (MinIO on the Mac, or Google Drive via rclone-crypt). It must work before the preview.                                         |
+| D6  | Where pre-production checks run, now that there is no staging | Rehearse each migration against the latest backup restored into a throwaway database (it doubles as the restore test). Run the M5 load test and the Cloudflare-contingency test against production before launch, at a quiet hour. Decide before the preview. |
 
 ## Questions for the chapter
 
@@ -289,8 +293,9 @@ My default is in brackets.
   - deployment is fully declarative;
   - a runbook for moving to another host ships in M5.
     Revisit after the election.]
-- **P13. Preview deployments.** There are no per-PR previews (§8 asks for them). A staging instance built from
-  `main`, plus a temporary stack spun up in CI for end-to-end tests, replaces them. [Yes.]
+- **P13. Preview deployments.** There are no per-PR previews (§8 asks for them). A temporary stack spun up in CI
+  for end-to-end tests replaces them, and UI demos run locally with the fictional seeds. [Yes. The staging
+  instance first planned here was dropped (ADR-0001).]
 
 ## Answered
 
@@ -305,15 +310,16 @@ My default is in brackets.
 | D4: repo                                              | `pauseai-en-espanol/aiontheballot`                                                                                                                                                                                         |
 | D5: stack ([ADR-0003](adr/0003-application-stack.md)) | Next.js web and admin, plus a Fastify API and worker that own all data access. Better Auth with mandatory TOTP. dbmate and Kysely, no ORM. Latest stable dependency versions.                                              |
 | D1: non-owner DB roles                                | halyard `postgresql` chart 1.1.0 adds `databases[].extraRoles`: login roles that own nothing, forced `NOSUPERUSER … NOBYPASSRLS`, with `CONNECT` on their database. Our migrations (as owner) grant them table privileges. |
+| Environments                                          | One, production, with no staging (ADR-0001). It tracks `main` until the preview, then a `production` branch the owner fast-forwards.                                                                                       |
 
 ## Tracking
 
-| Milestone | Status                                                                                                                                                                 | Demo note                                                                                                                                                                                                                                                                                                                                               |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| M0        | In progress: workspace, app skeletons, database foundation and delivery (images, Helm chart, CI/CD, e2e smoke) done; next: the gitops PR and a first run on the runner | TS 7 spike passed. Public app serves with no cookies. 34 database tests: catalog meta-tests, normaliser parity, immutability triggers, isolation-matrix harness. Images run as non-root; the CI database job replayed locally against a fresh Postgres. Playwright smoke on production builds, which caught the platform name being fixed at build time |
-| M1        | Not started                                                                                                                                                            | —                                                                                                                                                                                                                                                                                                                                                       |
-| M2        | Not started                                                                                                                                                            | —                                                                                                                                                                                                                                                                                                                                                       |
-| M3        | Not started                                                                                                                                                            | —                                                                                                                                                                                                                                                                                                                                                       |
-| Preview   | Not started                                                                                                                                                            | —                                                                                                                                                                                                                                                                                                                                                       |
-| M5        | Not started                                                                                                                                                            | —                                                                                                                                                                                                                                                                                                                                                       |
-| M4        | Gated                                                                                                                                                                  | —                                                                                                                                                                                                                                                                                                                                                       |
+| Milestone | Status                                                                                                                                                                                                                                               | Demo note                                                                                                                                                                                                                                                                                                                                               |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| M0        | In progress: workspace, app skeletons, database foundation and delivery (images, Helm chart, CI/CD, e2e smoke) done; the first runner run failed at install (UI package not built yet; fixed); next: the gitops change and a green run on the runner | TS 7 spike passed. Public app serves with no cookies. 34 database tests: catalog meta-tests, normaliser parity, immutability triggers, isolation-matrix harness. Images run as non-root; the CI database job replayed locally against a fresh Postgres. Playwright smoke on production builds, which caught the platform name being fixed at build time |
+| M1        | Not started                                                                                                                                                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                       |
+| M2        | Not started                                                                                                                                                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                       |
+| M3        | Not started                                                                                                                                                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                       |
+| Preview   | Not started                                                                                                                                                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                       |
+| M5        | Not started                                                                                                                                                                                                                                          | —                                                                                                                                                                                                                                                                                                                                                       |
+| M4        | Gated                                                                                                                                                                                                                                                | —                                                                                                                                                                                                                                                                                                                                                       |

@@ -3,7 +3,7 @@ name: 📦 Release
 # After CI passes on main:
 #   1. version: apply the changesets (versions and changelogs) and commit the result.
 #   2. deploy: build and push the image of every deployable whose version is ahead of the umbrella chart, then write
-#      the new tags into the chart. Argo CD deploys main to staging; production follows the production branch
+#      the new tags into the chart. Argo CD deploys main to production until the preview, then the production branch
 #      (ADR-0001).
 # One workflow with two jobs, rather than gifcept's chain of workflow_run workflows: both jobs work on the commit CI
 # tested, never on whatever main points to by the time they start.

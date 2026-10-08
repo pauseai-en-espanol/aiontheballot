@@ -127,17 +127,23 @@ fix them rather than copy them.
     whose package version is ahead of its tag in the chart, so a failed or skipped release is picked up by the next.
   - No `pull_request_target` workflows.
   - **CI never holds cluster credentials;** Argo CD pulls.
+- **One environment: production.** There is no staging instance:
+  - Until the preview, production publishes nothing (it shows "coming soon"), so it is where deployments are
+    tried.
+  - CI already runs the database tests against Postgres 18 with the production roles, and the smoke tests
+    against production builds.
+  - A public copy filled with fictional parties and ratings could be passed around as real.
+  - A second environment on the shared Postgres would need its own runtime roles (see Database).
 - **Promotion:**
-  - Staging tracks the chart at `main`.
-  - Production tracks a `production` branch.
-  - Promoting means fast-forwarding `production`, which the owner does after reviewing the staging demo.
-- **Previews:** this replaces the per-PR preview deployments in BRIEF §8 (see PLAN.md, P13).
+  - Until the preview, production tracks the chart at `main`, so every release deploys.
+  - Before the preview, it switches to a `production` branch. From then on, deploying means fast-forwarding
+    `production`, which the owner does; the branch decides when changes go live.
+- **Previews:** there are no per-PR preview deployments (BRIEF §8; see PLAN.md, P13).
 
 ### GitOps entries
 
-- `catalog/apps/ballot/applicationset.yaml` (goTemplate) discovers
-  `clusters/danilupion-com/values/apps/ballot.yaml` (production) and `ballot-staging.yaml` (staging). Each has its
-  own `targetRevision` and database, following the `pauseai-es-demo` precedent.
+- `catalog/apps/ballot/applicationset.yaml` discovers `clusters/danilupion-com/values/apps/ballot.yaml` and
+  deploys `helm-charts/ballot` into the `ballot` namespace.
 - SealedSecrets go in `clusters/danilupion-com/resources/apps/ballot/`.
 - The repo and namespace are added to `projects/apps.yaml`.
 - Harbor gets a `ballot` project with pull and push robots.
@@ -156,10 +162,13 @@ fix them rather than copy them.
 - Reachable only inside the cluster: ClusterIP, no NodePort.
 - The shared `postgresql` instance, with a `ballot` database. The apps never connect as the role that owns the
   tables: an owner bypasses RLS and can disable policies and triggers.
-- The runtime roles `ballot_web` and `ballot_admin` come from the halyard `postgresql` chart's
+- The runtime roles `ballot_web`, `ballot_admin` and `ballot_worker` come from the halyard `postgresql` chart's
   `databases[].extraRoles` (chart 1.1.0): login roles that own nothing and are forced to
   `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`. Our migrations, run as the owner, grant them
   table privileges.
+- Role names belong to the whole Postgres server, and the migrations grant to these fixed names. A second
+  environment on the same server would have to share the roles and their passwords (halyard also rejects a role
+  listed under two databases), so it would need its own Postgres instance.
 
 ### Files
 
@@ -185,11 +194,11 @@ fix them rather than copy them.
   requests and limits. Background jobs run in the separate worker (ADR-0003).
 - An Envoy Gateway `BackendTrafficPolicy` applies a per-IP rate limit to the report and image endpoints. Client
   IPs reach the gateway intact through Cilium.
-- An M5 load test on staging measures requests per second for HTML and for images, and how much uplink headroom
-  is left.
+- An M5 load test measures requests per second for HTML and for images, and how much uplink headroom is left.
+  Where it runs is open (PLAN.md, D6).
 
-**Contingency (documented and tried once on staging; not enabled for launch):** put Cloudflare's proxy in front.
-The dashboard toggle alone is not enough, because:
+**Contingency (documented and tried once before launch, see PLAN.md D6; not enabled for launch):** put
+Cloudflare's proxy in front. The dashboard toggle alone is not enough, because:
 
 - **external-dns would undo it.** Set the `external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"`
   annotation on the HTTPRoute instead.
