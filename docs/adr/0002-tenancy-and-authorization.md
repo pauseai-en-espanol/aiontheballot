@@ -386,7 +386,7 @@ All fixture data is fictional:
 
 ### Dimensions
 
-Expected outcomes are written as data in `db/tests/rls/matrix.ts`, and the individual test cases are generated
+Expected outcomes are written as data in `packages/db/tests/rls/matrix.ts`, and the individual test cases are generated
 from it.
 
 - **Principals:**

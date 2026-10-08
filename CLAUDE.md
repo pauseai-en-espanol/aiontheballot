@@ -14,7 +14,7 @@ A multi-tenant platform that publishes sourced comparisons of political parties'
 - **The Host header selects public content only; it never grants access.** The public app has no sessions or
   cookies.
 - **Tenant isolation lives in Postgres (ADR-0002).** Every new table needs `tenant_id`, RLS, composite FKs, the
-  immutability trigger, explicit grants and an entry in `db/tests/rls/matrix.ts` (checklist in CONTRIBUTING.md).
+  immutability trigger, explicit grants and an entry in `packages/db/tests/rls/matrix.ts` (checklist in CONTRIBUTING.md).
 - **Database roles:** runtime roles never own anything, every admin query goes through `withActor`, and
   `ballot_web` never gets write grants. A new `SECURITY DEFINER` function or grant requires an ADR-0002 update.
 - **Data rules are database triggers:** evidence, four-eyes review, verbatim match, immutability. UI checks are

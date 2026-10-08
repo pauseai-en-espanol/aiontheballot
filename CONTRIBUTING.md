@@ -47,9 +47,10 @@ and the [data model spec](docs/spec/data-model.md)):
    - membership policies through the `private` helpers, which already require `aal2`.
 5. **Explicit grants** for each runtime role (`ballot_web`, `ballot_admin`, `ballot_worker`), and nothing to
    `PUBLIC`.
-6. **If it holds published history:** `UPDATE`/`DELETE`/`TRUNCATE` triggers that honour only `app.purge`.
+6. **If it holds published history:** `UPDATE`/`DELETE`/`TRUNCATE` triggers using `private.forbid_mutation()`,
+   which honours `app.purge` only for the table owner.
 7. **Personal data?** Define its retention, and keep it out of `audit_log`.
-8. **An entry in `db/tests/rls/matrix.ts`** with the expected outcome for every principal and operation, plus
+8. **An entry in `packages/db/tests/rls/matrix.ts`** with the expected outcome for every principal and operation, plus
    data-rule tests for any new trigger.
 9. **Docs:** update the data model spec, and regenerate `db/schema.sql` and the Kysely types.
 
