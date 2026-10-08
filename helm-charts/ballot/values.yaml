@@ -1,0 +1,18 @@
+# Image tags are written by CD (.github/workflows/cd.yml). Everything environment-specific (hostnames, gateway,
+# registry, secrets) lives in the gitops values for each environment, not here.
+ballot-migrations:
+  nameOverride: migrations
+  image:
+    tag: ''
+ballot-api:
+  nameOverride: api
+  image:
+    tag: ''
+ballot-web:
+  nameOverride: web
+  image:
+    tag: ''
+ballot-admin:
+  nameOverride: admin
+  image:
+    tag: ''

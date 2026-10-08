@@ -1,0 +1,30 @@
+replicaCount: 2
+image:
+  repository: ballot/api
+  tag: ''
+  pullPolicy: IfNotPresent
+service:
+  port: 3001
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    cpu: '1'
+    memory: 384Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+# Extra environment (plain values, or secretKeyRef for credentials sealed in gitops)
+env: []
+envFrom: []

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ballot-api
+description: Fastify API, the only component that talks to Postgres (reached through the web and admin routes)
+type: application
+version: 0.1.0
+appVersion: '0.0.0'

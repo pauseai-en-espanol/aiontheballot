@@ -17,3 +17,7 @@ docs
 .env
 **/.env*
 !.env.example
+
+# Deployment manifests are not part of any image.
+**/helm-chart
+helm-charts

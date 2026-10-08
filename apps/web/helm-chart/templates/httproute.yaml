@@ -1,0 +1,36 @@
+{{- if .Values.route.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "ballot-web.fullname" . }}
+  labels:
+    {{- include "ballot-web.labels" . | nindent 4 }}
+  {{- with .Values.route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml (required "route.parentRefs is required when route.enabled" .Values.route.parentRefs) | nindent 4 }}
+  hostnames:
+    {{- toYaml (required "route.hostnames is required when route.enabled" .Values.route.hostnames) | nindent 4 }}
+  rules:
+
+    {{- range .Values.route.apiPaths }}
+    # Public API routes (e.g. the report endpoint) go to the API; everything else to the public site.
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ . }}
+      backendRefs:
+        - name: {{ $.Values.api.serviceName | default (printf "%s-api" $.Release.Name) }}
+          port: {{ $.Values.api.servicePort }}
+    {{- end }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "ballot-web.fullname" . }}
+          port: {{ .Values.service.port }}
+{{- end }}

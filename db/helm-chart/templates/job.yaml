@@ -1,0 +1,39 @@
+{{- if .Values.enabled }}
+# Runs before every sync, so the schema is migrated before new pods start. Migrations are forward-only.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ballot-migrations.fullname" . }}
+  labels:
+    {{- include "ballot-migrations.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: {{ .Values.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "ballot-migrations.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrations
+          image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            # The owner's connection string (ballot_owner), sealed in gitops.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseUrlSecret.name is required" .Values.databaseUrlSecret.name }}
+                  key: {{ .Values.databaseUrlSecret.key }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}

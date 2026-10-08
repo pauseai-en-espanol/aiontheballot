@@ -1,0 +1,19 @@
+apiVersion: v2
+name: ballot
+description: Umbrella chart for the ballot platform, deployed by Argo CD on danilupion-com (ADR-0001)
+type: application
+version: 0.1.0
+appVersion: '0.0.0'
+dependencies:
+  - name: ballot-migrations
+    version: 0.1.0
+    repository: file://../../db/helm-chart
+  - name: ballot-api
+    version: 0.1.0
+    repository: file://../../apps/api/helm-chart
+  - name: ballot-web
+    version: 0.1.0
+    repository: file://../../apps/web/helm-chart
+  - name: ballot-admin
+    version: 0.1.0
+    repository: file://../../apps/admin/helm-chart

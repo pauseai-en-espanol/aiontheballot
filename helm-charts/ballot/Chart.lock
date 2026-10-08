@@ -1,0 +1,15 @@
+dependencies:
+- name: ballot-migrations
+  repository: file://../../db/helm-chart
+  version: 0.1.0
+- name: ballot-api
+  repository: file://../../apps/api/helm-chart
+  version: 0.1.0
+- name: ballot-web
+  repository: file://../../apps/web/helm-chart
+  version: 0.1.0
+- name: ballot-admin
+  repository: file://../../apps/admin/helm-chart
+  version: 0.1.0
+digest: sha256:91c06c6b400dee64431da567a10e57d3bae7454e49629238a29bdbddcdf33e7b
+generated: "2026-10-08T21:25:30.907433+02:00"

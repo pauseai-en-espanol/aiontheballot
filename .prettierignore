@@ -3,3 +3,8 @@ pnpm-lock.yaml
 docs/BRIEF.md
 LICENSE
 LICENSE-CONTENT
+# Helm templates are Go templates, not YAML (packages with charts repeat this in their own .prettierignore,
+# because lint-staged runs Prettier from the package directory). Vendored subcharts are build output.
+**/helm-chart/templates/**
+helm-charts/*/templates/**
+helm-charts/*/charts/**

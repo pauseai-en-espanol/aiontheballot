@@ -1,0 +1,19 @@
+# Rendered in CI (helm lint/template) to exercise every template. Fictional hosts, placeholder secret names.
+ballot-migrations:
+  image: { repository: registry.example/ballot/migrations, tag: 0.1.0.abc1234 }
+  databaseUrlSecret: { name: ballot-owner-db }
+ballot-api:
+  image: { repository: registry.example/ballot/api, tag: 0.1.0.abc1234 }
+ballot-web:
+  image: { repository: registry.example/ballot/web, tag: 0.1.0.abc1234 }
+  route:
+    enabled: true
+    parentRefs: [{ name: gateway-public, namespace: gateway-public }]
+    hostnames: [example-tenant.test]
+    apiPaths: [/api/public]
+ballot-admin:
+  image: { repository: registry.example/ballot/admin, tag: 0.1.0.abc1234 }
+  route:
+    enabled: true
+    parentRefs: [{ name: gateway-public, namespace: gateway-public }]
+    hostnames: [admin.example-platform.test]

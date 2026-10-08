@@ -1,0 +1,2 @@
+ballot {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}".
+Migrations run first as a PreSync hook; web and admin are exposed only through their HTTPRoutes.

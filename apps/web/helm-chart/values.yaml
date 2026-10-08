@@ -1,0 +1,48 @@
+replicaCount: 2
+image:
+  repository: ballot/web
+  tag: ''
+  pullPolicy: IfNotPresent
+service:
+  port: 3000
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: '1'
+    memory: 512Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+# Extra environment (plain values, or secretKeyRef for credentials sealed in gitops)
+env: []
+envFrom: []
+
+# Gateway API HTTPRoute (halyard `route:` convention). Hostnames and gateway come from gitops values.
+route:
+  enabled: false
+  # e.g. - name: gateway-public
+  #        namespace: gateway-public
+  parentRefs: []
+  hostnames: []
+  annotations: {}
+  trafficPolicy:
+    enabled: true
+  apiPaths: []
+
+# Public API paths routed to the API on public hosts (none yet).
+api:
+  # Defaults to <release>-api, the API service of the same release.
+  serviceName: ''
+  servicePort: 3001
