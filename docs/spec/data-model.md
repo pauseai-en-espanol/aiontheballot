@@ -91,7 +91,7 @@ create table app.tenants (
   created_at       timestamptz not null default now()
 );
 
-create table app.platform_hostnames (hostname text primary key);   -- reserved, e.g. the admin host
+create table app.platform_hostnames (hostname text primary key);   -- reserved exact names: admin host, platform domain
 
 create table app.tenant_hostnames (
   hostname      text primary key,                        -- lowercase ASCII/punycode, no port, no trailing dot

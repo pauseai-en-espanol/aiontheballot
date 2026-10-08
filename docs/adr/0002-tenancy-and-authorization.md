@@ -252,20 +252,33 @@ These platform-wide rows are also public: active `tenants`, verified `tenant_hos
   - A partial unique index on `(tenant_id) WHERE is_canonical` allows at most one canonical hostname per tenant.
   - `CHECK (NOT is_canonical OR verified_at IS NOT NULL)`: only a verified hostname can be canonical.
 - Hostnames are never deleted. Both the grants and a trigger prevent it.
-- Hostnames under the platform's own domains are rejected via a `platform_hostnames` table.
+- Reserved platform hostnames (the admin host, the platform domain itself) are listed in `platform_hostnames` and
+  can never be claimed by a tenant. Subdomains of the platform domain (e.g. `es.<platform-domain>`) can be
+  assigned to a tenant like any other hostname.
 - Only platform admins can write hostnames.
 - DNS TXT verification tokens live in a separate private table, `hostname_verifications`.
 
 **Operations:** a hostname gets its gateway route and certificate SAN through a gitops PR (ADR-0001), and only
 after `verified_at` is set. Neither is ever removed.
 
-### At most one canonical hostname
+### How a tenant is reachable, and its canonical address
 
-**This changes the brief,** which says "exactly one". A tenant that lives only on the shared platform domain has
-no hostname of its own, and the platform domain can't be listed under several tenants because the hostname is
-the primary key.
+The slug is mandatory: it is the tenant's internal identifier (admin URLs, config, logs). **Public addresses are all
+optional**, and a tenant may use any combination:
 
-- A tenant with no canonical custom hostname has canonical base URL `https://{platform-host}/{slug}`.
+1. its own domain or domains, e.g. `iaenlasurnas.es`;
+2. a subdomain of the platform domain, e.g. `es.<platform-domain>` (a `tenant_hostnames` row like any other);
+3. a path on the platform domain, `<platform-domain>/{slug}/…`. This works whenever a platform domain is configured,
+   and 301-redirects to the canonical hostname if the tenant has one.
+
+The platform domain itself is optional configuration; the Spain pilot runs without one.
+
+**At most one canonical hostname.** This changes the brief, which says "exactly one". A tenant reachable only by
+path has no hostname of its own, and the platform domain can't be listed under several tenants because the hostname
+is the primary key.
+
+- A tenant with no canonical hostname has canonical base URL `https://{platform-domain}/{slug}`.
+- A tenant with neither a canonical hostname nor a configured platform domain is not publicly reachable.
 - `canonicalBase(tenant)` is the only source for `rel=canonical`, OG and share URLs, sitemaps and the URL printed
   on images.
 - The request's `Host` header is never echoed back.
