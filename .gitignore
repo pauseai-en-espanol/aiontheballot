@@ -1,0 +1,73 @@
+# IDEs and editors
+.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Build Outputs
+dist/
+dist-ssr/
+build/
+out-tsc/
+out/
+.next/
+next-env.d.ts
+tsconfig.tsbuildinfo
+tsconfig.*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# Tests
+coverage
+.nyc_output
+playwright-report/
+blob-report/
+test-results/
+
+# Env files (real secrets live in SealedSecrets, never in the repo)
+.env
+.env.*
+!.env.example
+*.local
+
+## Local database assets (dev Postgres data, dumps)
+.local-data/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.pem
+tmp
+.temp
+.tmp
+
+# Turbo
+.turbo
+
+# Caches
+.eslintcache
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
