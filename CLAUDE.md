@@ -32,19 +32,19 @@ A multi-tenant platform that publishes sourced comparisons of political parties'
 
 ## Commands
 
-These become available once the M0 skeleton lands.
+Copy `.env.example` to `.env` for local database URLs.
 
-| Command                                    | What it does                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------------- |
-| `pnpm install` · `pnpm dev` · `pnpm build` | Install, run locally, build                                               |
-| `pnpm lint` · `pnpm format`                | oxlint (type-aware) · Prettier                                            |
-| `pnpm build:check`                         | Type check                                                                |
-| `pnpm test`                                | Unit tests (Vitest)                                                       |
-| `pnpm test:db`                             | RLS matrix, catalog meta-tests and data rules (needs a local Postgres 18) |
-| `pnpm test:e2e`                            | Playwright, against a production build                                    |
-| `pnpm db:migrate` · `pnpm db:new <name>`   | Run migrations · create a new one                                         |
-| `pnpm db:seed`                             | Load fictional seed data (refuses to run against production)              |
-| `pnpm release:note`                        | Add a changeset (pre-push and CI require one)                             |
+| Command                                                     | What it does                                                              |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `pnpm install` · `pnpm dev` · `pnpm build`                  | Install, run locally, build                                               |
+| `pnpm lint` · `pnpm format`                                 | oxlint (type-aware) · Prettier                                            |
+| `pnpm build:check`                                          | Type check                                                                |
+| `pnpm test`                                                 | Unit tests (Vitest)                                                       |
+| `pnpm test:db`                                              | RLS matrix, catalog meta-tests and data rules (needs a local Postgres 18) |
+| `pnpm test:e2e`                                             | Playwright, against a production build                                    |
+| `pnpm db:up` · `pnpm db:down`                               | Start or stop local Postgres 18 (Docker, roles as in production)          |
+| `pnpm db:migrate` · `pnpm db:new <name>` · `pnpm db:status` | Apply migrations (refreshes `db/schema.sql`) · new migration · status     |
+| `pnpm release:note`                                         | Add a changeset (pre-push and CI require one)                             |
 
 ## Conventions
 
