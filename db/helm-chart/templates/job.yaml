@@ -1,5 +1,7 @@
 {{- if .Values.enabled }}
-# Runs before every sync, so the schema is migrated before new pods start. Migrations are forward-only.
+# Runs on every sync, after the Secrets and the default ServiceAccount patch (sync wave -2 in gitops) and before the
+# Deployments (wave 0), so the schema is migrated before new pods start. Not a PreSync hook: on a first sync, PreSync
+# would run before those exist. A failed migration rolls back and stops the sync; old pods keep serving.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -7,7 +9,8 @@ metadata:
   labels:
     {{- include "ballot-migrations.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: '-1'
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
 spec:
   backoffLimit: {{ .Values.backoffLimit }}

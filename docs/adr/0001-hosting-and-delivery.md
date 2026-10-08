@@ -108,7 +108,7 @@ fix them rather than copy them.
 
 - **Repository:** `pauseai-en-espanol/aiontheballot`.
 - **Umbrella chart:** `helm-charts/ballot`, with one subchart per deployable (`apps/*/helm-chart`: web, admin,
-  API, worker), a PreSync migration Job, and the backup CronJob.
+  API, worker), a migration Job, and the backup CronJob.
 - **Routes:** the halyard `route:` convention (`enabled`/`parentRefs`/`hostnames`/`annotations`) on
   `gateway-public`.
 - **Pods:**
@@ -127,6 +127,9 @@ fix them rather than copy them.
     whose package version is ahead of its tag in the chart, so a failed or skipped release is picked up by the next.
   - No `pull_request_target` workflows.
   - **CI never holds cluster credentials;** Argo CD pulls.
+- **Sync order:** the gitops Secrets and the default ServiceAccount patch (wave -2), then the migration Job (a
+  Sync hook in wave -1), then everything else. Not a PreSync hook: on a first sync it would run before the Secrets
+  and the pull secret exist. Migrations are expand/contract, because old pods serve until the rollout finishes.
 - **One environment: production.** There is no staging instance:
   - Until the preview, production publishes nothing (it shows "coming soon"), so it is where deployments are
     tried.

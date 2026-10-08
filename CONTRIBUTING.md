@@ -32,6 +32,9 @@ the checklists.
 
 - Migrations are plain SQL in `db/migrations/`, run by dbmate. They are **forward-only**: never edit a migration
   that has been merged, and keep one concern per migration.
+- Migrations run before the new pods roll out, so the old code runs against the new schema for a while. Make each one
+  **expand/contract**: add what the new code needs, and drop or rename what the old code uses only in a later release,
+  once nothing deployed reads it.
 - After every migration, regenerate `db/schema.sql` and the Kysely types, and commit both. Review the
   `db/schema.sql` diff; it shows exactly how policies and grants changed.
 - Only `apps/api` (API and worker) talks to Postgres, through `packages/db`. Admin queries go through `withActor`.
