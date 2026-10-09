@@ -132,6 +132,9 @@ demo, recorded in [Tracking](#tracking).
 - **SEO:** canonical URLs, sitemaps and `hreflang` groundwork.
 - **Security and traffic:** CSP and security headers; the Envoy rate-limit policy.
 - **Analytics:** Plausible.
+- **Coming soon:** a branded _próximamente_ page on the public hosts until the preview. The real site is visible
+  only on a preview host on `gateway-private`, reachable over the VPN, so skipping the page needs no cookie or login
+  on the public site.
 
 **Demo:**
 
