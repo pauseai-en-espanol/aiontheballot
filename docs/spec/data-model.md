@@ -1,6 +1,7 @@
 # Spec: data model
 
-- **Status:** Reviewed by Dani; the basis for the M1 migrations
+- **Status:** Draft for review, revised after an adversarial review (actor binding, same-election keys, change
+  control, worker scope, audit privacy)
 - **Relates to:** [ADR-0002](../adr/0002-tenancy-and-authorization.md) (rules and isolation),
   [ADR-0003](../adr/0003-application-stack.md) (dbmate, Kysely), BRIEF §2–§5
 
@@ -27,6 +28,14 @@ lives. Any example data here is fictional.
   - Tenant-owned tables have `tenant_id uuid not null` and `unique (tenant_id, id)`.
   - Children reference parents through composite foreign keys, `(tenant_id, parent_id) → parent (tenant_id, id)`.
   - `tenant_id` never changes (trigger).
+- **Same election:** a row that belongs to an election references its parties, criteria, sources and cells
+  through `(tenant_id, election_id, …)` foreign keys, so nothing can mix two elections, even within one tenant.
+  Parents expose `unique (tenant_id, election_id, id)` for this.
+- **Actor columns** (`created_by`, `updated_by`, `checked_by`, `attested_by`, `proposed_by`, `decided_by`,
+  `triaged_by`, `requested_by`, `granted_by`, `actor_id`) are set by trigger to `private.current_user_id()`. A
+  value sent by the caller is overwritten, so nobody can act in someone else's name.
+- **Personal data columns** carry the column comment `personal data`. The audit trigger never copies them into
+  `audit_log`, and a catalog test checks every such column.
 - **Localized text:** `jsonb` objects that map a locale to a string, e.g. `{"es": "…", "en": "…"}`.
   - `private.is_localized()` checks the shape.
   - The tenant's default locale must be present before anything goes public: at publish time, and when an election
@@ -88,6 +97,7 @@ create table app.tenants (
   display_name     jsonb not null,                       -- localized
   theme            jsonb not null default '{}',          -- brand colours, logo file id; validated + contrast-checked
   active           boolean not null default false,
+  live_edits_need_second_approver  boolean not null default false,  -- change control on live elections (ADR-0002 §12)
   created_at       timestamptz not null default now()
 );
 
@@ -188,7 +198,7 @@ create table app.memberships (
 create table app.invitations (
   id           uuid primary key default uuidv7(),
   tenant_id    uuid not null references app.tenants,
-  email        text not null check (email = lower(email)),
+  email        text not null check (email = lower(email)),  -- personal data
   role         app.tenant_role not null,
   token_hash   text not null unique,
   expires_at   timestamptz not null,
@@ -254,6 +264,7 @@ create table app.parties (
   programme_status      app.programme_status not null default 'pending',
   programme_checked_at  timestamptz,                   -- "comprobado el …"
   unique (tenant_id, id),
+  unique (tenant_id, election_id, id),
   foreign key (tenant_id, election_id) references app.elections (tenant_id, id),
   foreign key (tenant_id, logo_file_id) references app.files (tenant_id, id)
 );
@@ -267,6 +278,7 @@ create table app.criteria (
   display_order      int not null,
   core_criterion_id  uuid references app.core_criteria,
   unique (tenant_id, id),
+  unique (tenant_id, election_id, id),
   foreign key (tenant_id, election_id) references app.elections (tenant_id, id)
 );
 ```
@@ -288,13 +300,15 @@ create table app.files (
   unique (tenant_id, bucket, sha256)                   -- the same file is stored once per tenant and bucket
 );
 
-create table app.file_blobs (
+create table app.file_blobs (                          -- a trigger checks sha256(content) and the size against files
   file_id    uuid primary key,
   tenant_id  uuid not null,
   content    bytea not null,
   foreign key (tenant_id, file_id) references app.files (tenant_id, id)
 );
 
+-- Immutable once created, except extraction_status (worker) and archive_url (set once): a quote matched against a
+-- source must stay matched against the same bytes. A wrong source is replaced by a new one, not edited.
 create table app.source_documents (
   id                 uuid primary key default uuidv7(),
   tenant_id          uuid not null,
@@ -311,12 +325,15 @@ create table app.source_documents (
   created_by         uuid not null,
   created_at         timestamptz not null default now(),
   unique (tenant_id, id),
+  unique (tenant_id, election_id, id),
   foreign key (tenant_id, election_id) references app.elections (tenant_id, id),
-  foreign key (tenant_id, party_id) references app.parties (tenant_id, id),
+  foreign key (tenant_id, election_id, party_id) references app.parties (tenant_id, election_id, id),
   foreign key (tenant_id, file_id) references app.files (tenant_id, id)
 );
 
-create table app.source_texts (                        -- private: the full text is never public (copyright)
+-- Private: the full text is never public (copyright). Written once by the worker's extraction; no runtime role can
+-- update or delete it, so nobody can edit the text a quote is matched against.
+create table app.source_texts (
   source_document_id  uuid not null,
   tenant_id           uuid not null,
   unit_index          int not null,                    -- the page number for PDFs, the section index for web pages
@@ -340,27 +357,37 @@ create table app.assessments (
   state                app.assessment_state not null default 'draft',
   draft_rating         app.rating,
   draft_summary        jsonb,
-  current_revision_id  uuid,                           -- the latest published revision (null = pending)
   updated_by           uuid not null,
   updated_at           timestamptz not null default now(),
   unique (tenant_id, id),
+  unique (tenant_id, id, election_id),
+  unique (tenant_id, id, election_id, party_id, criterion_id),
   unique (party_id, criterion_id),
-  foreign key (tenant_id, election_id)  references app.elections (tenant_id, id),
-  foreign key (tenant_id, party_id)     references app.parties (tenant_id, id),
-  foreign key (tenant_id, criterion_id) references app.criteria (tenant_id, id)
+  foreign key (tenant_id, election_id)               references app.elections (tenant_id, id),
+  foreign key (tenant_id, election_id, party_id)     references app.parties (tenant_id, election_id, id),
+  foreign key (tenant_id, election_id, criterion_id) references app.criteria (tenant_id, election_id, id)
 );
+-- What the public sees is the latest revision (app.current_revisions); there is no pointer column to keep in sync.
 
-create table app.assessment_contributors (             -- everyone who edited since the last publish
-  assessment_id  uuid not null,
-  tenant_id      uuid not null,
-  user_id        uuid not null,
-  primary key (assessment_id, user_id),
+-- Who edited a cell since a given revision. Append-only: every insert or update of the cell, its draft_evidence
+-- or its draft_checked_documents adds (current_user_id(), latest revision number) by trigger, on conflict do
+-- nothing. Runtime roles have INSERT (the triggers run as the editing user) but no UPDATE or DELETE, and a trigger
+-- rejects any row that isn't the current user at the current base revision: adding yourself can only stop you
+-- approving. Nothing is ever cleared; the next publish only looks at rows for the current base_revision_no.
+create table app.assessment_contributors (
+  assessment_id     uuid not null,
+  tenant_id         uuid not null,
+  base_revision_no  int not null,                      -- 0 before the first publish
+  user_id           uuid not null,
+  first_edit_at     timestamptz not null default now(),
+  primary key (assessment_id, base_revision_no, user_id),
   foreign key (tenant_id, assessment_id) references app.assessments (tenant_id, id)
 );
 
 create table app.draft_evidence (
   id                   uuid primary key default uuidv7(),
   tenant_id            uuid not null,
+  election_id          uuid not null,
   assessment_id        uuid not null,
   source_document_id   uuid not null,
   ordinal              int not null,
@@ -369,26 +396,31 @@ create table app.draft_evidence (
   section_label        text,
   ts_start             interval,                       -- video and audio
   ts_end               interval,
-  match_status         app.match_status not null default 'unmatched',  -- set by trigger for pdf and web_page
+  match_status         app.match_status not null default 'unmatched',  -- always computed by trigger, see below
   matched_unit_index   int,
-  attested_by          uuid,
+  attested_by          uuid,                           -- set by trigger to the attesting user
   attestation_file_id  uuid,
   created_by           uuid not null,
   created_at           timestamptz not null default now(),
   unique (tenant_id, id),
-  foreign key (tenant_id, assessment_id)      references app.assessments (tenant_id, id),
-  foreign key (tenant_id, source_document_id) references app.source_documents (tenant_id, id)
+  foreign key (tenant_id, assessment_id, election_id)      references app.assessments (tenant_id, id, election_id),
+  foreign key (tenant_id, election_id, source_document_id) references app.source_documents (tenant_id, election_id, id),
+  foreign key (tenant_id, attestation_file_id)             references app.files (tenant_id, id)
 );
+-- match_status is never taken from the caller. For pdf and web_page sources the trigger computes matched/unmatched
+-- against source_texts.normalized. For other kinds it is 'attested' only when the caller asks to attest, a stored
+-- attestation file is present, and attested_by is the current user; otherwise 'unmatched'.
 
 create table app.draft_checked_documents (             -- backs not_mentioned
   assessment_id       uuid not null,
   tenant_id           uuid not null,
+  election_id         uuid not null,
   source_document_id  uuid not null,
   checked_at          timestamptz not null,
   checked_by          uuid not null,
   primary key (assessment_id, source_document_id),
-  foreign key (tenant_id, assessment_id)      references app.assessments (tenant_id, id),
-  foreign key (tenant_id, source_document_id) references app.source_documents (tenant_id, id)
+  foreign key (tenant_id, assessment_id, election_id)      references app.assessments (tenant_id, id, election_id),
+  foreign key (tenant_id, election_id, source_document_id) references app.source_documents (tenant_id, election_id, id)
 );
 
 create table app.review_events (                       -- private review trail
@@ -416,22 +448,26 @@ create table app.assessment_revisions (                -- public
   election_id    uuid not null,
   party_id       uuid not null,
   criterion_id   uuid not null,
-  revision_no    int not null,
+  revision_no    int not null,                         -- next number for the cell, set by trigger
   rating         app.rating,                           -- null only for a withdrawal
   summary        jsonb,                                -- localized; null only for a withdrawal
   change_kind    app.change_kind not null,
   public_note    jsonb,                                -- required unless change_kind = 'initial'
   published_at   timestamptz not null default now(),
   unique (tenant_id, id),
+  unique (tenant_id, id, election_id),
   unique (assessment_id, revision_no),
   check ((change_kind = 'withdrawal') = (rating is null)),
   check (change_kind = 'initial' or public_note is not null),
-  foreign key (tenant_id, assessment_id) references app.assessments (tenant_id, id)
+  -- The copied election, party and criterion must be the cell's own: public visibility follows election_id.
+  foreign key (tenant_id, assessment_id, election_id, party_id, criterion_id)
+    references app.assessments (tenant_id, id, election_id, party_id, criterion_id)
 );
 
 create table app.revision_evidence (                   -- public
   revision_id         uuid not null,
   tenant_id           uuid not null,
+  election_id         uuid not null,
   ordinal             int not null,
   source_document_id  uuid not null,
   quote               text not null,
@@ -441,27 +477,32 @@ create table app.revision_evidence (                   -- public
   ts_end              interval,
   match_status        app.match_status not null check (match_status in ('matched', 'attested')),
   primary key (revision_id, ordinal),
-  foreign key (tenant_id, revision_id)        references app.assessment_revisions (tenant_id, id),
-  foreign key (tenant_id, source_document_id) references app.source_documents (tenant_id, id)
+  foreign key (tenant_id, revision_id, election_id)
+    references app.assessment_revisions (tenant_id, id, election_id),
+  foreign key (tenant_id, election_id, source_document_id) references app.source_documents (tenant_id, election_id, id)
 );
 
 create table app.revision_checked_documents (          -- public
   revision_id         uuid not null,
   tenant_id           uuid not null,
+  election_id         uuid not null,
   source_document_id  uuid not null,
   checked_at          timestamptz not null,
   primary key (revision_id, source_document_id),
-  foreign key (tenant_id, revision_id) references app.assessment_revisions (tenant_id, id)
+  foreign key (tenant_id, revision_id, election_id)
+    references app.assessment_revisions (tenant_id, id, election_id),
+  foreign key (tenant_id, election_id, source_document_id) references app.source_documents (tenant_id, election_id, id)
 );
 
 create table app.revision_internal (                   -- private: who signed off, and why
   revision_id      uuid primary key,
   tenant_id        uuid not null,
-  contributor_ids  uuid[] not null,
-  reviewer_id      uuid not null,
+  contributor_ids  uuid[] not null,                    -- snapshot taken by trigger; the caller's value is ignored
+  reviewer_id      uuid not null,                      -- set by trigger to current_user_id()
   report_id        uuid,                               -- the right-of-reply report that prompted it, if any
   check (not reviewer_id = any (contributor_ids)),
-  foreign key (tenant_id, revision_id) references app.assessment_revisions (tenant_id, id)
+  foreign key (tenant_id, revision_id) references app.assessment_revisions (tenant_id, id),
+  foreign key (tenant_id, report_id)   references app.reports (tenant_id, id)
 );
 ```
 
@@ -480,20 +521,32 @@ create table app.change_requests (
   tenant_id       uuid not null,
   election_id     uuid not null,
   target_kind     text not null check (target_kind in ('criterion', 'party', 'methodology')),
-  target_id       uuid not null,
+  target_id       uuid not null,                       -- trigger: the target is in this tenant and election
   field           text not null,                       -- e.g. 'title', 'name', 'body'
   previous_value  jsonb not null,
   proposed_value  jsonb not null,
-  public_note     jsonb not null,
+  public_note     jsonb not null,                      -- always required: it feeds the corrections log
   state           app.change_request_state not null default 'pending',
   proposed_by     uuid not null,
   proposed_at     timestamptz not null default now(),
-  decided_by      uuid,
+  decided_by      uuid,                                -- set by trigger to current_user_id()
   decided_at      timestamptz,
-  check (decided_by is null or decided_by <> proposed_by),
+  decided_txid    xid8,                                -- set by trigger to pg_current_xact_id() on approval
+  unique (tenant_id, id),
   foreign key (tenant_id, election_id) references app.elections (tenant_id, id)
 );
 ```
+
+**Who approves** depends on the tenant's `live_edits_need_second_approver`:
+
+- **Off (the default):** one member can propose and approve their own change in one step. It still needs a public
+  note and still appears in the corrections log, so live changes stay visible to the public.
+- **On:** a different member must approve (`decided_by <> proposed_by`, checked by trigger).
+
+Either way the approver holds `reviewer` or `country_admin`. **How the edit is allowed:** the trigger on `criteria`,
+`parties` and `methodologies` accepts a structural edit to a live election only if an `approved` change request for
+exactly that target, field and new value has `decided_txid = pg_current_xact_id()`, i.e. it was approved in the same
+transaction. There is no session flag to set, so the rule can't be switched off from a connection.
 
 ### 3.8 Right of reply (personal data: private, deletable)
 
@@ -504,21 +557,27 @@ create table app.reports (
   election_id              uuid,
   assessment_id            uuid,
   kind                     app.report_kind not null,
-  name                     text,
-  email                    text,
-  organization             text,
+  name                     text,                       -- personal data
+  email                    text,                       -- personal data
+  organization             text,                       -- personal data
   is_party_representative  boolean not null default false,
-  message                  text not null,
+  message                  text not null,              -- personal data (free text)
   status                   app.report_status not null default 'new',
   created_at               timestamptz not null default now(),
   triaged_by               uuid,
   triaged_at               timestamptz,
   resolution_note          text,
   delete_after             date not null,              -- the retention period (PLAN Q7)
-  unique (tenant_id, id)
+  unique (tenant_id, id),
+  check (assessment_id is null or election_id is not null),
+  foreign key (tenant_id, election_id) references app.elections (tenant_id, id),
+  foreign key (tenant_id, assessment_id, election_id) references app.assessments (tenant_id, id, election_id)
 );
 
-create table app.report_daily_counts (                 -- per-tenant daily cap, used by submit_report()
+-- Per-tenant daily cap, used by submit_report(). It is a backstop: the per-IP rate limit at the gateway comes
+-- first. A flood can still use up a day's cap for everyone; that is accepted, and the cap is sized well above
+-- normal use.
+create table app.report_daily_counts (
   tenant_id  uuid not null references app.tenants,
   day        date not null,
   count      int not null,
@@ -532,6 +591,7 @@ create table app.report_daily_counts (                 -- per-tenant daily cap, 
 create table app.llm_runs (
   id                  uuid primary key default uuidv7(),
   tenant_id           uuid not null,
+  election_id         uuid not null,
   source_document_id  uuid not null,
   requested_by        uuid not null,
   model               text not null,
@@ -544,12 +604,14 @@ create table app.llm_runs (
   cost_usd            numeric(10, 4),
   error               text,
   unique (tenant_id, id),
-  foreign key (tenant_id, source_document_id) references app.source_documents (tenant_id, id)
+  unique (tenant_id, id, election_id),
+  foreign key (tenant_id, election_id, source_document_id) references app.source_documents (tenant_id, election_id, id)
 );
 
 create table app.llm_suggestions (
   id                uuid primary key default uuidv7(),
   tenant_id         uuid not null,
+  election_id       uuid not null,
   run_id            uuid not null,
   party_id          uuid not null,
   criterion_id      uuid not null,
@@ -559,11 +621,36 @@ create table app.llm_suggestions (
   state             app.suggestion_state not null default 'open',
   decided_by        uuid,
   decided_at        timestamptz,
-  foreign key (tenant_id, run_id) references app.llm_runs (tenant_id, id)
+  unique (tenant_id, id),
+  foreign key (tenant_id, run_id, election_id)       references app.llm_runs (tenant_id, id, election_id),
+  foreign key (tenant_id, election_id, party_id)     references app.parties (tenant_id, election_id, id),
+  foreign key (tenant_id, election_id, criterion_id) references app.criteria (tenant_id, election_id, id)
 );
 ```
 
-### 3.10 Audit
+### 3.10 Jobs
+
+```sql
+-- What a background job is for. The API inserts it inside withActor, so RLS checks the actor's membership and the
+-- foreign keys pin the target to that tenant. The pg-boss payload carries only this id: the worker reads the row
+-- and takes the tenant from it, never from the payload, so a forged or mistaken payload can't move work into
+-- another tenant.
+create table app.job_requests (
+  id                  uuid primary key default uuidv7(),
+  tenant_id           uuid not null references app.tenants,
+  kind                text not null check (kind in ('extract_source', 'llm_run')),
+  source_document_id  uuid not null,
+  llm_run_id          uuid,                            -- for kind = 'llm_run'
+  requested_by        uuid not null,
+  created_at          timestamptz not null default now(),
+  unique (tenant_id, id),
+  check ((kind = 'llm_run') = (llm_run_id is not null)),
+  foreign key (tenant_id, source_document_id) references app.source_documents (tenant_id, id),
+  foreign key (tenant_id, llm_run_id)         references app.llm_runs (tenant_id, id)
+);
+```
+
+### 3.11 Audit
 
 ```sql
 create table app.audit_log (                           -- append-only; no personal data
@@ -573,7 +660,7 @@ create table app.audit_log (                           -- append-only; no person
   action      text not null,                           -- e.g. 'operator.changed', 'revision.published'
   table_name  text not null,
   row_id      text not null,
-  diff        jsonb,
+  diff        jsonb,                                   -- never includes columns commented 'personal data'
   at          timestamptz not null default now()
 );
 
@@ -604,15 +691,15 @@ draft ──submit──▶ in_review       needs a rating that is valid for the
                                   ≥1 evidence item (matched, or attested by someone other than the publisher)
                                   or, for not_mentioned, ≥1 checked document
 in_review ──reject (note)──▶ draft
-in_review ──approve──▶ published  publisher ∉ contributors; publisher holds reviewer or country_admin;
-                                  a new revision is inserted; current_revision_id is updated;
-                                  contributors are cleared
-published ──edit──▶ draft         the public keeps seeing current_revision_id until the next approval
+in_review ──approve──▶ published  publisher ∉ contributors since the latest revision; publisher holds
+                                  reviewer or country_admin; a new revision is inserted, and later
+                                  edits are counted against it (base_revision_no)
+published ──edit──▶ draft         the public keeps seeing the latest revision until the next approval
 published ──withdraw──▶ published a withdrawal revision is inserted (rating null); the cell shows "pending"
 ```
 
 **Change request:** `pending → approved | rejected`. Approval applies the change to its target in the same
-transaction.
+transaction. Whether the proposer may approve their own request is the tenant's setting (§3.7).
 
 **Report:** `new → triaged → accepted | rejected | spam`. An accepted report is linked from the
 `revision_internal` row of the correction it caused.
@@ -639,33 +726,43 @@ transaction.
 - `source_texts` and the `sources` bucket (copyright);
 - `reports`, `report_daily_counts`;
 - `invitations`, `memberships`, `platform_admins`, `hostname_verifications`;
-- `llm_*`, `audit_log`, `purge_log`.
+- `llm_*`, `job_requests`, `audit_log`, `purge_log`.
 
 The only write available to `aiontheballot_web` is calling `app.submit_report()`.
 
 ## 6. Enforcement map
 
-| Rule (ADR-0002 / BRIEF)                                                                | Mechanism                                                                                    | Where                                                                   |
-| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Tenant id never changes                                                                | `BEFORE UPDATE` trigger                                                                      | Every tenant-owned table                                                |
-| No cross-tenant references                                                             | Composite foreign keys                                                                       | Every child table                                                       |
-| Exactly one operator                                                                   | Partial unique index, plus a deferred check when a tenant becomes active                     | `tenant_organizations`, `tenants`                                       |
-| Only platform admins change the operator, the methodology kind or `is_pauseai_chapter` | Trigger, plus an audit row                                                                   | `tenant_organizations`, `methodologies`, `organizations`                |
-| A demands methodology names its owner                                                  | `CHECK`                                                                                      | `methodologies`                                                         |
-| Restricted assets only for eligible tenants                                            | Trigger on selection, with re-check when grants or the operator change                       | `tenant_brand_selections`, `brand_asset_grants`, `tenant_organizations` |
-| Hostname rules                                                                         | Checks, partial index, no-delete trigger, platform-host rejection                            | `tenant_hostnames`                                                      |
-| Ratings must be valid for the kind                                                     | Trigger                                                                                      | `assessments`, `assessment_revisions`, `llm_suggestions`                |
-| Verbatim match                                                                         | Trigger computes `match_status` against `source_texts.normalized`                            | `draft_evidence`                                                        |
-| Only admissible source kinds                                                           | Trigger checks `methodologies.admissible_source_kinds`                                       | `draft_evidence`, `revision_evidence`                                   |
-| The evidence requirement                                                               | Deferred constraint trigger on revision insert                                               | `assessment_revisions`                                                  |
-| Four-eyes; publisher identity                                                          | Trigger: `reviewer_id = current_user_id()` and not among contributors; role check            | `revision_internal`                                                     |
-| Legal state transitions                                                                | Trigger                                                                                      | `assessments`, `elections`, `change_requests`, `reports`                |
-| Published data is immutable                                                            | `UPDATE`, `DELETE` and `TRUNCATE` triggers, honouring only `app.purge`                       | `assessment_revisions`, `revision_*`, `audit_log`, `purge_log`          |
-| Live-election structural edits need an approved change request                         | Trigger allows them only while `app.applying_change_request` is set by the approval function | `criteria`, `parties`, `methodologies`                                  |
-| Publishing freeze                                                                      | Trigger                                                                                      | `assessment_revisions`                                                  |
-| Archived elections are read-only                                                       | Trigger                                                                                      | Every election-scoped table                                             |
-| Default-locale text is present when public                                             | Trigger on publish and on going live                                                         | `assessment_revisions`, `elections`                                     |
-| Report cap and status                                                                  | `submit_report()`, using the daily counts                                                    | `reports`, `report_daily_counts`                                        |
+| Rule (ADR-0002 / BRIEF)                                                                | Mechanism                                                                                                                                                | Where                                                                   |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Tenant id never changes                                                                | `BEFORE UPDATE` trigger                                                                                                                                  | Every tenant-owned table                                                |
+| No cross-tenant references                                                             | Composite foreign keys                                                                                                                                   | Every child table                                                       |
+| No cross-election references within a tenant                                           | `(tenant_id, election_id, …)` foreign keys                                                                                                               | Every election-scoped child table                                       |
+| Actors are who they say they are                                                       | Trigger sets every actor column to `current_user_id()`                                                                                                   | Every table with an actor column                                        |
+| Change-request targets belong to the same tenant and election                          | Trigger                                                                                                                                                  | `change_requests`                                                       |
+| Exactly one operator                                                                   | Partial unique index, plus a deferred check when a tenant becomes active                                                                                 | `tenant_organizations`, `tenants`                                       |
+| Only platform admins change the operator, the methodology kind or `is_pauseai_chapter` | Trigger, plus an audit row                                                                                                                               | `tenant_organizations`, `methodologies`, `organizations`                |
+| A demands methodology names its owner                                                  | `CHECK`                                                                                                                                                  | `methodologies`                                                         |
+| Restricted assets only for eligible tenants                                            | Trigger on selection, with re-check when grants or the operator change                                                                                   | `tenant_brand_selections`, `brand_asset_grants`, `tenant_organizations` |
+| Hostname rules                                                                         | Checks, partial index, no-delete trigger, platform-host rejection                                                                                        | `tenant_hostnames`                                                      |
+| Ratings must be valid for the kind                                                     | Trigger                                                                                                                                                  | `assessments`, `assessment_revisions`, `llm_suggestions`                |
+| Verbatim match                                                                         | Trigger computes `match_status` against `source_texts.normalized`; the caller's value is ignored                                                         | `draft_evidence`                                                        |
+| Attestation is by a named second person                                                | Trigger: `attested_by = current_user_id()`, a stored file, and not the publisher                                                                         | `draft_evidence`, `revision_internal`                                   |
+| The matched text can't be edited                                                       | `source_texts` written once by the worker, no runtime `UPDATE`/`DELETE`; sources immutable except `extraction_status` and `archive_url`                  | `source_texts`, `source_documents`                                      |
+| Stored files are what their hash says                                                  | Trigger checks `sha256(content)` and size                                                                                                                | `file_blobs`                                                            |
+| Only admissible source kinds                                                           | Trigger checks `methodologies.admissible_source_kinds`                                                                                                   | `draft_evidence`, `revision_evidence`                                   |
+| The evidence requirement                                                               | Deferred constraint trigger on revision insert                                                                                                           | `assessment_revisions`                                                  |
+| Four-eyes; publisher identity                                                          | Trigger: `reviewer_id = current_user_id()`, not in `assessment_contributors` for the current base revision (snapshot into `contributor_ids`); role check | `revision_internal`                                                     |
+| Contributors can't be hidden                                                           | Rows added by triggers on every draft edit; only the current user's own row can be inserted; no `UPDATE` or `DELETE`                                     | `assessment_contributors`                                               |
+| Legal state transitions                                                                | Trigger                                                                                                                                                  | `assessments`, `elections`, `change_requests`, `reports`                |
+| Published data is immutable                                                            | `UPDATE`, `DELETE` and `TRUNCATE` triggers, honouring only `app.purge`                                                                                   | `assessment_revisions`, `revision_*`, `audit_log`, `purge_log`          |
+| Live-election structural edits need an approved change request                         | Trigger allows them only if a matching request was approved in the same transaction (`decided_txid`); no session flag                                    | `criteria`, `parties`, `methodologies`                                  |
+| Second approver for live edits, if the tenant requires it                              | Trigger: `decided_by <> proposed_by` when `live_edits_need_second_approver`                                                                              | `change_requests`                                                       |
+| Publishing freeze                                                                      | Trigger                                                                                                                                                  | `assessment_revisions`                                                  |
+| Archived elections are read-only                                                       | Trigger                                                                                                                                                  | Every election-scoped table                                             |
+| Default-locale text is present when public                                             | Trigger on publish and on going live                                                                                                                     | `assessment_revisions`, `elections`                                     |
+| Report cap and status                                                                  | `submit_report()`, using the daily counts                                                                                                                | `reports`, `report_daily_counts`                                        |
+| The worker acts only in the job's own tenant                                           | Tenant read from `job_requests`, never from the payload                                                                                                  | `job_requests`                                                          |
+| No personal data in the audit log                                                      | Audit trigger skips columns commented `personal data`; catalog test                                                                                      | `audit_log`                                                             |
 
 Each row has a matching test, either in the data-rule list or in the matrix (ADR-0002).
 
@@ -680,16 +777,18 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
 
 - The migration Job creates the `pgboss` schema as owner, using pg-boss's construction SQL. Runtime roles never
   need `CREATE`.
-- Only the API enqueues jobs, always inside `withActor`. Every payload carries `tenant_id` and `requested_by`.
-- The worker runs as its own role, `aiontheballot_worker`. It sets the job's `tenant_id` as transaction context, and can
-  only touch what jobs need: `source_texts`, `source_documents.extraction_status`, `llm_runs` and
-  `llm_suggestions`.
+- Only the API enqueues jobs, always inside `withActor`: it inserts a `job_requests` row (§3.10) and puts only that
+  row's id in the pg-boss payload.
+- The worker runs as its own role, `aiontheballot_worker`. For each job it reads the `job_requests` row (its one
+  table readable across tenants: ids and kinds, nothing sensitive), sets that row's `tenant_id` as transaction
+  context, and can only touch what jobs need: `source_texts` (insert only), `source_documents.extraction_status`,
+  `llm_runs` and `llm_suggestions`.
 
 ## 9. Open items
 
 1. ~~**Worker database role.**~~ **Decided:** a third halyard extra role, `aiontheballot_worker`. Its grants are limited
-   to job tables, with RLS scoped by `app.tenant_id` from the job payload. It is a runtime role like the others:
-   it owns nothing and has no `BYPASSRLS` (ADR-0002 §2).
+   to job tables, with RLS scoped by the tenant of the job's `job_requests` row. It is a runtime role like the
+   others: it owns nothing and has no `BYPASSRLS` (ADR-0002 §2).
 2. **Better Auth tables.** They should sit in the `auth` schema with uuid ids (its `generateId` configured), if its
    Postgres adapter supports a non-default schema cleanly. The spike will confirm. Otherwise the fallback is
    prefixed tables in a schema `aiontheballot_web` can't read.

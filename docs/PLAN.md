@@ -27,7 +27,7 @@ Each spec is reviewed by Dani before the milestone that builds it starts:
 
 | Spec                                                                                                 | Ready before | Status                                                  |
 | ---------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- |
-| [Data model](spec/data-model.md)                                                                     | M1           | Reviewed                                                |
+| [Data model](spec/data-model.md)                                                                     | M1           | Draft for review (revised)                              |
 | Editorial workflow (user stories and acceptance criteria per role)                                   | M2           | Written during M1                                       |
 | Public site (page content, mobile layouts, display states, share-image layouts, performance budgets) | M3           | Written during M2, with chapter input on public wording |
 
@@ -115,7 +115,8 @@ demo, recorded in [Tracking](#tracking).
 
 - Two users take a cell from draft to published.
 - Self-review, a missing quote and a quote that doesn't match the source are all rejected.
-- Editing a criterion in a live election requires approval from someone else.
+- Editing a criterion in a live election requires an approved change request with a public note, and a second
+  person when the tenant requires one.
 
 ### M3: Public site (overlaps M2)
 

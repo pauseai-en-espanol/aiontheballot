@@ -34,12 +34,12 @@ The UI repeats some checks, but only for user experience.
 
 ### 2. Database roles
 
-| Role                   | Used by                         | Notes                                                     |
-| ---------------------- | ------------------------------- | --------------------------------------------------------- |
-| `aiontheballot_owner`  | Migration and backup jobs only  | Owns the schemas; never used by the running apps          |
-| `aiontheballot_admin`  | API admin routes and the worker | Runtime role                                              |
-| `aiontheballot_web`    | API public routes (read-only)   | Runtime role                                              |
-| `aiontheballot_worker` | Background worker               | Runtime role; only job tables, scoped to the job's tenant |
+| Role                   | Used by                         | Notes                                                                                                                                                    |
+| ---------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aiontheballot_owner`  | Migration and backup jobs only  | Owns the schemas; never used by the running apps                                                                                                         |
+| `aiontheballot_admin`  | API admin routes and the worker | Runtime role                                                                                                                                             |
+| `aiontheballot_web`    | API public routes (read-only)   | Runtime role                                                                                                                                             |
+| `aiontheballot_worker` | Background worker               | Runtime role; only job tables, scoped to the tenant of the job's `job_requests` row, which is the one table it reads across tenants (ids and kinds only) |
 
 All runtime roles are `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB` and own nothing. A catalog
 meta-test fails if this ever changes.
@@ -123,8 +123,14 @@ expires_at)`, under RLS.
 ### 12. Live elections are change-controlled
 
 - Once an election is `live`, editing criteria text, party name or short name, or the methodology body goes
-  through `change_requests`. One member proposes; a different member approves.
-- Each approved change also adds a corrections-log entry.
+  through `change_requests`, always with a public note.
+- **Who approves is a per-tenant setting** (`tenants.live_edits_need_second_approver`). Off by default: with one or
+  two maintainers, one member may propose and approve their own change. On: a different member must approve. The
+  approver always holds `reviewer` or `country_admin`.
+- The edit is accepted only if a matching request was approved in the same transaction. There is no session flag
+  that turns the rule off.
+- Each approved change also adds a corrections-log entry, so live changes are public whichever setting applies.
+- This differs from cell publishing, where four-eyes is a brief-level rule (BRIEF §4) and is never configurable.
 - Programme-status updates need only one person, but are audited and shown publicly with their check date.
 
 ### 13. Withdrawal
@@ -154,16 +160,16 @@ A revision with `change_kind='withdrawal'` returns the cell to _pending_ and log
 
 "Own" means the member's own tenant. A member of tenant A acting on tenant B gets exactly what `aiontheballot_web` gets.
 
-| Capability                                                                                                | editor | reviewer | country_admin | platform_admin                      |
-| --------------------------------------------------------------------------------------------------------- | ------ | -------- | ------------- | ----------------------------------- |
-| Read own-tenant private data (drafts, sources, queue)                                                     | ✓      | ✓        | ✓             | ✓ all tenants, **except** `reports` |
-| Create and edit drafts, evidence and sources; propose live changes                                        | ✓      | –        | ✓             | ✓                                   |
-| Approve and publish revisions and change requests (never own work)                                        | –      | ✓        | ✓             | ✓                                   |
-| Triage right-of-reply reports                                                                             | ✓      | ✓        | ✓             | –                                   |
-| Invite members and manage memberships in own tenant                                                       | –      | –        | ✓             | ✓                                   |
-| Tenant theme, election status, methodology **body**                                                       | –      | –        | ✓             | ✓                                   |
-| Operator, methodology **kind**, `is_pauseai_chapter`, restricted-asset grants, hostnames, tenant `active` | –      | –        | –             | ✓ (audited)                         |
-| Read the audit log                                                                                        | –      | –        | ✓             | ✓                                   |
+| Capability                                                                                                                    | editor | reviewer | country_admin | platform_admin                      |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------ | -------- | ------------- | ----------------------------------- |
+| Read own-tenant private data (drafts, sources, queue)                                                                         | ✓      | ✓        | ✓             | ✓ all tenants, **except** `reports` |
+| Create and edit drafts, evidence and sources; propose live changes                                                            | ✓      | –        | ✓             | ✓                                   |
+| Approve and publish revisions (never own work) and change requests (own allowed unless the tenant requires a second approver) | –      | ✓        | ✓             | ✓                                   |
+| Triage right-of-reply reports                                                                                                 | ✓      | ✓        | ✓             | –                                   |
+| Invite members and manage memberships in own tenant                                                                           | –      | –        | ✓             | ✓                                   |
+| Tenant theme, election status, methodology **body**                                                                           | –      | –        | ✓             | ✓                                   |
+| Operator, methodology **kind**, `is_pauseai_chapter`, restricted-asset grants, hostnames, tenant `active`                     | –      | –        | –             | ✓ (audited)                         |
+| Read the audit log                                                                                                            | –      | –        | ✓             | ✓                                   |
 
 **About platform admins and reports:** the app never lets a platform admin read reports. A platform admin could
 grant themselves a membership to do so, but that grant is audited and visible to the tenant's country admin.
@@ -349,7 +355,7 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 | T21 | A retired or alias domain expires and someone else buys it                 | A7     | Association-owned registrar with auto-renew; hostnames never deleted or detached; uptime monitor per hostname       | Ops checklist                         |
 | T22 | Per-tenant export or purge touches another tenant                          | —      | Owner-only `purge_tenant`; tenant-scoped export                                                                     | Integration tests                     |
 | T23 | Compromised API impersonates users                                         | A10    | Accepted. Small admin surface; immutable audit log; MFA; alert on unusual publish volume                            | Audit review                          |
-| T24 | A live criterion is reworded, changing what already-published ratings mean | A5     | Change requests need four-eyes and create a corrections entry                                                       | DB-rule tests                         |
+| T24 | A live criterion is reworded, changing what already-published ratings mean | A5     | Change requests always create a public corrections entry; a second approver if the tenant requires it               | DB-rule tests                         |
 
 ## Test matrix (BRIEF §8)
 
@@ -444,7 +450,17 @@ Each of these must fail:
 - Publishing a quote that doesn't match its source text.
 - `UPDATE`, `DELETE` or `TRUNCATE` on an immutable table.
 - Running `purge_tenant` as any role other than the owner.
-- Editing a criterion in a live election without an approved change request.
+- Editing a criterion in a live election without an approved change request, including after setting any session
+  variable.
+- Approving one's own change request when the tenant requires a second approver.
+- A change request whose target belongs to another tenant or another election.
+- Writing an actor column (`created_by`, `decided_by`, `attested_by`, …) as someone other than the current user.
+- Updating or deleting `assessment_contributors` rows, or inserting one for another user or another revision.
+- Setting `match_status` to `matched` by hand, or updating `source_texts` or a cited source's file.
+- Referencing a party, criterion or source from another election of the same tenant.
+- A worker job whose payload names a different tenant from its `job_requests` row.
+- A `file_blobs` row whose content doesn't match the recorded hash.
+- An audit diff containing a column marked as personal data.
 - A country admin changing the operator or the methodology kind.
 - Anyone other than a platform admin setting `is_pauseai_chapter`.
 - An ineligible tenant selecting a restricted brand asset.
@@ -457,6 +473,7 @@ And each of these must succeed:
 
 - Quotes whose PDF text contains ligatures or line-break hyphenation.
 - `purge_tenant` run as the owner role.
+- Approving one's own change request when the tenant does not require a second approver.
 - Every permitted operator or kind change, which also writes an audit row.
 
 ### Routing tests
