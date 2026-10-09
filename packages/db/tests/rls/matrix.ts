@@ -113,6 +113,14 @@ export const BRAND_ASSETS = {
   unused: { id: fixtureId(4, 3), restricted: true },
 } as const;
 
+/** Fictional policy texts: a published privacy policy per tenant, plus a newer draft in A. */
+export const TENANT_DOCUMENTS = {
+  publishedA: { id: fixtureId(5, 1), tenant: 'A', published: true },
+  draftA: { id: fixtureId(5, 2), tenant: 'A', published: false },
+  publishedB: { id: fixtureId(5, 3), tenant: 'B', published: true },
+  publishedInactive: { id: fixtureId(5, 4), tenant: 'inactive', published: true },
+} as const satisfies Record<string, { id: string; tenant: TenantKey; published: boolean }>;
+
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
   [{ user: USERS.revokedA, tenant: 'A', role: 'editor' }];
@@ -161,8 +169,11 @@ export interface Row {
   public: boolean;
   /** A predicate matching exactly this fixture row. */
   where: string;
-  /** Rules that differ for this row's state (say, a draft row may be deleted and a published one not). */
-  rules?: Partial<Record<'select' | 'update' | 'delete', Rule>>;
+  /**
+   * Rules that differ for this row's state (say, a draft row may be deleted and a published one not), by operation:
+   * 'select', 'update', 'delete', or 'update:<column>' for a column update.
+   */
+  rules?: Readonly<Record<string, Rule>>;
   /**
    * Operations a permitted principal still can't complete, with the SQLSTATE that stops them (say, 23503 when a
    * foreign key protects a referenced row). Denied principals must still be stopped by the security layers.
@@ -641,6 +652,36 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     delete: COUNTRY_ADMINS,
     columnUpdates: {
       tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
+  'app.tenant_documents': {
+    rows: Object.entries(TENANT_DOCUMENTS).map(([name, doc]) => ({
+      id: `${doc.published ? 'published' : 'draft'} document of ${doc.tenant}${name === 'draftA' ? ' (draft)' : ''}`,
+      tenant: doc.tenant,
+      public: doc.published && TENANTS[doc.tenant].active,
+      where: `id = '${doc.id}'`,
+      ...(doc.published
+        ? { rules: { update: NOBODY, delete: NOBODY, 'update:published_at': NOBODY } }
+        : {}),
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `draft for ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.tenant_documents (tenant_id, kind, body)
+            VALUES ('${TENANTS[key].id}', 'right_of_reply_policy', '{"es": "Política de réplica de ejemplo"}')`,
+    })),
+    set: `body = '{"es": "Texto revisado de ejemplo"}'`,
+    select: { public: true, ...MEMBERS },
+    insert: COUNTRY_ADMINS,
+    update: COUNTRY_ADMINS,
+    delete: COUNTRY_ADMINS,
+    columnUpdates: {
+      published_at: { set: 'published_at = now()', rule: COUNTRY_ADMINS },
+      kind: { set: `kind = 'about_operator'`, rule: NOBODY },
+      version: { set: 'version = version + 10', rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+      created_by: { set: `created_by = '${USERS.newcomer}'`, rule: NOBODY },
     },
   },
 

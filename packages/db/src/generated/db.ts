@@ -9,6 +9,8 @@ export type AppMethodologyKind = 'demands' | 'descriptive';
 
 export type AppOrgRole = 'endorser' | 'operator';
 
+export type AppTenantDocumentKind = 'about_operator' | 'privacy_policy' | 'right_of_reply_policy';
+
 export type AppTenantRole = 'country_admin' | 'editor' | 'reviewer';
 
 export type Generated<T> =
@@ -134,6 +136,17 @@ export interface AppTenantBrandSelections {
   tenant_id: string;
 }
 
+export interface AppTenantDocuments {
+  body: Json;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  kind: AppTenantDocumentKind;
+  published_at: Timestamp | null;
+  tenant_id: string;
+  version: number;
+}
+
 export interface AppTenantHostnames {
   created_at: Generated<Timestamp>;
   hostname: string;
@@ -179,6 +192,7 @@ export interface DB {
   'app.platform_hostnames': AppPlatformHostnames;
   'app.public_versions': AppPublicVersions;
   'app.tenant_brand_selections': AppTenantBrandSelections;
+  'app.tenant_documents': AppTenantDocuments;
   'app.tenant_hostnames': AppTenantHostnames;
   'app.tenant_organizations': AppTenantOrganizations;
   'app.tenants': AppTenants;

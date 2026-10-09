@@ -10,6 +10,7 @@ import {
   PLATFORM_HOSTNAME,
   REVOKED_INVITATION_TOKEN,
   REVOKED_MEMBERSHIPS,
+  TENANT_DOCUMENTS,
   type TenantKey,
   TENANTS,
   TOMBSTONE_HOSTNAME,
@@ -130,5 +131,12 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
   await client.query('INSERT INTO app.hostname_tombstones (hostname) VALUES ($1)', [
     TOMBSTONE_HOSTNAME,
   ]);
+  for (const doc of Object.values(TENANT_DOCUMENTS)) {
+    await client.query(
+      `INSERT INTO app.tenant_documents (id, tenant_id, kind, body, published_at)
+       VALUES ($1, $2, 'privacy_policy', $3, CASE WHEN $4 THEN now() END)`,
+      [doc.id, TENANTS[doc.tenant].id, { es: 'Política de privacidad de ejemplo' }, doc.published],
+    );
+  }
   await client.query('COMMIT');
 };

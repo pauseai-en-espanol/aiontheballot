@@ -231,8 +231,10 @@ const STAMPED_ON_INSERT = [
 ];
 /** Set on every insert and update. Columns set on a later transition are covered by the data-rule tests. */
 const STAMPED_ALWAYS = ['updated_by', 'updated_at'];
-/** `table.column` pairs that look stamped but are copied from another row instead, with the reason. */
-const NOT_STAMPED: Readonly<Record<string, string>> = {};
+/** `table.column` pairs that look stamped but are set elsewhere (copied, or on a later transition), and why. */
+const NOT_STAMPED: Readonly<Record<string, string>> = {
+  'tenant_documents.published_at': 'set when a draft is published, by the rules trigger',
+};
 
 const ROW = 1;
 const BEFORE = 2;

@@ -78,8 +78,16 @@ export const matrixCases = (): MatrixCase[] =>
           rule('update'),
           true,
         );
-        for (const [column, { set, rule }] of Object.entries(spec.columnUpdates ?? {})) {
-          add(`update:${column}`, `UPDATE ${relation} SET ${set} WHERE ${row.where}`, rule, true);
+        for (const [column, { set, rule: columnRule }] of Object.entries(
+          spec.columnUpdates ?? {},
+        )) {
+          const op = `update:${column}`;
+          add(
+            op,
+            `UPDATE ${relation} SET ${set} WHERE ${row.where}`,
+            row.rules?.[op] ?? columnRule,
+            true,
+          );
         }
         add('delete', `DELETE FROM ${relation} WHERE ${row.where}`, rule('delete'), true);
       }

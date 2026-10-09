@@ -793,6 +793,41 @@ CREATE FUNCTION private.stamp() RETURNS trigger
 ALTER FUNCTION private.stamp() OWNER TO aiontheballot_owner;
 
 --
+-- Name: tenant_document_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.tenant_document_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    IF TG_OP = 'INSERT' THEN
+      NEW.version := (SELECT coalesce(max(d.version), 0) + 1 FROM app.tenant_documents d
+                       WHERE d.tenant_id = NEW.tenant_id AND d.kind = NEW.kind);
+    ELSE
+      IF OLD.published_at IS NOT NULL THEN
+        RAISE EXCEPTION '% version % is published and never changes', OLD.kind, OLD.version
+          USING ERRCODE = 'restrict_violation';
+      END IF;
+      IF NEW.kind IS DISTINCT FROM OLD.kind OR NEW.version IS DISTINCT FROM OLD.version THEN
+        RAISE EXCEPTION 'a document keeps its kind and version' USING ERRCODE = 'restrict_violation';
+      END IF;
+    END IF;
+    IF NEW.published_at IS NOT NULL THEN
+      IF NOT NEW.body ? (SELECT t.default_locale FROM app.tenants t WHERE t.id = NEW.tenant_id) THEN
+        RAISE EXCEPTION '% needs text in the tenant''s default locale before it is published', NEW.kind
+          USING ERRCODE = 'check_violation';
+      END IF;
+      NEW.published_at := now();
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.tenant_document_rules() OWNER TO aiontheballot_owner;
+
+--
 -- Name: tenant_hostname_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1056,6 +1091,24 @@ CREATE TABLE app.tenant_brand_selections (
 ALTER TABLE app.tenant_brand_selections OWNER TO aiontheballot_owner;
 
 --
+-- Name: tenant_documents; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.tenant_documents (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    kind app.tenant_document_kind NOT NULL,
+    version integer NOT NULL,
+    body app.localized NOT NULL,
+    published_at timestamp with time zone,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE app.tenant_documents OWNER TO aiontheballot_owner;
+
+--
 -- Name: tenant_hostnames; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1240,6 +1293,30 @@ ALTER TABLE ONLY app.public_versions
 
 ALTER TABLE ONLY app.tenant_brand_selections
     ADD CONSTRAINT tenant_brand_selections_pkey PRIMARY KEY (tenant_id, slot);
+
+
+--
+-- Name: tenant_documents tenant_documents_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.tenant_documents
+    ADD CONSTRAINT tenant_documents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tenant_documents tenant_documents_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.tenant_documents
+    ADD CONSTRAINT tenant_documents_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
+-- Name: tenant_documents tenant_documents_tenant_id_kind_version_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.tenant_documents
+    ADD CONSTRAINT tenant_documents_tenant_id_kind_version_key UNIQUE (tenant_id, kind, version);
 
 
 --
@@ -1430,6 +1507,13 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.tenant_brand_select
 
 
 --
+-- Name: tenant_documents audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.tenant_documents FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
 -- Name: tenant_hostnames audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1469,6 +1553,13 @@ CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.organ
 --
 
 CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.tenant_brand_selections FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: tenant_documents bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.tenant_documents FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
 
 
 --
@@ -1556,6 +1647,13 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.tenant_brand_selections
 
 
 --
+-- Name: tenant_documents forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.tenant_documents FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: tenant_hostnames forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1640,6 +1738,13 @@ CREATE CONSTRAINT TRIGGER restricted_assets_are_eligible AFTER INSERT OR DELETE 
 
 
 --
+-- Name: tenant_documents rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.tenant_documents FOR EACH ROW EXECUTE FUNCTION private.tenant_document_rules();
+
+
+--
 -- Name: tenant_hostnames rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1693,6 +1798,13 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.organizations FOR EACH ROW E
 --
 
 CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.platform_admins FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
+
+
+--
+-- Name: tenant_documents stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.tenant_documents FOR EACH ROW EXECUTE FUNCTION private.stamp('created_by', 'created_at');
 
 
 --
@@ -1797,6 +1909,14 @@ ALTER TABLE ONLY app.tenant_brand_selections
 
 
 --
+-- Name: tenant_documents tenant_documents_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.tenant_documents
+    ADD CONSTRAINT tenant_documents_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
 -- Name: tenant_hostnames tenant_hostnames_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1860,6 +1980,13 @@ CREATE POLICY country_admin_delete ON app.tenant_brand_selections FOR DELETE TO 
 
 
 --
+-- Name: tenant_documents country_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_delete ON app.tenant_documents FOR DELETE TO aiontheballot_admin USING ((((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)) AND (published_at IS NULL)));
+
+
+--
 -- Name: invitations country_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1878,6 +2005,13 @@ CREATE POLICY country_admin_insert ON app.memberships FOR INSERT TO aiontheballo
 --
 
 CREATE POLICY country_admin_insert ON app.tenant_brand_selections FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: tenant_documents country_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_insert ON app.tenant_documents FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -1906,6 +2040,13 @@ CREATE POLICY country_admin_revoke ON app.invitations FOR UPDATE TO aiontheballo
 --
 
 CREATE POLICY country_admin_update ON app.tenant_brand_selections FOR UPDATE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: tenant_documents country_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_update ON app.tenant_documents FOR UPDATE TO aiontheballot_admin USING ((((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)) AND (published_at IS NULL))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -1972,6 +2113,13 @@ CREATE POLICY member_read ON app.organizations FOR SELECT TO aiontheballot_admin
 --
 
 CREATE POLICY member_read ON app.tenant_brand_selections FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: tenant_documents member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.tenant_documents FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -2212,6 +2360,15 @@ CREATE POLICY public_read ON app.tenant_brand_selections FOR SELECT TO aiontheba
 
 
 --
+-- Name: tenant_documents public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.tenant_documents FOR SELECT TO aiontheballot_web USING (((published_at IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM app.tenants t
+  WHERE ((t.id = tenant_documents.tenant_id) AND t.active)))));
+
+
+--
 -- Name: tenant_hostnames public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2247,6 +2404,12 @@ ALTER TABLE app.public_versions ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE app.tenant_brand_selections ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: tenant_documents; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.tenant_documents ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: tenant_hostnames; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
@@ -2583,6 +2746,13 @@ REVOKE ALL ON FUNCTION private.stamp() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION tenant_document_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.tenant_document_rules() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION tenant_hostname_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -2913,6 +3083,42 @@ GRANT INSERT(slot) ON TABLE app.tenant_brand_selections TO aiontheballot_admin;
 --
 
 GRANT INSERT(brand_asset_id),UPDATE(brand_asset_id) ON TABLE app.tenant_brand_selections TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE tenant_documents; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.tenant_documents TO aiontheballot_web;
+GRANT SELECT,DELETE ON TABLE app.tenant_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_documents.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.tenant_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_documents.kind; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(kind) ON TABLE app.tenant_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_documents.body; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(body),UPDATE(body) ON TABLE app.tenant_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_documents.published_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(published_at),UPDATE(published_at) ON TABLE app.tenant_documents TO aiontheballot_admin;
 
 
 --
