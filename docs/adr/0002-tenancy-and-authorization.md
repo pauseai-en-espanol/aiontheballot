@@ -294,7 +294,8 @@ is the primary key.
 Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that returns serve, a 301 redirect, or
 404:
 
-1. Normalize the host: lowercase, strip the port and any trailing dot, convert IDNs.
+1. Normalize the host: lowercase, strip the port and any trailing dot, convert IDNs. A host with userinfo,
+   percent-encoding or a path is **404**.
 2. If the host is a platform host and the path is `/{slug}/…`:
    - unknown slug → **404**;
    - the tenant has a canonical custom host → **301** to it, same path and query;
@@ -306,9 +307,15 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 
 **When serving:**
 
-- Requests are rewritten to an internal path that includes the tenant, so render caches can never mix tenants.
-- Incoming requests that already target that internal path prefix get 404.
-- Static asset paths are excluded from the rewrite.
+- Requests are rewritten to an internal path that includes the tenant and the locale (`/_tenant/{slug}/{locale}/…`),
+  so render caches can never mix tenants.
+- Paths whose first segment starts with `_` are reserved and get 404, percent-encoded or not, so no request can
+  target the internal prefix. Slugs can never start with `_`.
+- System paths are served as they are on any host, without the rewrite: build assets (`/_next/`), the health probe
+  (`/healthz`, which the kubelet calls with the pod IP as host) and the error relay (`/_relay/`).
+- `www.` gets no special treatment: it is an ordinary alias, and 404 unless registered.
+- `resolve()`, `canonicalBase()` and the routing table live in `packages/domain`. The table is built from public
+  hostname data and re-checks the hostname invariants above.
 - The exact mechanics depend on the framework (ADR-0003).
 
 ## Threat model (cross-tenant focus)

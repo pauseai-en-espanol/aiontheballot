@@ -170,7 +170,8 @@ cross-country views and an open-data export.
 - Catalan, Basque and Galician are added later as optional locales that fall back to Spanish.
 - **The library formats messages; it doesn't route.** Our `resolve()` parses the locale from the path, and
   next-intl's routing middleware is not used.
-  - Paths look like `/generales-2026` in the tenant's default locale and `/ca/generales-2026` in others.
+  - Paths look like `/generales-2026` in the tenant's default locale and `/ca/generales-2026` in others. The
+    default locale's own prefix (`/es/…` for Spain) 301s to the unprefixed path, so each page has one address.
   - `hreflang` is generated from the locales each tenant enables.
 - **The same messages are used outside Next.** The share-image templates and the API's emails use next-intl's core
   (`createTranslator`) through `packages/i18n`.
