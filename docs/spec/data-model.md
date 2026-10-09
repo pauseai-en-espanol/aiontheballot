@@ -32,7 +32,8 @@ lives. Any example data here is fictional.
   through `(tenant_id, election_id, …)` foreign keys, so nothing can mix two elections, even within one tenant.
   Parents expose `unique (tenant_id, election_id, id)` for this.
 - **Actor columns** are set by trigger to `private.current_user_id()`; a value sent by the caller is overwritten, so
-  nobody can act in someone else's name. Each is set at one moment only:
+  nobody can act in someone else's name. Each is set at one moment only (columns set on insert or on every update by
+  `private.stamp(columns…)`, the others by the trigger for their transition):
 
   | Columns                                                                             | Set                                    |
   | ----------------------------------------------------------------------------------- | -------------------------------------- |
@@ -50,12 +51,15 @@ lives. Any example data here is fictional.
   `organization`, `message`, `resolution_note`), `invitations.email`, `files.original_filename` and
   `methodology_reviewers.name`.
 - **Localized text:** `jsonb` objects that map a locale to a string, e.g. `{"es": "…", "en": "…"}`.
-  - `private.is_localized()` checks the shape.
+  - The domain `app.localized` checks the shape: a non-empty object whose keys are locale codes (`app.locale`) and
+    whose values are non-blank strings.
   - The tenant's default locale must be present before anything goes public: at publish time, when an election goes
     live, and when a change request is approved.
-- **Slugs:** lowercase, matching `^[a-z0-9]+(-[a-z0-9]+)*$`. Election, party and criterion slugs are fixed once the
-  election leaves `draft`, because share images carry their URLs. An election slug is never locale-shaped
-  (`^[a-z]{2}(-[a-z]{2})?$`), since `/ca/…` is a locale prefix.
+- **Slugs:** the domain `app.slug`, lowercase, matching `^[a-z0-9]+(-[a-z0-9]+)*$`. Election, party and criterion
+  slugs are fixed once the election leaves `draft`, because share images carry their URLs. An election slug is never
+  locale-shaped (`^[a-z]{2}(-[a-z]{2})?$`), since `/ca/…` is a locale prefix.
+- **Domains** (`app.localized`, `app.slug`, `app.locale`) check with built-in functions only, so writing them needs
+  no `EXECUTE` grant to a runtime role. The illustrative SQL below writes their base types, `jsonb` and `text`.
 - **Emails:** stored lowercased (`check (email = lower(email))`).
 - **Timestamps:** `created_at timestamptz not null default now()`. Mutable tables also get `updated_at`, kept by a
   trigger.

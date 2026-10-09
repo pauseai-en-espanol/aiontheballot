@@ -47,7 +47,8 @@ and the [data model spec](docs/spec/data-model.md)):
 1. **Classify it** as public-capable or private. A table is never both: private columns go in their own table.
 2. **Tenant ownership:** `tenant_id uuid not null`, `unique (tenant_id, id)`, and composite foreign keys
    `(tenant_id, parent_id)` to every tenant-scoped parent.
-3. **The tenant-immutability trigger.**
+3. **The tenant-immutability trigger,** and a `private.stamp(...)` trigger for its actor columns and event
+   timestamps. Localized text, slugs and locale codes use the domains `app.localized`, `app.slug` and `app.locale`.
 4. **RLS enabled, with policies:**
    - the public-visibility rule, if the table is public-capable;
    - membership policies through the `private` helpers, which already require `aal2`.

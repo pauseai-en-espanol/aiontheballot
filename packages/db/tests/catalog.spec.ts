@@ -1,3 +1,5 @@
+import type pg from 'pg';
+
 import { describe, expect, it } from 'vitest';
 
 import { EXECUTE_ALLOWLIST, SECURITY_DEFINER_ALLOWLIST } from './allowlists.js';
@@ -75,6 +77,92 @@ describe('catalog: closed by default', () => {
     expect(functions.filter((f) => f.definer).map((f) => f.fn)).toEqual([
       ...SECURITY_DEFINER_ALLOWLIST,
     ]);
+  });
+});
+
+/** Actor columns and event timestamps set when a row is inserted (data model spec §1). */
+const STAMPED_ON_INSERT = [
+  'created_by',
+  'proposed_by',
+  'requested_by',
+  'granted_by',
+  'checked_by',
+  'actor_id',
+  'created_at',
+  'proposed_at',
+  'checked_at',
+  'granted_at',
+  'approved_at',
+  'published_at',
+  'first_edit_at',
+];
+/** Set on every insert and update. Columns set on a later transition are covered by the data-rule tests. */
+const STAMPED_ALWAYS = ['updated_by', 'updated_at'];
+/** `table.column` pairs that look stamped but are copied from another row instead, with the reason. */
+const NOT_STAMPED: Readonly<Record<string, string>> = {};
+
+const ROW = 1;
+const BEFORE = 2;
+const INSERT = 4;
+const UPDATE = 16;
+
+/** Every `table.column` in app that should be stamped by a BEFORE ROW `private.stamp` trigger but isn't. */
+const missingStamps = async (client: pg.Client): Promise<string[]> => {
+  const columns = (
+    await client.query<{ name: string; col: string }>(
+      `SELECT c.relname AS name, a.attname AS col
+         FROM pg_attribute a
+         JOIN pg_class c ON c.oid = a.attrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p') AND a.attnum > 0 AND NOT a.attisdropped
+          AND a.attname = ANY($1)
+        ORDER BY 1, 2`,
+      [[...STAMPED_ON_INSERT, ...STAMPED_ALWAYS]],
+    )
+  ).rows;
+  const triggers = (
+    await client.query<{ name: string; type: number; args: Buffer }>(
+      `SELECT c.relname AS name, t.tgtype AS type, t.tgargs AS args
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'app' AND NOT t.tgisinternal AND t.tgfoid = to_regprocedure('private.stamp()')`,
+    )
+  ).rows.map((t) => ({ ...t, args: t.args.toString('utf8').split('\0').filter(Boolean) }));
+
+  return columns
+    .filter(({ name, col }) => !(`${name}.${col}` in NOT_STAMPED))
+    .filter(({ name, col }) => {
+      const events = INSERT | (STAMPED_ALWAYS.includes(col) ? UPDATE : 0);
+      return !triggers.some(
+        (t) =>
+          t.name === name &&
+          t.args.includes(col) &&
+          (t.type & (ROW | BEFORE)) === (ROW | BEFORE) &&
+          (t.type & events) === events,
+      );
+    })
+    .map(({ name, col }) => `${name}.${col}`);
+};
+
+describe('catalog: actor columns and event timestamps', () => {
+  it('are all set by a private.stamp trigger', async () => {
+    expect(await inRolledBackTransaction(missingStamps)).toEqual([]);
+  });
+
+  it('are reported when a table forgets the trigger, or stamps updated_by on insert only', async () => {
+    const missing = await inRolledBackTransaction(async (client) => {
+      await client.query(`
+        CREATE TABLE app.unstamped (id int PRIMARY KEY, created_by uuid);
+        CREATE TABLE app.half_stamped (id int PRIMARY KEY, created_at timestamptz, updated_by uuid);
+        CREATE TRIGGER stamp BEFORE INSERT ON app.half_stamped
+          FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at', 'updated_by');
+        CREATE TABLE app.stamped (id int PRIMARY KEY, created_by uuid, updated_at timestamptz);
+        CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.stamped
+          FOR EACH ROW EXECUTE FUNCTION private.stamp('created_by', 'updated_at');`);
+      return missingStamps(client);
+    });
+    expect(missing).toEqual(['half_stamped.updated_by', 'unstamped.created_by']);
   });
 });
 

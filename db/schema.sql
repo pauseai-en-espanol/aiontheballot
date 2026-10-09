@@ -172,6 +172,30 @@ CREATE TYPE app.job_kind AS ENUM (
 ALTER TYPE app.job_kind OWNER TO aiontheballot_owner;
 
 --
+-- Name: locale; Type: DOMAIN; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE DOMAIN app.locale AS text
+	CONSTRAINT locale_check CHECK ((VALUE ~ '^[a-z]{2}(-[a-z]{2})?$'::text));
+
+
+ALTER DOMAIN app.locale OWNER TO aiontheballot_owner;
+
+--
+-- Name: localized; Type: DOMAIN; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE DOMAIN app.localized AS jsonb
+	CONSTRAINT localized_check CHECK (
+CASE
+    WHEN (jsonb_typeof(VALUE) = 'object'::text) THEN ((VALUE <> '{}'::jsonb) AND (NOT jsonb_path_exists(VALUE, '$.keyvalue()?(!(@."key" like_regex "^[a-z]{2}(-[a-z]{2})?$"))'::jsonpath)) AND (NOT jsonb_path_exists(VALUE, '$.*?(@.type() != "string" || !(@ like_regex "[^[:space:]]"))'::jsonpath)))
+    ELSE false
+END);
+
+
+ALTER DOMAIN app.localized OWNER TO aiontheballot_owner;
+
+--
 -- Name: match_status; Type: TYPE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -278,6 +302,16 @@ CREATE TYPE app.review_event_kind AS ENUM (
 
 
 ALTER TYPE app.review_event_kind OWNER TO aiontheballot_owner;
+
+--
+-- Name: slug; Type: DOMAIN; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE DOMAIN app.slug AS text
+	CONSTRAINT slug_check CHECK ((VALUE ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text));
+
+
+ALTER DOMAIN app.slug OWNER TO aiontheballot_owner;
 
 --
 -- Name: source_kind; Type: TYPE; Schema: app; Owner: aiontheballot_owner
@@ -429,6 +463,43 @@ CREATE FUNCTION private.normalize_for_match(input text) RETURNS text
 
 ALTER FUNCTION private.normalize_for_match(input text) OWNER TO aiontheballot_owner;
 
+--
+-- Name: stamp(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.stamp() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    col text;
+    fresh jsonb := to_jsonb(NEW);
+    stamped jsonb := '{}';
+  BEGIN
+    IF TG_NARGS = 0 THEN
+      RAISE EXCEPTION 'private.stamp on %.% needs the columns to stamp', TG_TABLE_SCHEMA, TG_TABLE_NAME
+        USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+    FOREACH col IN ARRAY TG_ARGV LOOP
+      IF NOT fresh ? col OR NOT (col LIKE '%\_at' OR col LIKE '%\_by' OR col = 'actor_id') THEN
+        RAISE EXCEPTION 'private.stamp on %.%: % is not an actor column or event timestamp of the table',
+          TG_TABLE_SCHEMA, TG_TABLE_NAME, col
+          USING ERRCODE = 'invalid_parameter_value';
+      END IF;
+      stamped := stamped || jsonb_build_object(col,
+        CASE
+          WHEN TG_OP = 'UPDATE' AND col NOT IN ('updated_by', 'updated_at') THEN to_jsonb(OLD) -> col
+          WHEN col LIKE '%\_at' THEN to_jsonb(now())
+          ELSE to_jsonb(private.current_user_id())
+        END);
+    END LOOP;
+    RETURN jsonb_populate_record(NEW, stamped);
+  END
+  $$;
+
+
+ALTER FUNCTION private.stamp() OWNER TO aiontheballot_owner;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -548,6 +619,20 @@ REVOKE ALL ON TYPE app.job_kind FROM PUBLIC;
 
 
 --
+-- Name: TYPE locale; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON TYPE app.locale FROM PUBLIC;
+
+
+--
+-- Name: TYPE localized; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON TYPE app.localized FROM PUBLIC;
+
+
+--
 -- Name: TYPE match_status; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -601,6 +686,13 @@ REVOKE ALL ON TYPE app.report_status FROM PUBLIC;
 --
 
 REVOKE ALL ON TYPE app.review_event_kind FROM PUBLIC;
+
+
+--
+-- Name: TYPE slug; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON TYPE app.slug FROM PUBLIC;
 
 
 --
@@ -666,6 +758,13 @@ REVOKE ALL ON FUNCTION private.forbid_tenant_change() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.normalize_for_match(input text) FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION stamp(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.stamp() FROM PUBLIC;
 
 
 --
