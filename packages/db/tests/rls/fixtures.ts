@@ -2,6 +2,8 @@ import type pg from 'pg';
 
 import {
   BRAND_ASSETS,
+  CORE_CRITERION,
+  ELECTIONS,
   FILES,
   HOSTNAMES,
   INVITATION_TOKENS,
@@ -151,6 +153,63 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
         `INSERT INTO app.file_blobs (file_id, tenant_id, content) VALUES ($1, $2, convert_to($3, 'UTF8'))`,
         [f.id, TENANTS[f.tenant].id, f.content],
       );
+    }
+  }
+  await client.query(
+    `INSERT INTO app.core_criteria (id, key, title, description)
+     VALUES ($1, 'criterio-comun-de-ejemplo', '{"es": "Criterio común de ejemplo"}', '{"es": "Descripción de ejemplo"}')`,
+    [CORE_CRITERION],
+  );
+  // Each election starts as a draft, gets its structure, and only then goes live (and is archived).
+  for (const e of Object.values(ELECTIONS)) {
+    const tenant = TENANTS[e.tenant].id;
+    await client.query(
+      `INSERT INTO app.elections (id, tenant_id, slug, type, territory_code, name) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [e.id, tenant, e.slug, e.type, e.territory, { es: `Elecciones de ejemplo ${e.slug}` }],
+    );
+    if (!e.structure) {
+      continue;
+    }
+    await client.query(
+      `INSERT INTO app.methodologies (id, tenant_id, election_id, kind, demands_owner_id, body)
+       VALUES ($1, $2, $3, 'demands', $4, '{"es": "Metodología de ejemplo"}')`,
+      [e.methodology, tenant, e.id, ORGANIZATIONS[e.tenant].id],
+    );
+    await client.query(
+      `INSERT INTO app.methodology_reviewers (id, tenant_id, methodology_id, name, affiliation)
+       VALUES ($1, $2, $3, 'Persona Revisora de Ejemplo', 'Universidad de Ejemplo')`,
+      [e.reviewer, tenant, e.methodology],
+    );
+    for (const [id, letter, order] of [
+      [e.party, 'A', 1],
+      [e.secondParty, 'B', 2],
+    ] as const) {
+      await client.query(
+        `INSERT INTO app.parties (id, tenant_id, election_id, slug, name, short_name, display_order, logo_file_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          id,
+          tenant,
+          e.id,
+          `partido-ejemplo-${letter.toLowerCase()}`,
+          { es: `Partido Ejemplo ${letter}` },
+          { es: `PE${letter}` },
+          order,
+          id === ELECTIONS.liveA.party ? FILES.logoA.id : null,
+        ],
+      );
+    }
+    await client.query(
+      `INSERT INTO app.criteria (id, tenant_id, election_id, slug, title, description, display_order, core_criterion_id)
+       VALUES ($1, $2, $3, 'criterio-de-ejemplo-1', '{"es": "Criterio de ejemplo 1"}',
+               '{"es": "Descripción de ejemplo"}', 1, $4)`,
+      [e.criterion, tenant, e.id, e.id === ELECTIONS.liveA.id ? CORE_CRITERION : null],
+    );
+    if (e.status !== 'draft') {
+      await client.query(`UPDATE app.elections SET status = 'live' WHERE id = $1`, [e.id]);
+    }
+    if (e.status === 'archived') {
+      await client.query(`UPDATE app.elections SET status = 'archived' WHERE id = $1`, [e.id]);
     }
   }
   await client.query('COMMIT');

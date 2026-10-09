@@ -526,6 +526,8 @@ CREATE FUNCTION private.bump_public_version() RETURNS trigger
         UNION
         SELECT o.tenant_id FROM app.tenant_organizations o JOIN app.organizations g ON g.id = o.organization_id
          WHERE g.logo_asset_id = (subject ->> 'id')::uuid)
+      WHEN TG_TABLE_SCHEMA = 'app' AND TG_TABLE_NAME = 'core_criteria' THEN ARRAY(
+        SELECT DISTINCT c.tenant_id FROM app.criteria c WHERE c.core_criterion_id = (subject ->> 'id')::uuid)
       ELSE ARRAY[(subject ->> 'tenant_id')::uuid]
     END;
     IF array_position(tenants, NULL) IS NOT NULL THEN
@@ -732,6 +734,26 @@ CREATE FUNCTION private.normalize_for_match(input text) RETURNS text
 ALTER FUNCTION private.normalize_for_match(input text) OWNER TO aiontheballot_owner;
 
 --
+-- Name: party_logo_is_public_asset(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.party_logo_is_public_asset() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    IF NEW.logo_file_id IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM app.files f WHERE f.id = NEW.logo_file_id AND f.bucket = 'public_assets') THEN
+      RAISE EXCEPTION 'a party logo must be an image in the public_assets bucket' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.party_logo_is_public_asset() OWNER TO aiontheballot_owner;
+
+--
 -- Name: platform_hostname_is_free(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -749,6 +771,36 @@ CREATE FUNCTION private.platform_hostname_is_free() RETURNS trigger
 
 
 ALTER FUNCTION private.platform_hostname_is_free() OWNER TO aiontheballot_owner;
+
+--
+-- Name: restrict_columns(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.restrict_columns() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    roles app.tenant_role[] := CASE WHEN TG_ARGV[0] = '' THEN '{}' ELSE string_to_array(TG_ARGV[0], ',') END;
+    guarded text[] := TG_ARGV[1:TG_NARGS - 1];
+    changed text;
+  BEGIN
+    SELECT string_agg(n.key, ', ' ORDER BY n.key) INTO changed
+      FROM jsonb_each(to_jsonb(NEW)) n
+     WHERE n.key = ANY (guarded) AND n.value IS DISTINCT FROM to_jsonb(OLD) -> n.key;
+    IF changed IS NOT NULL
+       AND NOT private.is_platform_admin()
+       AND (to_jsonb(NEW) ->> 'tenant_id')::uuid NOT IN (SELECT private.my_tenants(VARIADIC roles)) THEN
+      RAISE EXCEPTION 'changing % of %.% needs %', changed, TG_TABLE_SCHEMA, TG_TABLE_NAME,
+        CASE WHEN cardinality(roles) = 0 THEN 'a platform admin' ELSE array_to_string(roles, ' or ') END
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.restrict_columns() OWNER TO aiontheballot_owner;
 
 --
 -- Name: restricted_assets_are_eligible(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -976,6 +1028,67 @@ CREATE TABLE app.brand_assets (
 ALTER TABLE app.brand_assets OWNER TO aiontheballot_owner;
 
 --
+-- Name: core_criteria; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.core_criteria (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    key app.slug NOT NULL,
+    title app.localized NOT NULL,
+    description app.localized NOT NULL
+);
+
+
+ALTER TABLE app.core_criteria OWNER TO aiontheballot_owner;
+
+--
+-- Name: criteria; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.criteria (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    election_id uuid NOT NULL,
+    slug app.slug NOT NULL,
+    title app.localized NOT NULL,
+    description app.localized NOT NULL,
+    display_order integer NOT NULL,
+    core_criterion_id uuid,
+    retired_at timestamp with time zone
+);
+
+
+ALTER TABLE app.criteria OWNER TO aiontheballot_owner;
+
+--
+-- Name: elections; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.elections (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    slug app.slug NOT NULL,
+    type app.election_type NOT NULL,
+    territory_code text,
+    name app.localized NOT NULL,
+    election_date date,
+    status app.election_status DEFAULT 'draft'::app.election_status NOT NULL,
+    went_live_at timestamp with time zone,
+    require_second_reviewer boolean DEFAULT true NOT NULL,
+    frozen_from timestamp with time zone,
+    frozen_until timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT elections_check CHECK (((type <> ALL (ARRAY['general'::app.election_type, 'european'::app.election_type])) OR (territory_code IS NULL))),
+    CONSTRAINT elections_check1 CHECK (((type <> 'regional'::app.election_type) OR (territory_code IS NOT NULL))),
+    CONSTRAINT elections_check2 CHECK (((frozen_until IS NULL) OR ((frozen_from IS NOT NULL) AND (frozen_until > frozen_from)))),
+    CONSTRAINT elections_slug_check CHECK (((slug)::text !~ '^[a-z]{2}(-[a-z]{2})?$'::text)),
+    CONSTRAINT elections_territory_code_check CHECK ((territory_code ~ '^[A-Z]{2}-[A-Z0-9]{1,3}$'::text))
+);
+
+
+ALTER TABLE app.elections OWNER TO aiontheballot_owner;
+
+--
 -- Name: file_blobs; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1094,6 +1207,50 @@ CREATE TABLE app.memberships (
 ALTER TABLE app.memberships OWNER TO aiontheballot_owner;
 
 --
+-- Name: methodologies; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.methodologies (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    election_id uuid NOT NULL,
+    kind app.methodology_kind NOT NULL,
+    demands_owner_id uuid,
+    body app.localized NOT NULL,
+    admissible_source_kinds app.source_kind[] DEFAULT '{pdf,web_page}'::app.source_kind[] NOT NULL,
+    not_mentioned_source_kinds app.source_kind[] DEFAULT '{pdf,web_page}'::app.source_kind[] NOT NULL,
+    CONSTRAINT methodologies_check CHECK (((kind = 'demands'::app.methodology_kind) = (demands_owner_id IS NOT NULL))),
+    CONSTRAINT methodologies_check1 CHECK (((cardinality(admissible_source_kinds) > 0) AND (cardinality(not_mentioned_source_kinds) > 0)))
+);
+
+
+ALTER TABLE app.methodologies OWNER TO aiontheballot_owner;
+
+--
+-- Name: methodology_reviewers; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.methodology_reviewers (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    methodology_id uuid NOT NULL,
+    name text NOT NULL,
+    affiliation text NOT NULL,
+    display_order integer DEFAULT 0 NOT NULL,
+    retired_at timestamp with time zone
+);
+
+
+ALTER TABLE app.methodology_reviewers OWNER TO aiontheballot_owner;
+
+--
+-- Name: COLUMN methodology_reviewers.name; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.methodology_reviewers.name IS 'personal data';
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1117,6 +1274,33 @@ CREATE TABLE app.organizations (
 
 
 ALTER TABLE app.organizations OWNER TO aiontheballot_owner;
+
+--
+-- Name: parties; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.parties (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    election_id uuid NOT NULL,
+    slug app.slug NOT NULL,
+    name app.localized NOT NULL,
+    short_name app.localized NOT NULL,
+    logo_file_id uuid,
+    colour text,
+    display_order integer NOT NULL,
+    website text,
+    programme_status app.programme_status DEFAULT 'pending'::app.programme_status NOT NULL,
+    programme_checked_at timestamp with time zone,
+    territory_codes text[],
+    retired_at timestamp with time zone,
+    CONSTRAINT parties_colour_check CHECK ((colour ~ '^#[0-9a-f]{6}$'::text)),
+    CONSTRAINT parties_territory_codes_check CHECK (((cardinality(territory_codes) > 0) AND (array_to_string(territory_codes, ','::text) ~ '^[A-Z]{2}-[A-Z0-9]{1,3}(,[A-Z]{2}-[A-Z0-9]{1,3})*$'::text))),
+    CONSTRAINT parties_website_check CHECK ((website ~ '^https?://'::text))
+);
+
+
+ALTER TABLE app.parties OWNER TO aiontheballot_owner;
 
 --
 -- Name: platform_admins; Type: TABLE; Schema: app; Owner: aiontheballot_owner
@@ -1285,6 +1469,78 @@ ALTER TABLE ONLY app.brand_assets
 
 
 --
+-- Name: core_criteria core_criteria_key_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.core_criteria
+    ADD CONSTRAINT core_criteria_key_key UNIQUE (key);
+
+
+--
+-- Name: core_criteria core_criteria_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.core_criteria
+    ADD CONSTRAINT core_criteria_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: criteria criteria_election_id_slug_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.criteria
+    ADD CONSTRAINT criteria_election_id_slug_key UNIQUE (election_id, slug);
+
+
+--
+-- Name: criteria criteria_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.criteria
+    ADD CONSTRAINT criteria_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: criteria criteria_tenant_id_election_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.criteria
+    ADD CONSTRAINT criteria_tenant_id_election_id_id_key UNIQUE (tenant_id, election_id, id);
+
+
+--
+-- Name: criteria criteria_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.criteria
+    ADD CONSTRAINT criteria_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
+-- Name: elections elections_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.elections
+    ADD CONSTRAINT elections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: elections elections_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.elections
+    ADD CONSTRAINT elections_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
+-- Name: elections elections_tenant_id_slug_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.elections
+    ADD CONSTRAINT elections_tenant_id_slug_key UNIQUE (tenant_id, slug);
+
+
+--
 -- Name: file_blobs file_blobs_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1365,11 +1621,83 @@ ALTER TABLE ONLY app.memberships
 
 
 --
+-- Name: methodologies methodologies_election_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.methodologies
+    ADD CONSTRAINT methodologies_election_id_key UNIQUE (election_id);
+
+
+--
+-- Name: methodologies methodologies_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.methodologies
+    ADD CONSTRAINT methodologies_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: methodologies methodologies_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.methodologies
+    ADD CONSTRAINT methodologies_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
+-- Name: methodology_reviewers methodology_reviewers_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.methodology_reviewers
+    ADD CONSTRAINT methodology_reviewers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: methodology_reviewers methodology_reviewers_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.methodology_reviewers
+    ADD CONSTRAINT methodology_reviewers_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
 -- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
 ALTER TABLE ONLY app.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: parties parties_election_id_slug_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.parties
+    ADD CONSTRAINT parties_election_id_slug_key UNIQUE (election_id, slug);
+
+
+--
+-- Name: parties parties_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.parties
+    ADD CONSTRAINT parties_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: parties parties_tenant_id_election_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.parties
+    ADD CONSTRAINT parties_tenant_id_election_id_id_key UNIQUE (tenant_id, election_id, id);
+
+
+--
+-- Name: parties parties_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.parties
+    ADD CONSTRAINT parties_tenant_id_id_key UNIQUE (tenant_id, id);
 
 
 --
@@ -1483,6 +1811,13 @@ CREATE INDEX brand_asset_grants_tenant_id_idx ON app.brand_asset_grants USING bt
 
 
 --
+-- Name: criteria_core_criterion_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX criteria_core_criterion_id_idx ON app.criteria USING btree (core_criterion_id);
+
+
+--
 -- Name: memberships_tenant_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1490,10 +1825,31 @@ CREATE INDEX memberships_tenant_id_idx ON app.memberships USING btree (tenant_id
 
 
 --
+-- Name: methodologies_demands_owner_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX methodologies_demands_owner_id_idx ON app.methodologies USING btree (demands_owner_id);
+
+
+--
+-- Name: methodology_reviewers_methodology_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX methodology_reviewers_methodology_id_idx ON app.methodology_reviewers USING btree (methodology_id);
+
+
+--
 -- Name: organizations_logo_asset_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE INDEX organizations_logo_asset_id_idx ON app.organizations USING btree (logo_asset_id);
+
+
+--
+-- Name: parties_logo_file_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX parties_logo_file_id_idx ON app.parties USING btree (logo_file_id);
 
 
 --
@@ -1560,6 +1916,27 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.brand_assets FOR EA
 
 
 --
+-- Name: core_criteria audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.core_criteria FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: criteria audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.criteria FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: elections audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.elections FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
 -- Name: files audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1595,10 +1972,31 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.memberships FOR EAC
 
 
 --
+-- Name: methodologies audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.methodologies FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: methodology_reviewers audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.methodology_reviewers FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
 -- Name: organizations audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.organizations FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: parties audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.parties FOR EACH ROW EXECUTE FUNCTION private.audit();
 
 
 --
@@ -1658,10 +2056,66 @@ CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.brand
 
 
 --
+-- Name: core_criteria bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.core_criteria FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: criteria bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.criteria FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: elections bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.elections FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: file_blobs bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.file_blobs FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: files bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.files FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: methodologies bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.methodologies FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: methodology_reviewers bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.methodology_reviewers FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
 -- Name: organizations bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.organizations FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: parties bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.parties FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
 
 
 --
@@ -1700,6 +2154,13 @@ CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.tenan
 
 
 --
+-- Name: elections country_admin_columns; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER country_admin_columns BEFORE UPDATE ON app.elections FOR EACH ROW EXECUTE FUNCTION private.restrict_columns('country_admin', 'status', 'frozen_from', 'frozen_until');
+
+
+--
 -- Name: tenant_hostnames forbid_delete; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1735,6 +2196,20 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.brand_asset_grants FOR 
 
 
 --
+-- Name: criteria forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.criteria FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: elections forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.elections FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: file_blobs forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1760,6 +2235,27 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.invitations FOR EACH RO
 --
 
 CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.memberships FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: methodologies forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.methodologies FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: methodology_reviewers forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.methodology_reviewers FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: parties forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.parties FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
 
 
 --
@@ -1854,6 +2350,13 @@ CREATE TRIGGER is_free BEFORE INSERT ON app.platform_hostnames FOR EACH ROW EXEC
 
 
 --
+-- Name: parties logo_is_public_asset; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER logo_is_public_asset BEFORE INSERT OR UPDATE OF logo_file_id ON app.parties FOR EACH ROW EXECUTE FUNCTION private.party_logo_is_public_asset();
+
+
+--
 -- Name: file_blobs matches_file; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1865,6 +2368,13 @@ CREATE TRIGGER matches_file BEFORE INSERT OR DELETE ON app.file_blobs FOR EACH R
 --
 
 CREATE TRIGGER members_may_change BEFORE UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.members_may_change('theme', 'report_retention_days', 'llm_monthly_cap_usd');
+
+
+--
+-- Name: elections platform_admin_columns; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER platform_admin_columns BEFORE UPDATE ON app.elections FOR EACH ROW EXECUTE FUNCTION private.restrict_columns('', 'require_second_reviewer');
 
 
 --
@@ -1935,6 +2445,13 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.brand_asset_grants FOR EACH 
 --
 
 CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.brand_assets FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
+
+
+--
+-- Name: elections stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.elections FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
 
 
 --
@@ -2025,6 +2542,30 @@ ALTER TABLE ONLY app.brand_asset_grants
 
 
 --
+-- Name: criteria criteria_core_criterion_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.criteria
+    ADD CONSTRAINT criteria_core_criterion_id_fkey FOREIGN KEY (core_criterion_id) REFERENCES app.core_criteria(id);
+
+
+--
+-- Name: criteria criteria_tenant_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.criteria
+    ADD CONSTRAINT criteria_tenant_id_election_id_fkey FOREIGN KEY (tenant_id, election_id) REFERENCES app.elections(tenant_id, id);
+
+
+--
+-- Name: elections elections_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.elections
+    ADD CONSTRAINT elections_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
 -- Name: file_blobs file_blobs_tenant_id_file_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2065,11 +2606,51 @@ ALTER TABLE ONLY app.memberships
 
 
 --
+-- Name: methodologies methodologies_demands_owner_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.methodologies
+    ADD CONSTRAINT methodologies_demands_owner_id_fkey FOREIGN KEY (demands_owner_id) REFERENCES app.organizations(id);
+
+
+--
+-- Name: methodologies methodologies_tenant_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.methodologies
+    ADD CONSTRAINT methodologies_tenant_id_election_id_fkey FOREIGN KEY (tenant_id, election_id) REFERENCES app.elections(tenant_id, id);
+
+
+--
+-- Name: methodology_reviewers methodology_reviewers_tenant_id_methodology_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.methodology_reviewers
+    ADD CONSTRAINT methodology_reviewers_tenant_id_methodology_id_fkey FOREIGN KEY (tenant_id, methodology_id) REFERENCES app.methodologies(tenant_id, id);
+
+
+--
 -- Name: organizations organizations_logo_asset_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
 ALTER TABLE ONLY app.organizations
     ADD CONSTRAINT organizations_logo_asset_id_fkey FOREIGN KEY (logo_asset_id) REFERENCES app.brand_assets(id);
+
+
+--
+-- Name: parties parties_tenant_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.parties
+    ADD CONSTRAINT parties_tenant_id_election_id_fkey FOREIGN KEY (tenant_id, election_id) REFERENCES app.elections(tenant_id, id);
+
+
+--
+-- Name: parties parties_tenant_id_logo_file_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.parties
+    ADD CONSTRAINT parties_tenant_id_logo_file_id_fkey FOREIGN KEY (tenant_id, logo_file_id) REFERENCES app.files(tenant_id, id);
 
 
 --
@@ -2147,6 +2728,19 @@ ALTER TABLE app.brand_asset_grants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.brand_assets ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: core_criteria; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.core_criteria ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: elections country_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_delete ON app.elections FOR DELETE TO aiontheballot_admin USING ((((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)) AND (status = 'draft'::app.election_status)));
+
+
+--
 -- Name: invitations country_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2158,6 +2752,25 @@ CREATE POLICY country_admin_delete ON app.invitations FOR DELETE TO aiontheballo
 --
 
 CREATE POLICY country_admin_delete ON app.memberships FOR DELETE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: methodologies country_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_delete ON app.methodologies FOR DELETE TO aiontheballot_admin USING ((((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)) AND (EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = methodologies.election_id) AND (e.status = 'draft'::app.election_status))))));
+
+
+--
+-- Name: methodology_reviewers country_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_delete ON app.methodology_reviewers FOR DELETE TO aiontheballot_admin USING ((((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)) AND (EXISTS ( SELECT 1
+   FROM (app.methodologies m
+     JOIN app.elections e ON ((e.id = m.election_id)))
+  WHERE ((m.id = methodology_reviewers.methodology_id) AND (e.status = 'draft'::app.election_status))))));
 
 
 --
@@ -2186,6 +2799,20 @@ CREATE POLICY country_admin_insert ON app.invitations FOR INSERT TO aiontheballo
 --
 
 CREATE POLICY country_admin_insert ON app.memberships FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: methodologies country_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_insert ON app.methodologies FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: methodology_reviewers country_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_insert ON app.methodology_reviewers FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -2224,6 +2851,20 @@ CREATE POLICY country_admin_revoke ON app.invitations FOR UPDATE TO aiontheballo
 
 
 --
+-- Name: methodologies country_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_update ON app.methodologies FOR UPDATE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: methodology_reviewers country_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_update ON app.methodology_reviewers FOR UPDATE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: tenant_brand_selections country_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2245,10 +2886,48 @@ CREATE POLICY country_admin_update ON app.tenants FOR UPDATE TO aiontheballot_ad
 
 
 --
+-- Name: criteria; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.criteria ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: criteria editor_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_delete ON app.criteria FOR DELETE TO aiontheballot_admin USING ((((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)) AND (EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = criteria.election_id) AND (e.status = 'draft'::app.election_status))))));
+
+
+--
 -- Name: files editor_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE POLICY editor_delete ON app.files FOR DELETE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: parties editor_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_delete ON app.parties FOR DELETE TO aiontheballot_admin USING ((((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)) AND (EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = parties.election_id) AND (e.status = 'draft'::app.election_status))))));
+
+
+--
+-- Name: criteria editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_insert ON app.criteria FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: elections editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_insert ON app.elections FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -2264,6 +2943,40 @@ CREATE POLICY editor_insert ON app.file_blobs FOR INSERT TO aiontheballot_admin 
 
 CREATE POLICY editor_insert ON app.files FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
+
+--
+-- Name: parties editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_insert ON app.parties FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: criteria editor_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_update ON app.criteria FOR UPDATE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: elections editor_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_update ON app.elections FOR UPDATE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: parties editor_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_update ON app.parties FOR UPDATE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: elections; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.elections ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: file_blobs; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
@@ -2314,6 +3027,27 @@ CREATE POLICY member_read ON app.brand_assets FOR SELECT TO aiontheballot_admin 
 
 
 --
+-- Name: core_criteria member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.core_criteria FOR SELECT TO aiontheballot_admin USING (((EXISTS ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: criteria member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.criteria FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: elections member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.elections FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: file_blobs member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2335,12 +3069,33 @@ CREATE POLICY member_read ON app.memberships FOR SELECT TO aiontheballot_admin U
 
 
 --
+-- Name: methodologies member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.methodologies FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: methodology_reviewers member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.methodology_reviewers FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: organizations member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE POLICY member_read ON app.organizations FOR SELECT TO aiontheballot_admin USING (((EXISTS ( SELECT 1
    FROM app.tenant_organizations o
   WHERE ((o.organization_id = organizations.id) AND (o.tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants))))) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: parties member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.parties FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -2385,10 +3140,28 @@ CREATE POLICY member_read ON app.tenants FOR SELECT TO aiontheballot_admin USING
 ALTER TABLE app.memberships ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: methodologies; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.methodologies ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: methodology_reviewers; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.methodology_reviewers ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: organizations; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
 --
 
 ALTER TABLE app.organizations ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: parties; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.parties ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: brand_asset_grants platform_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
@@ -2402,6 +3175,13 @@ CREATE POLICY platform_admin_delete ON app.brand_asset_grants FOR DELETE TO aion
 --
 
 CREATE POLICY platform_admin_delete ON app.brand_assets FOR DELETE TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: core_criteria platform_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_delete ON app.core_criteria FOR DELETE TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin));
 
 
 --
@@ -2430,6 +3210,13 @@ CREATE POLICY platform_admin_insert ON app.brand_asset_grants FOR INSERT TO aion
 --
 
 CREATE POLICY platform_admin_insert ON app.brand_assets FOR INSERT TO aiontheballot_admin WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: core_criteria platform_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_insert ON app.core_criteria FOR INSERT TO aiontheballot_admin WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
 
 
 --
@@ -2510,6 +3297,13 @@ CREATE POLICY platform_admin_update ON app.brand_assets FOR UPDATE TO aionthebal
 
 
 --
+-- Name: core_criteria platform_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_update ON app.core_criteria FOR UPDATE TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin)) WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
 -- Name: hostname_verifications platform_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2560,10 +3354,72 @@ CREATE POLICY public_read ON app.brand_assets FOR SELECT TO aiontheballot_web US
 
 
 --
+-- Name: core_criteria public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.core_criteria FOR SELECT TO aiontheballot_web USING (true);
+
+
+--
+-- Name: criteria public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.criteria FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = criteria.election_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))));
+
+
+--
+-- Name: elections public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.elections FOR SELECT TO aiontheballot_web USING (((status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status])) AND (EXISTS ( SELECT 1
+   FROM app.tenants t
+  WHERE ((t.id = elections.tenant_id) AND t.active)))));
+
+
+--
+-- Name: file_blobs public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.file_blobs FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM app.files f
+  WHERE ((f.id = file_blobs.file_id) AND (f.bucket = 'public_assets'::app.file_bucket)))));
+
+
+--
+-- Name: files public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.files FOR SELECT TO aiontheballot_web USING (((bucket = 'public_assets'::app.file_bucket) AND (EXISTS ( SELECT 1
+   FROM app.parties p
+  WHERE (p.logo_file_id = files.id)))));
+
+
+--
 -- Name: hostname_tombstones public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE POLICY public_read ON app.hostname_tombstones FOR SELECT TO aiontheballot_web USING (true);
+
+
+--
+-- Name: methodologies public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.methodologies FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = methodologies.election_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))));
+
+
+--
+-- Name: methodology_reviewers public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.methodology_reviewers FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM (app.methodologies m
+     JOIN app.elections e ON ((e.id = m.election_id)))
+  WHERE ((m.id = methodology_reviewers.methodology_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))));
 
 
 --
@@ -2574,6 +3430,15 @@ CREATE POLICY public_read ON app.organizations FOR SELECT TO aiontheballot_web U
    FROM (app.tenant_organizations o
      JOIN app.tenants t ON ((t.id = o.tenant_id)))
   WHERE ((o.organization_id = organizations.id) AND t.active))));
+
+
+--
+-- Name: parties public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.parties FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = parties.election_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))));
 
 
 --
@@ -2967,10 +3832,24 @@ REVOKE ALL ON FUNCTION private.normalize_for_match(input text) FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION party_logo_is_public_asset(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.party_logo_is_public_asset() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION platform_hostname_is_free(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
 REVOKE ALL ON FUNCTION private.platform_hostname_is_free() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION restrict_columns(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.restrict_columns() FROM PUBLIC;
 
 
 --
@@ -3073,10 +3952,209 @@ GRANT INSERT(content) ON TABLE app.brand_assets TO aiontheballot_admin;
 
 
 --
+-- Name: TABLE core_criteria; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.core_criteria TO aiontheballot_web;
+GRANT SELECT,DELETE ON TABLE app.core_criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN core_criteria.key; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(key),UPDATE(key) ON TABLE app.core_criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN core_criteria.title; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(title),UPDATE(title) ON TABLE app.core_criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN core_criteria.description; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(description),UPDATE(description) ON TABLE app.core_criteria TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE criteria; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.criteria TO aiontheballot_web;
+GRANT SELECT,DELETE ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN criteria.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN criteria.election_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(election_id) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN criteria.slug; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(slug),UPDATE(slug) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN criteria.title; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(title),UPDATE(title) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN criteria.description; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(description),UPDATE(description) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN criteria.display_order; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(display_order),UPDATE(display_order) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN criteria.core_criterion_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(core_criterion_id),UPDATE(core_criterion_id) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN criteria.retired_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(retired_at) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE elections; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,DELETE ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(id) ON TABLE app.elections TO aiontheballot_web;
+
+
+--
+-- Name: COLUMN elections.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(tenant_id) ON TABLE app.elections TO aiontheballot_web;
+GRANT INSERT(tenant_id) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.slug; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(slug) ON TABLE app.elections TO aiontheballot_web;
+GRANT INSERT(slug),UPDATE(slug) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.type; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(type) ON TABLE app.elections TO aiontheballot_web;
+GRANT INSERT(type),UPDATE(type) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.territory_code; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(territory_code) ON TABLE app.elections TO aiontheballot_web;
+GRANT INSERT(territory_code),UPDATE(territory_code) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.name; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(name) ON TABLE app.elections TO aiontheballot_web;
+GRANT INSERT(name),UPDATE(name) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.election_date; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(election_date) ON TABLE app.elections TO aiontheballot_web;
+GRANT INSERT(election_date),UPDATE(election_date) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.status; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(status) ON TABLE app.elections TO aiontheballot_web;
+GRANT UPDATE(status) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.went_live_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(went_live_at) ON TABLE app.elections TO aiontheballot_web;
+
+
+--
+-- Name: COLUMN elections.require_second_reviewer; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(require_second_reviewer) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.frozen_from; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(frozen_from) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.frozen_until; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(frozen_until) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.created_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(created_at) ON TABLE app.elections TO aiontheballot_web;
+
+
+--
 -- Name: TABLE file_blobs; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
 GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_admin;
+GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_web;
 
 
 --
@@ -3108,10 +4186,18 @@ GRANT SELECT,DELETE ON TABLE app.files TO aiontheballot_admin;
 
 
 --
+-- Name: COLUMN files.id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(id) ON TABLE app.files TO aiontheballot_web;
+
+
+--
 -- Name: COLUMN files.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
 GRANT INSERT(tenant_id) ON TABLE app.files TO aiontheballot_admin;
+GRANT SELECT(tenant_id) ON TABLE app.files TO aiontheballot_web;
 
 
 --
@@ -3119,6 +4205,7 @@ GRANT INSERT(tenant_id) ON TABLE app.files TO aiontheballot_admin;
 --
 
 GRANT INSERT(bucket) ON TABLE app.files TO aiontheballot_admin;
+GRANT SELECT(bucket) ON TABLE app.files TO aiontheballot_web;
 
 
 --
@@ -3126,6 +4213,7 @@ GRANT INSERT(bucket) ON TABLE app.files TO aiontheballot_admin;
 --
 
 GRANT INSERT(content_type) ON TABLE app.files TO aiontheballot_admin;
+GRANT SELECT(content_type) ON TABLE app.files TO aiontheballot_web;
 
 
 --
@@ -3133,6 +4221,7 @@ GRANT INSERT(content_type) ON TABLE app.files TO aiontheballot_admin;
 --
 
 GRANT INSERT(byte_size) ON TABLE app.files TO aiontheballot_admin;
+GRANT SELECT(byte_size) ON TABLE app.files TO aiontheballot_web;
 
 
 --
@@ -3140,6 +4229,7 @@ GRANT INSERT(byte_size) ON TABLE app.files TO aiontheballot_admin;
 --
 
 GRANT INSERT(sha256) ON TABLE app.files TO aiontheballot_admin;
+GRANT SELECT(sha256) ON TABLE app.files TO aiontheballot_web;
 
 
 --
@@ -3147,6 +4237,13 @@ GRANT INSERT(sha256) ON TABLE app.files TO aiontheballot_admin;
 --
 
 GRANT INSERT(original_filename) ON TABLE app.files TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN files.created_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(created_at) ON TABLE app.files TO aiontheballot_web;
 
 
 --
@@ -3270,6 +4367,113 @@ GRANT INSERT(role) ON TABLE app.memberships TO aiontheballot_admin;
 
 
 --
+-- Name: TABLE methodologies; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.methodologies TO aiontheballot_web;
+GRANT SELECT,DELETE ON TABLE app.methodologies TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodologies.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.methodologies TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodologies.election_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(election_id) ON TABLE app.methodologies TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodologies.kind; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(kind),UPDATE(kind) ON TABLE app.methodologies TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodologies.demands_owner_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(demands_owner_id),UPDATE(demands_owner_id) ON TABLE app.methodologies TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodologies.body; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(body),UPDATE(body) ON TABLE app.methodologies TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodologies.admissible_source_kinds; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(admissible_source_kinds),UPDATE(admissible_source_kinds) ON TABLE app.methodologies TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodologies.not_mentioned_source_kinds; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(not_mentioned_source_kinds),UPDATE(not_mentioned_source_kinds) ON TABLE app.methodologies TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE methodology_reviewers; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.methodology_reviewers TO aiontheballot_web;
+GRANT SELECT,DELETE ON TABLE app.methodology_reviewers TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodology_reviewers.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.methodology_reviewers TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodology_reviewers.methodology_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(methodology_id) ON TABLE app.methodology_reviewers TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodology_reviewers.name; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(name),UPDATE(name) ON TABLE app.methodology_reviewers TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodology_reviewers.affiliation; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(affiliation),UPDATE(affiliation) ON TABLE app.methodology_reviewers TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodology_reviewers.display_order; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(display_order),UPDATE(display_order) ON TABLE app.methodology_reviewers TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN methodology_reviewers.retired_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(retired_at) ON TABLE app.methodology_reviewers TO aiontheballot_admin;
+
+
+--
 -- Name: TABLE organizations; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3345,6 +4549,105 @@ GRANT INSERT(logo_asset_id),UPDATE(logo_asset_id) ON TABLE app.organizations TO 
 --
 
 GRANT INSERT(is_pauseai_chapter),UPDATE(is_pauseai_chapter) ON TABLE app.organizations TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE parties; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.parties TO aiontheballot_web;
+GRANT SELECT,DELETE ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.election_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(election_id) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.slug; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(slug),UPDATE(slug) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.name; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(name),UPDATE(name) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.short_name; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(short_name),UPDATE(short_name) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.logo_file_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(logo_file_id),UPDATE(logo_file_id) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.colour; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(colour),UPDATE(colour) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.display_order; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(display_order),UPDATE(display_order) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.website; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(website),UPDATE(website) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.programme_status; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(programme_status) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.programme_checked_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(programme_checked_at) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.territory_codes; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(territory_codes),UPDATE(territory_codes) ON TABLE app.parties TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN parties.retired_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(retired_at) ON TABLE app.parties TO aiontheballot_admin;
 
 
 --

@@ -5,15 +5,29 @@
 
 import type { ColumnType } from 'kysely';
 
+export type AppElectionStatus = 'archived' | 'draft' | 'live';
+
+export type AppElectionType = 'european' | 'general' | 'municipal' | 'other' | 'regional';
+
 export type AppFileBucket = 'public_assets' | 'sources';
 
 export type AppMethodologyKind = 'demands' | 'descriptive';
 
 export type AppOrgRole = 'endorser' | 'operator';
 
+export type AppProgrammeStatus = 'pending' | 'published';
+
+export type AppSourceKind =
+  'audio' | 'party_submission' | 'pdf' | 'social_post' | 'video' | 'web_page';
+
 export type AppTenantDocumentKind = 'about_operator' | 'privacy_policy' | 'right_of_reply_policy';
 
 export type AppTenantRole = 'country_admin' | 'editor' | 'reviewer';
+
+export type ArrayType<T> = ArrayTypeImpl<T> extends (infer U)[] ? U[] : ArrayTypeImpl<T>;
+
+export type ArrayTypeImpl<T> =
+  T extends ColumnType<infer S, infer I, infer U> ? ColumnType<S[], I[], U[]> : T[];
 
 export type Generated<T> =
   T extends ColumnType<infer S, infer I, infer U>
@@ -64,6 +78,41 @@ export interface AppBrandAssets {
   name: string;
   restricted: Generated<boolean>;
   sha256: string;
+}
+
+export interface AppCoreCriteria {
+  description: Json;
+  id: Generated<string>;
+  key: string;
+  title: Json;
+}
+
+export interface AppCriteria {
+  core_criterion_id: string | null;
+  description: Json;
+  display_order: number;
+  election_id: string;
+  id: Generated<string>;
+  retired_at: Timestamp | null;
+  slug: string;
+  tenant_id: string;
+  title: Json;
+}
+
+export interface AppElections {
+  created_at: Generated<Timestamp>;
+  election_date: Timestamp | null;
+  frozen_from: Timestamp | null;
+  frozen_until: Timestamp | null;
+  id: Generated<string>;
+  name: Json;
+  require_second_reviewer: Generated<boolean>;
+  slug: string;
+  status: Generated<AppElectionStatus>;
+  tenant_id: string;
+  territory_code: string | null;
+  type: AppElectionType;
+  went_live_at: Timestamp | null;
 }
 
 export interface AppFileBlobs {
@@ -124,6 +173,30 @@ export interface AppMemberships {
   user_id: string;
 }
 
+export interface AppMethodologies {
+  admissible_source_kinds: Generated<ArrayType<AppSourceKind>>;
+  body: Json;
+  demands_owner_id: string | null;
+  election_id: string;
+  id: Generated<string>;
+  kind: AppMethodologyKind;
+  not_mentioned_source_kinds: Generated<ArrayType<AppSourceKind>>;
+  tenant_id: string;
+}
+
+export interface AppMethodologyReviewers {
+  affiliation: string;
+  display_order: Generated<number>;
+  id: Generated<string>;
+  methodology_id: string;
+  /**
+   * personal data
+   */
+  name: string;
+  retired_at: Timestamp | null;
+  tenant_id: string;
+}
+
 export interface AppOrganizations {
   address: string | null;
   contact_email: string | null;
@@ -137,6 +210,23 @@ export interface AppOrganizations {
   registry_entry: string | null;
   tax_id: string | null;
   url: string | null;
+}
+
+export interface AppParties {
+  colour: string | null;
+  display_order: number;
+  election_id: string;
+  id: Generated<string>;
+  logo_file_id: string | null;
+  name: Json;
+  programme_checked_at: Timestamp | null;
+  programme_status: Generated<AppProgrammeStatus>;
+  retired_at: Timestamp | null;
+  short_name: Json;
+  slug: string;
+  tenant_id: string;
+  territory_codes: string[] | null;
+  website: string | null;
 }
 
 export interface AppPlatformAdmins {
@@ -206,13 +296,19 @@ export interface DB {
   'app.audit_log': AppAuditLog;
   'app.brand_asset_grants': AppBrandAssetGrants;
   'app.brand_assets': AppBrandAssets;
+  'app.core_criteria': AppCoreCriteria;
+  'app.criteria': AppCriteria;
+  'app.elections': AppElections;
   'app.file_blobs': AppFileBlobs;
   'app.files': AppFiles;
   'app.hostname_tombstones': AppHostnameTombstones;
   'app.hostname_verifications': AppHostnameVerifications;
   'app.invitations': AppInvitations;
   'app.memberships': AppMemberships;
+  'app.methodologies': AppMethodologies;
+  'app.methodology_reviewers': AppMethodologyReviewers;
   'app.organizations': AppOrganizations;
+  'app.parties': AppParties;
   'app.platform_admins': AppPlatformAdmins;
   'app.platform_hostnames': AppPlatformHostnames;
   'app.public_versions': AppPublicVersions;

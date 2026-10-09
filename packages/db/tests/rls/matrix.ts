@@ -142,6 +142,15 @@ export const FILES = {
     content: 'png-a',
     blob: true,
   },
+  /** An image no party shows: it must stay private. */
+  unusedImageA: {
+    id: fixtureId(6, 8),
+    tenant: 'A',
+    bucket: 'public_assets',
+    type: 'image/png',
+    content: 'png-sin-uso-a',
+    blob: true,
+  },
   sourceB: {
     id: fixtureId(6, 3),
     tenant: 'B',
@@ -186,6 +195,76 @@ export const FILES = {
   string,
   { id: string; tenant: TenantKey; bucket: string; type: string; content: string; blob: boolean }
 >;
+
+export type ElectionStatus = 'draft' | 'live' | 'archived';
+
+export interface FixtureElection {
+  id: string;
+  tenant: TenantKey;
+  status: ElectionStatus;
+  slug: string;
+  type: 'general' | 'european' | 'regional' | 'municipal' | 'other';
+  territory: string | null;
+  /** Whether it has a methodology, an external reviewer, two parties and a criterion. */
+  structure: boolean;
+  methodology: string;
+  reviewer: string;
+  party: string;
+  secondParty: string;
+  criterion: string;
+}
+
+const election = (
+  n: number,
+  tenant: TenantKey,
+  status: ElectionStatus,
+  slug: string,
+  type: FixtureElection['type'],
+  territory: string | null,
+  structure = true,
+): FixtureElection => ({
+  id: fixtureId(7, n),
+  tenant,
+  status,
+  slug,
+  type,
+  territory,
+  structure,
+  methodology: fixtureId(8, n),
+  reviewer: fixtureId(9, n),
+  party: fixtureId(7, 20 + n),
+  secondParty: fixtureId(7, 40 + n),
+  criterion: fixtureId(8, 20 + n),
+});
+
+/**
+ * Fictional elections (ADR-0002, fixtures): a live, a draft and an archived one in A and B, a live and a draft one in
+ * the inactive tenant, and an empty draft (no structure) in each tenant, for the insert cases.
+ */
+export const ELECTIONS = {
+  liveA: election(1, 'A', 'live', 'generales-de-ejemplo', 'general', null),
+  draftA: election(2, 'A', 'draft', 'autonomicas-de-ejemplo', 'regional', 'XA-01'),
+  archivedA: election(3, 'A', 'archived', 'europeas-de-ejemplo', 'european', null),
+  emptyA: election(4, 'A', 'draft', 'municipales-de-ejemplo', 'municipal', null, false),
+  liveB: election(5, 'B', 'live', 'generales-de-ejemplo', 'general', null),
+  draftB: election(6, 'B', 'draft', 'autonomicas-de-ejemplo', 'regional', 'XB-01'),
+  archivedB: election(7, 'B', 'archived', 'europeas-de-ejemplo', 'european', null),
+  emptyB: election(8, 'B', 'draft', 'municipales-de-ejemplo', 'municipal', null, false),
+  liveInactive: election(9, 'inactive', 'live', 'generales-de-ejemplo', 'general', null),
+  draftInactive: election(10, 'inactive', 'draft', 'autonomicas-de-ejemplo', 'regional', 'XC-01'),
+  emptyInactive: election(
+    11,
+    'inactive',
+    'draft',
+    'municipales-de-ejemplo',
+    'municipal',
+    null,
+    false,
+  ),
+} as const satisfies Record<string, FixtureElection>;
+
+/** A global core criterion, referenced by the criterion of A's live election. */
+export const CORE_CRITERION = fixtureId(9, 90);
 
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
@@ -274,6 +353,37 @@ const COUNTRY_ADMINS: Rule = { members: ['country_admin'], platformAdmin: true }
 const PLATFORM_ADMIN: Rule = { platformAdmin: true };
 /** Who writes drafts, evidence and sources (ADR-0002, capabilities by role). */
 const EDITORS: Rule = { members: ['editor', 'country_admin'], platformAdmin: true };
+
+const isPublic = (e: FixtureElection): boolean => e.status !== 'draft' && TENANTS[e.tenant].active;
+const structured: readonly FixtureElection[] = Object.values(ELECTIONS).filter((e) => e.structure);
+/** The draft election with structure of a tenant, where insert cases add rows. */
+const draftOf = (key: TenantKey): FixtureElection => {
+  const e = structured.find(
+    (candidate) => candidate.tenant === key && candidate.status === 'draft',
+  );
+  if (!e) {
+    throw new Error(`No structured draft election in tenant ${key}`);
+  }
+  return e;
+};
+/** The empty draft election of a tenant (no methodology yet). */
+const emptyOf = (key: TenantKey): FixtureElection => {
+  const e = Object.values(ELECTIONS).find(
+    (candidate) => candidate.tenant === key && !candidate.structure,
+  );
+  if (!e) {
+    throw new Error(`No empty election in tenant ${key}`);
+  }
+  return e;
+};
+/** A row of an election's structure: only a draft election's may be deleted. */
+const structureRow = (e: FixtureElection, label: string, where: string, deletable: Rule): Row => ({
+  id: `${label} of ${e.tenant} ${e.status}`,
+  tenant: e.tenant,
+  public: isPublic(e),
+  where,
+  rules: { delete: e.status === 'draft' ? deletable : NOBODY },
+});
 
 const tenantRow = (key: TenantKey): Row => ({
   id: `tenant ${key}`,
@@ -759,8 +869,10 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       .map(([name, f]) => ({
         id: `${name} file`,
         tenant: f.tenant,
-        public: false,
+        public: f.id === FILES.logoA.id,
         where: `id = '${f.id}'`,
+        // A party shows it, so it can't be deleted.
+        ...(f.id === FILES.logoA.id ? { blocked: { delete: '23503' } } : {}),
       })),
     inserts: TENANT_KEYS.map((key) => ({
       id: `upload into ${key}`,
@@ -770,10 +882,11 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
                     'programa.pdf')`,
     })),
     set: 'content_type = content_type',
-    select: MEMBERS,
+    select: { public: true, ...MEMBERS },
     insert: EDITORS,
     update: NOBODY,
     delete: EDITORS,
+    columnReads: { original_filename: MEMBERS, created_by: MEMBERS },
   },
 
   'app.file_blobs': {
@@ -782,7 +895,7 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       .map(([name, f]) => ({
         id: `${name} blob`,
         tenant: f.tenant,
-        public: false,
+        public: f.id === FILES.logoA.id,
         where: `file_id = '${f.id}'`,
       })),
     inserts: Object.values(FILES)
@@ -794,10 +907,163 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
               VALUES ('${f.id}', '${TENANTS[f.tenant].id}', convert_to('${f.content}', 'UTF8'))`,
       })),
     set: 'content = content',
-    select: MEMBERS,
+    select: { public: true, ...MEMBERS },
     insert: EDITORS,
     update: NOBODY,
     delete: NOBODY,
+  },
+
+  'app.core_criteria': {
+    rows: [
+      {
+        id: 'core criterion',
+        tenant: null,
+        public: true,
+        where: `id = '${CORE_CRITERION}'`,
+        // A criterion references it.
+        blocked: { delete: '23503' },
+      },
+    ],
+    inserts: [
+      {
+        id: 'new core criterion',
+        tenant: null,
+        sql: `INSERT INTO app.core_criteria (key, title, description)
+              VALUES ('criterio-comun-nuevo', '{"es": "Criterio común nuevo"}', '{"es": "Descripción de ejemplo"}')`,
+      },
+    ],
+    set: `title = '{"es": "Criterio común revisado"}'`,
+    select: { public: true, anyMember: true, platformAdmin: true },
+    insert: PLATFORM_ADMIN,
+    update: PLATFORM_ADMIN,
+    delete: PLATFORM_ADMIN,
+  },
+
+  'app.elections': {
+    rows: Object.entries(ELECTIONS).map(([name, e]): Row => ({
+      id: `${name} election`,
+      tenant: e.tenant,
+      public: isPublic(e),
+      where: `id = '${e.id}'`,
+      // Only a draft is deleted, and only once its structure is gone.
+      ...(e.status !== 'draft'
+        ? { rules: { delete: NOBODY } }
+        : e.structure
+          ? { blocked: { delete: '23503' } }
+          : {}),
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `election in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.elections (tenant_id, slug, type, name)
+            VALUES ('${TENANTS[key].id}', 'elecciones-nuevas', 'other', '{"es": "Elecciones nuevas de ejemplo"}')`,
+    })),
+    set: `name = '{"es": "Elecciones de ejemplo (renombradas)"}'`,
+    select: { public: true, ...MEMBERS },
+    insert: EDITORS,
+    update: EDITORS,
+    delete: COUNTRY_ADMINS,
+    columnReads: {
+      require_second_reviewer: MEMBERS,
+      frozen_from: MEMBERS,
+      frozen_until: MEMBERS,
+    },
+    columnUpdates: {
+      frozen_from: { set: 'frozen_from = now()', rule: COUNTRY_ADMINS },
+      require_second_reviewer: {
+        set: 'require_second_reviewer = NOT require_second_reviewer',
+        rule: PLATFORM_ADMIN,
+      },
+      went_live_at: { set: 'went_live_at = now()', rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+      created_at: { set: 'created_at = now()', rule: NOBODY },
+    },
+  },
+
+  'app.methodologies': {
+    rows: structured.map((e) => ({
+      ...structureRow(e, 'methodology', `id = '${e.methodology}'`, COUNTRY_ADMINS),
+      // Its external reviewer references it.
+      ...(e.status === 'draft' ? { blocked: { delete: '23503' } } : {}),
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `methodology of the empty election of ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.methodologies (tenant_id, election_id, kind, demands_owner_id, body)
+            VALUES ('${TENANTS[key].id}', '${emptyOf(key).id}', 'demands', '${ORGANIZATIONS[key].id}',
+                    '{"es": "Metodología de ejemplo"}')`,
+    })),
+    set: `body = '{"es": "Metodología de ejemplo revisada"}'`,
+    select: { public: true, ...MEMBERS },
+    insert: COUNTRY_ADMINS,
+    update: COUNTRY_ADMINS,
+    delete: COUNTRY_ADMINS,
+    columnUpdates: {
+      election_id: { set: `election_id = '${ELECTIONS.emptyA.id}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
+  'app.methodology_reviewers': {
+    rows: structured.map((e) =>
+      structureRow(e, 'external reviewer', `id = '${e.reviewer}'`, COUNTRY_ADMINS),
+    ),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `external reviewer in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.methodology_reviewers (tenant_id, methodology_id, name, affiliation)
+            VALUES ('${TENANTS[key].id}', '${draftOf(key).methodology}', 'Persona Revisora de Ejemplo',
+                    'Universidad de Ejemplo')`,
+    })),
+    set: `affiliation = 'Instituto de Ejemplo'`,
+    select: { public: true, ...MEMBERS },
+    insert: COUNTRY_ADMINS,
+    update: COUNTRY_ADMINS,
+    delete: COUNTRY_ADMINS,
+    columnUpdates: {
+      methodology_id: { set: `methodology_id = '${ELECTIONS.liveA.methodology}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
+  'app.parties': {
+    rows: structured.map((e) => structureRow(e, 'party', `id = '${e.party}'`, EDITORS)),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `party in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.parties (tenant_id, election_id, slug, name, short_name, display_order)
+            VALUES ('${TENANTS[key].id}', '${draftOf(key).id}', 'partido-ejemplo-nuevo',
+                    '{"es": "Partido Ejemplo Nuevo"}', '{"es": "PEN"}', 9)`,
+    })),
+    set: `colour = '#123456'`,
+    select: { public: true, ...MEMBERS },
+    insert: EDITORS,
+    update: EDITORS,
+    delete: EDITORS,
+    columnUpdates: {
+      election_id: { set: `election_id = '${ELECTIONS.emptyA.id}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
+  'app.criteria': {
+    rows: structured.map((e) => structureRow(e, 'criterion', `id = '${e.criterion}'`, EDITORS)),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `criterion in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.criteria (tenant_id, election_id, slug, title, description, display_order)
+            VALUES ('${TENANTS[key].id}', '${draftOf(key).id}', 'criterio-de-ejemplo-nuevo',
+                    '{"es": "Criterio de ejemplo nuevo"}', '{"es": "Descripción de ejemplo"}', 9)`,
+    })),
+    set: 'display_order = display_order + 1',
+    select: { public: true, ...MEMBERS },
+    insert: EDITORS,
+    update: EDITORS,
+    delete: EDITORS,
+    columnUpdates: {
+      election_id: { set: `election_id = '${ELECTIONS.emptyA.id}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
   },
 
   'app.memberships': {
