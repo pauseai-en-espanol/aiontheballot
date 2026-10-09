@@ -188,7 +188,11 @@ cross-country views and an open-data export.
 
 - **Error tracking:** self-hosted **GlitchTip** (MIT), receiving errors through the standard Sentry SDKs
   (`@sentry/nextjs` in both Next apps, `@sentry/node` in the API and worker).
-  - It runs on the cluster, with its database on the shared Postgres instance.
+  - It runs on the cluster as a **cluster-wide** service (gitops `catalog/o11y/glitchtip`), with its database on
+    the shared Postgres instance. The UI is **VPN-only** (`gateway-private`).
+  - Server-side SDKs send to its in-cluster Service. Browser SDKs send through a relay endpoint on our own host
+    (Sentry `tunnel`) that forwards in-cluster, so nothing of GlitchTip faces the internet. The relay sets no
+    cookie, caps the payload size and shares the per-IP rate limit; the CSP stays `'self'`.
   - Personal data (right-of-reply submissions, emails) is scrubbed in `beforeSend` before anything leaves the app.
   - Because the SDKs speak the Sentry protocol, switching backend later is a DSN change.
 - **Observability:** the API, the worker and both Next apps are instrumented with OpenTelemetry from day one

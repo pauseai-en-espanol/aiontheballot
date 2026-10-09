@@ -70,7 +70,7 @@ demo, recorded in [Tracking](#tracking).
   - DNS and a certificate SAN for `iaenlasurnas.es`;
   - `aiontheballot_web`, `aiontheballot_admin` and `aiontheballot_worker` as `extraRoles` of the `aiontheballot`
     database (D1);
-  - GlitchTip (web, worker, and a database on the shared Postgres), in a follow-up gitops change.
+  - GlitchTip (cluster-wide, VPN-only UI, a database on the shared Postgres), in a follow-up gitops change.
 
 **Demo:** a PR goes green in CI, and the hello-world page loads on `iaenlasurnas.es` over TLS through
 `gateway-public`.
