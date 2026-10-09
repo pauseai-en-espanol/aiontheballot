@@ -13,6 +13,7 @@ import {
   PLATFORM_HOSTNAME,
   REVOKED_INVITATION_TOKEN,
   REVOKED_MEMBERSHIPS,
+  SOURCES,
   TENANT_DOCUMENTS,
   type TenantKey,
   TENANTS,
@@ -218,6 +219,32 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
     }
     if (e.status === 'archived') {
       await client.query(`UPDATE app.elections SET status = 'archived' WHERE id = $1`, [e.id]);
+    }
+  }
+  // Sources: created bare, then given their stored copy and their extracted text, as the worker will.
+  for (const src of Object.values(SOURCES)) {
+    const tenant = TENANTS[src.election.tenant].id;
+    await client.query(
+      `INSERT INTO app.source_documents (id, tenant_id, election_id, party_id, kind, title, url, is_programme)
+       VALUES ($1, $2, $3, $4, 'pdf', 'Programa de ejemplo', 'https://example.org/programa.pdf', $5)`,
+      [src.id, tenant, src.election.id, src.party, src.party !== null],
+    );
+    if (src.file) {
+      await client.query(
+        `UPDATE app.source_documents SET file_id = $1, file_origin = 'uploaded' WHERE id = $2`,
+        [src.file, src.id],
+      );
+      for (const [index, body] of src.pages.entries()) {
+        await client.query(
+          `INSERT INTO app.source_texts (source_document_id, tenant_id, unit_index, label, body)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [src.id, tenant, index + 1, `p. ${index + 1}`, body],
+        );
+      }
+      await client.query(
+        `UPDATE app.source_documents SET extraction_status = 'done' WHERE id = $1`,
+        [src.id],
+      );
     }
   }
   await client.query('COMMIT');

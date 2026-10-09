@@ -333,11 +333,13 @@ describe('catalog: tables', () => {
 const NOT_AUDITED: Readonly<Record<string, string>> = {
   audit_log: 'the log itself',
   file_blobs: 'the bytes of a file, whose metadata row is audited',
+  source_texts:
+    "extracted text, written by the extraction job; the source's status change is audited",
   public_versions: 'a counter moved only by triggers, whose writes are audited themselves',
 };
 
 /** Tables in app whose rows are never updated or deleted (ADR-0002 §14), except by purge_tenant. */
-const IMMUTABLE = ['audit_log', 'hostname_tombstones'];
+const IMMUTABLE = ['audit_log', 'hostname_tombstones', 'source_texts'];
 
 /** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
 const PERSONAL_DATA: readonly string[] = [

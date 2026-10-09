@@ -9,6 +9,8 @@ export type AppElectionStatus = 'archived' | 'draft' | 'live';
 
 export type AppElectionType = 'european' | 'general' | 'municipal' | 'other' | 'regional';
 
+export type AppExtractionStatus = 'done' | 'failed' | 'not_applicable' | 'pending';
+
 export type AppFileBucket = 'public_assets' | 'sources';
 
 export type AppMethodologyKind = 'demands' | 'descriptive';
@@ -243,6 +245,35 @@ export interface AppPublicVersions {
   version: Generated<Int8>;
 }
 
+export interface AppSourceDocuments {
+  archive_url: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  election_id: string;
+  extraction_status: Generated<AppExtractionStatus>;
+  file_id: string | null;
+  file_origin: string | null;
+  id: Generated<string>;
+  is_programme: Generated<boolean>;
+  kind: AppSourceKind;
+  language: string | null;
+  party_id: string | null;
+  retrieved_at: Timestamp | null;
+  sha256: string | null;
+  tenant_id: string;
+  title: string;
+  url: string | null;
+}
+
+export interface AppSourceTexts {
+  body: string;
+  label: string;
+  normalized: Generated<string | null>;
+  source_document_id: string;
+  tenant_id: string;
+  unit_index: number;
+}
+
 export interface AppTenantBrandSelections {
   brand_asset_id: string;
   slot: string;
@@ -312,6 +343,8 @@ export interface DB {
   'app.platform_admins': AppPlatformAdmins;
   'app.platform_hostnames': AppPlatformHostnames;
   'app.public_versions': AppPublicVersions;
+  'app.source_documents': AppSourceDocuments;
+  'app.source_texts': AppSourceTexts;
   'app.tenant_brand_selections': AppTenantBrandSelections;
   'app.tenant_documents': AppTenantDocuments;
   'app.tenant_hostnames': AppTenantHostnames;

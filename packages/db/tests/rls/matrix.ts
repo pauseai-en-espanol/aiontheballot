@@ -266,6 +266,44 @@ export const ELECTIONS = {
 /** A global core criterion, referenced by the criterion of A's live election. */
 export const CORE_CRITERION = fixtureId(9, 90);
 
+export interface FixtureSource {
+  id: string;
+  election: FixtureElection;
+  party: string | null;
+  /** The stored copy, if any; its extraction is done and these are its pages. */
+  file: string | null;
+  pages: readonly string[];
+}
+
+/** Fictional source documents: one with a stored, extracted copy in each tenant's live election, and one without. */
+export const SOURCES = {
+  liveA: {
+    id: fixtureId(6, 51),
+    election: ELECTIONS.liveA,
+    party: ELECTIONS.liveA.party,
+    file: FILES.sourceA.id,
+    pages: [
+      'El Partido Ejemplo A propone una moratoria de ejemplo sobre los sistemas de prueba más avanzados.',
+      'En la página dos, el programa de ejemplo pide una agencia de supervisión ficticia.',
+    ],
+  },
+  draftA: { id: fixtureId(6, 52), election: ELECTIONS.draftA, party: null, file: null, pages: [] },
+  liveB: {
+    id: fixtureId(6, 53),
+    election: ELECTIONS.liveB,
+    party: ELECTIONS.liveB.party,
+    file: FILES.sourceB.id,
+    pages: ['Texto de ejemplo del programa ficticio del inquilino B.'],
+  },
+  liveInactive: {
+    id: fixtureId(6, 54),
+    election: ELECTIONS.liveInactive,
+    party: null,
+    file: FILES.sourceInactive.id,
+    pages: ['Texto de ejemplo del inquilino inactivo.'],
+  },
+} as const satisfies Record<string, FixtureSource>;
+
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
   [{ user: USERS.revokedA, tenant: 'A', role: 'editor' }];
@@ -875,8 +913,12 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
         tenant: f.tenant,
         public: f.id === FILES.logoA.id,
         where: `id = '${f.id}'`,
-        // A party shows it, so it can't be deleted.
-        ...(f.id === FILES.logoA.id ? { blocked: { delete: '23503' } } : {}),
+        // A party shows it, or a source keeps it as its stored copy, so it can't be deleted.
+        ...([FILES.logoA.id, FILES.sourceA.id, FILES.sourceB.id, FILES.sourceInactive.id].includes(
+          f.id,
+        )
+          ? { blocked: { delete: '23503' } }
+          : {}),
       })),
     inserts: TENANT_KEYS.map((key) => ({
       id: `upload into ${key}`,
@@ -1077,6 +1119,61 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       election_id: { set: `election_id = '${ELECTIONS.emptyA.id}'`, rule: NOBODY },
       tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
     },
+  },
+
+  'app.source_documents': {
+    rows: Object.entries(SOURCES).map(([name, src]): Row => ({
+      id: `${name} source`,
+      tenant: src.election.tenant,
+      public: false,
+      where: `id = '${src.id}'`,
+      // Once its copy is stored, a source never changes (only its extraction status and archive, by the worker), and
+      // its extracted text keeps it.
+      ...(src.file ? { blocked: { update: '23001', delete: '23503' } } : {}),
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `source in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.source_documents (tenant_id, election_id, kind, title, url)
+            VALUES ('${TENANTS[key].id}', '${draftOf(key).id}', 'web_page', 'Página de ejemplo',
+                    'https://example.org/programa')`,
+    })),
+    set: `title = 'Título revisado de ejemplo'`,
+    select: MEMBERS,
+    insert: EDITORS,
+    update: EDITORS,
+    delete: EDITORS,
+    columnUpdates: {
+      extraction_status: { set: `extraction_status = 'not_applicable'`, rule: NOBODY },
+      archive_url: { set: `archive_url = 'https://archive.example.org/x'`, rule: NOBODY },
+      sha256: { set: `sha256 = encode(sha256('x'), 'hex')`, rule: NOBODY },
+      retrieved_at: { set: 'retrieved_at = now()', rule: NOBODY },
+      election_id: { set: `election_id = '${ELECTIONS.emptyA.id}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+      created_by: { set: `created_by = '${USERS.newcomer}'`, rule: NOBODY },
+    },
+  },
+
+  'app.source_texts': {
+    rows: Object.entries(SOURCES)
+      .filter(([, src]) => src.pages.length > 0)
+      .map(([name, src]) => ({
+        id: `first page of ${name}`,
+        tenant: src.election.tenant,
+        public: false,
+        where: `source_document_id = '${src.id}' AND unit_index = 1`,
+      })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `page of the draft source of ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.source_texts (source_document_id, tenant_id, unit_index, label, body)
+            VALUES ('${SOURCES.draftA.id}', '${TENANTS[key].id}', 1, 'p. 1', 'Texto añadido a mano')`,
+    })),
+    set: `body = 'Texto cambiado'`,
+    select: MEMBERS,
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
   },
 
   'app.memberships': {

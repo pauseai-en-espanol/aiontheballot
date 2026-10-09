@@ -915,6 +915,79 @@ CREATE FUNCTION private.restricted_assets_are_eligible() RETURNS trigger
 ALTER FUNCTION private.restricted_assets_are_eligible() OWNER TO aiontheballot_owner;
 
 --
+-- Name: source_document_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.source_document_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    workflow text[] := ARRAY['extraction_status', 'archive_url'];
+    copy record;
+  BEGIN
+    IF TG_OP = 'INSERT' THEN
+      IF NEW.extraction_status <> 'pending' OR NEW.archive_url IS NOT NULL THEN
+        RAISE EXCEPTION 'a new source starts pending, with no archive' USING ERRCODE = 'restrict_violation';
+      END IF;
+    ELSE
+      IF OLD.file_id IS NOT NULL AND (to_jsonb(NEW) - workflow) IS DISTINCT FROM (to_jsonb(OLD) - workflow) THEN
+        RAISE EXCEPTION 'source % has a stored copy, so it never changes: replace it instead', OLD.id
+          USING ERRCODE = 'restrict_violation';
+      END IF;
+      IF NEW.extraction_status IS DISTINCT FROM OLD.extraction_status AND OLD.extraction_status <> 'pending' THEN
+        RAISE EXCEPTION 'the extraction status of source % leaves pending only once', OLD.id
+          USING ERRCODE = 'restrict_violation';
+      END IF;
+      IF OLD.archive_url IS NOT NULL AND NEW.archive_url IS DISTINCT FROM OLD.archive_url THEN
+        RAISE EXCEPTION 'the archive of source % is set once', OLD.id USING ERRCODE = 'restrict_violation';
+      END IF;
+    END IF;
+
+    -- The stored copy, as it is set: the hash comes from the file and the time from the transaction. The file is read
+    -- as the writer, so a file the writer can't see is never attached by them.
+    IF NEW.file_id IS NOT NULL AND (TG_OP = 'INSERT' OR OLD.file_id IS NULL) THEN
+      SELECT f.sha256, f.bucket INTO copy FROM app.files f WHERE f.id = NEW.file_id;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'file % is not visible to the writer', NEW.file_id USING ERRCODE = 'insufficient_privilege';
+      END IF;
+      IF copy.bucket <> 'sources' THEN
+        RAISE EXCEPTION 'a source''s copy is a file in the sources bucket' USING ERRCODE = 'check_violation';
+      END IF;
+      NEW.sha256 := copy.sha256;
+      NEW.retrieved_at := now();
+    ELSIF NEW.file_id IS NULL THEN
+      NEW.sha256 := NULL;
+      NEW.retrieved_at := NULL;
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.source_document_rules() OWNER TO aiontheballot_owner;
+
+--
+-- Name: source_text_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.source_text_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    IF NOT EXISTS (SELECT 1 FROM app.source_documents s
+                    WHERE s.id = NEW.source_document_id AND s.extraction_status = 'pending' AND s.file_id IS NOT NULL) THEN
+      RAISE EXCEPTION 'text is extracted only into a pending source with a stored copy' USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.source_text_rules() OWNER TO aiontheballot_owner;
+
+--
 -- Name: stamp(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1501,6 +1574,57 @@ CREATE TABLE app.public_versions (
 ALTER TABLE app.public_versions OWNER TO aiontheballot_owner;
 
 --
+-- Name: source_documents; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.source_documents (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    election_id uuid NOT NULL,
+    party_id uuid,
+    kind app.source_kind NOT NULL,
+    title text NOT NULL,
+    url text,
+    language app.locale,
+    is_programme boolean DEFAULT false NOT NULL,
+    file_id uuid,
+    file_origin text,
+    sha256 text,
+    retrieved_at timestamp with time zone,
+    archive_url text,
+    extraction_status app.extraction_status DEFAULT 'pending'::app.extraction_status NOT NULL,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT source_documents_archive_url_check CHECK ((archive_url ~ '^https://'::text)),
+    CONSTRAINT source_documents_check CHECK ((((file_id IS NULL) = (file_origin IS NULL)) AND ((file_id IS NULL) = (sha256 IS NULL)))),
+    CONSTRAINT source_documents_check1 CHECK (((file_id IS NULL) = (retrieved_at IS NULL))),
+    CONSTRAINT source_documents_check2 CHECK (((NOT is_programme) OR (party_id IS NOT NULL))),
+    CONSTRAINT source_documents_check3 CHECK (((extraction_status <> 'done'::app.extraction_status) OR (file_id IS NOT NULL))),
+    CONSTRAINT source_documents_file_origin_check CHECK ((file_origin = ANY (ARRAY['fetched'::text, 'uploaded'::text]))),
+    CONSTRAINT source_documents_url_check CHECK ((url ~ '^https?://'::text))
+);
+
+
+ALTER TABLE app.source_documents OWNER TO aiontheballot_owner;
+
+--
+-- Name: source_texts; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.source_texts (
+    source_document_id uuid NOT NULL,
+    tenant_id uuid NOT NULL,
+    unit_index integer NOT NULL,
+    label text NOT NULL,
+    body text NOT NULL,
+    normalized text GENERATED ALWAYS AS (private.normalize_for_match(body)) STORED,
+    CONSTRAINT source_texts_unit_index_check CHECK ((unit_index > 0))
+);
+
+
+ALTER TABLE app.source_texts OWNER TO aiontheballot_owner;
+
+--
 -- Name: tenant_brand_selections; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1888,6 +2012,38 @@ ALTER TABLE ONLY app.public_versions
 
 
 --
+-- Name: source_documents source_documents_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.source_documents
+    ADD CONSTRAINT source_documents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: source_documents source_documents_tenant_id_election_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.source_documents
+    ADD CONSTRAINT source_documents_tenant_id_election_id_id_key UNIQUE (tenant_id, election_id, id);
+
+
+--
+-- Name: source_documents source_documents_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.source_documents
+    ADD CONSTRAINT source_documents_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
+-- Name: source_texts source_texts_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.source_texts
+    ADD CONSTRAINT source_texts_pkey PRIMARY KEY (source_document_id, unit_index);
+
+
+--
 -- Name: tenant_brand_selections tenant_brand_selections_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2013,6 +2169,27 @@ CREATE INDEX organizations_logo_asset_id_idx ON app.organizations USING btree (l
 --
 
 CREATE INDEX parties_logo_file_id_idx ON app.parties USING btree (logo_file_id);
+
+
+--
+-- Name: source_documents_election_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX source_documents_election_id_idx ON app.source_documents USING btree (election_id);
+
+
+--
+-- Name: source_documents_file_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX source_documents_file_id_idx ON app.source_documents USING btree (file_id);
+
+
+--
+-- Name: source_documents_party_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX source_documents_party_id_idx ON app.source_documents USING btree (party_id);
 
 
 --
@@ -2174,6 +2351,13 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.platform_admins FOR
 --
 
 CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.platform_hostnames FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: source_documents audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.source_documents FOR EACH ROW EXECUTE FUNCTION private.audit();
 
 
 --
@@ -2345,6 +2529,13 @@ CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.hostname_tombstone
 
 
 --
+-- Name: source_texts forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.source_texts FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
 -- Name: audit_log forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2429,6 +2620,20 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.public_versions FOR EAC
 
 
 --
+-- Name: source_documents forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.source_documents FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: source_texts forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.source_texts FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: tenant_brand_selections forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2482,6 +2687,13 @@ CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.files FOR EACH STATEMENT E
 --
 
 CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.hostname_tombstones FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: source_texts forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.source_texts FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
 
 
 --
@@ -2611,6 +2823,20 @@ CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.parties FOR EACH ROW EXECUTE
 
 
 --
+-- Name: source_documents rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.source_documents FOR EACH ROW EXECUTE FUNCTION private.source_document_rules();
+
+
+--
+-- Name: source_texts rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules BEFORE INSERT ON app.source_texts FOR EACH ROW EXECUTE FUNCTION private.source_text_rules();
+
+
+--
 -- Name: tenant_documents rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2692,6 +2918,13 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.organizations FOR EACH ROW E
 --
 
 CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.platform_admins FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
+
+
+--
+-- Name: source_documents stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.source_documents FOR EACH ROW EXECUTE FUNCTION private.stamp('created_by', 'created_at');
 
 
 --
@@ -2864,6 +3097,38 @@ ALTER TABLE ONLY app.parties
 
 ALTER TABLE ONLY app.public_versions
     ADD CONSTRAINT public_versions_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: source_documents source_documents_tenant_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.source_documents
+    ADD CONSTRAINT source_documents_tenant_id_election_id_fkey FOREIGN KEY (tenant_id, election_id) REFERENCES app.elections(tenant_id, id);
+
+
+--
+-- Name: source_documents source_documents_tenant_id_election_id_party_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.source_documents
+    ADD CONSTRAINT source_documents_tenant_id_election_id_party_id_fkey FOREIGN KEY (tenant_id, election_id, party_id) REFERENCES app.parties(tenant_id, election_id, id);
+
+
+--
+-- Name: source_documents source_documents_tenant_id_file_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.source_documents
+    ADD CONSTRAINT source_documents_tenant_id_file_id_fkey FOREIGN KEY (tenant_id, file_id) REFERENCES app.files(tenant_id, id);
+
+
+--
+-- Name: source_texts source_texts_tenant_id_source_document_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.source_texts
+    ADD CONSTRAINT source_texts_tenant_id_source_document_id_fkey FOREIGN KEY (tenant_id, source_document_id) REFERENCES app.source_documents(tenant_id, id);
 
 
 --
@@ -3122,6 +3387,13 @@ CREATE POLICY editor_delete ON app.parties FOR DELETE TO aiontheballot_admin USI
 
 
 --
+-- Name: source_documents editor_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_delete ON app.source_documents FOR DELETE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: criteria editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3157,6 +3429,13 @@ CREATE POLICY editor_insert ON app.parties FOR INSERT TO aiontheballot_admin WIT
 
 
 --
+-- Name: source_documents editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_insert ON app.source_documents FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: criteria editor_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3175,6 +3454,13 @@ CREATE POLICY editor_update ON app.elections FOR UPDATE TO aiontheballot_admin U
 --
 
 CREATE POLICY editor_update ON app.parties FOR UPDATE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: source_documents editor_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_update ON app.source_documents FOR UPDATE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -3301,6 +3587,20 @@ CREATE POLICY member_read ON app.organizations FOR SELECT TO aiontheballot_admin
 --
 
 CREATE POLICY member_read ON app.parties FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: source_documents member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.source_documents FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: source_texts member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.source_texts FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -3705,6 +4005,18 @@ CREATE POLICY public_read ON app.tenants FOR SELECT TO aiontheballot_web USING (
 ALTER TABLE app.public_versions ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: source_documents; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.source_documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: source_texts; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.source_texts ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: tenant_brand_selections; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -4069,6 +4381,20 @@ REVOKE ALL ON FUNCTION private.restrict_columns() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.restricted_assets_are_eligible() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION source_document_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.source_document_rules() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION source_text_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.source_text_rules() FROM PUBLIC;
 
 
 --
@@ -4902,6 +5228,90 @@ GRANT INSERT(hostname) ON TABLE app.platform_hostnames TO aiontheballot_admin;
 --
 
 GRANT SELECT ON TABLE app.public_versions TO aiontheballot_web;
+
+
+--
+-- Name: TABLE source_documents; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,DELETE ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.election_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(election_id) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.party_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(party_id),UPDATE(party_id) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.kind; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(kind),UPDATE(kind) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.title; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(title),UPDATE(title) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.url; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(url),UPDATE(url) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.language; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(language),UPDATE(language) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.is_programme; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(is_programme),UPDATE(is_programme) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.file_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(file_id),UPDATE(file_id) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN source_documents.file_origin; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(file_origin),UPDATE(file_origin) ON TABLE app.source_documents TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE source_texts; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.source_texts TO aiontheballot_admin;
 
 
 --

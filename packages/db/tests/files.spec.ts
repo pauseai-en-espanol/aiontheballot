@@ -117,10 +117,12 @@ describe('app.files and app.file_blobs', () => {
 
   it('removes the bytes with the file, when an editor deletes an unreferenced file', async () => {
     const left = await asEditorA(async (client) => {
-      await client.query(`DELETE FROM app.files WHERE id = $1`, [FILES.sourceA.id]);
+      await client.query(`DELETE FROM app.files WHERE id = $1`, [FILES.unusedImageA.id]);
       await client.query('RESET ROLE');
       return (
-        await client.query(`SELECT 1 FROM app.file_blobs WHERE file_id = $1`, [FILES.sourceA.id])
+        await client.query(`SELECT 1 FROM app.file_blobs WHERE file_id = $1`, [
+          FILES.unusedImageA.id,
+        ])
       ).rowCount;
     });
     expect(left).toBe(0);

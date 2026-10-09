@@ -488,6 +488,10 @@ goes with it (`on delete cascade`); deleting the bytes of a file that still exis
 its extraction is `done` (or `not_applicable`, for kinds without text). The source's `party_id` must be null or the
 cell's party: one party's documents never back another party's cell.
 
+**Sources over time.** A source starts `pending`; its extracted text is added only while it is pending and has a stored
+copy, and `done` needs that copy. Sources can still be added to an archived election, because corrections may cite new
+documents.
+
 **Matching across units.** The verbatim check runs on a source's units joined in order with a single space, so a
 quote that crosses a page break still matches. The trigger records the first and last unit the match spans; the
 public sees those units' labels (for example "pp. 47–48"), never a page the editor typed.
