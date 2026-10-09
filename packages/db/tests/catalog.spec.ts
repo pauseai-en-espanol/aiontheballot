@@ -337,7 +337,7 @@ const NOT_AUDITED: Readonly<Record<string, string>> = {
 const IMMUTABLE = ['audit_log'];
 
 /** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
-const PERSONAL_DATA: readonly string[] = [];
+const PERSONAL_DATA: readonly string[] = ['invitations.email'];
 
 const DELETE = 8;
 const TRUNCATE = 32;

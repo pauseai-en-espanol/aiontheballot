@@ -104,7 +104,8 @@ Backups are not part of M1: they come from the cluster's backup plan (D2) and mu
 
 **Ships:**
 
-- **Access:** sign-in by invitation plus TOTP; a tenant switcher.
+- **Access:** sign-in by invitation plus TOTP; a tenant switcher. `private.accept_invitation(token)` comes with
+  Better Auth's tables, since it checks the invited email against the user's verified email.
 - **Content setup:** create and edit elections, methodology, external reviewers, parties and criteria.
 - **Sources:** PDFs and web pages, stored in `app.files` with extracted text (pages or sections), a SHA-256 hash
   and an archive snapshot. Other kinds go through the attested path.
@@ -341,6 +342,7 @@ My default is in brackets.
 | D2: backups                                           | Follow the gitops backup plan (Velero + MinIO + DB dumps): the shared Postgres's nightly `pg_dump`, copied off the node by Velero. Nightly also during the campaign; no app-owned job. Must work before the preview.                                                                                               |
 | Admin visibility                                      | The admin shows each user only what is theirs: memberships give access per tenant, and a member of another tenant gets nothing, not even published rows (read those on the public site). Platform admins see every tenant except reports. Public-visibility policies apply to `aiontheballot_web` only (ADR-0002). |
 | Public cache key                                      | One version counter per tenant (`public_versions`), the safety net behind revalidation (ADR-0003). Only a `SECURITY DEFINER` trigger on every public-readable table moves it, so no runtime role can set or rewind it (ADR-0002 §6).                                                                               |
+| Invitation acceptance                                 | `accept_invitation()` ships in M2 with Better Auth's tables and reads the verified email from there; M1 ships the `invitations` table, its policies and its revoke/accept transitions.                                                                                                                             |
 
 ## Tracking
 

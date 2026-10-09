@@ -277,6 +277,12 @@ create table app.invitations (
 );
 ```
 
+**Invitations.** The token is random and only its SHA-256 is stored; an invitation expires within 30 days. It changes
+once: revoked, or accepted before it expires (the time and the acceptor come from the session). Only country admins
+and platform admins see invitations, since they hold emails; they may delete one once it is no longer pending, so an
+email is kept only while needed (the audit log keeps the id only). `private.accept_invitation(token)` arrives in M2
+with Better Auth's tables, because it checks the invited email against the user's verified email.
+
 ### 3.3 Elections, methodology, parties and criteria
 
 ```sql

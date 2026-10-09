@@ -1,8 +1,10 @@
 import type pg from 'pg';
 
 import {
+  INVITATION_TOKENS,
   MEMBERSHIPS,
   PLATFORM_ADMINS,
+  REVOKED_INVITATION_TOKEN,
   REVOKED_MEMBERSHIPS,
   type TenantKey,
   TENANTS,
@@ -49,5 +51,19 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       [m.user, TENANTS[m.tenant].id, m.role],
     );
   }
+  const invite = (tenant: TenantKey, token: string): Promise<unknown> =>
+    client.query(
+      `INSERT INTO app.invitations (tenant_id, email, role, token_hash, expires_at)
+       VALUES ($1, $2, 'editor', encode(sha256($3::bytea), 'hex'), now() + interval '7 days')`,
+      [TENANTS[tenant].id, `persona-invitada-${tenant.toLowerCase()}@example.org`, token],
+    );
+  for (const [key, token] of Object.entries(INVITATION_TOKENS) as [TenantKey, string][]) {
+    await invite(key, token);
+  }
+  await invite('A', REVOKED_INVITATION_TOKEN);
+  await client.query(
+    `UPDATE app.invitations SET revoked_at = now() WHERE token_hash = encode(sha256($1::bytea), 'hex')`,
+    [REVOKED_INVITATION_TOKEN],
+  );
   await client.query('COMMIT');
 };

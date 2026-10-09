@@ -43,6 +43,23 @@ export interface AppAuditLog {
   tenant_id: string | null;
 }
 
+export interface AppInvitations {
+  accepted_at: Timestamp | null;
+  accepted_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  /**
+   * personal data
+   */
+  email: string;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  revoked_at: Timestamp | null;
+  role: AppTenantRole;
+  tenant_id: string;
+  token_hash: string;
+}
+
 export interface AppMemberships {
   created_at: Generated<Timestamp>;
   created_by: string;
@@ -79,6 +96,7 @@ export interface AppTenants {
 
 export interface DB {
   'app.audit_log': AppAuditLog;
+  'app.invitations': AppInvitations;
   'app.memberships': AppMemberships;
   'app.platform_admins': AppPlatformAdmins;
   'app.public_versions': AppPublicVersions;

@@ -50,6 +50,14 @@ export const MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: Tena
   { user: USERS.countryAdminInactive, tenant: 'inactive', role: 'country_admin' },
 ];
 
+/** The raw tokens of the fixture invitations (only their SHA-256 is stored), one pending per tenant. */
+export const INVITATION_TOKENS: Readonly<Record<TenantKey, string>> = {
+  A: 'token-de-prueba-a',
+  B: 'token-de-prueba-b',
+  inactive: 'token-de-prueba-inactivo',
+};
+export const REVOKED_INVITATION_TOKEN = 'token-de-prueba-revocado-a';
+
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
   [{ user: USERS.revokedA, tenant: 'A', role: 'editor' }];
@@ -96,6 +104,8 @@ export interface Row {
   public: boolean;
   /** A predicate matching exactly this fixture row. */
   where: string;
+  /** Rules that differ for this row's state (say, a draft row may be deleted and a published one not). */
+  rules?: Partial<Record<'select' | 'update' | 'delete', Rule>>;
 }
 
 export interface Insert {
@@ -277,6 +287,47 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     insert: NOBODY,
     update: NOBODY,
     delete: NOBODY,
+  },
+
+  'app.invitations': {
+    rows: [
+      ...TENANT_KEYS.map((key) => ({
+        id: `pending invitation of ${key}`,
+        tenant: key,
+        public: false,
+        where: `token_hash = encode(sha256('${INVITATION_TOKENS[key]}'), 'hex')`,
+        rules: { delete: NOBODY },
+      })),
+      {
+        id: 'revoked invitation of A',
+        tenant: 'A',
+        public: false,
+        where: `token_hash = encode(sha256('${REVOKED_INVITATION_TOKEN}'), 'hex')`,
+        rules: { update: NOBODY },
+      },
+    ],
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `invitation into ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.invitations (tenant_id, email, role, token_hash, expires_at)
+            VALUES ('${TENANTS[key].id}', 'persona-nueva@example.org', 'editor',
+                    encode(sha256('token-nuevo-${key}'), 'hex'), now() + interval '7 days')`,
+    })),
+    set: 'revoked_at = now()',
+    select: COUNTRY_ADMINS,
+    insert: COUNTRY_ADMINS,
+    update: COUNTRY_ADMINS,
+    delete: COUNTRY_ADMINS,
+    columnUpdates: {
+      email: { set: `email = 'otra-persona@example.org'`, rule: NOBODY },
+      role: { set: `role = 'country_admin'`, rule: NOBODY },
+      token_hash: { set: `token_hash = encode(sha256('token-cambiado'), 'hex')`, rule: NOBODY },
+      expires_at: { set: `expires_at = now() + interval '20 days'`, rule: NOBODY },
+      accepted_at: { set: 'accepted_at = now()', rule: NOBODY },
+      accepted_by: { set: `accepted_by = '${USERS.newcomer}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+      created_by: { set: `created_by = '${USERS.newcomer}'`, rule: NOBODY },
+    },
   },
 
   'app.memberships': {

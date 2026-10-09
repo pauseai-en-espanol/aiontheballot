@@ -56,7 +56,8 @@ export const matrixCases = (): MatrixCase[] =>
             expected: expectedOutcome(principal, rule, row.tenant, row.public, write),
           });
         };
-        add('select', `SELECT 1 FROM ${relation} WHERE ${row.where}`, spec.select, false);
+        const rule = (op: 'select' | 'update' | 'delete'): Rule => row.rules?.[op] ?? spec[op];
+        add('select', `SELECT 1 FROM ${relation} WHERE ${row.where}`, rule('select'), false);
         for (const [column, rule] of Object.entries(spec.columnReads ?? {})) {
           add(
             `select:${column}`,
@@ -65,11 +66,16 @@ export const matrixCases = (): MatrixCase[] =>
             false,
           );
         }
-        add('update', `UPDATE ${relation} SET ${spec.set} WHERE ${row.where}`, spec.update, true);
+        add(
+          'update',
+          `UPDATE ${relation} SET ${spec.set} WHERE ${row.where}`,
+          rule('update'),
+          true,
+        );
         for (const [column, { set, rule }] of Object.entries(spec.columnUpdates ?? {})) {
           add(`update:${column}`, `UPDATE ${relation} SET ${set} WHERE ${row.where}`, rule, true);
         }
-        add('delete', `DELETE FROM ${relation} WHERE ${row.where}`, spec.delete, true);
+        add('delete', `DELETE FROM ${relation} WHERE ${row.where}`, rule('delete'), true);
       }
       for (const insert of spec.inserts) {
         cases.push({

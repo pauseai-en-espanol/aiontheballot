@@ -530,6 +530,42 @@ CREATE FUNCTION private.forbid_tenant_change() RETURNS trigger
 ALTER FUNCTION private.forbid_tenant_change() OWNER TO aiontheballot_owner;
 
 --
+-- Name: invitation_transition(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.invitation_transition() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    decision text[] := ARRAY['accepted_at', 'accepted_by', 'revoked_at'];
+  BEGIN
+    IF OLD.accepted_at IS NOT NULL OR OLD.revoked_at IS NOT NULL THEN
+      RAISE EXCEPTION 'invitation % is already decided', OLD.id USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF (to_jsonb(NEW) - decision) IS DISTINCT FROM (to_jsonb(OLD) - decision) THEN
+      RAISE EXCEPTION 'invitation %: only revoking or accepting it is allowed', OLD.id
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF NEW.revoked_at IS NOT NULL AND NEW.accepted_at IS NULL AND NEW.accepted_by IS NULL THEN
+      NEW.revoked_at := now();
+    ELSIF NEW.revoked_at IS NULL AND (NEW.accepted_at IS NOT NULL OR NEW.accepted_by IS NOT NULL) THEN
+      IF OLD.expires_at <= now() THEN
+        RAISE EXCEPTION 'invitation % has expired', OLD.id USING ERRCODE = 'restrict_violation';
+      END IF;
+      NEW.accepted_at := now();
+      NEW.accepted_by := private.current_user_id();
+    ELSE
+      RAISE EXCEPTION 'invitation %: revoke it or accept it', OLD.id USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.invitation_transition() OWNER TO aiontheballot_owner;
+
+--
 -- Name: is_platform_admin(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -688,6 +724,39 @@ ALTER TABLE app.audit_log ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 
 --
+-- Name: invitations; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.invitations (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    email text NOT NULL,
+    role app.tenant_role NOT NULL,
+    token_hash text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    accepted_at timestamp with time zone,
+    accepted_by uuid,
+    revoked_at timestamp with time zone,
+    CONSTRAINT invitations_check CHECK (((expires_at > created_at) AND (expires_at <= (created_at + '30 days'::interval)))),
+    CONSTRAINT invitations_check1 CHECK (((accepted_at IS NULL) = (accepted_by IS NULL))),
+    CONSTRAINT invitations_check2 CHECK (((accepted_at IS NULL) OR (revoked_at IS NULL))),
+    CONSTRAINT invitations_email_check CHECK (((email = lower(email)) AND (email ~ '^[^@[:space:]]+@[^@[:space:]]+$'::text))),
+    CONSTRAINT invitations_token_hash_check CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
+);
+
+
+ALTER TABLE app.invitations OWNER TO aiontheballot_owner;
+
+--
+-- Name: COLUMN invitations.email; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.invitations.email IS 'personal data';
+
+
+--
 -- Name: memberships; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -778,6 +847,30 @@ ALTER TABLE ONLY app.audit_log
 
 
 --
+-- Name: invitations invitations_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.invitations
+    ADD CONSTRAINT invitations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: invitations invitations_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.invitations
+    ADD CONSTRAINT invitations_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
+-- Name: invitations invitations_token_hash_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.invitations
+    ADD CONSTRAINT invitations_token_hash_key UNIQUE (token_hash);
+
+
+--
 -- Name: memberships memberships_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -840,6 +933,13 @@ CREATE INDEX memberships_tenant_id_idx ON app.memberships USING btree (tenant_id
 
 
 --
+-- Name: invitations audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.invitations FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
 -- Name: memberships audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -882,6 +982,13 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.audit_log FOR EACH ROW 
 
 
 --
+-- Name: invitations forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.invitations FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: memberships forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -917,6 +1024,13 @@ CREATE TRIGGER stamp BEFORE INSERT ON app.audit_log FOR EACH ROW EXECUTE FUNCTIO
 
 
 --
+-- Name: invitations stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.invitations FOR EACH ROW EXECUTE FUNCTION private.stamp('created_by', 'created_at');
+
+
+--
 -- Name: memberships stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -938,11 +1052,26 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.tenants FOR EACH ROW EXECUTE
 
 
 --
+-- Name: invitations transition; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER transition BEFORE UPDATE ON app.invitations FOR EACH ROW EXECUTE FUNCTION private.invitation_transition();
+
+
+--
 -- Name: audit_log audit_log_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
 ALTER TABLE ONLY app.audit_log
     ADD CONSTRAINT audit_log_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: invitations invitations_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.invitations
+    ADD CONSTRAINT invitations_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
 
 
 --
@@ -968,10 +1097,24 @@ ALTER TABLE ONLY app.public_versions
 ALTER TABLE app.audit_log ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: invitations country_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_delete ON app.invitations FOR DELETE TO aiontheballot_admin USING ((((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)) AND ((accepted_at IS NOT NULL) OR (revoked_at IS NOT NULL) OR (expires_at <= now()))));
+
+
+--
 -- Name: memberships country_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE POLICY country_admin_delete ON app.memberships FOR DELETE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: invitations country_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_insert ON app.invitations FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -989,11 +1132,31 @@ CREATE POLICY country_admin_read ON app.audit_log FOR SELECT TO aiontheballot_ad
 
 
 --
+-- Name: invitations country_admin_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_read ON app.invitations FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: invitations country_admin_revoke; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_revoke ON app.invitations FOR UPDATE TO aiontheballot_admin USING ((((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)) AND (accepted_at IS NULL) AND (revoked_at IS NULL))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: tenants country_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE POLICY country_admin_update ON app.tenants FOR UPDATE TO aiontheballot_admin USING (((id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
+
+--
+-- Name: invitations; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.invitations ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: memberships member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
@@ -1308,6 +1471,13 @@ REVOKE ALL ON FUNCTION private.forbid_tenant_change() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION invitation_transition(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.invitation_transition() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION is_platform_admin(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1349,6 +1519,55 @@ REVOKE ALL ON FUNCTION private.stamp() FROM PUBLIC;
 --
 
 GRANT SELECT ON TABLE app.audit_log TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE invitations; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,DELETE ON TABLE app.invitations TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN invitations.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.invitations TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN invitations.email; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(email) ON TABLE app.invitations TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN invitations.role; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(role) ON TABLE app.invitations TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN invitations.token_hash; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(token_hash) ON TABLE app.invitations TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN invitations.expires_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(expires_at) ON TABLE app.invitations TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN invitations.revoked_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(revoked_at) ON TABLE app.invitations TO aiontheballot_admin;
 
 
 --
