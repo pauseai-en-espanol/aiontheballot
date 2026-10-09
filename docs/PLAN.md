@@ -27,7 +27,7 @@ Each spec is reviewed by Dani before the milestone that builds it starts:
 
 | Spec                                                                                                 | Ready before | Status                                                  |
 | ---------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- |
-| [Data model](spec/data-model.md)                                                                     | M1           | Draft for review (revised)                              |
+| [Data model](spec/data-model.md)                                                                     | M1           | Approved                                                |
 | Editorial workflow (user stories and acceptance criteria per role)                                   | M2           | Written during M1                                       |
 | Public site (page content, mobile layouts, display states, share-image layouts, performance budgets) | M3           | Written during M2, with chapter input on public wording |
 
@@ -118,7 +118,8 @@ Backups are not part of M1: they come from the cluster's backup plan (D2) and mu
 **Demo:**
 
 - Two users take a cell from draft to published.
-- Self-review, a missing quote and a quote that doesn't match the source are all rejected.
+- Self-review (while the election requires a second reviewer), a missing quote and a quote that doesn't match the
+  source are all rejected.
 - Editing a criterion in a live election requires an approved change request with a public note, and a second
   person when the tenant requires one.
 
@@ -225,7 +226,7 @@ is done and M2 is on track.
 
 - RLS and the isolation matrix.
 - The hostname rules.
-- The evidence requirement, four-eyes review and verbatim match.
+- The evidence requirement, the four-eyes mechanism (on by default; see P14) and verbatim match.
 - History and the corrections log.
 - The operator line and the methodology link.
 - The legal pages.
@@ -268,7 +269,8 @@ D1–D5 are decided (see [Answered](#answered)).
 - **Q6. Legal notice.** Article 10 of the LSSI appears to require registry details and a contact address beyond
   the fields in the brief. Proposal: add `registry_entry` and `contact_email` to `organizations`. Please confirm
   with counsel.
-- **Q7. Personal data.** How long should right-of-reply submissions be kept, and who is the privacy contact?
+- **Q7. Personal data.** How long should right-of-reply submissions be kept (a per-tenant setting; reports are then
+  anonymized), and who is the privacy contact?
   Deleted submissions stay in backups until those expire (up to 90 days under the cluster's backup policy), which
   the privacy policy should say.
 - **Q8. Electoral law.** Has the association had advice on publishing or updating the table during the campaign,
@@ -277,7 +279,8 @@ D1–D5 are decided (see [Answered](#answered)).
 - **Q9. Admissible sources.** Which kinds of source can back a rating? Options: official programmes and documents
   only, or also web pages, debate and interview statements, and social posts. The platform supports all of them
   (PDFs and web pages are matched automatically; the rest need a second person to attest them). Restricting to
-  official documents is the most defensible.
+  official documents is the most defensible. Separately: which kinds can back "No lo menciona", which may be given
+  before a party's programme exists? The default is the party's programme and its website.
 
 ## Pushback and clarifications on the brief
 
@@ -290,6 +293,14 @@ My default is in brackets.
 - **P3. Verbatim matching.** Apply it to **every** quote, not only those the LLM proposes. For sources with no
   extractable text, a second person must attest the quote. [Yes.]
 - **P4. Four-eyes.** "Author" means **anyone who edited the revision**, not just its creator. [Yes.]
+- **P14. Four-eyes per election.** BRIEF §4 makes a second person mandatory to publish. The pilot may run with one
+  or two people, and a mandatory second person would block publishing whenever one is away. [Decided by the owner:
+  a per-election setting, on by default. Only a platform admin turns it off, audited; self-review is then recorded
+  privately, not shown publicly. It covers publishing, withdrawals, public notes, attestations and corrections.]
+- **P15. "No lo menciona" before the programme.** [Decided: allowed, backed by checked records of the party's own
+  stored documents (kinds per the methodology, Q9). The cell is flagged for a recheck when the programme appears.]
+- **P16. Archived elections.** [Decided: corrections and withdrawals stay possible, under the same review rule and
+  with a public note; right-of-reply reports are still handled.]
 - **P5. MFA.** TOTP is **mandatory** for every admin role and enforced in the database. [Yes.]
 - **P6. Descriptive methodology.** What distinguishes "red = no position" from "No lo menciona"? This doesn't
   block Spain, which uses the `demands` methodology.
@@ -334,7 +345,7 @@ My default is in brackets.
 | Milestone | Status                                                                                                                                                      | Demo note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | M0        | Done. Green CI and an automatic release on the self-hosted runner; deployed by Argo CD on danilupion-com, with GlitchTip running cluster-wide (VPN-only UI) | TS 7 spike passed. Public app serves with no cookies. 34 database tests: catalog meta-tests, normaliser parity, immutability triggers, isolation-matrix harness. Images run as non-root; the CI database job replayed locally against a fresh Postgres. Playwright smoke on production builds, which caught the platform name being fixed at build time. Demo: `iaenlasurnas.es` and `admin.iaenlasurnas.es` serve over TLS through `gateway-public`, titled from `PLATFORM_NAME`, no cookies; migrations ran as `aiontheballot_owner` before the pods started, and the runtime roles own nothing and cannot bypass RLS |
-| M1        | In progress. Error tracking and `resolve()` are done; the schema waits for the data-model spec review                                                       | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| M1        | In progress. Error tracking (shown in production) and `resolve()` are done; data model approved; schema next                                                | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | M2        | Not started                                                                                                                                                 | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | M3        | Not started                                                                                                                                                 | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Preview   | Not started                                                                                                                                                 | —                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |

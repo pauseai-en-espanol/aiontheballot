@@ -34,12 +34,12 @@ The UI repeats some checks, but only for user experience.
 
 ### 2. Database roles
 
-| Role                   | Used by                         | Notes                                                                                                                                                    |
-| ---------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `aiontheballot_owner`  | The migration Job only          | Owns the schemas; never used by the running apps                                                                                                         |
-| `aiontheballot_admin`  | API admin routes and the worker | Runtime role                                                                                                                                             |
-| `aiontheballot_web`    | API public routes (read-only)   | Runtime role                                                                                                                                             |
-| `aiontheballot_worker` | Background worker               | Runtime role; only job tables, scoped to the tenant of the job's `job_requests` row, which is the one table it reads across tenants (ids and kinds only) |
+| Role                   | Used by                         | Notes                                                                                                   |
+| ---------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `aiontheballot_owner`  | The migration Job only          | Owns the schemas; never used by the running apps                                                        |
+| `aiontheballot_admin`  | API admin routes and the worker | Runtime role                                                                                            |
+| `aiontheballot_web`    | API public routes (read-only)   | Runtime role                                                                                            |
+| `aiontheballot_worker` | Background worker               | Runtime role; only job tables, scoped to the one open `job_requests` row it runs (`app.job_request_id`) |
 
 All runtime roles are `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB` and own nothing. A catalog
 meta-test fails if this ever changes.
@@ -71,7 +71,7 @@ log makes it visible (T23).
 - Drafts, sign-offs, review notes and tokens live in private tables.
 - **Storage is tables too:**
   - `app.files(tenant_id, bucket, …)` holds metadata and `app.file_blobs` holds the bytes, under the same RLS.
-  - `bucket` is one of `public_assets`, `sources` or `platform_assets`.
+  - `bucket` is `public_assets` or `sources`. Platform brand assets live in their own table, `brand_assets`.
   - This is how the brief's "storage buckets under RLS" is met.
 
 ### 6. Closed by default
@@ -80,8 +80,11 @@ log makes it visible (T23).
 - Default privileges are set so that new functions are not executable by `PUBLIC` either.
 - Every grant is explicit.
 - Helper functions live in a `private` schema.
-- `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, `submit_report` and
-  `accept_invitation`. All of them set `search_path = ''`.
+- `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, `submit_report`,
+  `accept_invitation`, the publish trigger `publish_revision` and `anonymize_expired_reports` (worker only). All of
+  them set `search_path = ''`.
+- `private.normalize_for_match` is executable by `aiontheballot_admin` (the match trigger) and
+  `aiontheballot_worker` (the generated column on `source_texts`).
 
 ### 7. The public role reads, and can call one function
 
@@ -116,37 +119,48 @@ expires_at)`, under RLS.
 
 ### 11. Data rules are enforced by table triggers, not by RPCs
 
-- Deferred constraint triggers enforce the evidence requirement, four-eyes review, the verbatim quote match, legal
-  status transitions, and `published_by := current_user_id()`.
+- **Publishing is one INSERT naming the cell and the version reviewed.** Its trigger checks the review rule, the
+  evidence requirement and the verbatim match, and copies the reviewed draft itself; the caller can't supply
+  published content, and runtime roles can't write the revision tables any other way.
+- Other triggers enforce legal state transitions, the content lock while a cell is in review, actor columns and
+  event timestamps (set from the session, never from the caller).
 - Server functions exist only for convenience. A direct `INSERT` or `UPDATE` that skips them is still checked.
 
 ### 12. Live elections are change-controlled
 
 - Once an election is `live`, editing criteria text, party name or short name, or the methodology body goes
   through `change_requests`, always with a public note.
-- **Who approves is a per-tenant setting** (`tenants.live_edits_need_second_approver`). Off by default: with one or
-  two maintainers, one member may propose and approve their own change. On: a different member must approve. The
-  approver always holds `reviewer` or `country_admin`.
+- **Who approves is a per-tenant setting** (`tenants.live_edits_need_second_approver`, set only by platform admins).
+  Off by default: with one or two maintainers, one member may propose and approve their own change. On: a different
+  member must approve. The approver always holds `reviewer` or `country_admin`.
+- Additions and retirements of parties, criteria and methodology reviewers go through change requests too; once
+  live, nothing structural is deleted.
+- A decided change request is immutable, and its "before" value is read from the target, never from the caller.
 - The edit is accepted only if a matching request was approved in the same transaction. There is no session flag
   that turns the rule off.
-- Each approved change also adds a corrections-log entry, so live changes are public whichever setting applies.
-- This differs from cell publishing, where four-eyes is a brief-level rule (BRIEF §4) and is never configurable.
+- Each approved change writes an immutable public record (`structural_changes`) that the corrections log reads, so
+  live changes are public whichever setting applies.
 - Programme-status updates need only one person, but are audited and shown publicly with their check date.
 
 ### 13. Withdrawal
 
-A revision with `change_kind='withdrawal'` returns the cell to _pending_ and logs a correction.
+A withdrawal is a draft (`draft_change_kind = 'withdrawal'`) reviewed like any other change. Its revision leaves the
+cell without a rating (_withdrawn_, distinct from _pending_) and logs a correction with its public note.
 
 ### 14. Immutability, with one purge path
 
-- Triggers reject `UPDATE`, `DELETE` and `TRUNCATE` on revisions and their child tables, `audit_log` and
-  `purge_log`. These triggers fire even for the owner role. The corrections log is a view derived from revisions
-  and approved change requests, so it can't be edited either.
+- Triggers reject `UPDATE`, `DELETE` and `TRUNCATE` on revisions and their child tables, `structural_changes`,
+  `review_events`, `audit_log` and `purge_log`. These triggers fire even for the owner role. The corrections log is
+  a view over revisions and `structural_changes`, so it can't be edited either.
+- Stored files are immutable, and deletable only while nothing references them.
 - The only exception is `private.purge_tenant(tenant_id)`:
   - Only `aiontheballot_owner` can execute it.
   - It sets a transaction-local `app.purge` flag that the triggers honour, and writes a platform-level purge record.
   - It covers per-tenant deletion (BRIEF §7) and GDPR erasure.
 - Personal data is never copied into `audit_log`; reports are logged by ID only.
+- Reports are anonymized, never deleted, because corrections cite them: at the end of the tenant's retention period
+  or on an erasure request, their personal-data columns are set to null.
+- A purge moves the tenant's hostnames to `hostname_tombstones`, so they can never be claimed again.
 
 ### 15. The Host header never authorizes
 
@@ -160,16 +174,16 @@ A revision with `change_kind='withdrawal'` returns the cell to _pending_ and log
 
 "Own" means the member's own tenant. A member of tenant A acting on tenant B gets exactly what `aiontheballot_web` gets.
 
-| Capability                                                                                                                    | editor | reviewer | country_admin | platform_admin                      |
-| ----------------------------------------------------------------------------------------------------------------------------- | ------ | -------- | ------------- | ----------------------------------- |
-| Read own-tenant private data (drafts, sources, queue)                                                                         | ✓      | ✓        | ✓             | ✓ all tenants, **except** `reports` |
-| Create and edit drafts, evidence and sources; propose live changes                                                            | ✓      | –        | ✓             | ✓                                   |
-| Approve and publish revisions (never own work) and change requests (own allowed unless the tenant requires a second approver) | –      | ✓        | ✓             | ✓                                   |
-| Triage right-of-reply reports                                                                                                 | ✓      | ✓        | ✓             | –                                   |
-| Invite members and manage memberships in own tenant                                                                           | –      | –        | ✓             | ✓                                   |
-| Tenant theme, election status, methodology **body**                                                                           | –      | –        | ✓             | ✓                                   |
-| Operator, methodology **kind**, `is_pauseai_chapter`, restricted-asset grants, hostnames, tenant `active`                     | –      | –        | –             | ✓ (audited)                         |
-| Read the audit log                                                                                                            | –      | –        | ✓             | ✓                                   |
+| Capability                                                                                                                                                                | editor | reviewer | country_admin | platform_admin                      |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------- | ------------- | ----------------------------------- |
+| Read own-tenant private data (drafts, sources, queue)                                                                                                                     | ✓      | ✓        | ✓             | ✓ all tenants, **except** `reports` |
+| Create and edit drafts, evidence and sources; propose live changes                                                                                                        | ✓      | –        | ✓             | ✓                                   |
+| Approve and publish revisions (not own work while the election requires a second reviewer) and change requests (own allowed unless the tenant requires a second approver) | –      | ✓        | ✓             | ✓                                   |
+| Triage right-of-reply reports                                                                                                                                             | ✓      | ✓        | ✓             | –                                   |
+| Invite members and manage memberships in own tenant                                                                                                                       | –      | –        | ✓             | ✓                                   |
+| Tenant theme, election status and freeze window, methodology **body**, policy texts, report retention, LLM cap                                                            | –      | –        | ✓             | ✓                                   |
+| Operator, organizations, methodology **kind**, `is_pauseai_chapter`, restricted-asset grants, hostnames, tenant `active`, review settings                                 | –      | –        | –             | ✓ (audited)                         |
+| Read the audit log                                                                                                                                                        | –      | –        | ✓             | ✓                                   |
 
 **About platform admins and reports:** the app never lets a platform admin read reports. A platform admin could
 grant themselves a membership to do so, but that grant is audited and visible to the tenant's country admin.
@@ -190,7 +204,9 @@ These platform-wide rows are also public: active `tenants`, verified `tenant_hos
 ### Evidence requirement
 
 - A published rating other than `not_mentioned` needs at least one evidence row with a non-empty verbatim quote.
-- `not_mentioned` needs at least one checked-document row: which document was checked, and `checked_at`.
+- `not_mentioned` needs at least one checked-document row for one of the party's own documents, of a kind the
+  methodology lists for it, with a stored copy: the proof of an absence is what was checked, kept, and when. It may
+  be published before the party's programme exists; when the programme appears, the cell is flagged for a recheck.
 
 **Verbatim match, for every quote** (not only LLM-proposed ones)
 
@@ -203,8 +219,11 @@ These platform-wide rows are also public: active `tenants`, verified `tenant_hos
   - folds typographic quotes and dashes;
   - collapses whitespace.
 - A TypeScript port of the function is tested against the same fixture file, so the UI and the database agree.
+- Matching runs across a document's pages, so a quote spanning a page break matches; the public sees the matched
+  pages, never a page someone typed.
 - **Exception:** sources with no extractable text (scans, video) can use `match_status='attested'`. That requires a
-  stored file, and the attester must be someone other than the publisher.
+  stored screenshot or clip, and the attester must be someone other than the quote's author, unless the election
+  doesn't require a second reviewer.
 
 ### Evidence source kinds
 
@@ -222,18 +241,26 @@ These platform-wide rows are also public: active `tenants`, verified `tenant_hos
 ### Four-eyes review
 
 - The publisher must hold `reviewer` or `country_admin`.
-- The publisher must not be among the revision's **contributors**: anyone who edited it since the last publish.
+- **Per election, on by default** (`elections.require_second_reviewer`): the publisher must not be among the
+  revision's **contributors**: anyone who changed its content since the last publish, or uploaded a file it cites.
+  Submitting, rejecting and attesting are not contributions.
+- **Only a platform admin can turn it off,** and that is audited. Then an author may publish their own work, and the
+  revision is marked self-reviewed in a private record, never shown publicly.
+- **This deviates from BRIEF §4** ("reviewer ≠ author to publish"), at the owner's decision: the pilot may run with
+  one or two people, and a mandatory second person would block publishing whenever one is away. The cost is T14:
+  while the setting is off, one compromised account can publish. It applies equally to withdrawals, public notes,
+  attestations and corrections after archive.
 
 ### History and corrections
 
 - Every publish after the first carries `change_kind` (`update`, `correction` or `withdrawal`) and a public,
-  localized note.
+  localized note, both written in the draft and reviewed with it. `initial` is only ever the first revision.
 - Each such publish appends to the election's corrections log.
 - A cell's "last updated" date is the time of its latest revision.
 
 ### "Pending" is not "not mentioned"
 
-- A cell with no published revision shows a non-rating _pending_ state.
+- A cell with no published revision shows a non-rating _pending_ state; a withdrawn cell shows _withdrawn_.
 - "Not mentioned" is an actual rating, backed by a record of which documents were checked and when.
 
 ## Platform invariants (BRIEF §3)
@@ -337,32 +364,32 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 
 ### Threats
 
-| #   | Threat                                                                     | Actor  | Mitigation                                                                                                          | Proven by                             |
-| --- | -------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| T1  | Read B's drafts, sources, reports or audit log                             | A2–A4  | Membership-based RLS; `aiontheballot_web` has no grants on private tables                                           | Matrix                                |
-| T2  | Write into B by forging `tenant_id`                                        | A3–A4  | `WITH CHECK` on membership                                                                                          | Matrix                                |
-| T3  | Reference across tenants (A's evidence or source on B's cell)              | A3     | Composite FKs                                                                                                       | DB-rule tests                         |
-| T4  | Move a row from one tenant to another                                      | A3–A4  | Immutability trigger plus composite FK                                                                              | DB-rule tests                         |
-| T5  | Escalate privileges (gain a role in A, or platform admin)                  | A4     | Policies on memberships and invitations; `platform_admins` has no app write path                                    | Matrix                                |
-| T6  | Claim A's hostname, or a domain the attacker doesn't own                   | A4, A7 | Hostname primary key; TXT verification; platform-admin-only writes; gitops PR only after verification               | Routing and DB tests                  |
-| T7  | Spoof the Host header to mix branding or poison a cache                    | A1     | Host only selects content; tenant is in the internal path; internal prefix blocked; absolute URLs built from the DB | Routing integration tests             |
-| T8  | Sessions or authorization appearing on public hosts                        | A1     | Public app has no session code; one admin host                                                                      | E2E: no `Set-Cookie` on public hosts  |
-| T9  | Read or overwrite another tenant's files                                   | A3     | RLS on `app.files` and `file_blobs`; tenant is part of the key                                                      | Matrix and endpoint integration tests |
-| T10 | A `SECURITY DEFINER` function or function grant leaks access               | —      | Allowlist; `search_path=''`; `EXECUTE` revoked from `PUBLIC`                                                        | Catalog meta-tests                    |
-| T11 | A runtime role drifts into ownership or `BYPASSRLS`                        | —      | Role-attribute meta-test                                                                                            | Catalog meta-tests                    |
-| T12 | The database is exposed outside the cluster                                | A1     | ClusterIP only; no NodePort                                                                                         | Deploy check                          |
-| T13 | Secrets leak                                                               | A9     | SealedSecrets; CI holds no cluster credentials (GitOps pull); no `pull_request_target`                              | CI review                             |
-| T14 | One compromised editor publishes a false rating                            | A5     | Four-eyes; MFA (aal2); audit log; public corrections                                                                | DB-rule tests                         |
-| T15 | One person uses a second ("sock-puppet") account to pass four-eyes         | A5     | Invite-only accounts vetted by the country admin; audit trail. **Residual risk accepted**                           | Process                               |
-| T16 | Platform admin abuses access                                               | A6     | Few admins, all with MFA; changes audited; no reading `reports` in the app                                          | Matrix and invariant tests            |
-| T17 | An ineligible tenant uses a restricted brand asset                         | A4     | DB check plus render-time check                                                                                     | Invariant tests                       |
-| T18 | Stored XSS through quotes, party names or methodology                      | A3, A8 | Render as text only; sanitized Markdown; CSP                                                                        | Unit and E2E tests                    |
-| T19 | Prompt injection in a programme sways the LLM's suggestions                | A8     | LLM only suggests; unmatched quotes dropped; humans decide with four-eyes; LLM has no tools                         | M4 tests                              |
-| T20 | Report spam or denial of service                                           | A1     | A single function as the only write path; per-tenant cap; honeypot; Envoy per-IP rate limit                         | Integration tests                     |
-| T21 | A retired or alias domain expires and someone else buys it                 | A7     | Association-owned registrar with auto-renew; hostnames never deleted or detached; uptime monitor per hostname       | Ops checklist                         |
-| T22 | Per-tenant export or purge touches another tenant                          | —      | Owner-only `purge_tenant`; tenant-scoped export                                                                     | Integration tests                     |
-| T23 | Compromised API impersonates users                                         | A10    | Accepted. Small admin surface; immutable audit log; MFA; alert on unusual publish volume                            | Audit review                          |
-| T24 | A live criterion is reworded, changing what already-published ratings mean | A5     | Change requests always create a public corrections entry; a second approver if the tenant requires it               | DB-rule tests                         |
+| #   | Threat                                                                     | Actor  | Mitigation                                                                                                                             | Proven by                             |
+| --- | -------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| T1  | Read B's drafts, sources, reports or audit log                             | A2–A4  | Membership-based RLS; `aiontheballot_web` has no grants on private tables                                                              | Matrix                                |
+| T2  | Write into B by forging `tenant_id`                                        | A3–A4  | `WITH CHECK` on membership                                                                                                             | Matrix                                |
+| T3  | Reference across tenants (A's evidence or source on B's cell)              | A3     | Composite FKs                                                                                                                          | DB-rule tests                         |
+| T4  | Move a row from one tenant to another                                      | A3–A4  | Immutability trigger plus composite FK                                                                                                 | DB-rule tests                         |
+| T5  | Escalate privileges (gain a role in A, or platform admin)                  | A4     | Policies on memberships and invitations; `platform_admins` has no app write path                                                       | Matrix                                |
+| T6  | Claim A's hostname, or a domain the attacker doesn't own                   | A4, A7 | Hostname primary key; TXT verification; platform-admin-only writes; gitops PR only after verification                                  | Routing and DB tests                  |
+| T7  | Spoof the Host header to mix branding or poison a cache                    | A1     | Host only selects content; tenant is in the internal path; internal prefix blocked; absolute URLs built from the DB                    | Routing integration tests             |
+| T8  | Sessions or authorization appearing on public hosts                        | A1     | Public app has no session code; one admin host                                                                                         | E2E: no `Set-Cookie` on public hosts  |
+| T9  | Read or overwrite another tenant's files                                   | A3     | RLS on `app.files` and `file_blobs`; tenant is part of the key                                                                         | Matrix and endpoint integration tests |
+| T10 | A `SECURITY DEFINER` function or function grant leaks access               | —      | Allowlist; `search_path=''`; `EXECUTE` revoked from `PUBLIC`                                                                           | Catalog meta-tests                    |
+| T11 | A runtime role drifts into ownership or `BYPASSRLS`                        | —      | Role-attribute meta-test                                                                                                               | Catalog meta-tests                    |
+| T12 | The database is exposed outside the cluster                                | A1     | ClusterIP only; no NodePort                                                                                                            | Deploy check                          |
+| T13 | Secrets leak                                                               | A9     | SealedSecrets; CI holds no cluster credentials (GitOps pull); no `pull_request_target`                                                 | CI review                             |
+| T14 | One compromised editor publishes a false rating                            | A5     | Four-eyes (residual risk accepted while a platform admin has turned it off for an election); MFA (aal2); audit log; public corrections | DB-rule tests                         |
+| T15 | One person uses a second ("sock-puppet") account to pass four-eyes         | A5     | Invite-only accounts vetted by the country admin; audit trail. **Residual risk accepted**                                              | Process                               |
+| T16 | Platform admin abuses access                                               | A6     | Few admins, all with MFA; changes audited; no reading `reports` in the app                                                             | Matrix and invariant tests            |
+| T17 | An ineligible tenant uses a restricted brand asset                         | A4     | DB check plus render-time check                                                                                                        | Invariant tests                       |
+| T18 | Stored XSS through quotes, party names or methodology                      | A3, A8 | Render as text only; sanitized Markdown; CSP                                                                                           | Unit and E2E tests                    |
+| T19 | Prompt injection in a programme sways the LLM's suggestions                | A8     | LLM only suggests; unmatched quotes dropped; humans decide with four-eyes; LLM has no tools                                            | M4 tests                              |
+| T20 | Report spam or denial of service                                           | A1     | A single function as the only write path; per-tenant cap; honeypot; Envoy per-IP rate limit                                            | Integration tests                     |
+| T21 | A retired or alias domain expires and someone else buys it                 | A7     | Association-owned registrar with auto-renew; hostnames never deleted or detached; uptime monitor per hostname                          | Ops checklist                         |
+| T22 | Per-tenant export or purge touches another tenant                          | —      | Owner-only `purge_tenant`; tenant-scoped export                                                                                        | Integration tests                     |
+| T23 | Compromised API impersonates users                                         | A10    | Accepted. Small admin surface; immutable audit log; MFA; alert on unusual publish volume                                               | Audit review                          |
+| T24 | A live criterion is reworded, changing what already-published ratings mean | A5     | Change requests always create a public corrections entry; a second approver if the tenant requires it                                  | DB-rule tests                         |
 
 ## Test matrix (BRIEF §8)
 
@@ -413,8 +440,9 @@ from it.
 - **Row state:** published in a live election, archived, draft, `in_review`, or belonging to an inactive tenant.
 - **Operations:**
   - select, insert, update and delete;
-  - plus **column-level updates** of sensitive columns: `status`, `author_id`, `published_by`, `tenant_id`,
-    `tenants.active` and `methodologies.kind`.
+  - plus **column-level updates** of sensitive columns: `assessments.state`, actor columns, `tenant_id`,
+    `tenants.active`, `tenants.methodology_kind`, `methodologies.kind`, `elections.require_second_reviewer` and
+    `tenants.live_edits_need_second_approver`.
 - **Relations:** every table and view in `app.*`, plus **every function a runtime role can execute**. The
   authoritative list is [the data model spec](../spec/data-model.md) (and, once they exist, the migrations). The
   catalog meta-test fails if `matrix.ts` and the database disagree.
@@ -450,8 +478,13 @@ These fail when someone adds a database object without wiring it in:
 Each of these must fail:
 
 - Publishing without evidence, including through a direct `INSERT` that skips the server function.
-- Publishing `not_mentioned` without a checked-documents record.
-- Self-review, including by someone who only co-edited the revision.
+- Publishing `not_mentioned` without a checked record of one of the party's own stored documents.
+- Self-review while the election requires a second reviewer, including by someone who only co-edited the revision
+  or uploaded a file it cites.
+- Publishing content other than the reviewed draft: a stale version, or writing the revision tables directly.
+- Editing a cell while it is in review.
+- `change_kind = 'initial'` on a later revision.
+- Turning off the second-reviewer setting as anyone but a platform admin.
 - Review by a reviewer from another tenant.
 - Review by a reviewer at aal1.
 - Publishing a quote that doesn't match its source text.
@@ -462,6 +495,13 @@ Each of these must fail:
 - Approving one's own change request when the tenant requires a second approver.
 - A change request whose target belongs to another tenant or another election.
 - Writing an actor column (`created_by`, `decided_by`, `attested_by`, …) as someone other than the current user.
+- Updating or deleting a decided change request, or supplying its "before" value.
+- Citing another party's source on a cell.
+- Inserting `source_texts` without an open extraction job; the worker writing outside its job request.
+- Updating a stored file, or deleting a referenced one.
+- Publishing in a draft election, anything but a correction or withdrawal in an archived one, or anything public
+  inside a freeze window.
+- Claiming a tombstoned hostname.
 - Updating or deleting `assessment_contributors` rows, or inserting one for another user or another revision.
 - Setting `match_status` to `matched` by hand, or updating `source_texts` or a cited source's file.
 - Referencing a party, criterion or source from another election of the same tenant.
@@ -482,6 +522,12 @@ And each of these must succeed:
 - Quotes whose PDF text contains ligatures or line-break hyphenation.
 - `purge_tenant` run as the owner role.
 - Approving one's own change request when the tenant does not require a second approver.
+- A reviewer who rejected a cell approving it after the fix.
+- Self-review when a platform admin has turned off the election's second-reviewer setting, recorded as such.
+- A correction in an archived election.
+- A quote spanning a page break.
+- Anonymizing a report that a correction cites.
+- A caller-supplied timestamp, replaced by the transaction time.
 - Every permitted operator or kind change, which also writes an audit row.
 
 ### Routing tests
