@@ -1,5 +1,16 @@
 # @aiontheballot/migrations
 
+## 0.4.0
+
+### Minor Changes
+
+- 312495f: Add stored files: `app.files` (metadata) and `app.file_blobs` (bytes) under the same RLS. Bytes must match the
+  file's SHA-256 and size; nothing is ever updated; a file is deleted only while unreferenced, with its bytes. Editors
+  and country admins upload and delete; members read. The original filename is personal data.
+- 9557541: Add the operator's policy texts, `app.tenant_documents`: versioned per tenant and kind by trigger, drafts editable and
+  deletable by country admins, published versions frozen (even for the owner) and requiring text in the tenant's default
+  locale. The public reads published versions of active tenants.
+
 ## 0.3.0
 
 ### Minor Changes
