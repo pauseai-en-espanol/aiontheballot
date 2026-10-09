@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect, test } from '@playwright/test';
 
-import { ADMIN_URL, DSNS, GLITCHTIP_URL, TENANT_URL } from '../servers.js';
+import { ADMIN_URL, DSNS, GLITCHTIP_URL, TENANT_URL, WEB_URL } from '../servers.js';
 
 interface Received {
   path: string;
@@ -50,9 +50,17 @@ const parseEnvelope = (body: string) => {
 };
 
 const apps = [
-  // A tenant's page: every other host gets the proxy's 404.
-  { name: 'web', url: TENANT_URL, dsn: DSNS.web, project: '1', key: 'e2e-web' },
-  { name: 'admin', url: ADMIN_URL, dsn: DSNS.admin, project: '2', key: 'e2e-admin' },
+  // The page is a tenant's (every other host gets the proxy's 404); the relay is a system path, served on any host, so
+  // requests from Node (which can't resolve .localhost names everywhere, unlike the browser) use the server's address.
+  { name: 'web', url: TENANT_URL, server: WEB_URL, dsn: DSNS.web, project: '1', key: 'e2e-web' },
+  {
+    name: 'admin',
+    url: ADMIN_URL,
+    server: ADMIN_URL,
+    dsn: DSNS.admin,
+    project: '2',
+    key: 'e2e-admin',
+  },
 ] as const;
 
 for (const app of apps) {
@@ -97,7 +105,7 @@ for (const app of apps) {
     });
 
     test('the relay accepts only small, well-formed envelopes', async ({ request }) => {
-      const relay = `${app.url}${RELAY_PATH}`;
+      const relay = `${app.server}${RELAY_PATH}`;
 
       expect((await request.get(relay)).status()).toBe(405);
       expect((await request.post(relay, { data: 'not an envelope' })).status()).toBe(400);
