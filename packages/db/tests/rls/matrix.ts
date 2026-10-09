@@ -95,6 +95,24 @@ export const HOSTNAMES: readonly {
 /** The fixture hostname with a pending DNS verification. */
 export const VERIFYING_HOSTNAME = 'pendiente-a.example.test';
 
+const fixtureId = (block: number, n: number): string =>
+  `0190f8c4-0000-7000-8000-000000000${block}${n.toString().padStart(2, '0')}`;
+
+/** Fictional organizations: the operator of each tenant, plus one linked to no tenant. A's is a PauseAI chapter. */
+export const ORGANIZATIONS = {
+  A: { id: fixtureId(3, 1), pauseai: true },
+  B: { id: fixtureId(3, 2), pauseai: false },
+  inactive: { id: fixtureId(3, 3), pauseai: false },
+  unlinked: { id: fixtureId(3, 4), pauseai: false },
+} as const;
+
+/** Brand assets: a shared one every tenant may select, a restricted one granted to and selected by A, and an unused one. */
+export const BRAND_ASSETS = {
+  shared: { id: fixtureId(4, 1), restricted: false },
+  restricted: { id: fixtureId(4, 2), restricted: true },
+  unused: { id: fixtureId(4, 3), restricted: true },
+} as const;
+
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
   [{ user: USERS.revokedA, tenant: 'A', role: 'editor' }];
@@ -129,6 +147,8 @@ export interface Rule {
   public?: true;
   /** Members holding one of these roles in the row's tenant, at aal2. */
   members?: readonly TenantRole[];
+  /** Anyone holding any membership, at aal2: for shared platform rows offered to every tenant. */
+  anyMember?: true;
   /** Platform admins at aal2, on every row. */
   platformAdmin?: true;
 }
@@ -143,6 +163,11 @@ export interface Row {
   where: string;
   /** Rules that differ for this row's state (say, a draft row may be deleted and a published one not). */
   rules?: Partial<Record<'select' | 'update' | 'delete', Rule>>;
+  /**
+   * Operations a permitted principal still can't complete, with the SQLSTATE that stops them (say, 23503 when a
+   * foreign key protects a referenced row). Denied principals must still be stopped by the security layers.
+   */
+  blocked?: Partial<Record<'update' | 'delete', string>>;
 }
 
 export interface Insert {
@@ -457,6 +482,161 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     delete: NOBODY,
     columnUpdates: {
       hostname: { set: `hostname = 'test-b.example.test'`, rule: NOBODY },
+    },
+  },
+
+  'app.organizations': {
+    rows: [
+      ...TENANT_KEYS.map((key) => ({
+        id: `operator of ${key}`,
+        tenant: key,
+        public: TENANTS[key].active,
+        where: `id = '${ORGANIZATIONS[key].id}'`,
+        blocked: { delete: '23503' },
+      })),
+      {
+        id: 'unlinked organization',
+        tenant: null,
+        public: false,
+        where: `id = '${ORGANIZATIONS.unlinked.id}'`,
+      },
+    ],
+    inserts: [
+      {
+        id: 'new organization',
+        tenant: null,
+        sql: `INSERT INTO app.organizations (display_name, legal_name)
+              VALUES ('{"es": "Organización nueva"}', 'Organización Nueva de Ejemplo')`,
+      },
+    ],
+    set: `legal_name = legal_name || ' (renombrada)'`,
+    select: { public: true, ...MEMBERS },
+    insert: PLATFORM_ADMIN,
+    update: PLATFORM_ADMIN,
+    delete: PLATFORM_ADMIN,
+    columnUpdates: {
+      id: { set: 'id = uuidv7()', rule: NOBODY },
+      created_at: { set: 'created_at = now()', rule: NOBODY },
+    },
+  },
+
+  'app.tenant_organizations': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `operator link of ${key}`,
+      tenant: key,
+      public: TENANTS[key].active,
+      where: `tenant_id = '${TENANTS[key].id}' AND organization_id = '${ORGANIZATIONS[key].id}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `endorser of ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.tenant_organizations (tenant_id, organization_id, role)
+            VALUES ('${TENANTS[key].id}', '${ORGANIZATIONS.unlinked.id}', 'endorser')`,
+    })),
+    set: 'display_order = display_order + 1',
+    select: { public: true, ...MEMBERS },
+    insert: PLATFORM_ADMIN,
+    update: PLATFORM_ADMIN,
+    delete: PLATFORM_ADMIN,
+    columnUpdates: {
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
+  'app.brand_assets': {
+    rows: [
+      {
+        id: 'shared asset',
+        tenant: null,
+        public: true,
+        where: `id = '${BRAND_ASSETS.shared.id}'`,
+        rules: { select: { public: true, anyMember: true, platformAdmin: true } },
+        blocked: { delete: '23503' },
+      },
+      {
+        id: 'restricted asset granted to A',
+        tenant: 'A',
+        public: true,
+        where: `id = '${BRAND_ASSETS.restricted.id}'`,
+        blocked: { delete: '23503' },
+      },
+      {
+        id: 'unused restricted asset',
+        tenant: null,
+        public: false,
+        where: `id = '${BRAND_ASSETS.unused.id}'`,
+      },
+    ],
+    inserts: [
+      {
+        id: 'new asset',
+        tenant: null,
+        sql: `INSERT INTO app.brand_assets (name, content_type, sha256, content)
+              VALUES ('Logo nuevo de ejemplo', 'image/png', encode(sha256('\\x89504e47'::bytea), 'hex'),
+                      '\\x89504e47'::bytea)`,
+      },
+    ],
+    set: `name = name || ' v2'`,
+    select: { public: true, ...MEMBERS },
+    insert: PLATFORM_ADMIN,
+    update: PLATFORM_ADMIN,
+    delete: PLATFORM_ADMIN,
+    columnUpdates: {
+      content: { set: `content = '\\x00'::bytea`, rule: NOBODY },
+      sha256: { set: `sha256 = encode(sha256('\\x00'::bytea), 'hex')`, rule: NOBODY },
+    },
+  },
+
+  'app.brand_asset_grants': {
+    rows: [
+      {
+        id: 'grant to A',
+        tenant: 'A',
+        public: false,
+        where: `brand_asset_id = '${BRAND_ASSETS.restricted.id}' AND tenant_id = '${TENANT_A}'`,
+      },
+    ],
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `grant to ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.brand_asset_grants (brand_asset_id, tenant_id)
+            VALUES ('${BRAND_ASSETS.unused.id}', '${TENANTS[key].id}')`,
+    })),
+    set: 'granted_at = granted_at',
+    select: MEMBERS,
+    insert: PLATFORM_ADMIN,
+    update: NOBODY,
+    delete: PLATFORM_ADMIN,
+  },
+
+  'app.tenant_brand_selections': {
+    rows: [
+      {
+        id: 'restricted mark of A',
+        tenant: 'A',
+        public: true,
+        where: `tenant_id = '${TENANT_A}' AND slot = 'header_mark'`,
+      },
+      ...TENANT_KEYS.map((key) => ({
+        id: `product logo of ${key}`,
+        tenant: key,
+        public: TENANTS[key].active,
+        where: `tenant_id = '${TENANTS[key].id}' AND slot = 'product_logo'`,
+      })),
+    ],
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `footer mark of ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.tenant_brand_selections (tenant_id, slot, brand_asset_id)
+            VALUES ('${TENANTS[key].id}', 'footer_mark', '${BRAND_ASSETS.shared.id}')`,
+    })),
+    set: 'brand_asset_id = brand_asset_id',
+    select: { public: true, ...MEMBERS },
+    insert: COUNTRY_ADMINS,
+    update: COUNTRY_ADMINS,
+    delete: COUNTRY_ADMINS,
+    columnUpdates: {
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
     },
   },
 

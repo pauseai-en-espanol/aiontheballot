@@ -102,6 +102,19 @@ describe('private.audit', () => {
     ]);
   });
 
+  it('never copies binary columns, which are identified by their hash columns instead', async () => {
+    const diffs = await inRolledBackTransaction(async (client) => {
+      await client.query(`
+        CREATE TABLE app.probe_binary (id int PRIMARY KEY, sha256 text, content bytea);
+        CREATE TRIGGER audit AFTER INSERT OR UPDATE OR DELETE ON app.probe_binary
+          FOR EACH ROW EXECUTE FUNCTION private.audit();
+        INSERT INTO app.probe_binary VALUES (1, 'abc', '\\x0102');
+        UPDATE app.probe_binary SET content = '\\x0304';`);
+      return (await auditOf(client, 'probe_binary')).map((r) => r.diff);
+    });
+    expect(diffs).toEqual([{ new: { id: 1, sha256: 'abc' } }, { old: {}, new: {} }]);
+  });
+
   it('cannot be changed or removed, even by the owner', async () => {
     await inRolledBackTransaction(async (client) => {
       await client.query('SET LOCAL ROLE aiontheballot_owner');

@@ -13,7 +13,8 @@ export interface MatrixCase extends Case {
   relation: string;
   /** "<operation> <row>", e.g. "update:active tenant B". */
   name: string;
-  expected: 'allow' | 'deny';
+  /** 'allow', 'deny', or `error <SQLSTATE>` when a permitted operation is blocked by an integrity rule. */
+  expected: string;
 }
 
 /** What a rule says for one principal on a row of `tenant` (ADR-0002: the admin sees only what is the user's). */
@@ -34,6 +35,9 @@ export const expectedOutcome = (
   if (rule.platformAdmin && PLATFORM_ADMINS.includes(userId)) {
     return 'allow';
   }
+  if (rule.anyMember && MEMBERSHIPS.some((m) => m.user === userId)) {
+    return 'allow';
+  }
   const holds = (role: string): boolean =>
     MEMBERSHIPS.some((m) => m.user === userId && m.tenant === tenant && m.role === role);
   return tenant !== null && (rule.members ?? []).some(holds) ? 'allow' : 'deny';
@@ -47,13 +51,15 @@ export const matrixCases = (): MatrixCase[] =>
       for (const row of spec.rows) {
         const target = `SELECT * FROM ${relation} WHERE ${row.where}`;
         const add = (op: string, sql: string, rule: Rule, write: boolean): void => {
+          const outcome = expectedOutcome(principal, rule, row.tenant, row.public, write);
+          const blocked = row.blocked?.[op as 'update' | 'delete'];
           cases.push({
             relation,
             name: `${op} ${row.id}`,
             principal,
             sql,
             target,
-            expected: expectedOutcome(principal, rule, row.tenant, row.public, write),
+            expected: outcome === 'allow' && blocked ? `error ${blocked}` : outcome,
           });
         };
         const rule = (op: 'select' | 'update' | 'delete'): Rule => row.rules?.[op] ?? spec[op];

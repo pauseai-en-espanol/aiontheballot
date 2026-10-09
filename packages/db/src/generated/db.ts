@@ -7,6 +7,8 @@ import type { ColumnType } from 'kysely';
 
 export type AppMethodologyKind = 'demands' | 'descriptive';
 
+export type AppOrgRole = 'endorser' | 'operator';
+
 export type AppTenantRole = 'country_admin' | 'editor' | 'reviewer';
 
 export type Generated<T> =
@@ -41,6 +43,23 @@ export interface AppAuditLog {
   row_id: string;
   table_name: string;
   tenant_id: string | null;
+}
+
+export interface AppBrandAssetGrants {
+  brand_asset_id: string;
+  granted_at: Generated<Timestamp>;
+  granted_by: string;
+  tenant_id: string;
+}
+
+export interface AppBrandAssets {
+  content: Buffer;
+  content_type: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  name: string;
+  restricted: Generated<boolean>;
+  sha256: string;
 }
 
 export interface AppHostnameTombstones {
@@ -80,6 +99,21 @@ export interface AppMemberships {
   user_id: string;
 }
 
+export interface AppOrganizations {
+  address: string | null;
+  contact_email: string | null;
+  created_at: Generated<Timestamp>;
+  display_name: Json;
+  id: Generated<string>;
+  is_pauseai_chapter: Generated<boolean>;
+  legal_name: string;
+  logo_asset_id: string | null;
+  privacy_email: string | null;
+  registry_entry: string | null;
+  tax_id: string | null;
+  url: string | null;
+}
+
 export interface AppPlatformAdmins {
   created_at: Generated<Timestamp>;
   user_id: string;
@@ -94,6 +128,12 @@ export interface AppPublicVersions {
   version: Generated<Int8>;
 }
 
+export interface AppTenantBrandSelections {
+  brand_asset_id: string;
+  slot: string;
+  tenant_id: string;
+}
+
 export interface AppTenantHostnames {
   created_at: Generated<Timestamp>;
   hostname: string;
@@ -101,6 +141,13 @@ export interface AppTenantHostnames {
   retired_at: Timestamp | null;
   tenant_id: string;
   verified_at: Timestamp | null;
+}
+
+export interface AppTenantOrganizations {
+  display_order: Generated<number>;
+  organization_id: string;
+  role: AppOrgRole;
+  tenant_id: string;
 }
 
 export interface AppTenants {
@@ -121,13 +168,18 @@ export interface AppTenants {
 
 export interface DB {
   'app.audit_log': AppAuditLog;
+  'app.brand_asset_grants': AppBrandAssetGrants;
+  'app.brand_assets': AppBrandAssets;
   'app.hostname_tombstones': AppHostnameTombstones;
   'app.hostname_verifications': AppHostnameVerifications;
   'app.invitations': AppInvitations;
   'app.memberships': AppMemberships;
+  'app.organizations': AppOrganizations;
   'app.platform_admins': AppPlatformAdmins;
   'app.platform_hostnames': AppPlatformHostnames;
   'app.public_versions': AppPublicVersions;
+  'app.tenant_brand_selections': AppTenantBrandSelections;
   'app.tenant_hostnames': AppTenantHostnames;
+  'app.tenant_organizations': AppTenantOrganizations;
   'app.tenants': AppTenants;
 }

@@ -49,7 +49,8 @@ lives. Any example data here is fictional.
 - **Personal data columns** carry the column comment `personal data`. The audit trigger never copies them into
   `audit_log`, and a catalog test checks every such column. They are: report contents (`name`, `email`,
   `organization`, `message`, `resolution_note`), `invitations.email`, `files.original_filename` and
-  `methodology_reviewers.name`.
+  `methodology_reviewers.name`. Binary (`bytea`) columns are never logged either; their tables log the content's
+  SHA-256.
 - **Localized text:** `jsonb` objects that map a locale to a string, e.g. `{"es": "…", "en": "…"}`.
   - The domain `app.localized` checks the shape: a non-empty object whose keys are locale codes (`app.locale`) and
     whose values are non-blank strings.
@@ -167,7 +168,7 @@ create table app.brand_assets (                        -- platform-global; conte
   restricted    boolean not null default false,        -- e.g. a PauseAI mark
   content_type  text not null check (content_type in ('image/png', 'image/jpeg', 'image/webp')),
   sha256        text not null,
-  content       bytea not null,
+  content       bytea not null check (octet_length(content) <= 2097152),  -- 2 MB; no SVG (it can carry script)
   created_at    timestamptz not null default now()
 );
 
@@ -992,6 +993,7 @@ The only write available to `aiontheballot_web` is calling `app.submit_report()`
 
 These public-visibility policies are for `aiontheballot_web` only. `aiontheballot_admin` sees what memberships give it
 (platform admins: every tenant), and nothing of other tenants, published or not (PLAN, Answered: admin visibility).
+Members also read the unrestricted brand-asset catalogue, to choose their tenant's logos from it.
 
 ## 6. Enforcement map
 
