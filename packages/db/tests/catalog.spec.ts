@@ -350,6 +350,7 @@ const IMMUTABLE = [
   'revision_evidence',
   'revision_internal',
   'source_texts',
+  'structural_changes',
 ];
 
 /** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
@@ -362,6 +363,10 @@ const PERSONAL_DATA: readonly string[] = [
   'reports.name',
   'reports.organization',
   'reports.resolution_note',
+  'change_requests.previous_value',
+  'change_requests.proposed_value',
+  'structural_changes.new_value',
+  'structural_changes.previous_value',
 ];
 
 const DELETE = 8;

@@ -7,7 +7,11 @@ import type { ColumnType } from 'kysely';
 
 export type AppAssessmentState = 'draft' | 'in_review' | 'published';
 
+export type AppChangeAction = 'add' | 'retire' | 'update';
+
 export type AppChangeKind = 'correction' | 'initial' | 'update' | 'withdrawal';
+
+export type AppChangeRequestState = 'approved' | 'pending' | 'rejected';
 
 export type AppElectionStatus = 'archived' | 'draft' | 'live';
 
@@ -145,11 +149,53 @@ export interface AppBrandAssets {
   sha256: string;
 }
 
+export interface AppChangeRequests {
+  action: AppChangeAction;
+  decided_at: Timestamp | null;
+  decided_by: string | null;
+  decided_txid: string | null;
+  election_id: string;
+  field: string | null;
+  id: Generated<string>;
+  /**
+   * personal data
+   */
+  previous_value: Json | null;
+  proposed_at: Generated<Timestamp>;
+  proposed_by: string;
+  /**
+   * personal data
+   */
+  proposed_value: Json | null;
+  public_note: Json;
+  report_id: string | null;
+  state: Generated<AppChangeRequestState>;
+  target_id: string | null;
+  target_kind: string;
+  tenant_id: string;
+}
+
 export interface AppCoreCriteria {
   description: Json;
   id: Generated<string>;
   key: string;
   title: Json;
+}
+
+export interface AppCorrectionsLog {
+  assessment_id: string | null;
+  at: Timestamp | null;
+  change: string | null;
+  election_id: string | null;
+  entry_id: string | null;
+  entry_kind: string | null;
+  field: string | null;
+  new_value: Json | null;
+  previous_value: Json | null;
+  public_note: Json | null;
+  target_id: string | null;
+  target_kind: string | null;
+  tenant_id: string | null;
 }
 
 export interface AppCriteria {
@@ -511,6 +557,27 @@ export interface AppSourceTexts {
   unit_index: number;
 }
 
+export interface AppStructuralChanges {
+  action: AppChangeAction;
+  approved_at: Generated<Timestamp>;
+  change_request_id: string;
+  election_id: string;
+  field: string | null;
+  id: Generated<string>;
+  /**
+   * personal data
+   */
+  new_value: Json | null;
+  /**
+   * personal data
+   */
+  previous_value: Json | null;
+  public_note: Json;
+  target_id: string;
+  target_kind: string;
+  tenant_id: string;
+}
+
 export interface AppTenantBrandSelections {
   brand_asset_id: string;
   slot: string;
@@ -567,7 +634,9 @@ export interface DB {
   'app.audit_log': AppAuditLog;
   'app.brand_asset_grants': AppBrandAssetGrants;
   'app.brand_assets': AppBrandAssets;
+  'app.change_requests': AppChangeRequests;
   'app.core_criteria': AppCoreCriteria;
+  'app.corrections_log': AppCorrectionsLog;
   'app.criteria': AppCriteria;
   'app.current_revisions': AppCurrentRevisions;
   'app.draft_checked_documents': AppDraftCheckedDocuments;
@@ -597,6 +666,7 @@ export interface DB {
   'app.revision_internal': AppRevisionInternal;
   'app.source_documents': AppSourceDocuments;
   'app.source_texts': AppSourceTexts;
+  'app.structural_changes': AppStructuralChanges;
   'app.tenant_brand_selections': AppTenantBrandSelections;
   'app.tenant_documents': AppTenantDocuments;
   'app.tenant_hostnames': AppTenantHostnames;

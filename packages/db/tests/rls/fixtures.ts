@@ -354,6 +354,26 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       [cells.published],
     );
   }
+  // Change control in each live election: a reworded criterion, proposed by the author and approved (public through
+  // structural_changes), and a pending reorder of the second criterion.
+  for (const [key, cells] of Object.entries(CELLS) as [TenantKey, (typeof CELLS)[TenantKey]][]) {
+    const tenant = TENANTS[key].id;
+    const e = cells.election;
+    await client.query(`SELECT set_config('app.user_id', $1, true)`, [cells.author]);
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO app.change_requests (tenant_id, election_id, action, target_kind, target_id, field,
+                                        proposed_value, public_note)
+       VALUES ($1, $2, 'update', 'criterion', $3, 'description', '{"es": "Descripción de ejemplo revisada"}',
+               '{"es": "Nota de ejemplo"}'),
+              ($1, $2, 'update', 'criterion', $4, 'display_order', '3', '{"es": "Nota de ejemplo"}')
+       RETURNING id`,
+      [tenant, e.id, e.criterion, e.secondCriterion],
+    );
+    await client.query(`SELECT set_config('app.user_id', $1, true)`, [cells.approver]);
+    await client.query(`UPDATE app.change_requests SET state = 'approved' WHERE id = $1`, [
+      rows[0]!.id,
+    ]);
+  }
   // Right-of-reply reports, one per tenant about its cell in review, sent as the public through app.submit_report (the
   // inactive tenant takes one only while active).
   for (const [key, tenant] of Object.entries(TENANTS) as [

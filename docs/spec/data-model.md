@@ -48,9 +48,10 @@ lives. Any example data here is fictional.
   and the order of the corrections log are true.
 - **Personal data columns** carry the column comment `personal data`. The audit trigger never copies them into
   `audit_log`, and a catalog test checks every such column. They are: report contents (`name`, `email`,
-  `organization`, `message`, `resolution_note`), `invitations.email`, `files.original_filename` and
-  `methodology_reviewers.name`. Binary (`bytea`) columns are never logged either; their tables log the content's
-  SHA-256.
+  `organization`, `message`, `resolution_note`), `invitations.email`, `files.original_filename`,
+  `methodology_reviewers.name`, and the values of change requests and structural changes (`proposed_value`,
+  `previous_value`, `new_value`), which can hold a reviewer's name. Binary (`bytea`) columns are never logged
+  either; their tables log the content's SHA-256.
 - **Localized text:** `jsonb` objects that map a locale to a string, e.g. `{"es": "…", "en": "…"}`.
   - The domain `app.localized` checks the shape: a non-empty object whose keys are locale codes (`app.locale`) and
     whose values are non-blank strings.
@@ -832,6 +833,29 @@ election only if an `approved` request for exactly that target, action, field an
 `decided_txid = pg_current_xact_id()`, i.e. it was approved in the same transaction. There is no session flag to
 set, so the rule can't be switched off from a connection. Approvals are blocked inside the election's freeze
 window.
+
+**How it is enforced** (`private.change_request_rules()` before an insert or update of a request and after an
+approval; `private.change_control()` after any write to the five structure tables):
+
+- Proposals are for live elections only (a draft's structure is edited directly). The target must be in the request's
+  election; `update` names a change-controlled column (the election's name and date; the methodology's demands owner,
+  body and source kinds; every reviewer, party and criterion column but slugs and the programme status); `add` and
+  `retire` are for reviewers, parties and criteria only. Proposed values are normalized to how the column stores them,
+  and `previous_value` is read from the target.
+- A decision sets the state once, with `decided_by`, `decided_at` and, for an approval, `decided_txid`. An approval
+  also needs the target unchanged since the proposal (otherwise propose again), default-locale text in the note and in
+  any localized value, no freeze, and (with `live_edits_need_second_approver`) an approver other than the proposer.
+- The approver applies the change with their own rights, so reviewers, who write no structure, approve nothing that
+  needs it (a permission error); in practice country admins and platform admins approve. A write that changes no row
+  is refused too. The `structural_changes` row is inserted by the same trigger: the insert policy admits it only at
+  trigger depth > 0.
+- An addition matches an approved, not-yet-recorded `add` request whose columns the new row has; once recorded, the
+  request authorizes nothing more.
+- `proposed_value`, `previous_value` and `new_value` can hold an external reviewer's name, so they are commented
+  `personal data` and never audited; `structural_changes` is itself the public record.
+- `app.corrections_log` has one row per entry: `entry_kind` (`revision` or `structural_change`), `entry_id`, `at`,
+  `change` (the change kind or action), the cell, or the target kind, id and field with the previous and new values,
+  and the public note.
 
 ### 3.8 Right of reply (personal data: private, anonymized)
 

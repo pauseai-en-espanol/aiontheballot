@@ -148,6 +148,8 @@ expires_at)`, under RLS.
   that turns the rule off.
 - Each approved change writes an immutable public record (`structural_changes`) that the corrections log reads, so
   live changes are public whichever setting applies.
+- The approver applies the change with their own rights, in the approving transaction; the public record is inserted
+  by the same trigger (its insert policy admits only writes at trigger depth > 0).
 - Programme-status updates need only one person, but are audited and shown publicly with their check date.
 
 ### 13. Withdrawal

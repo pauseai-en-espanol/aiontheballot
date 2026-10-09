@@ -429,6 +429,8 @@ export interface FixtureCells {
   publishedQuote: string;
   /** Publishes it: a reviewer or country admin of the tenant who didn't write it (or the platform admin). */
   publisher: string;
+  /** Approves the fixture's change request in its live election. */
+  approver: string;
 }
 
 /** Fictional cells in each tenant's live election, on its first party. */
@@ -446,6 +448,7 @@ export const CELLS = {
     neutral: SOURCES.neutralA,
     publishedQuote: 'una propuesta ficticia de regulación',
     publisher: USERS.reviewerA,
+    approver: USERS.countryAdminA,
   },
   B: {
     election: ELECTIONS.liveB,
@@ -460,6 +463,7 @@ export const CELLS = {
     neutral: SOURCES.neutralB,
     publishedQuote: 'una propuesta ficticia de regulación',
     publisher: USERS.editorAReviewerB,
+    approver: USERS.countryAdminB,
   },
   inactive: {
     election: ELECTIONS.liveInactive,
@@ -474,6 +478,7 @@ export const CELLS = {
     neutral: SOURCES.neutralInactive,
     publishedQuote: 'una propuesta ficticia de regulación',
     publisher: USERS.platformAdmin,
+    approver: USERS.platformAdmin,
   },
 } as const satisfies Record<TenantKey, FixtureCells>;
 
@@ -584,6 +589,8 @@ const COUNTRY_ADMINS: Rule = { members: ['country_admin'], platformAdmin: true }
 const PLATFORM_ADMIN: Rule = { platformAdmin: true };
 /** Who reviews: publishes cells and decides change requests (ADR-0002, capabilities by role). */
 const REVIEWERS: Rule = { members: ['reviewer', 'country_admin'], platformAdmin: true };
+/** Who approves a change request: an approver applies it with their own rights, which reviewers lack. */
+const APPROVERS: Rule = COUNTRY_ADMINS;
 /** Who triages right-of-reply reports: every member, never a platform admin (ADR-0002, capabilities by role). */
 const TRIAGERS: Rule = { members: ALL_ROLES };
 /** Who writes drafts, evidence and sources (ADR-0002, capabilities by role). */
@@ -618,8 +625,8 @@ const structureRow = (e: FixtureElection, label: string, where: string, deletabl
   public: isPublic(e),
   where,
   rules: { delete: e.status === 'draft' ? deletable : NOBODY },
-  // An archived election is read-only.
-  ...(e.status === 'archived' ? { blocked: { update: '23001' } } : {}),
+  // An archived election is read-only; a live one changes only through approved change requests.
+  ...(e.status !== 'draft' ? { blocked: { update: '23001' } } : {}),
 });
 
 const tenantRow = (key: TenantKey): Row => ({
@@ -1202,7 +1209,10 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
               'update:require_second_reviewer': '23001',
             },
           }
-        : {}),
+        : // Renaming a live election needs an approved change request.
+          e.status === 'live'
+          ? { blocked: { update: '23001' } }
+          : {}),
     })),
     inserts: TENANT_KEYS.map((key) => ({
       id: `election in ${key}`,
@@ -1804,6 +1814,86 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     })),
     inserts: [],
     set: 'revision_no = revision_no',
+    select: { public: true, ...MEMBERS },
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.change_requests': {
+    rows: TENANT_KEYS.flatMap((key): Row[] => [
+      {
+        id: `pending change of ${key}`,
+        tenant: key,
+        public: false,
+        where: `tenant_id = '${TENANTS[key].id}' AND state = 'pending'`,
+      },
+      {
+        id: `approved change of ${key}`,
+        tenant: key,
+        public: false,
+        where: `tenant_id = '${TENANTS[key].id}' AND state = 'approved'`,
+        // Decided: it never changes, and it is never deleted.
+        rules: { delete: NOBODY, 'update:state (approve)': REVIEWERS },
+        blocked: { update: '23001', 'update:state (approve)': '23001' },
+      },
+    ]),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `proposal in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.change_requests (tenant_id, election_id, action, target_kind, target_id, field,
+                                            proposed_value, public_note)
+            VALUES ('${TENANTS[key].id}', '${CELLS[key].election.id}', 'update', 'criterion',
+                    '${CELLS[key].election.secondCriterion}', 'display_order', '5', '{"es": "Nota de ejemplo"}')`,
+    })),
+    set: `state = 'rejected'`,
+    select: MEMBERS,
+    insert: EDITORS,
+    update: REVIEWERS,
+    delete: EDITORS,
+    columnUpdates: {
+      'state (approve)': { set: `state = 'approved'`, rule: APPROVERS },
+      decided_by: { set: `decided_by = '${USERS.newcomer}'`, rule: NOBODY },
+      decided_txid: { set: 'decided_txid = pg_current_xact_id()', rule: NOBODY },
+      previous_value: { set: `previous_value = '{"es": "Otro"}'`, rule: NOBODY },
+      proposed_value: { set: `proposed_value = '7'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
+  'app.structural_changes': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `structural change of ${key}`,
+      tenant: key,
+      public: isPublic(CELLS[key].election),
+      where: `tenant_id = '${TENANTS[key].id}'`,
+    })),
+    // Written only by the approval trigger.
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `record of the pending change of ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.structural_changes (tenant_id, election_id, change_request_id, action, target_kind,
+                                               target_id, public_note)
+            SELECT tenant_id, election_id, id, action, target_kind, target_id, public_note FROM app.change_requests
+             WHERE tenant_id = '${TENANTS[key].id}' AND state = 'pending'`,
+    })),
+    set: 'field = field',
+    select: { public: true, ...MEMBERS },
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.corrections_log': {
+    view: true,
+    rows: TENANT_KEYS.map((key) => ({
+      id: `logged structural change of ${key}`,
+      tenant: key,
+      public: isPublic(CELLS[key].election),
+      where: `tenant_id = '${TENANTS[key].id}' AND entry_kind = 'structural_change'`,
+    })),
+    inserts: [],
+    set: 'field = field',
     select: { public: true, ...MEMBERS },
     insert: NOBODY,
     update: NOBODY,

@@ -319,6 +319,19 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 - **R23. Fixture files are uploaded by each tenant's author,** not the platform admin, so the fixture publishers are
   never the uploaders of what they publish.
 
+**Change control (migration `change_control`):**
+
+- **R24. Approvers apply the change with their own rights** (spec: "as the approver"), with no new `SECURITY DEFINER`
+  function. Reviewers write no structure, so in practice only country admins and platform admins can approve; a
+  reviewer's approval is refused rather than silently doing nothing.
+- **R25. An approval needs the target unchanged since the proposal;** otherwise it is refused and proposed again, so
+  the public "before" value is always true.
+- **R26. The values in change requests and structural changes are personal data** (a reviewer's name can be one), so
+  the audit log keeps the request but not the values; the public record is `structural_changes`.
+- **R27. Proposals are for live elections only;** slugs and the programme status are never change-requested.
+- **R28. Withdrawing a pending proposal is a delete** by an editor or country admin; decided requests are never
+  deleted.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).
