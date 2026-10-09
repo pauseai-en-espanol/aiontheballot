@@ -1,5 +1,17 @@
 # @aiontheballot/db
 
+## 0.3.0
+
+### Minor Changes
+
+- 7c39e38: Add cells: `assessments`, `assessment_contributors`, `draft_evidence`, `draft_checked_documents` and `review_events`.
+  Editors and country admins write draft content; reviewers change only the state and attest quotes; every member
+  reads. Also fix `app.localized`, whose check refused SQL NULL, so nullable localized columns can use it.
+- 72e2756: Add job requests and the worker's access. The worker sets `app.job_request_id` and acts as the request's requester;
+  its RLS shows only that open request and what it names (its tenant, source, the source's copy and pages, its LLM run
+  and the run's election), a trigger limits what each job kind may change, and finishing the request ends what it
+  authorizes. Requests are made only when their job has something to do, and change only by finishing, once.
+
 ## 0.2.0
 
 ### Minor Changes

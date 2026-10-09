@@ -1,5 +1,33 @@
 # @aiontheballot/migrations
 
+## 0.5.0
+
+### Minor Changes
+
+- 7c39e38: Add cells: `assessments`, `assessment_contributors`, `draft_evidence`, `draft_checked_documents` and `review_events`.
+  Editors and country admins write draft content; reviewers change only the state and attest quotes; every member
+  reads. Also fix `app.localized`, whose check refused SQL NULL, so nullable localized columns can use it.
+- 6d88a26: Add the election lifecycle: draft → live → archived, never back. Going live needs an active tenant with its operator,
+  a methodology and default-locale texts, and stamps `went_live_at`; slugs, type and territory are fixed once live;
+  archived elections and their structure are read-only. Territories stay inside the tenant's country, methodologies use
+  the tenant's kind and a demands owner it links to, and a tenant's kind and country are fixed by the data that uses them.
+- ef654e8: Add an election's structure: `core_criteria`, `elections`, `methodologies`, `methodology_reviewers`, `parties` and
+  `criteria`. Editors and country admins write elections, parties and criteria; country admins set status and the freeze
+  window and write the methodology and its external reviewers; only platform admins change four-eyes review. New
+  elections start as drafts; structure is deleted only in drafts. The public reads live and archived elections of active
+  tenants, and the images their parties show as logos.
+- 72e2756: Add job requests and the worker's access. The worker sets `app.job_request_id` and acts as the request's requester;
+  its RLS shows only that open request and what it names (its tenant, source, the source's copy and pages, its LLM run
+  and the run's election), a trigger limits what each job kind may change, and finishing the request ends what it
+  authorizes. Requests are made only when their job has something to do, and change only by finishing, once.
+- 5136158: Add the LLM assistance schema (the feature is M4): `llm_runs`, refused once the tenant's monthly cap is reached (a cap
+  of 0 turns it off) and moving queued → running → done or failed; and `llm_suggestions`, with a rating of the tenant's
+  scale, accepted or rejected once by an editor.
+- 6d4ada4: Add source documents and their extracted text. A source's stored copy (a sources-bucket file) is set once, with its
+  hash and time from the file and the session; after that only its extraction status (one way) and archive URL (once)
+  change. Extracted text is private, added only while the source is pending, and never changed. Editors and country
+  admins add and edit sources until their copy is stored; members read them.
+
 ## 0.4.0
 
 ### Minor Changes
