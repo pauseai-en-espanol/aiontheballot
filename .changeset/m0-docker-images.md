@@ -1,8 +1,8 @@
 ---
-'@ballot/web': minor
-'@ballot/admin': minor
-'@ballot/api': minor
-'@ballot/migrations': minor
+'@aiontheballot/web': minor
+'@aiontheballot/admin': minor
+'@aiontheballot/api': minor
+'@aiontheballot/migrations': minor
 ---
 
 Ship Docker images: web, admin and api built with turbo prune (manifest-only install layer), running as non-root, and

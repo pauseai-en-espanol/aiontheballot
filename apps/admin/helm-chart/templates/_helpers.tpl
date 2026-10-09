@@ -1,8 +1,8 @@
-{{- define "ballot-admin.name" -}}
+{{- define "aiontheballot-admin.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{- define "ballot-admin.fullname" -}}
+{{- define "aiontheballot-admin.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -15,15 +15,15 @@
 {{- end }}
 {{- end }}
 
-{{- define "ballot-admin.labels" -}}
+{{- define "aiontheballot-admin.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{ include "ballot-admin.selectorLabels" . }}
+{{ include "aiontheballot-admin.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
-app.kubernetes.io/part-of: ballot
+app.kubernetes.io/part-of: aiontheballot
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
-{{- define "ballot-admin.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "ballot-admin.name" . }}
+{{- define "aiontheballot-admin.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "aiontheballot-admin.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}

@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "ballot-api.fullname" . }}
+  name: {{ include "aiontheballot-api.fullname" . }}
   labels:
-    {{- include "ballot-api.labels" . | nindent 4 }}
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "ballot-api.selectorLabels" . | nindent 6 }}
+      {{- include "aiontheballot-api.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "ballot-api.selectorLabels" . | nindent 8 }}
+        {{- include "aiontheballot-api.selectorLabels" . | nindent 8 }}
     spec:
       # preStop sleep + time to drain in-flight requests
       terminationGracePeriodSeconds: 30

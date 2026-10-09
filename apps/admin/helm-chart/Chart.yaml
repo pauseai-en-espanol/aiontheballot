@@ -1,5 +1,5 @@
 apiVersion: v2
-name: ballot-admin
+name: aiontheballot-admin
 description: 'Admin: editorial workflow on the central admin host'
 type: application
 version: 0.1.0

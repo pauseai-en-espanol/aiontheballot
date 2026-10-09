@@ -5,9 +5,9 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "ballot-migrations.fullname" . }}
+  name: {{ include "aiontheballot-migrations.fullname" . }}
   labels:
-    {{- include "ballot-migrations.labels" . | nindent 4 }}
+    {{- include "aiontheballot-migrations.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/sync-wave: '-1'
@@ -18,7 +18,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "ballot-migrations.selectorLabels" . | nindent 8 }}
+        {{- include "aiontheballot-migrations.selectorLabels" . | nindent 8 }}
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -31,7 +31,7 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           env:
-            # The owner's connection string (ballot_owner), sealed in gitops.
+            # The owner's connection string (aiontheballot_owner), sealed in gitops.
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

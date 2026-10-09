@@ -1,0 +1,19 @@
+# Rendered in CI (helm lint/template) to exercise every template. Fictional hosts, placeholder secret names.
+aiontheballot-migrations:
+  image: { repository: registry.example/aiontheballot/migrations, tag: 0.1.0.abc1234 }
+  databaseUrlSecret: { name: aiontheballot-owner-db }
+aiontheballot-api:
+  image: { repository: registry.example/aiontheballot/api, tag: 0.1.0.abc1234 }
+aiontheballot-web:
+  image: { repository: registry.example/aiontheballot/web, tag: 0.1.0.abc1234 }
+  route:
+    enabled: true
+    parentRefs: [{ name: gateway-public, namespace: gateway-public }]
+    hostnames: [example-tenant.test]
+    apiPaths: [/api/public]
+aiontheballot-admin:
+  image: { repository: registry.example/aiontheballot/admin, tag: 0.1.0.abc1234 }
+  route:
+    enabled: true
+    parentRefs: [{ name: gateway-public, namespace: gateway-public }]
+    hostnames: [admin.example-platform.test]

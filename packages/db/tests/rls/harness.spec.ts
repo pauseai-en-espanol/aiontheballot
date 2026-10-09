@@ -15,17 +15,17 @@ const CELL = {
   new: '0190f8c4-0000-7000-8000-0000000002ff',
 };
 
-const publicRole: Principal = { id: 'public', role: 'ballot_web' };
-const noActor: Principal = { id: 'admin role, no actor', role: 'ballot_admin' };
+const publicRole: Principal = { id: 'public', role: 'aiontheballot_web' };
+const noActor: Principal = { id: 'admin role, no actor', role: 'aiontheballot_admin' };
 const editorA: Principal = {
   id: 'editor@A aal2',
-  role: 'ballot_admin',
+  role: 'aiontheballot_admin',
   userId: USERS.editorA,
   aal: 2,
 };
 const editorAaal1: Principal = {
   id: 'editor@A aal1',
-  role: 'ballot_admin',
+  role: 'aiontheballot_admin',
   userId: USERS.editorA,
   aal: 1,
 };
@@ -35,14 +35,14 @@ const withProbe = <T>(fn: (client: pg.Client) => Promise<T>): Promise<T> =>
     await client.query(`
       CREATE TABLE app.probe_members (user_id uuid NOT NULL, tenant_id uuid NOT NULL);
       CREATE TABLE app.probe_cells (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, published boolean NOT NULL, note text);
-      ALTER TABLE app.probe_members OWNER TO ballot_owner;
-      ALTER TABLE app.probe_cells OWNER TO ballot_owner;
+      ALTER TABLE app.probe_members OWNER TO aiontheballot_owner;
+      ALTER TABLE app.probe_cells OWNER TO aiontheballot_owner;
       ALTER TABLE app.probe_cells ENABLE ROW LEVEL SECURITY;
-      GRANT SELECT ON app.probe_cells TO ballot_web;
-      GRANT SELECT, INSERT, UPDATE, DELETE ON app.probe_cells TO ballot_admin;
-      GRANT SELECT ON app.probe_members TO ballot_admin;
-      CREATE POLICY public_read ON app.probe_cells FOR SELECT TO ballot_web USING (published);
-      CREATE POLICY member_all ON app.probe_cells FOR ALL TO ballot_admin
+      GRANT SELECT ON app.probe_cells TO aiontheballot_web;
+      GRANT SELECT, INSERT, UPDATE, DELETE ON app.probe_cells TO aiontheballot_admin;
+      GRANT SELECT ON app.probe_members TO aiontheballot_admin;
+      CREATE POLICY public_read ON app.probe_cells FOR SELECT TO aiontheballot_web USING (published);
+      CREATE POLICY member_all ON app.probe_cells FOR ALL TO aiontheballot_admin
         USING (private.current_aal() = 2 AND tenant_id IN (
           SELECT m.tenant_id FROM app.probe_members m WHERE m.user_id = private.current_user_id()))
         WITH CHECK (private.current_aal() = 2 AND tenant_id IN (

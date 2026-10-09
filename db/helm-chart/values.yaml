@@ -1,6 +1,6 @@
 enabled: true
 image:
-  repository: ballot/migrations
+  repository: aiontheballot/migrations
   tag: ''
   pullPolicy: IfNotPresent
 databaseUrlSecret:

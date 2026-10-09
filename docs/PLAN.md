@@ -68,7 +68,8 @@ demo, recorded in [Tracking](#tracking).
   - the ApplicationSet: one environment, production, tracking `main` until the preview (no staging, ADR-0001);
   - the AppProject entry and SealedSecrets;
   - DNS and a certificate SAN for `iaenlasurnas.es`;
-  - `ballot_web`, `ballot_admin` and `ballot_worker` as `extraRoles` of the `ballot` database (D1);
+  - `aiontheballot_web`, `aiontheballot_admin` and `aiontheballot_worker` as `extraRoles` of the `aiontheballot`
+    database (D1);
   - GlitchTip (web, worker, and a database on the shared Postgres), in a follow-up gitops change.
 
 **Demo:** a PR goes green in CI, and the hello-world page loads on `iaenlasurnas.es` over TLS through
@@ -311,6 +312,7 @@ My default is in brackets.
 | D5: stack ([ADR-0003](adr/0003-application-stack.md)) | Next.js web and admin, plus a Fastify API and worker that own all data access. Better Auth with mandatory TOTP. dbmate and Kysely, no ORM. Latest stable dependency versions.                                              |
 | D1: non-owner DB roles                                | halyard `postgresql` chart 1.1.0 adds `databases[].extraRoles`: login roles that own nothing, forced `NOSUPERUSER … NOBYPASSRLS`, with `CONNECT` on their database. Our migrations (as owner) grant them table privileges. |
 | Environments                                          | One, production, with no staging (ADR-0001). It tracks `main` until the preview, then a `production` branch the owner fast-forwards.                                                                                       |
+| Names                                                 | `aiontheballot` everywhere: repo, packages (`@aiontheballot/*`), chart, images, Harbor project, namespace, database and roles. The product name is configuration (`PLATFORM_NAME`).                                        |
 
 ## Tracking
 

@@ -1,5 +1,5 @@
 ---
-'@ballot/api': minor
+'@aiontheballot/api': minor
 ---
 
 Add the Fastify API skeleton: validated config, a dependency-free and unlogged `/healthz`, graceful shutdown, and a

@@ -1,15 +1,15 @@
 dependencies:
-- name: ballot-migrations
+- name: aiontheballot-migrations
   repository: file://../../db/helm-chart
   version: 0.1.0
-- name: ballot-api
+- name: aiontheballot-api
   repository: file://../../apps/api/helm-chart
   version: 0.1.0
-- name: ballot-web
+- name: aiontheballot-web
   repository: file://../../apps/web/helm-chart
   version: 0.1.0
-- name: ballot-admin
+- name: aiontheballot-admin
   repository: file://../../apps/admin/helm-chart
   version: 0.1.0
-digest: sha256:91c06c6b400dee64431da567a10e57d3bae7454e49629238a29bdbddcdf33e7b
-generated: "2026-10-08T21:25:30.907433+02:00"
+digest: sha256:c8cdec168bc1f92d7324601f16ff9c29aeec3bc71344206e11b2c9c3ee89af91
+generated: "2026-10-09T02:16:01.038658+02:00"

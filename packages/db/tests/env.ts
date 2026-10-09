@@ -15,10 +15,10 @@ const required = (name: string): string => {
   return value;
 };
 
-/** ballot_owner on ballot_test: migrations run as the owner, as in production. */
+/** aiontheballot_owner on aiontheballot_test: migrations run as the owner, as in production. */
 export const ownerUrl = (): string => required('TEST_DATABASE_URL');
 
-/** Superuser on ballot_test: tests switch to each runtime role with SET LOCAL ROLE. */
+/** Superuser on aiontheballot_test: tests switch to each runtime role with SET LOCAL ROLE. */
 export const superuserUrl = (): string => required('TEST_SUPERUSER_DATABASE_URL');
 
 export const migrationsDir = `${root}db/migrations`;

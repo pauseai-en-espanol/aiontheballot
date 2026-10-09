@@ -1,4 +1,4 @@
-/** Methodology kinds and their rating scales (BRIEF §3). Labels and icons live in @ballot/i18n and the UI. */
+/** Methodology kinds and their rating scales (BRIEF §3). Labels and icons live in @aiontheballot/i18n and the UI. */
 
 export const METHODOLOGY_KINDS = ['demands', 'descriptive'] as const;
 export type MethodologyKind = (typeof METHODOLOGY_KINDS)[number];

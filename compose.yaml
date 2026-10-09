@@ -2,32 +2,32 @@
 # the same Postgres image as the halyard `postgresql` chart, and the same roles (an owner plus three
 # non-owner runtime roles, as the chart's `extraRoles` create them). See ADR-0001 and ADR-0002 §2.
 #
-#   pnpm db:up        # start Postgres on :5432 (override with BALLOT_PG_PORT)
+#   pnpm db:up        # start Postgres on :5432 (override with AIONTHEBALLOT_PG_PORT)
 #   pnpm db:migrate   # apply migrations and refresh db/schema.sql
 #   docker compose down -v   # stop and wipe the database
 
 services:
   postgres:
     image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
-    container_name: ballot-postgres
+    container_name: aiontheballot-postgres
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
-      BALLOT_OWNER_PASSWORD: ${BALLOT_OWNER_PASSWORD:-dev-only-owner}
-      BALLOT_WEB_PASSWORD: ${BALLOT_WEB_PASSWORD:-dev-only-web}
-      BALLOT_ADMIN_PASSWORD: ${BALLOT_ADMIN_PASSWORD:-dev-only-admin}
-      BALLOT_WORKER_PASSWORD: ${BALLOT_WORKER_PASSWORD:-dev-only-worker}
+      AIONTHEBALLOT_OWNER_PASSWORD: ${AIONTHEBALLOT_OWNER_PASSWORD:-dev-only-owner}
+      AIONTHEBALLOT_WEB_PASSWORD: ${AIONTHEBALLOT_WEB_PASSWORD:-dev-only-web}
+      AIONTHEBALLOT_ADMIN_PASSWORD: ${AIONTHEBALLOT_ADMIN_PASSWORD:-dev-only-admin}
+      AIONTHEBALLOT_WORKER_PASSWORD: ${AIONTHEBALLOT_WORKER_PASSWORD:-dev-only-worker}
     ports:
-      - '${BALLOT_PG_PORT:-5432}:5432'
+      - '${AIONTHEBALLOT_PG_PORT:-5432}:5432'
     volumes:
-      - ballot-pg-data:/var/lib/postgresql
+      - aiontheballot-pg-data:/var/lib/postgresql
       - ./db/local/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d ballot']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d aiontheballot']
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  ballot-pg-data:
+  aiontheballot-pg-data:

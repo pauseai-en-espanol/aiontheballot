@@ -1,5 +1,5 @@
 {
-  "name": "@ballot/db",
+  "name": "@aiontheballot/db",
   "version": "0.0.0",
   "private": true,
   "description": "Database access for the API and worker: Kysely, generated types and withActor",
@@ -24,7 +24,7 @@
     "pg": "8.23.1"
   },
   "devDependencies": {
-    "@ballot/domain": "workspace:*",
+    "@aiontheballot/domain": "workspace:*",
     "@slango.configs/lint-staged": "2.0.8",
     "@slango.configs/oxlint": "0.1.12",
     "@slango.configs/typescript": "3.0.0",

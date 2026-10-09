@@ -30,4 +30,8 @@ export const errorCode = async (client: pg.Client, sql: string): Promise<string 
   }
 };
 
-export const RUNTIME_ROLES = ['ballot_web', 'ballot_admin', 'ballot_worker'] as const;
+export const RUNTIME_ROLES = [
+  'aiontheballot_web',
+  'aiontheballot_admin',
+  'aiontheballot_worker',
+] as const;

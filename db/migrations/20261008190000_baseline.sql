@@ -1,7 +1,7 @@
 -- migrate:up
 
--- Migrations run as the database owner (ballot_owner). The runtime roles ballot_web, ballot_admin and
--- ballot_worker are created by the cluster's Postgres provisioning, own nothing and cannot bypass RLS
+-- Migrations run as the database owner (aiontheballot_owner). The runtime roles aiontheballot_web, aiontheballot_admin and
+-- aiontheballot_worker are created by the cluster's Postgres provisioning, own nothing and cannot bypass RLS
 -- (ADR-0002 §2). Migrations are forward-only: every down block is empty.
 
 -- Only roles granted CONNECT explicitly may reach this database; other apps on the shared instance cannot.
@@ -25,8 +25,8 @@ REVOKE ALL ON SCHEMA app FROM PUBLIC;
 REVOKE ALL ON SCHEMA private FROM PUBLIC;
 
 -- Runtime roles can look objects up in these schemas. Table and function privileges are granted one by one.
-GRANT USAGE ON SCHEMA app TO ballot_web, ballot_admin, ballot_worker;
-GRANT USAGE ON SCHEMA private TO ballot_web, ballot_admin, ballot_worker;
+GRANT USAGE ON SCHEMA app TO aiontheballot_web, aiontheballot_admin, aiontheballot_worker;
+GRANT USAGE ON SCHEMA private TO aiontheballot_web, aiontheballot_admin, aiontheballot_worker;
 
 -- migrate:down
 -- Forward-only: migrations are never rolled back. Recover by restoring a backup (ADR-0001).

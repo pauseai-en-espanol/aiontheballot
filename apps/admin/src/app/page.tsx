@@ -1,4 +1,4 @@
-import { getTranslator } from '@ballot/i18n/messages';
+import { getTranslator } from '@aiontheballot/i18n/messages';
 import { css } from '@styled-system/css';
 
 const Home = () => {

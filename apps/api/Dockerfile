@@ -15,7 +15,7 @@ FROM pnpm AS prune
 ARG TURBO_VERSION
 WORKDIR /repo
 COPY . .
-RUN pnpm dlx turbo@${TURBO_VERSION} prune @ballot/api --docker
+RUN pnpm dlx turbo@${TURBO_VERSION} prune @aiontheballot/api --docker
 
 # ------ build, then deploy: production dependencies only, workspace packages injected ------
 FROM pnpm AS build
@@ -24,8 +24,8 @@ COPY --from=prune /repo/out/json/ ./
 # Sources aren't here yet, so skip prepare hooks (e.g. panda codegen); the build runs them.
 RUN PACKAGED=true pnpm install --frozen-lockfile
 COPY --from=prune /repo/out/full/ ./
-RUN pnpm exec turbo run build --filter=@ballot/api \
- && pnpm --filter=@ballot/api deploy --prod /prod/api
+RUN pnpm exec turbo run build --filter=@aiontheballot/api \
+ && pnpm --filter=@aiontheballot/api deploy --prod /prod/api
 
 # ------ runtime ------
 FROM ${NODE_IMAGE} AS runtime

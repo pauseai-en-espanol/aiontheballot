@@ -1,4 +1,4 @@
-import { messages } from '@ballot/i18n/messages';
+import { messages } from '@aiontheballot/i18n/messages';
 import { expect, type Response, test } from '@playwright/test';
 
 import { ADMIN_URL, API_URL, PLATFORM_NAME, WEB_URL } from '../servers.js';

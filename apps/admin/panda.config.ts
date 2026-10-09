@@ -1,4 +1,4 @@
-import { ballotPreset } from '@ballot/ui/preset';
+import { aiontheballotPreset } from '@aiontheballot/ui/preset';
 import { defineConfig } from '@pandacss/dev';
 
 export default defineConfig({
@@ -7,5 +7,5 @@ export default defineConfig({
   exclude: [],
   jsxFramework: 'react',
   outdir: 'styled-system',
-  presets: ['@pandacss/preset-base', '@pandacss/preset-panda', ballotPreset],
+  presets: ['@pandacss/preset-base', '@pandacss/preset-panda', aiontheballotPreset],
 });

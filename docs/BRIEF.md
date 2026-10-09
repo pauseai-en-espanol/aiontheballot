@@ -1,4 +1,4 @@
-# Product brief — working name "AI on the Ballot" (codename: `ballot`)
+# Product brief — working name "AI on the Ballot" (codename: `aiontheballot`)
 
 > Save this file as `docs/BRIEF.md` in the repo. It is the source of truth for scope and constraints.
 > The platform name is a **working name** and may change: keep it in config, never hardcode it.

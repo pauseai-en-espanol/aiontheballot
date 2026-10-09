@@ -1,18 +1,18 @@
 # Image tags are written by the release workflow (.github/workflows/release.yml). Everything environment-specific
 # (hostnames, gateway, registry, secrets) lives in the gitops values for each environment, not here.
-ballot-migrations:
+aiontheballot-migrations:
   nameOverride: migrations
   image:
     tag: ''
-ballot-api:
+aiontheballot-api:
   nameOverride: api
   image:
     tag: ''
-ballot-web:
+aiontheballot-web:
   nameOverride: web
   image:
     tag: ''
-ballot-admin:
+aiontheballot-admin:
   nameOverride: admin
   image:
     tag: ''

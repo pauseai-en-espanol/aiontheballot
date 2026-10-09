@@ -1,6 +1,6 @@
 import type pg from 'pg';
 
-export type RuntimeRole = 'ballot_web' | 'ballot_admin' | 'ballot_worker';
+export type RuntimeRole = 'aiontheballot_web' | 'aiontheballot_admin' | 'aiontheballot_worker';
 
 /** Who runs a case: a runtime role, plus the actor (admin) or the job's tenant (worker). ADR-0002 §2–§3. */
 export interface Principal {
@@ -27,7 +27,11 @@ export type Outcome =
   | { kind: 'deny'; reason: 'error'; code: string }
   | { kind: 'deny'; reason: 'no-rows' };
 
-const ROLES: readonly RuntimeRole[] = ['ballot_web', 'ballot_admin', 'ballot_worker'];
+const ROLES: readonly RuntimeRole[] = [
+  'aiontheballot_web',
+  'aiontheballot_admin',
+  'aiontheballot_worker',
+];
 
 const fingerprint = async (client: pg.Client, c: Case): Promise<string> =>
   JSON.stringify((await client.query(c.target, c.targetParams)).rows);

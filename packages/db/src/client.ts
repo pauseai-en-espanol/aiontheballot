@@ -6,7 +6,7 @@ import type { DB } from './generated/db.js';
 export type Database = Kysely<DB>;
 
 export interface DatabaseOptions {
-  /** Connection string for one runtime role: ballot_web, ballot_admin or ballot_worker. Never the owner. */
+  /** Connection string for one runtime role: aiontheballot_web, aiontheballot_admin or aiontheballot_worker. Never the owner. */
   connectionString: string;
   maxConnections?: number;
   applicationName?: string;

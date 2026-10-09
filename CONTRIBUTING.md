@@ -15,7 +15,7 @@ the checklists.
    ```
 
    For changes to the apps, also run `pnpm test:e2e` (Playwright, against production builds). Install its browser
-   once with `pnpm --filter @ballot/e2e exec playwright install chromium`.
+   once with `pnpm --filter @aiontheballot/e2e exec playwright install chromium`.
 
 3. Add a changeset for any change that affects a package (`pnpm release:note`). Use `pnpm release:empty` for docs or
    CI-only changes. The pre-push hook checks for one.
@@ -51,8 +51,8 @@ and the [data model spec](docs/spec/data-model.md)):
 4. **RLS enabled, with policies:**
    - the public-visibility rule, if the table is public-capable;
    - membership policies through the `private` helpers, which already require `aal2`.
-5. **Explicit grants** for each runtime role (`ballot_web`, `ballot_admin`, `ballot_worker`), and nothing to
-   `PUBLIC`.
+5. **Explicit grants** for each runtime role (`aiontheballot_web`, `aiontheballot_admin`, `aiontheballot_worker`),
+   and nothing to `PUBLIC`.
 6. **If it holds published history:** `UPDATE`/`DELETE`/`TRUNCATE` triggers using `private.forbid_mutation()`,
    which honours `app.purge` only for the table owner.
 7. **Personal data?** Define its retention, and keep it out of `audit_log`.

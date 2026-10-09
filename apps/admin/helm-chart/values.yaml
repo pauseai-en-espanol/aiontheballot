@@ -1,6 +1,6 @@
 replicaCount: 1
 image:
-  repository: ballot/admin
+  repository: aiontheballot/admin
   tag: ''
   pullPolicy: IfNotPresent
 service:

@@ -107,7 +107,7 @@ fix them rather than copy them.
 ### Repository, chart and CD
 
 - **Repository:** `pauseai-en-espanol/aiontheballot`.
-- **Umbrella chart:** `helm-charts/ballot`, with one subchart per deployable (`apps/*/helm-chart`: web, admin,
+- **Umbrella chart:** `helm-charts/aiontheballot`, with one subchart per deployable (`apps/*/helm-chart`: web, admin,
   API, worker), a migration Job, and the backup CronJob.
 - **Routes:** the halyard `route:` convention (`enabled`/`parentRefs`/`hostnames`/`annotations`) on
   `gateway-public`.
@@ -117,7 +117,7 @@ fix them rather than copy them.
   - Unlike gifcept, explicit **resource requests and limits** and a **restrictive securityContext**, because the
     node is shared.
 - **Images:**
-  - Tagged `harbor.danilupion.com/ballot/<component>:<version>.<sha>`, never `:latest`.
+  - Tagged `harbor.danilupion.com/aiontheballot/<component>:<version>.<sha>`, never `:latest`.
   - The base image is pinned by digest.
 - **CI:**
   - Runs on the `pauseai-en-espanol` self-hosted runner, with actions pinned by SHA.
@@ -145,11 +145,14 @@ fix them rather than copy them.
 
 ### GitOps entries
 
-- `catalog/apps/ballot/applicationset.yaml` discovers `clusters/danilupion-com/values/apps/ballot.yaml` and
-  deploys `helm-charts/ballot` into the `ballot` namespace.
-- SealedSecrets go in `clusters/danilupion-com/resources/apps/ballot/`.
+- `catalog/apps/aiontheballot/applicationset.yaml` discovers
+  `clusters/danilupion-com/values/apps/aiontheballot.yaml` and deploys `helm-charts/aiontheballot` into the
+  `aiontheballot` namespace.
+- SealedSecrets go in `clusters/danilupion-com/resources/apps/aiontheballot/`, plus the database passwords in
+  `resources/data/postgresql/`. `scripts/seal-gitops-secrets.sh` generates and seals all of them in one run, so
+  each password is created once and never printed.
 - The repo and namespace are added to `projects/apps.yaml`.
-- Harbor gets a `ballot` project with pull and push robots.
+- Harbor gets an `aiontheballot` project with pull and push robots.
 
 ### DNS and TLS
 
@@ -163,10 +166,10 @@ fix them rather than copy them.
 
 - Postgres 18, with runtime roles that do not own anything (ADR-0002).
 - Reachable only inside the cluster: ClusterIP, no NodePort.
-- The shared `postgresql` instance, with a `ballot` database. The apps never connect as the role that owns the
+- The shared `postgresql` instance, with an `aiontheballot` database. The apps never connect as the role that owns the
   tables: an owner bypasses RLS and can disable policies and triggers.
-- The runtime roles `ballot_web`, `ballot_admin` and `ballot_worker` come from the halyard `postgresql` chart's
-  `databases[].extraRoles` (chart 1.1.0): login roles that own nothing and are forced to
+- The runtime roles `aiontheballot_web`, `aiontheballot_admin` and `aiontheballot_worker` come from the halyard
+  `postgresql` chart's `databases[].extraRoles` (chart 1.1.0): login roles that own nothing and are forced to
   `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`. Our migrations, run as the owner, grant them
   table privileges.
 - Role names belong to the whole Postgres server, and the migrations grant to these fixed names. A second

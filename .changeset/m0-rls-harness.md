@@ -1,5 +1,5 @@
 ---
-'@ballot/db': patch
+'@aiontheballot/db': patch
 ---
 
 Add the tenant-isolation matrix harness: principals from ADR-0002, a runner that refuses to pass on a missing target,

@@ -20,25 +20,25 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: app; Type: SCHEMA; Schema: -; Owner: ballot_owner
+-- Name: app; Type: SCHEMA; Schema: -; Owner: aiontheballot_owner
 --
 
 CREATE SCHEMA app;
 
 
-ALTER SCHEMA app OWNER TO ballot_owner;
+ALTER SCHEMA app OWNER TO aiontheballot_owner;
 
 --
--- Name: private; Type: SCHEMA; Schema: -; Owner: ballot_owner
+-- Name: private; Type: SCHEMA; Schema: -; Owner: aiontheballot_owner
 --
 
 CREATE SCHEMA private;
 
 
-ALTER SCHEMA private OWNER TO ballot_owner;
+ALTER SCHEMA private OWNER TO aiontheballot_owner;
 
 --
--- Name: current_aal(); Type: FUNCTION; Schema: private; Owner: ballot_owner
+-- Name: current_aal(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
 CREATE FUNCTION private.current_aal() RETURNS integer
@@ -47,10 +47,10 @@ CREATE FUNCTION private.current_aal() RETURNS integer
     AS $$ SELECT coalesce(nullif(current_setting('app.aal', true), '')::integer, 0) $$;
 
 
-ALTER FUNCTION private.current_aal() OWNER TO ballot_owner;
+ALTER FUNCTION private.current_aal() OWNER TO aiontheballot_owner;
 
 --
--- Name: current_user_id(); Type: FUNCTION; Schema: private; Owner: ballot_owner
+-- Name: current_user_id(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
 CREATE FUNCTION private.current_user_id() RETURNS uuid
@@ -59,10 +59,10 @@ CREATE FUNCTION private.current_user_id() RETURNS uuid
     AS $$ SELECT nullif(current_setting('app.user_id', true), '')::uuid $$;
 
 
-ALTER FUNCTION private.current_user_id() OWNER TO ballot_owner;
+ALTER FUNCTION private.current_user_id() OWNER TO aiontheballot_owner;
 
 --
--- Name: forbid_mutation(); Type: FUNCTION; Schema: private; Owner: ballot_owner
+-- Name: forbid_mutation(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
 CREATE FUNCTION private.forbid_mutation() RETURNS trigger
@@ -84,10 +84,10 @@ CREATE FUNCTION private.forbid_mutation() RETURNS trigger
   $$;
 
 
-ALTER FUNCTION private.forbid_mutation() OWNER TO ballot_owner;
+ALTER FUNCTION private.forbid_mutation() OWNER TO aiontheballot_owner;
 
 --
--- Name: forbid_tenant_change(); Type: FUNCTION; Schema: private; Owner: ballot_owner
+-- Name: forbid_tenant_change(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
 CREATE FUNCTION private.forbid_tenant_change() RETURNS trigger
@@ -104,10 +104,10 @@ CREATE FUNCTION private.forbid_tenant_change() RETURNS trigger
   $$;
 
 
-ALTER FUNCTION private.forbid_tenant_change() OWNER TO ballot_owner;
+ALTER FUNCTION private.forbid_tenant_change() OWNER TO aiontheballot_owner;
 
 --
--- Name: normalize_for_match(text); Type: FUNCTION; Schema: private; Owner: ballot_owner
+-- Name: normalize_for_match(text); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
 CREATE FUNCTION private.normalize_for_match(input text) RETURNS text
@@ -130,14 +130,14 @@ CREATE FUNCTION private.normalize_for_match(input text) RETURNS text
   $_$;
 
 
-ALTER FUNCTION private.normalize_for_match(input text) OWNER TO ballot_owner;
+ALTER FUNCTION private.normalize_for_match(input text) OWNER TO aiontheballot_owner;
 
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: schema_migrations; Type: TABLE; Schema: public; Owner: ballot_owner
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: aiontheballot_owner
 --
 
 CREATE TABLE public.schema_migrations (
@@ -145,10 +145,10 @@ CREATE TABLE public.schema_migrations (
 );
 
 
-ALTER TABLE public.schema_migrations OWNER TO ballot_owner;
+ALTER TABLE public.schema_migrations OWNER TO aiontheballot_owner;
 
 --
--- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: ballot_owner
+-- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: aiontheballot_owner
 --
 
 ALTER TABLE ONLY public.schema_migrations
@@ -156,21 +156,21 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: SCHEMA app; Type: ACL; Schema: -; Owner: ballot_owner
+-- Name: SCHEMA app; Type: ACL; Schema: -; Owner: aiontheballot_owner
 --
 
-GRANT USAGE ON SCHEMA app TO ballot_web;
-GRANT USAGE ON SCHEMA app TO ballot_admin;
-GRANT USAGE ON SCHEMA app TO ballot_worker;
+GRANT USAGE ON SCHEMA app TO aiontheballot_web;
+GRANT USAGE ON SCHEMA app TO aiontheballot_admin;
+GRANT USAGE ON SCHEMA app TO aiontheballot_worker;
 
 
 --
--- Name: SCHEMA private; Type: ACL; Schema: -; Owner: ballot_owner
+-- Name: SCHEMA private; Type: ACL; Schema: -; Owner: aiontheballot_owner
 --
 
-GRANT USAGE ON SCHEMA private TO ballot_web;
-GRANT USAGE ON SCHEMA private TO ballot_admin;
-GRANT USAGE ON SCHEMA private TO ballot_worker;
+GRANT USAGE ON SCHEMA private TO aiontheballot_web;
+GRANT USAGE ON SCHEMA private TO aiontheballot_admin;
+GRANT USAGE ON SCHEMA private TO aiontheballot_worker;
 
 
 --
@@ -181,47 +181,47 @@ REVOKE USAGE ON SCHEMA public FROM PUBLIC;
 
 
 --
--- Name: FUNCTION current_aal(); Type: ACL; Schema: private; Owner: ballot_owner
+-- Name: FUNCTION current_aal(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
 REVOKE ALL ON FUNCTION private.current_aal() FROM PUBLIC;
-GRANT ALL ON FUNCTION private.current_aal() TO ballot_admin;
+GRANT ALL ON FUNCTION private.current_aal() TO aiontheballot_admin;
 
 
 --
--- Name: FUNCTION current_user_id(); Type: ACL; Schema: private; Owner: ballot_owner
+-- Name: FUNCTION current_user_id(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
 REVOKE ALL ON FUNCTION private.current_user_id() FROM PUBLIC;
-GRANT ALL ON FUNCTION private.current_user_id() TO ballot_admin;
+GRANT ALL ON FUNCTION private.current_user_id() TO aiontheballot_admin;
 
 
 --
--- Name: FUNCTION forbid_mutation(); Type: ACL; Schema: private; Owner: ballot_owner
+-- Name: FUNCTION forbid_mutation(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
 REVOKE ALL ON FUNCTION private.forbid_mutation() FROM PUBLIC;
 
 
 --
--- Name: FUNCTION forbid_tenant_change(); Type: ACL; Schema: private; Owner: ballot_owner
+-- Name: FUNCTION forbid_tenant_change(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
 REVOKE ALL ON FUNCTION private.forbid_tenant_change() FROM PUBLIC;
 
 
 --
--- Name: FUNCTION normalize_for_match(input text); Type: ACL; Schema: private; Owner: ballot_owner
+-- Name: FUNCTION normalize_for_match(input text); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
 REVOKE ALL ON FUNCTION private.normalize_for_match(input text) FROM PUBLIC;
 
 
 --
--- Name: DEFAULT PRIVILEGES FOR FUNCTIONS; Type: DEFAULT ACL; Schema: -; Owner: ballot_owner
+-- Name: DEFAULT PRIVILEGES FOR FUNCTIONS; Type: DEFAULT ACL; Schema: -; Owner: aiontheballot_owner
 --
 
-ALTER DEFAULT PRIVILEGES FOR ROLE ballot_owner REVOKE ALL ON FUNCTIONS FROM PUBLIC;
+ALTER DEFAULT PRIVILEGES FOR ROLE aiontheballot_owner REVOKE ALL ON FUNCTIONS FROM PUBLIC;
 
 
 --

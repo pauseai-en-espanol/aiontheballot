@@ -56,8 +56,8 @@ cross-country views and an open-data export.
 2. **The API runs at least 2 replicas**, with resource requests and limits, like `apps/web`.
 3. **The public web keeps serving its cache when the API errors.** Pages already rendered stay up; only pages
    nobody has visited yet, and new images, fail until the API recovers.
-4. **Public routes in the API use the read-only `ballot_web` pool.** Only admin routes get `ballot_admin`, so a bug
-   in a public route still can't write.
+4. **Public routes in the API use the read-only `aiontheballot_web` pool.** Only admin routes get
+   `aiontheballot_admin`, so a bug in a public route still can't write.
 
 **Options considered:**
 

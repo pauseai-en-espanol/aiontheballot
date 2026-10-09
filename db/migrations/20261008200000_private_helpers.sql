@@ -12,12 +12,12 @@ CREATE FUNCTION private.current_aal() RETURNS integer
   SET search_path = ''
   AS $$ SELECT coalesce(nullif(current_setting('app.aal', true), '')::integer, 0) $$;
 
-GRANT EXECUTE ON FUNCTION private.current_user_id(), private.current_aal() TO ballot_admin;
+GRANT EXECUTE ON FUNCTION private.current_user_id(), private.current_aal() TO aiontheballot_admin;
 
 -- Normalisation for the verbatim quote check (ADR-0002, data rules). Used for matching only: quotes are always
 -- displayed exactly as stored. Steps: NFKC (expands ligatures such as "ﬁ"), drop soft hyphens, fold typographic
 -- quotes and dashes, join words hyphenated across a line break, collapse whitespace. Must stay identical to
--- normalizeForMatch() in @ballot/domain; packages/db tests both on the same fixtures.
+-- normalizeForMatch() in @aiontheballot/domain; packages/db tests both on the same fixtures.
 CREATE FUNCTION private.normalize_for_match(input text) RETURNS text
   LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
   SET search_path = ''

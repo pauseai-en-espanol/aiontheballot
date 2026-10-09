@@ -2,7 +2,7 @@
 # The umbrella chart vendors its subcharts as .tgz files (`helm dependency update`), and Argo CD deploys those copies.
 # Check that each one matches its source directory, so a template change can't merge without being re-vendored.
 set -euo pipefail
-umbrella=helm-charts/ballot
+umbrella=helm-charts/aiontheballot
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 status=0

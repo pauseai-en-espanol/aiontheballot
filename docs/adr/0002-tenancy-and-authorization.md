@@ -34,12 +34,12 @@ The UI repeats some checks, but only for user experience.
 
 ### 2. Database roles
 
-| Role            | Used by                         | Notes                                                     |
-| --------------- | ------------------------------- | --------------------------------------------------------- |
-| `ballot_owner`  | Migration and backup jobs only  | Owns the schemas; never used by the running apps          |
-| `ballot_admin`  | API admin routes and the worker | Runtime role                                              |
-| `ballot_web`    | API public routes (read-only)   | Runtime role                                              |
-| `ballot_worker` | Background worker               | Runtime role; only job tables, scoped to the job's tenant |
+| Role                   | Used by                         | Notes                                                     |
+| ---------------------- | ------------------------------- | --------------------------------------------------------- |
+| `aiontheballot_owner`  | Migration and backup jobs only  | Owns the schemas; never used by the running apps          |
+| `aiontheballot_admin`  | API admin routes and the worker | Runtime role                                              |
+| `aiontheballot_web`    | API public routes (read-only)   | Runtime role                                              |
+| `aiontheballot_worker` | Background worker               | Runtime role; only job tables, scoped to the job's tenant |
 
 All runtime roles are `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB` and own nothing. A catalog
 meta-test fails if this ever changes.
@@ -50,7 +50,7 @@ meta-test fails if this ever changes.
   `withActor(actor, fn)`.
 - `withActor` sets `SET LOCAL app.user_id` and `SET LOCAL app.aal`.
 - `private.current_user_id()` returns NULL when no actor is set, so every member policy **denies by default**.
-- `ballot_web` never sets an actor.
+- `aiontheballot_web` never sets an actor.
 
 **Trust boundary:** the API is trusted to establish _who_ the user is. It is never trusted to decide
 _what_ they may do. A compromised API could impersonate users. We accept that risk; the immutable audit
@@ -85,7 +85,7 @@ log makes it visible (T23).
 
 ### 7. The public role reads, and can call one function
 
-- `ballot_web` can `SELECT` public-capable tables. RLS limits it to published rows in live or archived elections
+- `aiontheballot_web` can `SELECT` public-capable tables. RLS limits it to published rows in live or archived elections
   of active tenants.
 - It can `EXECUTE` `app.submit_report(...)`, which is `SECURITY DEFINER`. The function checks the tenant is
   active, inserts the report with `status='new'`, and enforces a per-tenant daily cap.
@@ -137,7 +137,7 @@ A revision with `change_kind='withdrawal'` returns the cell to _pending_ and log
   `purge_log`. These triggers fire even for the owner role. The corrections log is a view derived from revisions
   and approved change requests, so it can't be edited either.
 - The only exception is `private.purge_tenant(tenant_id)`:
-  - Only `ballot_owner` can execute it.
+  - Only `aiontheballot_owner` can execute it.
   - It sets a transaction-local `app.purge` flag that the triggers honour, and writes a platform-level purge record.
   - It covers per-tenant deletion (BRIEF §7) and GDPR erasure.
 - Personal data is never copied into `audit_log`; reports are logged by ID only.
@@ -152,7 +152,7 @@ A revision with `change_kind='withdrawal'` returns the cell to _pending_ and log
 
 ## Capabilities by role
 
-"Own" means the member's own tenant. A member of tenant A acting on tenant B gets exactly what `ballot_web` gets.
+"Own" means the member's own tenant. A member of tenant A acting on tenant B gets exactly what `aiontheballot_web` gets.
 
 | Capability                                                                                                | editor | reviewer | country_admin | platform_admin                      |
 | --------------------------------------------------------------------------------------------------------- | ------ | -------- | ------------- | ----------------------------------- |
@@ -326,7 +326,7 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 
 | #   | Threat                                                                     | Actor  | Mitigation                                                                                                          | Proven by                             |
 | --- | -------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| T1  | Read B's drafts, sources, reports or audit log                             | A2–A4  | Membership-based RLS; `ballot_web` has no grants on private tables                                                  | Matrix                                |
+| T1  | Read B's drafts, sources, reports or audit log                             | A2–A4  | Membership-based RLS; `aiontheballot_web` has no grants on private tables                                           | Matrix                                |
 | T2  | Write into B by forging `tenant_id`                                        | A3–A4  | `WITH CHECK` on membership                                                                                          | Matrix                                |
 | T3  | Reference across tenants (A's evidence or source on B's cell)              | A3     | Composite FKs                                                                                                       | DB-rule tests                         |
 | T4  | Move a row from one tenant to another                                      | A3–A4  | Immutability trigger plus composite FK                                                                              | DB-rule tests                         |
@@ -362,7 +362,7 @@ that Postgres is a service container or embedded binaries.
 
 Each case runs in its own transaction, which is rolled back afterwards:
 
-1. Switch role: `SET LOCAL ROLE ballot_web` or `ballot_admin`.
+1. Switch role: `SET LOCAL ROLE aiontheballot_web` or `aiontheballot_admin`.
 2. Set the actor context: `set_config('app.user_id', …, true)` and `set_config('app.aal', …, true)`.
 3. Run the operation.
 4. Classify the result:
@@ -390,8 +390,8 @@ Expected outcomes are written as data in `packages/db/tests/rls/matrix.ts`, and 
 from it.
 
 - **Principals:**
-  - `ballot_web` (the API's public routes);
-  - `ballot_admin` with no actor set;
+  - `aiontheballot_web` (the API's public routes);
+  - `aiontheballot_admin` with no actor set;
   - a user with no membership;
   - editor@A, reviewer@A, country_admin@A and platform_admin, **each at aal2 and at aal1**;
   - a user who is editor in A and reviewer in B;
@@ -410,13 +410,13 @@ from it.
 
 Exceptions are listed in `matrix.ts`.
 
-| Principal                                                      | Public-capable, own, published      | Public-capable, own, draft or in_review  | Private, own                                                | Any row of another tenant            | Immutable tables                 |
-| -------------------------------------------------------------- | ----------------------------------- | ---------------------------------------- | ----------------------------------------------------------- | ------------------------------------ | -------------------------------- |
-| `ballot_web`, no actor, no membership, or **any role at aal1** | Read only                           | Deny                                     | Deny                                                        | Published: read only. Otherwise deny | Read published only; never write |
-| editor@A, aal2                                                 | Read; cannot change status directly | Read, insert and update; delete drafts   | Read; write sources; triage reports                         | Same as `ballot_web`                 | Read; never update or delete     |
-| reviewer@A, aal2                                               | Read                                | Read; approve or reject (never own work) | Read; triage reports                                        | Same as `ballot_web`                 | Read; never update or delete     |
-| country_admin@A, aal2                                          | Read                                | Full access to drafts                    | Full, including invitations and memberships; read audit log | Same as `ballot_web`                 | Read; never update or delete     |
-| platform_admin, aal2                                           | All tenants                         | All tenants                              | All, **except `reports`**                                   | All tenants                          | Read; never update or delete     |
+| Principal                                                             | Public-capable, own, published      | Public-capable, own, draft or in_review  | Private, own                                                | Any row of another tenant            | Immutable tables                 |
+| --------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------- | ----------------------------------------------------------- | ------------------------------------ | -------------------------------- |
+| `aiontheballot_web`, no actor, no membership, or **any role at aal1** | Read only                           | Deny                                     | Deny                                                        | Published: read only. Otherwise deny | Read published only; never write |
+| editor@A, aal2                                                        | Read; cannot change status directly | Read, insert and update; delete drafts   | Read; write sources; triage reports                         | Same as `aiontheballot_web`          | Read; never update or delete     |
+| reviewer@A, aal2                                                      | Read                                | Read; approve or reject (never own work) | Read; triage reports                                        | Same as `aiontheballot_web`          | Read; never update or delete     |
+| country_admin@A, aal2                                                 | Read                                | Full access to drafts                    | Full, including invitations and memberships; read audit log | Same as `aiontheballot_web`          | Read; never update or delete     |
+| platform_admin, aal2                                                  | All tenants                         | All tenants                              | All, **except `reports`**                                   | All tenants                          | Read; never update or delete     |
 
 ### Catalog meta-tests
 
@@ -426,7 +426,7 @@ These fail when someone adds a database object without wiring it in:
 2. Every `app.*` table and every executable function appears in `matrix.ts`, and nothing listed there is stale.
 3. Every table with a `tenant_id` has the immutability trigger and composite FKs.
 4. The runtime roles own nothing and have neither `BYPASSRLS`, `CREATEROLE` nor superuser.
-5. `ballot_web` has no `INSERT`, `UPDATE` or `DELETE` grant anywhere.
+5. `aiontheballot_web` has no `INSERT`, `UPDATE` or `DELETE` grant anywhere.
 6. `EXECUTE` grants match the allowlist, and no function is executable by `PUBLIC`.
 7. Every `SECURITY DEFINER` function is on the allowlist and sets `search_path`.
 8. Every view is `security_invoker`, and there are no materialized views.

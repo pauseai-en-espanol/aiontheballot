@@ -619,7 +619,7 @@ transaction.
 
 **Hostname:** inserted unverified → `verified_at` set → may become canonical → may be retired. Never deleted.
 
-## 5. Public read model (what `ballot_web` can read)
+## 5. Public read model (what `aiontheballot_web` can read)
 
 | Relation                                                                     | Visible rows                                                                   |
 | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
@@ -633,7 +633,7 @@ transaction.
 | `files` and `file_blobs`                                                     | Only the `public_assets` bucket (logos)                                        |
 | `current_revisions`, `corrections_log`                                       | Through the rules above (`security_invoker`)                                   |
 
-**Never readable by `ballot_web`:**
+**Never readable by `aiontheballot_web`:**
 
 - `assessments`, `draft_*`, `assessment_contributors`, `review_events`, `revision_internal`, `change_requests`;
 - `source_texts` and the `sources` bucket (copyright);
@@ -641,7 +641,7 @@ transaction.
 - `invitations`, `memberships`, `platform_admins`, `hostname_verifications`;
 - `llm_*`, `audit_log`, `purge_log`.
 
-The only write available to `ballot_web` is calling `app.submit_report()`.
+The only write available to `aiontheballot_web` is calling `app.submit_report()`.
 
 ## 6. Enforcement map
 
@@ -681,18 +681,18 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
 - The migration Job creates the `pgboss` schema as owner, using pg-boss's construction SQL. Runtime roles never
   need `CREATE`.
 - Only the API enqueues jobs, always inside `withActor`. Every payload carries `tenant_id` and `requested_by`.
-- The worker runs as its own role, `ballot_worker`. It sets the job's `tenant_id` as transaction context, and can
+- The worker runs as its own role, `aiontheballot_worker`. It sets the job's `tenant_id` as transaction context, and can
   only touch what jobs need: `source_texts`, `source_documents.extraction_status`, `llm_runs` and
   `llm_suggestions`.
 
 ## 9. Open items
 
-1. ~~**Worker database role.**~~ **Decided:** a third halyard extra role, `ballot_worker`. Its grants are limited
+1. ~~**Worker database role.**~~ **Decided:** a third halyard extra role, `aiontheballot_worker`. Its grants are limited
    to job tables, with RLS scoped by `app.tenant_id` from the job payload. It is a runtime role like the others:
    it owns nothing and has no `BYPASSRLS` (ADR-0002 §2).
 2. **Better Auth tables.** They should sit in the `auth` schema with uuid ids (its `generateId` configured), if its
    Postgres adapter supports a non-default schema cleanly. The spike will confirm. Otherwise the fallback is
-   prefixed tables in a schema `ballot_web` can't read.
+   prefixed tables in a schema `aiontheballot_web` can't read.
 3. **The descriptive scale** (PLAN P6): define `red` versus `not_mentioned`.
 4. **Admissible sources** (PLAN Q9): the default is `{pdf, web_page}` until the chapter decides.
 5. **Party names localized?** They're assumed to be `jsonb`, because some coalitions use different names in

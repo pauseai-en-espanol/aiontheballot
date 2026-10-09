@@ -15,9 +15,9 @@ describe('withActor', () => {
     await db.destroy();
   });
 
-  it('exposes the actor to ballot_admin through the private helpers', async () => {
+  it('exposes the actor to aiontheballot_admin through the private helpers', async () => {
     const seen = await withActor(db, { userId: USER, aal: 2 }, async (trx) => {
-      await sql`SET LOCAL ROLE ballot_admin`.execute(trx);
+      await sql`SET LOCAL ROLE aiontheballot_admin`.execute(trx);
       const result = await sql<{ user_id: string; aal: number }>`
         SELECT private.current_user_id() AS user_id, private.current_aal() AS aal`.execute(trx);
       return result.rows[0];

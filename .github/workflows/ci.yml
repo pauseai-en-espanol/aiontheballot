@@ -86,7 +86,7 @@ jobs:
           for chart in apps/*/helm-chart db/helm-chart; do
             helm lint --strict "$chart"
           done
-          helm lint --strict helm-charts/ballot --values helm-charts/ballot/ci/example-values.yaml
+          helm lint --strict helm-charts/aiontheballot --values helm-charts/aiontheballot/ci/example-values.yaml
 
       - name: Vendored subcharts match their sources
         run: scripts/check-chart-vendoring.sh
@@ -118,7 +118,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - uses: ./.github/actions/install-pnpm-dependencies
 
-      # The script compose.yaml runs at init: the owner, the three non-owner runtime roles, `ballot` and `ballot_test`.
+      # The script compose.yaml runs at init: the owner, the three non-owner runtime roles, `aiontheballot` and `aiontheballot_test`.
       - name: Create roles and databases
         env:
           CONTAINER: ${{ job.services.postgres.id }}
@@ -126,17 +126,17 @@ jobs:
         run: |
           docker exec -i \
             -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -e PGPASSWORD=postgres \
-            -e BALLOT_OWNER_PASSWORD=ci-owner -e BALLOT_WEB_PASSWORD=ci-web \
-            -e BALLOT_ADMIN_PASSWORD=ci-admin -e BALLOT_WORKER_PASSWORD=ci-worker \
+            -e AIONTHEBALLOT_OWNER_PASSWORD=ci-owner -e AIONTHEBALLOT_WEB_PASSWORD=ci-web \
+            -e AIONTHEBALLOT_ADMIN_PASSWORD=ci-admin -e AIONTHEBALLOT_WORKER_PASSWORD=ci-worker \
             "$CONTAINER" sh < db/local/init.sh
           {
-            echo "BALLOT_PG_CONTAINER=$CONTAINER"
-            echo "DATABASE_URL=postgres://ballot_owner:ci-owner@localhost:$PG_PORT/ballot?sslmode=disable"
-            echo "TEST_DATABASE_URL=postgres://ballot_owner:ci-owner@localhost:$PG_PORT/ballot_test?sslmode=disable"
-            echo "TEST_SUPERUSER_DATABASE_URL=postgres://postgres:postgres@localhost:$PG_PORT/ballot_test?sslmode=disable"
+            echo "AIONTHEBALLOT_PG_CONTAINER=$CONTAINER"
+            echo "DATABASE_URL=postgres://aiontheballot_owner:ci-owner@localhost:$PG_PORT/aiontheballot?sslmode=disable"
+            echo "TEST_DATABASE_URL=postgres://aiontheballot_owner:ci-owner@localhost:$PG_PORT/aiontheballot_test?sslmode=disable"
+            echo "TEST_SUPERUSER_DATABASE_URL=postgres://postgres:postgres@localhost:$PG_PORT/aiontheballot_test?sslmode=disable"
           } >> "$GITHUB_ENV"
 
-      # Rebuilds ballot_test from the migrations, then runs the RLS matrix, the catalog meta-tests and the data rules.
+      # Rebuilds aiontheballot_test from the migrations, then runs the RLS matrix, the catalog meta-tests and the data rules.
       - name: Database tests
         run: pnpm test:db
 
@@ -180,7 +180,7 @@ jobs:
 
       # Headless Chromium only, plus the system libraries it needs (apt, every run; the browser itself is cached).
       - name: Install Chromium
-        run: pnpm --filter @ballot/e2e exec playwright install --with-deps --only-shell chromium
+        run: pnpm --filter @aiontheballot/e2e exec playwright install --with-deps --only-shell chromium
 
       - name: E2E smoke tests
         run: pnpm test:e2e

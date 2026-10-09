@@ -1,8 +1,8 @@
-{{- define "ballot-migrations.name" -}}
+{{- define "aiontheballot-migrations.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{- define "ballot-migrations.fullname" -}}
+{{- define "aiontheballot-migrations.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -15,15 +15,15 @@
 {{- end }}
 {{- end }}
 
-{{- define "ballot-migrations.labels" -}}
+{{- define "aiontheballot-migrations.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{ include "ballot-migrations.selectorLabels" . }}
+{{ include "aiontheballot-migrations.selectorLabels" . }}
 app.kubernetes.io/version: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
-app.kubernetes.io/part-of: ballot
+app.kubernetes.io/part-of: aiontheballot
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
-{{- define "ballot-migrations.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "ballot-migrations.name" . }}
+{{- define "aiontheballot-migrations.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "aiontheballot-migrations.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}

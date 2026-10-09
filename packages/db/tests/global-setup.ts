@@ -7,7 +7,7 @@ import { migrationsDir, ownerUrl } from './env.js';
 
 const run = promisify(execFile);
 
-/** Rebuilds ballot_test from scratch: drop everything the owner created, then apply every migration as the owner. */
+/** Rebuilds aiontheballot_test from scratch: drop everything the owner created, then apply every migration as the owner. */
 export default async function setup(): Promise<void> {
   const client = new pg.Client({ connectionString: ownerUrl() });
   await client.connect();

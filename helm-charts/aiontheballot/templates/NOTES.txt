@@ -1,2 +1,2 @@
-ballot {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}".
+aiontheballot {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}".
 Migrations run first, as a Sync hook in wave -1; web and admin are exposed only through their HTTPRoutes.

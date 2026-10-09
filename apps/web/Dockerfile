@@ -15,7 +15,7 @@ FROM pnpm AS prune
 ARG TURBO_VERSION
 WORKDIR /repo
 COPY . .
-RUN pnpm dlx turbo@${TURBO_VERSION} prune @ballot/web --docker
+RUN pnpm dlx turbo@${TURBO_VERSION} prune @aiontheballot/web --docker
 
 # ------ build: install from manifests first (cached until they change), then build ------
 FROM pnpm AS build
@@ -24,7 +24,7 @@ COPY --from=prune /repo/out/json/ ./
 # Sources aren't here yet, so skip prepare hooks (e.g. panda codegen); the build runs them.
 RUN PACKAGED=true pnpm install --frozen-lockfile
 COPY --from=prune /repo/out/full/ ./
-RUN pnpm exec turbo run build --filter=@ballot/web
+RUN pnpm exec turbo run build --filter=@aiontheballot/web
 
 # ------ runtime: Next.js standalone output only ------
 FROM ${NODE_IMAGE} AS runtime

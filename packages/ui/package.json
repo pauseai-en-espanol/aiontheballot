@@ -1,5 +1,5 @@
 {
-  "name": "@ballot/ui",
+  "name": "@aiontheballot/ui",
   "version": "0.0.0",
   "private": true,
   "description": "Shared Panda preset and UI components (Ark UI) for the web and admin apps",

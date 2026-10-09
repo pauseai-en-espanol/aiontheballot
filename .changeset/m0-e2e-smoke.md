@@ -1,7 +1,7 @@
 ---
-'@ballot/e2e': minor
-'@ballot/web': patch
-'@ballot/admin': patch
+'@aiontheballot/e2e': minor
+'@aiontheballot/web': patch
+'@aiontheballot/admin': patch
 ---
 
 Add Playwright smoke tests against production builds of web, admin and api: pages render, health probes answer, and

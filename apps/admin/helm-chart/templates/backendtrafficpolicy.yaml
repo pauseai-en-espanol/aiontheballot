@@ -5,14 +5,14 @@
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: BackendTrafficPolicy
 metadata:
-  name: {{ include "ballot-admin.fullname" . }}
+  name: {{ include "aiontheballot-admin.fullname" . }}
   labels:
-    {{- include "ballot-admin.labels" . | nindent 4 }}
+    {{- include "aiontheballot-admin.labels" . | nindent 4 }}
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
-      name: {{ include "ballot-admin.fullname" . }}
+      name: {{ include "aiontheballot-admin.fullname" . }}
   retry:
     numRetries: 2
     retryOn:

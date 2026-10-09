@@ -16,7 +16,7 @@ A multi-tenant platform that publishes sourced comparisons of political parties'
 - **Tenant isolation lives in Postgres (ADR-0002).** Every new table needs `tenant_id`, RLS, composite FKs, the
   immutability trigger, explicit grants and an entry in `packages/db/tests/rls/matrix.ts` (checklist in CONTRIBUTING.md).
 - **Database roles:** runtime roles never own anything, every admin query goes through `withActor`, and
-  `ballot_web` never gets write grants. A new `SECURITY DEFINER` function or grant requires an ADR-0002 update.
+  `aiontheballot_web` never gets write grants. A new `SECURITY DEFINER` function or grant requires an ADR-0002 update.
 - **Data rules are database triggers:** evidence, four-eyes review, verbatim match, immutability. UI checks are
   for user experience only.
 - **Accessibility:** ratings are never shown by colour alone (icon + text + colour). Target WCAG 2.2 AA.
@@ -53,7 +53,7 @@ Copy `.env.example` to `.env` for local database URLs.
 - **Migrations:** SQL only, forward-only (never edit one once merged), one concern each.
 - **Tests:** next to the code as `*.spec.ts`. Every new invariant or policy gets its test first.
 - **i18n:** UI strings via `packages/i18n` (next-intl): English source, Spanish mandatory. Content is localized jsonb.
-- **Deployment (ADR-0001):** Helm chart in `helm-charts/ballot`, deployed by Argo CD on the `danilupion-com`
+- **Deployment (ADR-0001):** Helm chart in `helm-charts/aiontheballot`, deployed by Argo CD on the `danilupion-com`
   cluster. Never tag images `:latest`. Every pod sets resource requests and limits and a securityContext.
 - **Docs:** Markdown lines under 120 characters. Any change to the stack, tenancy or security model needs a new
   ADR (copy `docs/adr/0000-template.md`).

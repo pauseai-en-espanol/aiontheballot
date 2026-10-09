@@ -130,11 +130,11 @@ jobs:
           tags=()
           while read -r key _ version; do
             tag="$version.$DOCKER_TAG_SUFFIX"
-            KEY="$key" TAG="$tag" yq -i '.[env(KEY)].image.tag = env(TAG)' helm-charts/ballot/values.yaml
+            KEY="$key" TAG="$tag" yq -i '.[env(KEY)].image.tag = env(TAG)' helm-charts/aiontheballot/values.yaml
             tags+=("$key-v$tag")
           done < "$RUNNER_TEMP/release-plan"
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m "Release: update image tags [skip ci]" -- helm-charts/ballot/values.yaml
+            commit -m "Release: update image tags [skip ci]" -- helm-charts/aiontheballot/values.yaml
           git push origin HEAD:main
           for tag in "${tags[@]}"; do
             git tag "$tag"

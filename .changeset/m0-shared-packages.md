@@ -1,6 +1,6 @@
 ---
-'@ballot/domain': minor
-'@ballot/i18n': minor
+'@aiontheballot/domain': minor
+'@aiontheballot/i18n': minor
 ---
 
 Add the shared domain package (methodology kinds and their rating scales) and the i18n package (English source

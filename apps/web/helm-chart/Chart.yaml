@@ -1,5 +1,5 @@
 apiVersion: v2
-name: ballot-web
+name: aiontheballot-web
 description: 'Public site: scorecards, methodology and share images'
 type: application
 version: 0.1.0

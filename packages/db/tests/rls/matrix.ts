@@ -22,25 +22,25 @@ export const USERS = {
 } as const;
 
 export const PRINCIPALS: readonly Principal[] = [
-  { id: 'public', role: 'ballot_web' },
-  { id: 'admin role, no actor', role: 'ballot_admin' },
-  { id: 'no membership aal2', role: 'ballot_admin', userId: USERS.noMembership, aal: 2 },
-  { id: 'editor@A aal2', role: 'ballot_admin', userId: USERS.editorA, aal: 2 },
-  { id: 'editor@A aal1', role: 'ballot_admin', userId: USERS.editorA, aal: 1 },
-  { id: 'reviewer@A aal2', role: 'ballot_admin', userId: USERS.reviewerA, aal: 2 },
-  { id: 'reviewer@A aal1', role: 'ballot_admin', userId: USERS.reviewerA, aal: 1 },
-  { id: 'country_admin@A aal2', role: 'ballot_admin', userId: USERS.countryAdminA, aal: 2 },
-  { id: 'country_admin@A aal1', role: 'ballot_admin', userId: USERS.countryAdminA, aal: 1 },
-  { id: 'platform_admin aal2', role: 'ballot_admin', userId: USERS.platformAdmin, aal: 2 },
-  { id: 'platform_admin aal1', role: 'ballot_admin', userId: USERS.platformAdmin, aal: 1 },
+  { id: 'public', role: 'aiontheballot_web' },
+  { id: 'admin role, no actor', role: 'aiontheballot_admin' },
+  { id: 'no membership aal2', role: 'aiontheballot_admin', userId: USERS.noMembership, aal: 2 },
+  { id: 'editor@A aal2', role: 'aiontheballot_admin', userId: USERS.editorA, aal: 2 },
+  { id: 'editor@A aal1', role: 'aiontheballot_admin', userId: USERS.editorA, aal: 1 },
+  { id: 'reviewer@A aal2', role: 'aiontheballot_admin', userId: USERS.reviewerA, aal: 2 },
+  { id: 'reviewer@A aal1', role: 'aiontheballot_admin', userId: USERS.reviewerA, aal: 1 },
+  { id: 'country_admin@A aal2', role: 'aiontheballot_admin', userId: USERS.countryAdminA, aal: 2 },
+  { id: 'country_admin@A aal1', role: 'aiontheballot_admin', userId: USERS.countryAdminA, aal: 1 },
+  { id: 'platform_admin aal2', role: 'aiontheballot_admin', userId: USERS.platformAdmin, aal: 2 },
+  { id: 'platform_admin aal1', role: 'aiontheballot_admin', userId: USERS.platformAdmin, aal: 1 },
   {
     id: 'editor@A + reviewer@B aal2',
-    role: 'ballot_admin',
+    role: 'aiontheballot_admin',
     userId: USERS.editorAReviewerB,
     aal: 2,
   },
-  { id: 'revoked member of A aal2', role: 'ballot_admin', userId: USERS.revokedA, aal: 2 },
-  { id: 'worker for A', role: 'ballot_worker', jobTenantId: TENANT_A },
+  { id: 'revoked member of A aal2', role: 'aiontheballot_admin', userId: USERS.revokedA, aal: 2 },
+  { id: 'worker for A', role: 'aiontheballot_worker', jobTenantId: TENANT_A },
 ];
 
 /** Relation name (`schema.name`) → its expectations. Empty until M1 adds tables. */
