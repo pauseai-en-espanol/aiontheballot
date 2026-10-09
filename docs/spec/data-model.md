@@ -389,6 +389,9 @@ live election they need a change request (§3.7). ISO 3166-2 names autonomous co
 change request once live; one person may update them (audited), and the public sees the check date. Setting
 `published` requires a source of that party marked `is_programme` (§3.4). When it is set, every cell of the party
 whose current rating is `not_mentioned` gets a `recheck_reason` (§3.5), so the programme is checked against it.
+Every update that sets the status, even to the same value, is a check: it stamps `programme_checked_at`, which nobody
+writes otherwise, and is refused inside the freeze window. A new party's programme is pending and unchecked. The
+recheck reason is `programme_published`, set only when the status changes to `published`.
 
 ```sql
 create table app.criteria (

@@ -1691,6 +1691,69 @@ CREATE FUNCTION private.platform_hostname_is_free() RETURNS trigger
 ALTER FUNCTION private.platform_hostname_is_free() OWNER TO aiontheballot_owner;
 
 --
+-- Name: programme_recheck(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.programme_recheck() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    UPDATE app.assessments a SET recheck_reason = 'programme_published'
+     WHERE a.party_id = NEW.id
+       AND a.recheck_reason IS DISTINCT FROM 'programme_published'
+       AND EXISTS (SELECT 1 FROM app.current_revisions c WHERE c.assessment_id = a.id AND c.rating = 'not_mentioned');
+    RETURN NULL;
+  END
+  $$;
+
+
+ALTER FUNCTION private.programme_recheck() OWNER TO aiontheballot_owner;
+
+--
+-- Name: programme_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.programme_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    election record;
+  BEGIN
+    -- Every write: the check date is the trigger's alone.
+    IF TG_ARGV[0] = 'keep' THEN
+      IF TG_OP = 'INSERT' THEN
+        IF NEW.programme_status <> 'pending' THEN
+          RAISE EXCEPTION 'a new party''s programme is pending' USING ERRCODE = 'restrict_violation';
+        END IF;
+        NEW.programme_checked_at := NULL;
+      ELSE
+        NEW.programme_checked_at := OLD.programme_checked_at;
+      END IF;
+      RETURN NEW;
+    END IF;
+
+    -- An update that sets the status: a check, now.
+    SELECT e.frozen_from, e.frozen_until INTO election FROM app.elections e WHERE e.id = NEW.election_id;
+    IF election.frozen_from <= now() AND (election.frozen_until IS NULL OR now() < election.frozen_until) THEN
+      RAISE EXCEPTION 'the election of party % is frozen: nothing public changes until the window ends', NEW.id
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF NEW.programme_status = 'published'
+       AND NOT EXISTS (SELECT 1 FROM app.source_documents s WHERE s.party_id = NEW.id AND s.is_programme) THEN
+      RAISE EXCEPTION 'party %: a published programme needs a source of the party marked as its programme', NEW.id
+        USING ERRCODE = 'check_violation';
+    END IF;
+    NEW.programme_checked_at := now();
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.programme_rules() OWNER TO aiontheballot_owner;
+
+--
 -- Name: publish_revision(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -5260,6 +5323,13 @@ CREATE TRIGGER platform_admin_columns BEFORE UPDATE ON app.elections FOR EACH RO
 
 
 --
+-- Name: parties programme_recheck; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER programme_recheck AFTER UPDATE OF programme_status ON app.parties FOR EACH ROW WHEN (((old.programme_status <> 'published'::app.programme_status) AND (new.programme_status = 'published'::app.programme_status))) EXECUTE FUNCTION private.programme_recheck();
+
+
+--
 -- Name: assessment_revisions publish; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5439,6 +5509,20 @@ CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.tenant_hostnames FOR EACH RO
 --
 
 CREATE TRIGGER rules BEFORE UPDATE OF methodology_kind, country_code ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.tenant_dependent_rules();
+
+
+--
+-- Name: parties rules_programme; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules_programme BEFORE INSERT OR UPDATE ON app.parties FOR EACH ROW EXECUTE FUNCTION private.programme_rules('keep');
+
+
+--
+-- Name: parties rules_programme_checked; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules_programme_checked BEFORE UPDATE OF programme_status ON app.parties FOR EACH ROW EXECUTE FUNCTION private.programme_rules('check');
 
 
 --
@@ -7941,6 +8025,20 @@ REVOKE ALL ON FUNCTION private.party_logo_is_public_asset() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.platform_hostname_is_free() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION programme_recheck(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.programme_recheck() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION programme_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.programme_rules() FROM PUBLIC;
 
 
 --

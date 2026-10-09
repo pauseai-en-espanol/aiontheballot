@@ -332,6 +332,13 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 - **R28. Withdrawing a pending proposal is a delete** by an editor or country admin; decided requests are never
   deleted.
 
+**Programme status (migration `programme_status`):**
+
+- **R29. Setting the status, even to the same value, counts as a check** and stamps its date (that is what "checked
+  on" means publicly); the status may go back to pending, with no rule against it in the spec.
+- **R30. "Published" needs a source of the party marked `is_programme`,** with or without a stored copy, as the spec
+  says; the stored copy matters for the evidence rules, not for the status.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).

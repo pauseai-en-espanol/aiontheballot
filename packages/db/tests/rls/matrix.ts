@@ -1289,7 +1289,16 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.parties': {
-    rows: structured.map((e) => structureRow(e, 'party', `id = '${e.party}'`, EDITORS)),
+    rows: structured.map((e): Row => {
+      const row = structureRow(e, 'party', `id = '${e.party}'`, EDITORS);
+      // The programme status needs no change request once live, but a source marked as the party's programme (only
+      // live elections' first parties have one); an archived election is read-only.
+      const programme: Record<string, string> =
+        e.status === 'live'
+          ? {}
+          : { 'update:programme_status': e.status === 'draft' ? '23514' : '23001' };
+      return { ...row, blocked: { ...row.blocked, ...programme } };
+    }),
     inserts: TENANT_KEYS.map((key) => ({
       id: `party in ${key}`,
       tenant: key,
@@ -1303,6 +1312,7 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     update: EDITORS,
     delete: EDITORS,
     columnUpdates: {
+      programme_status: { set: `programme_status = 'published'`, rule: EDITORS },
       election_id: { set: `election_id = '${ELECTIONS.emptyA.id}'`, rule: NOBODY },
       tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
     },
