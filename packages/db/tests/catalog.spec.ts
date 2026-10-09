@@ -334,7 +334,7 @@ const NOT_AUDITED: Readonly<Record<string, string>> = {
 };
 
 /** Tables in app whose rows are never updated or deleted (ADR-0002 §14), except by purge_tenant. */
-const IMMUTABLE = ['audit_log'];
+const IMMUTABLE = ['audit_log', 'hostname_tombstones'];
 
 /** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
 const PERSONAL_DATA: readonly string[] = ['invitations.email'];
@@ -414,6 +414,7 @@ describe('catalog: audit', () => {
 /** Public-capable tables (readable by aiontheballot_web) whose writes don't bump the public cache key, and why. */
 const NOT_BUMPED: Readonly<Record<string, string>> = {
   public_versions: 'the counter itself',
+  hostname_tombstones: 'platform-wide, with no tenant to bump; routing data has its own refresh',
 };
 
 /** Every table aiontheballot_web can read without an AFTER ROW bump trigger on insert, update and delete. */

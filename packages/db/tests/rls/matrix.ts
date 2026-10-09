@@ -58,6 +58,43 @@ export const INVITATION_TOKENS: Readonly<Record<TenantKey, string>> = {
 };
 export const REVOKED_INVITATION_TOKEN = 'token-de-prueba-revocado-a';
 
+/** Fictional hostnames (the .test TLD is reserved). */
+export const PLATFORM_HOSTNAME = 'admin.plataforma.test';
+export const TOMBSTONE_HOSTNAME = 'purgado.example.test';
+export const HOSTNAMES: readonly {
+  hostname: string;
+  tenant: TenantKey;
+  canonical: boolean;
+  verified: boolean;
+  retired: boolean;
+}[] = [
+  { hostname: 'test-a.example.test', tenant: 'A', canonical: true, verified: true, retired: false },
+  {
+    hostname: 'pendiente-a.example.test',
+    tenant: 'A',
+    canonical: false,
+    verified: false,
+    retired: false,
+  },
+  {
+    hostname: 'antiguo-a.example.test',
+    tenant: 'A',
+    canonical: false,
+    verified: true,
+    retired: true,
+  },
+  { hostname: 'test-b.example.test', tenant: 'B', canonical: true, verified: true, retired: false },
+  {
+    hostname: 'test-inactivo.example.test',
+    tenant: 'inactive',
+    canonical: true,
+    verified: true,
+    retired: false,
+  },
+];
+/** The fixture hostname with a pending DNS verification. */
+export const VERIFYING_HOSTNAME = 'pendiente-a.example.test';
+
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
   [{ user: USERS.revokedA, tenant: 'A', role: 'editor' }];
@@ -327,6 +364,99 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       accepted_by: { set: `accepted_by = '${USERS.newcomer}'`, rule: NOBODY },
       tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
       created_by: { set: `created_by = '${USERS.newcomer}'`, rule: NOBODY },
+    },
+  },
+
+  'app.platform_hostnames': {
+    rows: [
+      {
+        id: 'reserved host',
+        tenant: null,
+        public: false,
+        where: `hostname = '${PLATFORM_HOSTNAME}'`,
+      },
+    ],
+    inserts: [
+      {
+        id: 'new reserved host',
+        tenant: null,
+        sql: `INSERT INTO app.platform_hostnames (hostname) VALUES ('plataforma.test')`,
+      },
+    ],
+    set: 'hostname = hostname',
+    select: PLATFORM_ADMIN,
+    insert: PLATFORM_ADMIN,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.tenant_hostnames': {
+    rows: HOSTNAMES.map((h) => ({
+      id: `${h.verified ? '' : 'unverified '}${h.retired ? 'retired ' : ''}${h.canonical ? 'canonical ' : ''}host of ${h.tenant}`,
+      tenant: h.tenant,
+      public: h.verified && TENANTS[h.tenant].active,
+      where: `hostname = '${h.hostname}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `host for ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.tenant_hostnames (hostname, tenant_id)
+            VALUES ('nuevo-${key.toLowerCase()}.example.test', '${TENANTS[key].id}')`,
+    })),
+    set: 'is_canonical = is_canonical',
+    select: { public: true, ...MEMBERS },
+    insert: PLATFORM_ADMIN,
+    update: PLATFORM_ADMIN,
+    delete: NOBODY,
+    columnUpdates: {
+      hostname: { set: `hostname = 'robado.example.test'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+      created_at: { set: 'created_at = now()', rule: NOBODY },
+    },
+  },
+
+  'app.hostname_tombstones': {
+    rows: [
+      { id: 'tombstone', tenant: null, public: true, where: `hostname = '${TOMBSTONE_HOSTNAME}'` },
+    ],
+    inserts: [
+      {
+        id: 'new tombstone',
+        tenant: null,
+        sql: `INSERT INTO app.hostname_tombstones (hostname) VALUES ('otro-purgado.example.test')`,
+      },
+    ],
+    set: 'purged_at = purged_at',
+    select: { public: true, platformAdmin: true },
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.hostname_verifications': {
+    rows: [
+      {
+        id: 'verification of an A host',
+        tenant: null,
+        public: false,
+        where: `hostname = '${VERIFYING_HOSTNAME}'`,
+      },
+    ],
+    inserts: [
+      {
+        id: 'verification of a B host',
+        tenant: null,
+        sql: `INSERT INTO app.hostname_verifications (hostname, token_hash)
+              VALUES ('test-b.example.test', encode(sha256('txt-b'), 'hex'))`,
+      },
+    ],
+    set: `last_result = 'not found'`,
+    select: PLATFORM_ADMIN,
+    insert: PLATFORM_ADMIN,
+    update: PLATFORM_ADMIN,
+    delete: NOBODY,
+    columnUpdates: {
+      hostname: { set: `hostname = 'test-b.example.test'`, rule: NOBODY },
     },
   },
 

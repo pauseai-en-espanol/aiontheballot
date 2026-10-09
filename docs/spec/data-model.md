@@ -245,6 +245,13 @@ create table app.platform_admins (
 );
 ```
 
+**Hostnames.** Every hostname column is the domain `app.hostname`: what `resolve()` normalizes a host to (lowercase
+ASCII, punycode, no port or trailing dot), with at least two labels and a last label starting with a letter.
+`verified_at` and `retired_at` are each set once, at the transaction time; a hostname is never renamed, moved, deleted
+or claimed already retired; reserved and tombstoned names can't be claimed, and a reserved name can't be one a tenant
+already has. A canonical hostname moves in two statements (unset, then set), because the one-canonical index is
+checked row by row.
+
 **The legal notice is generated** (BRIEF §3, invariant 3) from the operator's `organizations` row, with i18n
 templates. The privacy policy, the right-of-reply policy (including the corrections turnaround) and the text about
 the operator are `tenant_documents` written by the operator.

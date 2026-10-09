@@ -158,6 +158,16 @@ CREATE TYPE app.file_bucket AS ENUM (
 ALTER TYPE app.file_bucket OWNER TO aiontheballot_owner;
 
 --
+-- Name: hostname; Type: DOMAIN; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE DOMAIN app.hostname AS text
+	CONSTRAINT hostname_check CHECK (((length(VALUE) <= 253) AND (VALUE ~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$'::text)));
+
+
+ALTER DOMAIN app.hostname OWNER TO aiontheballot_owner;
+
+--
 -- Name: job_kind; Type: TYPE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -651,6 +661,25 @@ CREATE FUNCTION private.normalize_for_match(input text) RETURNS text
 ALTER FUNCTION private.normalize_for_match(input text) OWNER TO aiontheballot_owner;
 
 --
+-- Name: platform_hostname_is_free(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.platform_hostname_is_free() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM app.tenant_hostnames t WHERE t.hostname = NEW.hostname) THEN
+      RAISE EXCEPTION 'hostname % already belongs to a tenant', NEW.hostname USING ERRCODE = 'restrict_violation';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.platform_hostname_is_free() OWNER TO aiontheballot_owner;
+
+--
 -- Name: stamp(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -687,6 +716,50 @@ CREATE FUNCTION private.stamp() RETURNS trigger
 
 ALTER FUNCTION private.stamp() OWNER TO aiontheballot_owner;
 
+--
+-- Name: tenant_hostname_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.tenant_hostname_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    IF TG_OP = 'INSERT' THEN
+      IF EXISTS (SELECT 1 FROM app.platform_hostnames p WHERE p.hostname = NEW.hostname)
+         OR EXISTS (SELECT 1 FROM app.hostname_tombstones t WHERE t.hostname = NEW.hostname) THEN
+        RAISE EXCEPTION 'hostname % is reserved and can never be claimed', NEW.hostname
+          USING ERRCODE = 'restrict_violation';
+      END IF;
+      IF NEW.retired_at IS NOT NULL THEN
+        RAISE EXCEPTION 'hostname % cannot be claimed already retired', NEW.hostname
+          USING ERRCODE = 'restrict_violation';
+      END IF;
+      NEW.verified_at := CASE WHEN NEW.verified_at IS NOT NULL THEN now() END;
+      RETURN NEW;
+    END IF;
+
+    IF NEW.hostname IS DISTINCT FROM OLD.hostname THEN
+      RAISE EXCEPTION 'hostname % cannot be renamed', OLD.hostname USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF OLD.verified_at IS NOT NULL AND NEW.verified_at IS DISTINCT FROM OLD.verified_at
+       OR OLD.retired_at IS NOT NULL AND NEW.retired_at IS DISTINCT FROM OLD.retired_at THEN
+      RAISE EXCEPTION 'hostname %: verification and retirement are set once', OLD.hostname
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF OLD.verified_at IS NULL AND NEW.verified_at IS NOT NULL THEN
+      NEW.verified_at := now();
+    END IF;
+    IF OLD.retired_at IS NULL AND NEW.retired_at IS NOT NULL THEN
+      NEW.retired_at := now();
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.tenant_hostname_rules() OWNER TO aiontheballot_owner;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -722,6 +795,33 @@ ALTER TABLE app.audit_log ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     CACHE 1
 );
 
+
+--
+-- Name: hostname_tombstones; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.hostname_tombstones (
+    hostname app.hostname NOT NULL,
+    purged_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE app.hostname_tombstones OWNER TO aiontheballot_owner;
+
+--
+-- Name: hostname_verifications; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.hostname_verifications (
+    hostname app.hostname NOT NULL,
+    token_hash text NOT NULL,
+    last_checked_at timestamp with time zone,
+    last_result text,
+    CONSTRAINT hostname_verifications_token_hash_check CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text))
+);
+
+
+ALTER TABLE app.hostname_verifications OWNER TO aiontheballot_owner;
 
 --
 -- Name: invitations; Type: TABLE; Schema: app; Owner: aiontheballot_owner
@@ -784,6 +884,17 @@ CREATE TABLE app.platform_admins (
 ALTER TABLE app.platform_admins OWNER TO aiontheballot_owner;
 
 --
+-- Name: platform_hostnames; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.platform_hostnames (
+    hostname app.hostname NOT NULL
+);
+
+
+ALTER TABLE app.platform_hostnames OWNER TO aiontheballot_owner;
+
+--
 -- Name: public_versions; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -794,6 +905,24 @@ CREATE TABLE app.public_versions (
 
 
 ALTER TABLE app.public_versions OWNER TO aiontheballot_owner;
+
+--
+-- Name: tenant_hostnames; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.tenant_hostnames (
+    hostname app.hostname NOT NULL,
+    tenant_id uuid NOT NULL,
+    is_canonical boolean DEFAULT false NOT NULL,
+    verified_at timestamp with time zone,
+    retired_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT tenant_hostnames_check CHECK (((NOT is_canonical) OR (verified_at IS NOT NULL))),
+    CONSTRAINT tenant_hostnames_check1 CHECK ((NOT (is_canonical AND (retired_at IS NOT NULL))))
+);
+
+
+ALTER TABLE app.tenant_hostnames OWNER TO aiontheballot_owner;
 
 --
 -- Name: tenants; Type: TABLE; Schema: app; Owner: aiontheballot_owner
@@ -847,6 +976,22 @@ ALTER TABLE ONLY app.audit_log
 
 
 --
+-- Name: hostname_tombstones hostname_tombstones_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.hostname_tombstones
+    ADD CONSTRAINT hostname_tombstones_pkey PRIMARY KEY (hostname);
+
+
+--
+-- Name: hostname_verifications hostname_verifications_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.hostname_verifications
+    ADD CONSTRAINT hostname_verifications_pkey PRIMARY KEY (hostname);
+
+
+--
 -- Name: invitations invitations_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -887,11 +1032,27 @@ ALTER TABLE ONLY app.platform_admins
 
 
 --
+-- Name: platform_hostnames platform_hostnames_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.platform_hostnames
+    ADD CONSTRAINT platform_hostnames_pkey PRIMARY KEY (hostname);
+
+
+--
 -- Name: public_versions public_versions_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
 ALTER TABLE ONLY app.public_versions
     ADD CONSTRAINT public_versions_pkey PRIMARY KEY (tenant_id);
+
+
+--
+-- Name: tenant_hostnames tenant_hostnames_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.tenant_hostnames
+    ADD CONSTRAINT tenant_hostnames_pkey PRIMARY KEY (hostname);
 
 
 --
@@ -933,6 +1094,34 @@ CREATE INDEX memberships_tenant_id_idx ON app.memberships USING btree (tenant_id
 
 
 --
+-- Name: tenant_hostnames_one_canonical_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE UNIQUE INDEX tenant_hostnames_one_canonical_idx ON app.tenant_hostnames USING btree (tenant_id) WHERE is_canonical;
+
+
+--
+-- Name: tenant_hostnames_tenant_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX tenant_hostnames_tenant_id_idx ON app.tenant_hostnames USING btree (tenant_id);
+
+
+--
+-- Name: hostname_tombstones audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.hostname_tombstones FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: hostname_verifications audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.hostname_verifications FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
 -- Name: invitations audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -954,10 +1143,31 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.platform_admins FOR
 
 
 --
+-- Name: platform_hostnames audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.platform_hostnames FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: tenant_hostnames audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.tenant_hostnames FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
 -- Name: tenants audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: tenant_hostnames bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.tenant_hostnames FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
 
 
 --
@@ -968,10 +1178,24 @@ CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.tenan
 
 
 --
+-- Name: tenant_hostnames forbid_delete; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_delete BEFORE DELETE ON app.tenant_hostnames FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
 -- Name: audit_log forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.audit_log FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: hostname_tombstones forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.hostname_tombstones FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
 
 
 --
@@ -1003,6 +1227,13 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.public_versions FOR EAC
 
 
 --
+-- Name: tenant_hostnames forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.tenant_hostnames FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: audit_log forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1010,10 +1241,38 @@ CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.audit_log FOR EACH STATEME
 
 
 --
+-- Name: hostname_tombstones forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.hostname_tombstones FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: tenant_hostnames forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.tenant_hostnames FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: platform_hostnames is_free; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER is_free BEFORE INSERT ON app.platform_hostnames FOR EACH ROW EXECUTE FUNCTION private.platform_hostname_is_free();
+
+
+--
 -- Name: tenants members_may_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER members_may_change BEFORE UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.members_may_change('theme', 'report_retention_days', 'llm_monthly_cap_usd');
+
+
+--
+-- Name: tenant_hostnames rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.tenant_hostnames FOR EACH ROW EXECUTE FUNCTION private.tenant_hostname_rules();
 
 
 --
@@ -1045,6 +1304,13 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.platform_admins FOR EACH ROW
 
 
 --
+-- Name: tenant_hostnames stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.tenant_hostnames FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
+
+
+--
 -- Name: tenants stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1064,6 +1330,14 @@ CREATE TRIGGER transition BEFORE UPDATE ON app.invitations FOR EACH ROW EXECUTE 
 
 ALTER TABLE ONLY app.audit_log
     ADD CONSTRAINT audit_log_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: hostname_verifications hostname_verifications_hostname_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.hostname_verifications
+    ADD CONSTRAINT hostname_verifications_hostname_fkey FOREIGN KEY (hostname) REFERENCES app.tenant_hostnames(hostname);
 
 
 --
@@ -1088,6 +1362,14 @@ ALTER TABLE ONLY app.memberships
 
 ALTER TABLE ONLY app.public_versions
     ADD CONSTRAINT public_versions_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: tenant_hostnames tenant_hostnames_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.tenant_hostnames
+    ADD CONSTRAINT tenant_hostnames_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
 
 
 --
@@ -1153,6 +1435,18 @@ CREATE POLICY country_admin_update ON app.tenants FOR UPDATE TO aiontheballot_ad
 
 
 --
+-- Name: hostname_tombstones; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.hostname_tombstones ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: hostname_verifications; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.hostname_verifications ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: invitations; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1163,6 +1457,13 @@ ALTER TABLE app.invitations ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY member_read ON app.memberships FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: tenant_hostnames member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.tenant_hostnames FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -1179,10 +1480,45 @@ CREATE POLICY member_read ON app.tenants FOR SELECT TO aiontheballot_admin USING
 ALTER TABLE app.memberships ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: hostname_verifications platform_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_insert ON app.hostname_verifications FOR INSERT TO aiontheballot_admin WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: platform_hostnames platform_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_insert ON app.platform_hostnames FOR INSERT TO aiontheballot_admin WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: tenant_hostnames platform_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_insert ON app.tenant_hostnames FOR INSERT TO aiontheballot_admin WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
 -- Name: tenants platform_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE POLICY platform_admin_insert ON app.tenants FOR INSERT TO aiontheballot_admin WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: hostname_tombstones platform_admin_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_read ON app.hostname_tombstones FOR SELECT TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: hostname_verifications platform_admin_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_read ON app.hostname_verifications FOR SELECT TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin));
 
 
 --
@@ -1193,10 +1529,44 @@ CREATE POLICY platform_admin_read ON app.platform_admins FOR SELECT TO aiontheba
 
 
 --
+-- Name: platform_hostnames platform_admin_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_read ON app.platform_hostnames FOR SELECT TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: hostname_verifications platform_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_update ON app.hostname_verifications FOR UPDATE TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin)) WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: tenant_hostnames platform_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_update ON app.tenant_hostnames FOR UPDATE TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin)) WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
 -- Name: platform_admins; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
 --
 
 ALTER TABLE app.platform_admins ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: platform_hostnames; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.platform_hostnames ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: hostname_tombstones public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.hostname_tombstones FOR SELECT TO aiontheballot_web USING (true);
+
 
 --
 -- Name: public_versions public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
@@ -1205,6 +1575,15 @@ ALTER TABLE app.platform_admins ENABLE ROW LEVEL SECURITY;
 CREATE POLICY public_read ON app.public_versions FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
    FROM app.tenants t
   WHERE ((t.id = public_versions.tenant_id) AND t.active))));
+
+
+--
+-- Name: tenant_hostnames public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.tenant_hostnames FOR SELECT TO aiontheballot_web USING (((verified_at IS NOT NULL) AND (EXISTS ( SELECT 1
+   FROM app.tenants t
+  WHERE ((t.id = tenant_hostnames.tenant_id) AND t.active)))));
 
 
 --
@@ -1219,6 +1598,12 @@ CREATE POLICY public_read ON app.tenants FOR SELECT TO aiontheballot_web USING (
 --
 
 ALTER TABLE app.public_versions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: tenant_hostnames; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.tenant_hostnames ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: tenants; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
@@ -1312,6 +1697,13 @@ REVOKE ALL ON TYPE app.extraction_status FROM PUBLIC;
 --
 
 REVOKE ALL ON TYPE app.file_bucket FROM PUBLIC;
+
+
+--
+-- Name: TYPE hostname; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON TYPE app.hostname FROM PUBLIC;
 
 
 --
@@ -1508,6 +1900,13 @@ REVOKE ALL ON FUNCTION private.normalize_for_match(input text) FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION platform_hostname_is_free(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.platform_hostname_is_free() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION stamp(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1515,10 +1914,60 @@ REVOKE ALL ON FUNCTION private.stamp() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION tenant_hostname_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.tenant_hostname_rules() FROM PUBLIC;
+
+
+--
 -- Name: TABLE audit_log; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
 GRANT SELECT ON TABLE app.audit_log TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE hostname_tombstones; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.hostname_tombstones TO aiontheballot_web;
+GRANT SELECT ON TABLE app.hostname_tombstones TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE hostname_verifications; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.hostname_verifications TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN hostname_verifications.hostname; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(hostname) ON TABLE app.hostname_verifications TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN hostname_verifications.token_hash; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(token_hash),UPDATE(token_hash) ON TABLE app.hostname_verifications TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN hostname_verifications.last_checked_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(last_checked_at) ON TABLE app.hostname_verifications TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN hostname_verifications.last_result; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(last_result) ON TABLE app.hostname_verifications TO aiontheballot_admin;
 
 
 --
@@ -1606,10 +2055,67 @@ GRANT SELECT ON TABLE app.platform_admins TO aiontheballot_admin;
 
 
 --
+-- Name: TABLE platform_hostnames; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.platform_hostnames TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN platform_hostnames.hostname; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(hostname) ON TABLE app.platform_hostnames TO aiontheballot_admin;
+
+
+--
 -- Name: TABLE public_versions; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
 GRANT SELECT ON TABLE app.public_versions TO aiontheballot_web;
+
+
+--
+-- Name: TABLE tenant_hostnames; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.tenant_hostnames TO aiontheballot_web;
+GRANT SELECT ON TABLE app.tenant_hostnames TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_hostnames.hostname; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(hostname) ON TABLE app.tenant_hostnames TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_hostnames.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.tenant_hostnames TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_hostnames.is_canonical; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(is_canonical),UPDATE(is_canonical) ON TABLE app.tenant_hostnames TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_hostnames.verified_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(verified_at),UPDATE(verified_at) ON TABLE app.tenant_hostnames TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_hostnames.retired_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(retired_at) ON TABLE app.tenant_hostnames TO aiontheballot_admin;
 
 
 --

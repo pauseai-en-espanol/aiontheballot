@@ -43,6 +43,18 @@ export interface AppAuditLog {
   tenant_id: string | null;
 }
 
+export interface AppHostnameTombstones {
+  hostname: string;
+  purged_at: Generated<Timestamp>;
+}
+
+export interface AppHostnameVerifications {
+  hostname: string;
+  last_checked_at: Timestamp | null;
+  last_result: string | null;
+  token_hash: string;
+}
+
 export interface AppInvitations {
   accepted_at: Timestamp | null;
   accepted_by: string | null;
@@ -73,9 +85,22 @@ export interface AppPlatformAdmins {
   user_id: string;
 }
 
+export interface AppPlatformHostnames {
+  hostname: string;
+}
+
 export interface AppPublicVersions {
   tenant_id: string;
   version: Generated<Int8>;
+}
+
+export interface AppTenantHostnames {
+  created_at: Generated<Timestamp>;
+  hostname: string;
+  is_canonical: Generated<boolean>;
+  retired_at: Timestamp | null;
+  tenant_id: string;
+  verified_at: Timestamp | null;
 }
 
 export interface AppTenants {
@@ -96,9 +121,13 @@ export interface AppTenants {
 
 export interface DB {
   'app.audit_log': AppAuditLog;
+  'app.hostname_tombstones': AppHostnameTombstones;
+  'app.hostname_verifications': AppHostnameVerifications;
   'app.invitations': AppInvitations;
   'app.memberships': AppMemberships;
   'app.platform_admins': AppPlatformAdmins;
+  'app.platform_hostnames': AppPlatformHostnames;
   'app.public_versions': AppPublicVersions;
+  'app.tenant_hostnames': AppTenantHostnames;
   'app.tenants': AppTenants;
 }

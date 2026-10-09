@@ -1,14 +1,18 @@
 import type pg from 'pg';
 
 import {
+  HOSTNAMES,
   INVITATION_TOKENS,
   MEMBERSHIPS,
   PLATFORM_ADMINS,
+  PLATFORM_HOSTNAME,
   REVOKED_INVITATION_TOKEN,
   REVOKED_MEMBERSHIPS,
   type TenantKey,
   TENANTS,
+  TOMBSTONE_HOSTNAME,
   USERS,
+  VERIFYING_HOSTNAME,
 } from './matrix.js';
 
 /** Fictional ISO 3166 user-assigned codes, one per fixture tenant. */
@@ -65,5 +69,27 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
     `UPDATE app.invitations SET revoked_at = now() WHERE token_hash = encode(sha256($1::bytea), 'hex')`,
     [REVOKED_INVITATION_TOKEN],
   );
+  await client.query('INSERT INTO app.platform_hostnames (hostname) VALUES ($1)', [
+    PLATFORM_HOSTNAME,
+  ]);
+  for (const h of HOSTNAMES) {
+    await client.query(
+      `INSERT INTO app.tenant_hostnames (hostname, tenant_id, is_canonical, verified_at)
+       VALUES ($1, $2, $3, CASE WHEN $4 THEN now() END)`,
+      [h.hostname, TENANTS[h.tenant].id, h.canonical, h.verified],
+    );
+    if (h.retired) {
+      await client.query('UPDATE app.tenant_hostnames SET retired_at = now() WHERE hostname = $1', [
+        h.hostname,
+      ]);
+    }
+  }
+  await client.query(
+    `INSERT INTO app.hostname_verifications (hostname, token_hash) VALUES ($1, encode(sha256('txt-a'), 'hex'))`,
+    [VERIFYING_HOSTNAME],
+  );
+  await client.query('INSERT INTO app.hostname_tombstones (hostname) VALUES ($1)', [
+    TOMBSTONE_HOSTNAME,
+  ]);
   await client.query('COMMIT');
 };
