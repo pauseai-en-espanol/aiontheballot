@@ -258,6 +258,27 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     },
   },
 
+  'app.public_versions': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `version of ${key}`,
+      tenant: key,
+      public: TENANTS[key].active,
+      where: `tenant_id = '${TENANTS[key].id}'`,
+    })),
+    inserts: [
+      {
+        id: 'version for a new tenant',
+        tenant: null,
+        sql: `INSERT INTO app.public_versions (tenant_id, version) VALUES ('${TENANT_A}', 0)`,
+      },
+    ],
+    set: 'version = 0',
+    select: { public: true },
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
   'app.memberships': {
     rows: TENANT_KEYS.map(membershipRow),
     inserts: TENANT_KEYS.map((key) => ({

@@ -80,7 +80,8 @@ log makes it visible (T23).
 - Default privileges are set so that new functions are not executable by `PUBLIC`, and new types not usable by it.
 - Every grant is explicit.
 - Helper functions live in a `private` schema.
-- `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, `submit_report`,
+- `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, the public-cache trigger
+  `bump_public_version` (so no runtime role can write `public_versions`), `submit_report`,
   `accept_invitation`, the publish trigger `publish_revision` and `anonymize_expired_reports` (worker only). All of
   them set `search_path = ''`.
 - The actor helpers (`private.current_user_id`, `private.current_aal`) and the policy helpers

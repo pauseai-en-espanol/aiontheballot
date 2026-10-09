@@ -436,6 +436,31 @@ CREATE FUNCTION private.audit() RETURNS trigger
 ALTER FUNCTION private.audit() OWNER TO aiontheballot_owner;
 
 --
+-- Name: bump_public_version(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.bump_public_version() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    subject jsonb := to_jsonb(CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END);
+    tenant uuid := (CASE WHEN TG_TABLE_SCHEMA = 'app' AND TG_TABLE_NAME = 'tenants' THEN subject ->> 'id'
+                         ELSE subject ->> 'tenant_id' END)::uuid;
+  BEGIN
+    IF tenant IS NULL THEN
+      RAISE EXCEPTION 'private.bump_public_version on %.%: the row has no tenant', TG_TABLE_SCHEMA, TG_TABLE_NAME;
+    END IF;
+    INSERT INTO app.public_versions AS v (tenant_id, version) VALUES (tenant, 1)
+      ON CONFLICT (tenant_id) DO UPDATE SET version = v.version + 1;
+    RETURN NULL;
+  END
+  $$;
+
+
+ALTER FUNCTION private.bump_public_version() OWNER TO aiontheballot_owner;
+
+--
 -- Name: current_aal(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -690,6 +715,18 @@ CREATE TABLE app.platform_admins (
 ALTER TABLE app.platform_admins OWNER TO aiontheballot_owner;
 
 --
+-- Name: public_versions; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.public_versions (
+    tenant_id uuid NOT NULL,
+    version bigint DEFAULT 0 NOT NULL
+);
+
+
+ALTER TABLE app.public_versions OWNER TO aiontheballot_owner;
+
+--
 -- Name: tenants; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -757,6 +794,14 @@ ALTER TABLE ONLY app.platform_admins
 
 
 --
+-- Name: public_versions public_versions_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.public_versions
+    ADD CONSTRAINT public_versions_pkey PRIMARY KEY (tenant_id);
+
+
+--
 -- Name: tenants tenants_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -816,6 +861,13 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.tenants FOR EACH RO
 
 
 --
+-- Name: tenants bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
 -- Name: audit_log forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -834,6 +886,13 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.audit_log FOR EACH ROW 
 --
 
 CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.memberships FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: public_versions forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.public_versions FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
 
 
 --
@@ -892,6 +951,14 @@ ALTER TABLE ONLY app.audit_log
 
 ALTER TABLE ONLY app.memberships
     ADD CONSTRAINT memberships_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: public_versions public_versions_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.public_versions
+    ADD CONSTRAINT public_versions_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
 
 
 --
@@ -969,11 +1036,26 @@ CREATE POLICY platform_admin_read ON app.platform_admins FOR SELECT TO aiontheba
 ALTER TABLE app.platform_admins ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: public_versions public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.public_versions FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM app.tenants t
+  WHERE ((t.id = public_versions.tenant_id) AND t.active))));
+
+
+--
 -- Name: tenants public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE POLICY public_read ON app.tenants FOR SELECT TO aiontheballot_web USING (active);
 
+
+--
+-- Name: public_versions; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.public_versions ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: tenants; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
@@ -1189,6 +1271,13 @@ REVOKE ALL ON FUNCTION private.audit() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION bump_public_version(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.bump_public_version() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION current_aal(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1295,6 +1384,13 @@ GRANT INSERT(role) ON TABLE app.memberships TO aiontheballot_admin;
 --
 
 GRANT SELECT ON TABLE app.platform_admins TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE public_versions; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.public_versions TO aiontheballot_web;
 
 
 --

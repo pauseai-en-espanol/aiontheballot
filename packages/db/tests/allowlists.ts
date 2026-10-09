@@ -12,6 +12,7 @@ export const EXECUTE_ALLOWLIST: readonly string[] = [
 /** SECURITY DEFINER functions allowed in `app` and `private` (ADR-0002 §6). */
 export const SECURITY_DEFINER_ALLOWLIST: readonly string[] = [
   'private.audit',
+  'private.bump_public_version',
   'private.is_platform_admin',
   'private.my_tenants',
 ];

@@ -56,6 +56,11 @@ export interface AppPlatformAdmins {
   user_id: string;
 }
 
+export interface AppPublicVersions {
+  tenant_id: string;
+  version: Generated<Int8>;
+}
+
 export interface AppTenants {
   active: Generated<boolean>;
   country_code: string;
@@ -76,5 +81,6 @@ export interface DB {
   'app.audit_log': AppAuditLog;
   'app.memberships': AppMemberships;
   'app.platform_admins': AppPlatformAdmins;
+  'app.public_versions': AppPublicVersions;
   'app.tenants': AppTenants;
 }

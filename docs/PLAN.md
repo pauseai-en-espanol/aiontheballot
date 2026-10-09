@@ -340,6 +340,7 @@ My default is in brackets.
 | Names                                                 | `aiontheballot` everywhere: repo, packages (`@aiontheballot/*`), chart, images, Harbor project, namespace, database and roles. The product name is configuration (`PLATFORM_NAME`).                                                                                                                                |
 | D2: backups                                           | Follow the gitops backup plan (Velero + MinIO + DB dumps): the shared Postgres's nightly `pg_dump`, copied off the node by Velero. Nightly also during the campaign; no app-owned job. Must work before the preview.                                                                                               |
 | Admin visibility                                      | The admin shows each user only what is theirs: memberships give access per tenant, and a member of another tenant gets nothing, not even published rows (read those on the public site). Platform admins see every tenant except reports. Public-visibility policies apply to `aiontheballot_web` only (ADR-0002). |
+| Public cache key                                      | One version counter per tenant (`public_versions`), the safety net behind revalidation (ADR-0003). Only a `SECURITY DEFINER` trigger on every public-readable table moves it, so no runtime role can set or rewind it (ADR-0002 §6).                                                                               |
 
 ## Tracking
 

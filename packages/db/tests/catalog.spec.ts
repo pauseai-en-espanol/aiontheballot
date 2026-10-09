@@ -330,6 +330,7 @@ describe('catalog: tables', () => {
 /** Tables written without an audit trigger, and why. Every other table in app must have one. */
 const NOT_AUDITED: Readonly<Record<string, string>> = {
   audit_log: 'the log itself',
+  public_versions: 'a counter moved only by triggers, whose writes are audited themselves',
 };
 
 /** Tables in app whose rows are never updated or deleted (ADR-0002 §14), except by purge_tenant. */
@@ -407,5 +408,46 @@ describe('catalog: audit', () => {
         (name) => !covers(name, UPDATE | DELETE, true) || !covers(name, TRUNCATE, false),
       ),
     ).toEqual([]);
+  });
+});
+
+/** Public-capable tables (readable by aiontheballot_web) whose writes don't bump the public cache key, and why. */
+const NOT_BUMPED: Readonly<Record<string, string>> = {
+  public_versions: 'the counter itself',
+};
+
+/** Every table aiontheballot_web can read without an AFTER ROW bump trigger on insert, update and delete. */
+const unbumped = async (client: pg.Client): Promise<string[]> =>
+  (
+    await client.query<{ name: string }>(
+      `SELECT c.relname AS name
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p')
+          AND has_any_column_privilege('aiontheballot_web', c.oid, 'SELECT')
+          AND NOT EXISTS (SELECT 1 FROM pg_trigger t
+                           WHERE t.tgrelid = c.oid AND NOT t.tgisinternal
+                             AND t.tgfoid = to_regprocedure('private.bump_public_version()')
+                             AND (t.tgtype & ${ROW | BEFORE}) = ${ROW}
+                             AND (t.tgtype & ${INSERT | UPDATE | DELETE}) = ${INSERT | UPDATE | DELETE})
+        ORDER BY 1`,
+    )
+  ).rows
+    .map((r) => r.name)
+    .filter((name) => !(name in NOT_BUMPED));
+
+describe('catalog: public cache key', () => {
+  it('is bumped by every table the public can read', async () => {
+    expect(await inRolledBackTransaction(unbumped)).toEqual([]);
+  });
+
+  it('reports a public table without the trigger, but not a private one', async () => {
+    const missing = await inRolledBackTransaction(async (client) => {
+      await client.query(`
+        CREATE TABLE app.probe_public (id int PRIMARY KEY, tenant_id uuid);
+        GRANT SELECT (id) ON app.probe_public TO aiontheballot_web;
+        CREATE TABLE app.probe_private (id int PRIMARY KEY, tenant_id uuid);`);
+      return unbumped(client);
+    });
+    expect(missing).toEqual(['probe_public']);
   });
 });

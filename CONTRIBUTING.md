@@ -52,7 +52,7 @@ and the [data model spec](docs/spec/data-model.md)):
    reason). Localized text, slugs and locale codes use the domains `app.localized`, `app.slug` and `app.locale`.
 4. **RLS enabled, with policies:**
    - the public-visibility rule, if the table is public-capable, for `aiontheballot_web` only (the admin role sees
-     only what memberships give it);
+     only what memberships give it), plus the `private.bump_public_version()` trigger, so the public cache follows;
    - membership policies through the `private` helpers, which already require `aal2`.
 5. **Explicit grants** for each runtime role (`aiontheballot_web`, `aiontheballot_admin`, `aiontheballot_worker`),
    and nothing to `PUBLIC`.
