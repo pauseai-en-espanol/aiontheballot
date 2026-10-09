@@ -316,6 +316,39 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       cells.review,
     ]);
   }
+  // Right-of-reply reports, one per tenant about its cell in review, sent as the public through app.submit_report (the
+  // inactive tenant takes one only while active).
+  for (const [key, tenant] of Object.entries(TENANTS) as [
+    TenantKey,
+    (typeof TENANTS)[TenantKey],
+  ][]) {
+    if (!tenant.active) {
+      await client.query('UPDATE app.tenants SET active = true WHERE id = $1', [tenant.id]);
+    }
+    await client.query(
+      `SELECT set_config('app.user_id', '', true), set_config('app.aal', '', true)`,
+    );
+    await client.query('SET LOCAL ROLE aiontheballot_web');
+    await client.query(
+      `SELECT app.submit_report(tenant => $1, kind => 'error_report', message => $2, election => $3,
+                                assessment => $4, name => 'Persona de Ejemplo', email => $5)`,
+      [
+        tenant.id,
+        `Mensaje de ejemplo sobre una celda de ${key}`,
+        CELLS[key].election.id,
+        CELLS[key].review,
+        `persona-${key.toLowerCase()}@example.org`,
+      ],
+    );
+    await client.query('RESET ROLE');
+    await client.query(
+      `SELECT set_config('app.user_id', $1, true), set_config('app.aal', '2', true)`,
+      [USERS.platformAdmin],
+    );
+    if (!tenant.active) {
+      await client.query('UPDATE app.tenants SET active = false WHERE id = $1', [tenant.id]);
+    }
+  }
   await client.query(`SELECT set_config('app.user_id', $1, true)`, [USERS.platformAdmin]);
   await client.query('COMMIT');
 };

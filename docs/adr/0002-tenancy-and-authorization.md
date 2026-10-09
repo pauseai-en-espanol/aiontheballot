@@ -91,6 +91,8 @@ log makes it visible (T23).
   `aiontheballot_worker` (the generated column on `source_texts`).
 - The worker may also execute `private.current_user_id`: it sets `app.user_id` to its job request's requester, so what
   it writes is stamped and audited as theirs, and its policies accept no one else.
+- `app.submit_report` is executable by `aiontheballot_web` only, and `private.anonymize_expired_reports` by
+  `aiontheballot_worker` only (both `SECURITY DEFINER`, on the allowlist above).
 
 ### 7. The public role reads, and can call one function
 

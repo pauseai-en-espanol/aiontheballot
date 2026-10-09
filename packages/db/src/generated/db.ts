@@ -32,6 +32,10 @@ export type AppProgrammeStatus = 'pending' | 'published';
 export type AppRating =
   'does_not_meet' | 'green' | 'meets' | 'not_mentioned' | 'partially_meets' | 'red' | 'yellow';
 
+export type AppReportKind = 'error_report' | 'party_response';
+
+export type AppReportStatus = 'accepted' | 'new' | 'rejected' | 'spam' | 'triaged';
+
 export type AppReviewEventKind = 'approved' | 'commented' | 'recalled' | 'rejected' | 'submitted';
 
 export type AppSourceKind =
@@ -364,6 +368,47 @@ export interface AppPublicVersions {
   version: Generated<Int8>;
 }
 
+export interface AppReportDailyCounts {
+  count: number;
+  day: Timestamp;
+  tenant_id: string;
+}
+
+export interface AppReports {
+  anonymize_after: Timestamp;
+  anonymized_at: Timestamp | null;
+  assessment_id: string | null;
+  created_at: Generated<Timestamp>;
+  election_id: string | null;
+  /**
+   * personal data
+   */
+  email: string | null;
+  id: Generated<string>;
+  is_party_representative: Generated<boolean>;
+  kind: AppReportKind;
+  /**
+   * personal data
+   */
+  message: string | null;
+  /**
+   * personal data
+   */
+  name: string | null;
+  /**
+   * personal data
+   */
+  organization: string | null;
+  /**
+   * personal data
+   */
+  resolution_note: string | null;
+  status: Generated<AppReportStatus>;
+  tenant_id: string;
+  triaged_at: Timestamp | null;
+  triaged_by: string | null;
+}
+
 export interface AppReviewEvents {
   actor_id: string;
   assessment_id: string;
@@ -479,6 +524,8 @@ export interface DB {
   'app.platform_admins': AppPlatformAdmins;
   'app.platform_hostnames': AppPlatformHostnames;
   'app.public_versions': AppPublicVersions;
+  'app.report_daily_counts': AppReportDailyCounts;
+  'app.reports': AppReports;
   'app.review_events': AppReviewEvents;
   'app.source_documents': AppSourceDocuments;
   'app.source_texts': AppSourceTexts;

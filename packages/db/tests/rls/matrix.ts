@@ -540,6 +540,8 @@ const NOBODY: Rule = {};
 const MEMBERS: Rule = { members: ALL_ROLES, platformAdmin: true };
 const COUNTRY_ADMINS: Rule = { members: ['country_admin'], platformAdmin: true };
 const PLATFORM_ADMIN: Rule = { platformAdmin: true };
+/** Who triages right-of-reply reports: every member, never a platform admin (ADR-0002, capabilities by role). */
+const TRIAGERS: Rule = { members: ALL_ROLES };
 /** Who writes drafts, evidence and sources (ADR-0002, capabilities by role). */
 const EDITORS: Rule = { members: ['editor', 'country_admin'], platformAdmin: true };
 
@@ -1579,6 +1581,61 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     set: 'note = note',
     select: MEMBERS,
     insert: MEMBERS,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.reports': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `report to ${key}`,
+      tenant: key,
+      public: false,
+      where: `tenant_id = '${TENANTS[key].id}'`,
+      // What was sent never changes.
+      blocked: { 'update:message': '23001' },
+    })),
+    // Only app.submit_report() writes reports, as its owner.
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `report into ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.reports (tenant_id, kind, message, anonymize_after)
+            VALUES ('${TENANTS[key].id}', 'error_report', 'Mensaje de ejemplo', current_date + 1)`,
+    })),
+    set: `status = 'triaged'`,
+    select: TRIAGERS,
+    insert: NOBODY,
+    update: TRIAGERS,
+    delete: NOBODY,
+    columnUpdates: {
+      // An erasure request: every personal-data column at once.
+      anonymized_at: {
+        set: `name = NULL, email = NULL, organization = NULL, message = NULL, resolution_note = NULL,
+              anonymized_at = now()`,
+        rule: { members: ['country_admin'] },
+      },
+      message: { set: `message = 'Mensaje cambiado'`, rule: TRIAGERS },
+      triaged_by: { set: `triaged_by = '${USERS.newcomer}'`, rule: NOBODY },
+      anonymize_after: { set: 'anonymize_after = current_date', rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
+  'app.report_daily_counts': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `report count of ${key}`,
+      tenant: key,
+      public: false,
+      where: `tenant_id = '${TENANTS[key].id}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `count for ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.report_daily_counts (tenant_id, day, count)
+            VALUES ('${TENANTS[key].id}', current_date - 1, 1)`,
+    })),
+    set: 'count = count + 1',
+    select: NOBODY,
+    insert: NOBODY,
     update: NOBODY,
     delete: NOBODY,
   },

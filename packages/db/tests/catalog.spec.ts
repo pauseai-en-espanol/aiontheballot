@@ -336,6 +336,7 @@ const NOT_AUDITED: Readonly<Record<string, string>> = {
   source_texts:
     "extracted text, written by the extraction job; the source's status change is audited",
   public_versions: 'a counter moved only by triggers, whose writes are audited themselves',
+  report_daily_counts: 'a counter moved only by app.submit_report, whose reports are audited',
 };
 
 /** Tables in app whose rows are never updated or deleted (ADR-0002 §14), except by purge_tenant. */
@@ -346,6 +347,11 @@ const PERSONAL_DATA: readonly string[] = [
   'files.original_filename',
   'invitations.email',
   'methodology_reviewers.name',
+  'reports.email',
+  'reports.message',
+  'reports.name',
+  'reports.organization',
+  'reports.resolution_note',
 ];
 
 const DELETE = 8;

@@ -293,6 +293,19 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 - **R13. An attestation file only needs to be in the `sources` bucket,** like a source's stored copy; its bytes are
   not checked separately.
 
+**Reports (migration `reports`):**
+
+- **R14. The daily cap is 200 reports per tenant and UTC day,** a constant in `submit_report()` rather than a tenant
+  setting (the spec names no setting). It is a backstop behind the gateway's per-IP limit.
+- **R15. A report may name any cell of a live or archived election of its tenant,** not only cells with a published
+  revision: revisions arrive in the next migration, and a cell's id is not guessable.
+- **R16. Triage follows the spec's arrows only:** `new → triaged → accepted | rejected | spam`; marking spam straight
+  from `new` is not allowed (spec open item 9 leaves it to the editorial workflow spec).
+- **R17. Anonymizing nulls all five personal-data columns at once,** and nothing else changes in that update.
+  Afterwards the status can still change, but no personal data can be written again.
+- **R18. Failure codes of `submit_report()`:** 22023 for a bad tenant, election or cell (the API can answer 404),
+  54000 for the cap (429).
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).

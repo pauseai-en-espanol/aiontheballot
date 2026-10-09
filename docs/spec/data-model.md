@@ -870,6 +870,22 @@ arguments and that only `aiontheballot_worker` can execute (ADR-0002 allowlist).
 UPDATE that the trigger accepts only if it nulls exactly those columns. Reports stay triageable when their election
 is archived.
 
+**Sending and triaging** (`app.submit_report()`, `private.report_rules()`):
+
+- `app.submit_report(tenant, kind, message, election, assessment, name, email, organization,
+is_party_representative)` is the public's only write and returns the report's id. It refuses an inactive or unknown
+  tenant, an election that is not the tenant's or not live or archived, and a cell of another election, all as
+  `invalid_parameter_value` (22023), and a tenant past its daily cap (200 reports per UTC day, a constant in the
+  function) as `program_limit_exceeded` (54000). It trims the text fields and lowercases the email; checks on the
+  table bound their lengths and the email's shape. `anonymize_after` is the UTC day it was sent plus the tenant's
+  `report_retention_days`.
+- Editors, reviewers and country admins triage: `new → triaged → accepted | rejected | spam`, each step once;
+  `triaged_by` and `triaged_at` are set at `new → triaged`. Only the status and the resolution note change; what was
+  sent never does. Platform admins neither read nor triage reports.
+- Anonymizing sets all five personal-data columns to null in one update that changes nothing else; `anonymized_at` is
+  the transaction time and is set once. Country admins do it on request; the daily run does it as the table owner.
+  Afterwards the report takes no personal data again, but its status can still change.
+
 ### 3.9 LLM assistance (M4; the schema exists from M1)
 
 ```sql

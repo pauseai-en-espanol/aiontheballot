@@ -379,6 +379,54 @@ CREATE TYPE app.tenant_role AS ENUM (
 ALTER TYPE app.tenant_role OWNER TO aiontheballot_owner;
 
 --
+-- Name: submit_report(uuid, app.report_kind, text, uuid, uuid, text, text, text, boolean); Type: FUNCTION; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION app.submit_report(tenant uuid, kind app.report_kind, message text, election uuid DEFAULT NULL::uuid, assessment uuid DEFAULT NULL::uuid, name text DEFAULT NULL::text, email text DEFAULT NULL::text, organization text DEFAULT NULL::text, is_party_representative boolean DEFAULT false) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    daily_cap constant int := 200;  -- per tenant and UTC day; far above normal use (spec §3.8)
+    today date := (now() AT TIME ZONE 'UTC')::date;
+    retention int;
+    sent int;
+    report uuid;
+  BEGIN
+    SELECT t.report_retention_days INTO retention FROM app.tenants t WHERE t.id = tenant AND t.active;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'no such tenant' USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+    IF election IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM app.elections e
+                        WHERE e.id = election AND e.tenant_id = tenant AND e.status IN ('live', 'archived')) THEN
+      RAISE EXCEPTION 'no such election' USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+    IF assessment IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM app.assessments a WHERE a.id = assessment AND a.election_id = election) THEN
+      RAISE EXCEPTION 'no such cell' USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+
+    INSERT INTO app.report_daily_counts AS c (tenant_id, day, count) VALUES (tenant, today, 1)
+      ON CONFLICT ON CONSTRAINT report_daily_counts_pkey DO UPDATE SET count = c.count + 1
+      RETURNING c.count INTO sent;
+    IF sent > daily_cap THEN
+      RAISE EXCEPTION 'this site takes no more reports today' USING ERRCODE = 'program_limit_exceeded';
+    END IF;
+
+    INSERT INTO app.reports (tenant_id, election_id, assessment_id, kind, name, email, organization,
+                             is_party_representative, message, anonymize_after)
+    VALUES (tenant, election, assessment, kind, nullif(btrim(name), ''), lower(nullif(btrim(email), '')),
+            nullif(btrim(organization), ''), coalesce(is_party_representative, false), message, today + retention)
+    RETURNING id INTO report;
+    RETURN report;
+  END
+  $$;
+
+
+ALTER FUNCTION app.submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean) OWNER TO aiontheballot_owner;
+
+--
 -- Name: active_tenant_has_operator(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -400,6 +448,27 @@ CREATE FUNCTION private.active_tenant_has_operator() RETURNS trigger
 
 
 ALTER FUNCTION private.active_tenant_has_operator() OWNER TO aiontheballot_owner;
+
+--
+-- Name: anonymize_expired_reports(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.anonymize_expired_reports() RETURNS integer
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+    WITH anonymized AS (
+      UPDATE app.reports r
+         SET name = NULL, email = NULL, organization = NULL, message = NULL, resolution_note = NULL,
+             anonymized_at = now()
+       WHERE r.anonymized_at IS NULL AND r.anonymize_after <= (now() AT TIME ZONE 'UTC')::date
+      RETURNING 1
+    )
+    SELECT count(*)::integer FROM anonymized
+  $$;
+
+
+ALTER FUNCTION private.anonymize_expired_reports() OWNER TO aiontheballot_owner;
 
 --
 -- Name: assessment_trail(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -1389,6 +1458,72 @@ CREATE FUNCTION private.platform_hostname_is_free() RETURNS trigger
 ALTER FUNCTION private.platform_hostname_is_free() OWNER TO aiontheballot_owner;
 
 --
+-- Name: report_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.report_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    personal text[] := ARRAY['name', 'email', 'organization', 'message', 'resolution_note'];
+    triage text[] := ARRAY['status', 'resolution_note', 'triaged_by', 'triaged_at'];
+  BEGIN
+    IF TG_OP = 'INSERT' THEN
+      IF NEW.status <> 'new' OR NEW.anonymized_at IS NOT NULL THEN
+        RAISE EXCEPTION 'a new report is new and not anonymized' USING ERRCODE = 'restrict_violation';
+      END IF;
+      NEW.triaged_by := NULL;
+      NEW.triaged_at := NULL;
+      RETURN NEW;
+    END IF;
+
+    -- Anonymizing: every personal-data column set to null at once, nothing else; by a country admin or the daily run
+    -- (which runs as the table owner).
+    IF OLD.anonymized_at IS NULL AND NEW.anonymized_at IS NOT NULL THEN
+      IF (SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.oid = TG_RELID)
+           <> (SELECT r.oid FROM pg_catalog.pg_roles r WHERE r.rolname = current_user)
+         AND NEW.tenant_id NOT IN (SELECT private.my_tenants('country_admin')) THEN
+        RAISE EXCEPTION 'anonymizing report % needs a country admin', OLD.id USING ERRCODE = 'insufficient_privilege';
+      END IF;
+      IF (to_jsonb(NEW) - personal - 'anonymized_at') IS DISTINCT FROM (to_jsonb(OLD) - personal - 'anonymized_at')
+         OR EXISTS (SELECT 1 FROM jsonb_each(to_jsonb(NEW)) n WHERE n.key = ANY (personal) AND n.value <> 'null') THEN
+        RAISE EXCEPTION 'anonymizing report % sets every personal-data column to null and changes nothing else', OLD.id
+          USING ERRCODE = 'restrict_violation';
+      END IF;
+      NEW.anonymized_at := now();
+      RETURN NEW;
+    END IF;
+
+    -- Triage: only the status, forward, and the resolution note (so anonymized_at is set once, for good).
+    IF (to_jsonb(NEW) - triage) IS DISTINCT FROM (to_jsonb(OLD) - triage) THEN
+      RAISE EXCEPTION 'report %: only its status and resolution note change', OLD.id USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF OLD.anonymized_at IS NOT NULL AND NEW.resolution_note IS NOT NULL THEN
+      RAISE EXCEPTION 'report % is anonymized: it takes no personal data again', OLD.id
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF NEW.status IS DISTINCT FROM OLD.status
+       AND NOT (OLD.status = 'new' AND NEW.status = 'triaged'
+                OR OLD.status = 'triaged' AND NEW.status IN ('accepted', 'rejected', 'spam')) THEN
+      RAISE EXCEPTION 'report % cannot go from % to %', OLD.id, OLD.status, NEW.status
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF OLD.status = 'new' AND NEW.status = 'triaged' THEN
+      NEW.triaged_by := private.current_user_id();
+      NEW.triaged_at := now();
+    ELSE
+      NEW.triaged_by := OLD.triaged_by;
+      NEW.triaged_at := OLD.triaged_at;
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.report_rules() OWNER TO aiontheballot_owner;
+
+--
 -- Name: restrict_columns(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -2348,6 +2483,91 @@ CREATE TABLE app.public_versions (
 ALTER TABLE app.public_versions OWNER TO aiontheballot_owner;
 
 --
+-- Name: report_daily_counts; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.report_daily_counts (
+    tenant_id uuid NOT NULL,
+    day date NOT NULL,
+    count integer NOT NULL,
+    CONSTRAINT report_daily_counts_count_check CHECK ((count > 0))
+);
+
+
+ALTER TABLE app.report_daily_counts OWNER TO aiontheballot_owner;
+
+--
+-- Name: reports; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.reports (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    election_id uuid,
+    assessment_id uuid,
+    kind app.report_kind NOT NULL,
+    name text,
+    email text,
+    organization text,
+    is_party_representative boolean DEFAULT false NOT NULL,
+    message text,
+    status app.report_status DEFAULT 'new'::app.report_status NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    triaged_by uuid,
+    triaged_at timestamp with time zone,
+    resolution_note text,
+    anonymize_after date NOT NULL,
+    anonymized_at timestamp with time zone,
+    CONSTRAINT reports_check CHECK (((assessment_id IS NULL) OR (election_id IS NOT NULL))),
+    CONSTRAINT reports_check1 CHECK (((message IS NOT NULL) OR (anonymized_at IS NOT NULL))),
+    CONSTRAINT reports_check2 CHECK (((anonymized_at IS NULL) OR ((name IS NULL) AND (email IS NULL) AND (organization IS NULL) AND (message IS NULL) AND (resolution_note IS NULL)))),
+    CONSTRAINT reports_check3 CHECK (((triaged_at IS NULL) = (status = 'new'::app.report_status))),
+    CONSTRAINT reports_email_check CHECK (((email = lower(email)) AND (char_length(email) <= 254) AND (email ~ '^[^@\s]+@[^@\s]+$'::text))),
+    CONSTRAINT reports_message_check CHECK (((char_length(btrim(message)) >= 1) AND (char_length(btrim(message)) <= 5000))),
+    CONSTRAINT reports_name_check CHECK (((char_length(name) >= 1) AND (char_length(name) <= 200))),
+    CONSTRAINT reports_organization_check CHECK (((char_length(organization) >= 1) AND (char_length(organization) <= 200))),
+    CONSTRAINT reports_resolution_note_check CHECK ((char_length(resolution_note) <= 5000))
+);
+
+
+ALTER TABLE app.reports OWNER TO aiontheballot_owner;
+
+--
+-- Name: COLUMN reports.name; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.reports.name IS 'personal data';
+
+
+--
+-- Name: COLUMN reports.email; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.reports.email IS 'personal data';
+
+
+--
+-- Name: COLUMN reports.organization; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.reports.organization IS 'personal data';
+
+
+--
+-- Name: COLUMN reports.message; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.reports.message IS 'personal data';
+
+
+--
+-- Name: COLUMN reports.resolution_note; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.reports.resolution_note IS 'personal data';
+
+
+--
 -- Name: review_events; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2947,6 +3167,30 @@ ALTER TABLE ONLY app.public_versions
 
 
 --
+-- Name: report_daily_counts report_daily_counts_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.report_daily_counts
+    ADD CONSTRAINT report_daily_counts_pkey PRIMARY KEY (tenant_id, day);
+
+
+--
+-- Name: reports reports_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.reports
+    ADD CONSTRAINT reports_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: reports reports_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.reports
+    ADD CONSTRAINT reports_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
 -- Name: review_events review_events_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3185,6 +3429,27 @@ CREATE INDEX parties_logo_file_id_idx ON app.parties USING btree (logo_file_id);
 
 
 --
+-- Name: reports_anonymize_after_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX reports_anonymize_after_idx ON app.reports USING btree (anonymize_after) WHERE (anonymized_at IS NULL);
+
+
+--
+-- Name: reports_assessment_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX reports_assessment_id_idx ON app.reports USING btree (assessment_id);
+
+
+--
+-- Name: reports_election_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX reports_election_id_idx ON app.reports USING btree (election_id);
+
+
+--
 -- Name: review_events_assessment_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3420,6 +3685,13 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.platform_admins FOR
 --
 
 CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.platform_hostnames FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: reports audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.reports FOR EACH ROW EXECUTE FUNCTION private.audit();
 
 
 --
@@ -3780,6 +4052,20 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.public_versions FOR EAC
 
 
 --
+-- Name: report_daily_counts forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.report_daily_counts FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: reports forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.reports FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: review_events forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -4060,6 +4346,13 @@ CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.parties FOR EACH ROW EXECUTE
 
 
 --
+-- Name: reports rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.reports FOR EACH ROW EXECUTE FUNCTION private.report_rules();
+
+
+--
 -- Name: source_documents rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -4197,6 +4490,13 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.organizations FOR EACH ROW E
 --
 
 CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.platform_admins FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
+
+
+--
+-- Name: reports stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT ON app.reports FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
 
 
 --
@@ -4533,6 +4833,38 @@ ALTER TABLE ONLY app.parties
 
 ALTER TABLE ONLY app.public_versions
     ADD CONSTRAINT public_versions_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: report_daily_counts report_daily_counts_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.report_daily_counts
+    ADD CONSTRAINT report_daily_counts_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: reports reports_tenant_id_assessment_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.reports
+    ADD CONSTRAINT reports_tenant_id_assessment_id_election_id_fkey FOREIGN KEY (tenant_id, assessment_id, election_id) REFERENCES app.assessments(tenant_id, id, election_id);
+
+
+--
+-- Name: reports reports_tenant_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.reports
+    ADD CONSTRAINT reports_tenant_id_election_id_fkey FOREIGN KEY (tenant_id, election_id) REFERENCES app.elections(tenant_id, id);
+
+
+--
+-- Name: reports reports_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.reports
+    ADD CONSTRAINT reports_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
 
 
 --
@@ -5195,6 +5527,13 @@ CREATE POLICY member_read ON app.parties FOR SELECT TO aiontheballot_admin USING
 
 
 --
+-- Name: reports member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.reports FOR SELECT TO aiontheballot_admin USING ((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)));
+
+
+--
 -- Name: review_events member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5262,6 +5601,13 @@ CREATE POLICY member_update ON app.assessments FOR UPDATE TO aiontheballot_admin
 --
 
 CREATE POLICY member_update ON app.draft_evidence FOR UPDATE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: reports member_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_update ON app.reports FOR UPDATE TO aiontheballot_admin USING ((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants))) WITH CHECK ((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)));
 
 
 --
@@ -5629,6 +5975,18 @@ CREATE POLICY public_read ON app.tenants FOR SELECT TO aiontheballot_web USING (
 --
 
 ALTER TABLE app.public_versions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: report_daily_counts; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.report_daily_counts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: reports; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.reports ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: review_events; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
@@ -6051,10 +6409,26 @@ REVOKE ALL ON TYPE app.tenant_role FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean); Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION app.submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION app.submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean) TO aiontheballot_web;
+
+
+--
 -- Name: FUNCTION active_tenant_has_operator(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
 REVOKE ALL ON FUNCTION private.active_tenant_has_operator() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION anonymize_expired_reports(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.anonymize_expired_reports() FROM PUBLIC;
+GRANT ALL ON FUNCTION private.anonymize_expired_reports() TO aiontheballot_worker;
 
 
 --
@@ -6230,6 +6604,13 @@ REVOKE ALL ON FUNCTION private.party_logo_is_public_asset() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.platform_hostname_is_free() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION report_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.report_rules() FROM PUBLIC;
 
 
 --
@@ -7563,6 +7944,62 @@ GRANT INSERT(hostname) ON TABLE app.platform_hostnames TO aiontheballot_admin;
 --
 
 GRANT SELECT ON TABLE app.public_versions TO aiontheballot_web;
+
+
+--
+-- Name: TABLE reports; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.reports TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN reports.name; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(name) ON TABLE app.reports TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN reports.email; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(email) ON TABLE app.reports TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN reports.organization; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(organization) ON TABLE app.reports TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN reports.message; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(message) ON TABLE app.reports TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN reports.status; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(status) ON TABLE app.reports TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN reports.resolution_note; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(resolution_note) ON TABLE app.reports TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN reports.anonymized_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(anonymized_at) ON TABLE app.reports TO aiontheballot_admin;
 
 
 --

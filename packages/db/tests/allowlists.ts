@@ -8,12 +8,16 @@ export const EXECUTE_ALLOWLIST: readonly string[] = [
   'aiontheballot_admin private.is_platform_admin()',
   'aiontheballot_admin private.my_tenants(VARIADIC roles app.tenant_role[])',
   'aiontheballot_admin private.normalize_for_match(input text)',
+  'aiontheballot_web app.submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean)',
+  'aiontheballot_worker private.anonymize_expired_reports()',
   'aiontheballot_worker private.current_user_id()',
   'aiontheballot_worker private.normalize_for_match(input text)',
 ];
 
 /** SECURITY DEFINER functions allowed in `app` and `private` (ADR-0002 §6). */
 export const SECURITY_DEFINER_ALLOWLIST: readonly string[] = [
+  'app.submit_report',
+  'private.anonymize_expired_reports',
   'private.audit',
   'private.bump_public_version',
   'private.is_platform_admin',
