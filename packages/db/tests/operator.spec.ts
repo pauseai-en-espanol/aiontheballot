@@ -3,7 +3,7 @@ import type pg from 'pg';
 import { describe, expect, it } from 'vitest';
 
 import { errorCode, inRolledBackTransaction } from './db.js';
-import { ORGANIZATIONS, TENANT_A, TENANT_INACTIVE, USERS } from './rls/matrix.js';
+import { ORGANIZATIONS, TENANT_A, TENANT_B, TENANT_INACTIVE, USERS } from './rls/matrix.js';
 
 const CHECK_VIOLATION = '23514';
 
@@ -61,11 +61,11 @@ describe('an active tenant has exactly one operator', () => {
     const log = await asPlatformAdmin(async (client) => {
       await client.query(
         `DELETE FROM app.tenant_organizations WHERE tenant_id = $1 AND organization_id = $2`,
-        [TENANT_A, ORGANIZATIONS.A.id],
+        [TENANT_B, ORGANIZATIONS.B.id],
       );
       await client.query(
         `INSERT INTO app.tenant_organizations (tenant_id, organization_id, role) VALUES ($1, $2, 'operator')`,
-        [TENANT_A, ORGANIZATIONS.unlinked.id],
+        [TENANT_B, ORGANIZATIONS.unlinked.id],
       );
       expect(await errorCode(client, 'SET CONSTRAINTS ALL IMMEDIATE')).toBeNull();
       await client.query('RESET ROLE');
@@ -73,7 +73,7 @@ describe('an active tenant has exactly one operator', () => {
         await client.query<{ action: string; actor_id: string }>(
           `SELECT action, actor_id FROM app.audit_log
             WHERE table_name = 'tenant_organizations' AND tenant_id = $1 AND at = now() ORDER BY id`,
-          [TENANT_A],
+          [TENANT_B],
         )
       ).rows;
     }, false);

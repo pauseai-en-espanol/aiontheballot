@@ -717,6 +717,45 @@ CREATE FUNCTION private.platform_hostname_is_free() RETURNS trigger
 ALTER FUNCTION private.platform_hostname_is_free() OWNER TO aiontheballot_owner;
 
 --
+-- Name: restricted_assets_are_eligible(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.restricted_assets_are_eligible() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    offender text;
+  BEGIN
+    SELECT format('tenant %s may not use restricted asset %s', s.tenant_id, s.brand_asset_id) INTO offender
+      FROM app.tenant_brand_selections s
+      JOIN app.brand_assets a ON a.id = s.brand_asset_id
+     WHERE a.restricted
+       AND NOT (EXISTS (SELECT 1 FROM app.brand_asset_grants g
+                         WHERE g.brand_asset_id = s.brand_asset_id AND g.tenant_id = s.tenant_id)
+                AND EXISTS (SELECT 1 FROM app.tenant_organizations o
+                              JOIN app.organizations org ON org.id = o.organization_id
+                             WHERE o.tenant_id = s.tenant_id AND o.role = 'operator' AND org.is_pauseai_chapter))
+     LIMIT 1;
+    IF offender IS NULL THEN
+      SELECT format('organization %s may not use restricted asset %s as its logo', org.id, org.logo_asset_id)
+        INTO offender
+        FROM app.organizations org
+        JOIN app.brand_assets a ON a.id = org.logo_asset_id
+       WHERE a.restricted AND NOT org.is_pauseai_chapter
+       LIMIT 1;
+    END IF;
+    IF offender IS NOT NULL THEN
+      RAISE EXCEPTION '%', offender USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NULL;
+  END
+  $$;
+
+
+ALTER FUNCTION private.restricted_assets_are_eligible() OWNER TO aiontheballot_owner;
+
+--
 -- Name: stamp(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1563,6 +1602,41 @@ CREATE TRIGGER is_free BEFORE INSERT ON app.platform_hostnames FOR EACH ROW EXEC
 --
 
 CREATE TRIGGER members_may_change BEFORE UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.members_may_change('theme', 'report_retention_days', 'llm_monthly_cap_usd');
+
+
+--
+-- Name: brand_asset_grants restricted_assets_are_eligible; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE CONSTRAINT TRIGGER restricted_assets_are_eligible AFTER DELETE OR UPDATE ON app.brand_asset_grants DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION private.restricted_assets_are_eligible();
+
+
+--
+-- Name: brand_assets restricted_assets_are_eligible; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE CONSTRAINT TRIGGER restricted_assets_are_eligible AFTER UPDATE OF restricted ON app.brand_assets DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION private.restricted_assets_are_eligible();
+
+
+--
+-- Name: organizations restricted_assets_are_eligible; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE CONSTRAINT TRIGGER restricted_assets_are_eligible AFTER INSERT OR UPDATE OF is_pauseai_chapter, logo_asset_id ON app.organizations DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION private.restricted_assets_are_eligible();
+
+
+--
+-- Name: tenant_brand_selections restricted_assets_are_eligible; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE CONSTRAINT TRIGGER restricted_assets_are_eligible AFTER INSERT OR UPDATE ON app.tenant_brand_selections DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION private.restricted_assets_are_eligible();
+
+
+--
+-- Name: tenant_organizations restricted_assets_are_eligible; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE CONSTRAINT TRIGGER restricted_assets_are_eligible AFTER INSERT OR DELETE OR UPDATE ON app.tenant_organizations DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION private.restricted_assets_are_eligible();
 
 
 --
@@ -2492,6 +2566,13 @@ REVOKE ALL ON FUNCTION private.normalize_for_match(input text) FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.platform_hostname_is_free() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION restricted_assets_are_eligible(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.restricted_assets_are_eligible() FROM PUBLIC;
 
 
 --

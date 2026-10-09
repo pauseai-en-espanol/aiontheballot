@@ -596,6 +596,8 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
         tenant: 'A',
         public: false,
         where: `brand_asset_id = '${BRAND_ASSETS.restricted.id}' AND tenant_id = '${TENANT_A}'`,
+        // A selects the asset, so the grant can't go while the selection stays.
+        blocked: { delete: '23514' },
       },
     ],
     inserts: TENANT_KEYS.map((key) => ({
