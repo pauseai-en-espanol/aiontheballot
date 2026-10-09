@@ -30,7 +30,7 @@
     "db:migrate": "dbmate --migrations-dir db/migrations --no-dump-schema up && pnpm db:dump",
     "db:status": "dbmate --migrations-dir db/migrations status",
     "db:dump": "docker exec -i ${AIONTHEBALLOT_PG_CONTAINER:-aiontheballot-postgres} sh -c 'PGPASSWORD=\"$POSTGRES_PASSWORD\" pg_dump --schema-only --restrict-key=schema -U postgres -d aiontheballot' > db/schema.sql",
-    "db:types": "kysely-codegen --dialect postgres --include-pattern 'app.*' --out-file packages/db/src/generated/db.ts",
+    "db:types": "kysely-codegen --dialect postgres --include-pattern 'app.*' --out-file packages/db/src/generated/db.ts && prettier --write packages/db/src/generated/db.ts",
     "release:note": "changeset add",
     "release:empty": "changeset add --empty",
     "release:bump": "changeset version",
