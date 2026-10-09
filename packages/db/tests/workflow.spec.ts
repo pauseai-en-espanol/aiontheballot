@@ -198,15 +198,39 @@ describe('editing a cell', () => {
     });
   });
 
-  it('is not a contribution when a reviewer attests a quote, even in review', async () => {
-    await actingAs(USERS.reviewerA, async (client) => {
-      const before = await version(client, A.review);
+  it('is not a contribution when a reviewer attests a quote', async () => {
+    await actingAs(USERS.editorA, async (client) => {
+      // A scanned copy of the programme, with no text: its quotes are attested.
+      const source = await asRole(client, async () => {
+        const { rows } = await client.query<{ id: string }>(
+          `INSERT INTO app.source_documents (tenant_id, election_id, party_id, kind, title)
+           VALUES ($1, $2, $3, 'pdf', 'Programa escaneado') RETURNING id`,
+          [TENANT_A, A.election.id, A.election.party],
+        );
+        await client.query(
+          `UPDATE app.source_documents SET file_id = $1, file_origin = 'uploaded' WHERE id = $2`,
+          [FILES.sourceA.id, rows[0]!.id],
+        );
+        await client.query(
+          `UPDATE app.source_documents SET extraction_status = 'not_applicable' WHERE id = $1`,
+          [rows[0]!.id],
+        );
+        return rows[0]!.id;
+      });
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote,
+                                         attestation_file_id)
+         VALUES ($1, $2, $3, $4, 9, 'Una frase escaneada de ejemplo', $5) RETURNING id`,
+        [TENANT_A, A.election.id, A.draft, source, FILES.sourceA.id],
+      );
+      const before = await version(client, A.draft);
+      await setActor(client, USERS.reviewerA);
       await client.query(`UPDATE app.draft_evidence SET attested_by = $1 WHERE id = $2`, [
         USERS.reviewerA,
-        A.evidence,
+        rows[0]!.id,
       ]);
-      expect(await version(client, A.review)).toBe(before);
-      expect(await contributors(client, A.review)).toEqual([`0 ${USERS.editorA}`]);
+      expect(await version(client, A.draft)).toBe(before);
+      expect(await contributors(client, A.draft)).toEqual([`0 ${USERS.editorA}`]);
     });
   });
 
@@ -363,18 +387,6 @@ describe('submitting a cell', () => {
     ],
     ['rated without a quote', 'meets', async () => 'SELECT 1'],
     ['"not mentioned" without a checked document', 'not_mentioned', async () => 'SELECT 1'],
-    [
-      '"not mentioned" backed by a document with no stored copy',
-      'not_mentioned',
-      async (c: pg.Client, id: string) => {
-        const { rows } = await c.query<{ id: string }>(
-          `INSERT INTO app.source_documents (tenant_id, election_id, party_id, kind, title)
-           VALUES ($1, $2, $3, 'pdf', 'Documento sin copia') RETURNING id`,
-          [TENANT_A, draftA.id, draftA.party],
-        );
-        return check(id, rows[0]!.id);
-      },
-    ],
     [
       '"not mentioned" backed by a party-neutral document',
       'not_mentioned',

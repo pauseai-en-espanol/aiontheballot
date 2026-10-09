@@ -3,7 +3,7 @@ import type pg from 'pg';
 import { describe, expect, it } from 'vitest';
 
 import { errorCode, inRolledBackTransaction } from './db.js';
-import { CELLS, ELECTIONS, LLM_RUNS, SOURCES, TENANT_A, USERS } from './rls/matrix.js';
+import { CELLS, ELECTIONS, FILES, LLM_RUNS, SOURCES, TENANT_A, USERS } from './rls/matrix.js';
 
 const CHECK_VIOLATION = '23514';
 const UNIQUE_VIOLATION = '23505';
@@ -104,9 +104,20 @@ describe('a quote', () => {
 
   it("comes from a source of the cell's own election", async () => {
     expect(
-      await actingAs(USERS.editorA, (c) =>
-        errorCode(c, evidence({ source_document_id: `'${SOURCES.draftA.id}'` })),
-      ),
+      await actingAs(USERS.editorA, async (client) => {
+        // A citable, party-neutral source in another election of the tenant, so only the key can refuse it.
+        await client.query('RESET ROLE');
+        await client.query(
+          `UPDATE app.source_documents SET file_id = $1, file_origin = 'uploaded' WHERE id = $2`,
+          [FILES.sourceA.id, SOURCES.draftA.id],
+        );
+        await client.query(
+          `UPDATE app.source_documents SET extraction_status = 'not_applicable' WHERE id = $1`,
+          [SOURCES.draftA.id],
+        );
+        await client.query('SET LOCAL ROLE aiontheballot_admin');
+        return errorCode(client, evidence({ source_document_id: `'${SOURCES.draftA.id}'` }));
+      }),
     ).toBe(FOREIGN_KEY_VIOLATION);
   });
 

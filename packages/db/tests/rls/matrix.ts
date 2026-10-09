@@ -1482,6 +1482,8 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
         tenant: key,
         public: false,
         where: `id = '${CELLS[key].draftEvidence}'`,
+        // Quotes from a source with text are matched, never attested.
+        blocked: { 'update:attested_by': '23514' },
       },
       {
         id: `quote in review of ${key}`,
@@ -1489,7 +1491,12 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
         public: false,
         where: `id = '${CELLS[key].evidence}'`,
         // Locked while its cell is in review.
-        blocked: { update: '23001', 'update:quote': '23001', delete: '23001' },
+        blocked: {
+          update: '23001',
+          'update:quote': '23001',
+          delete: '23001',
+          'update:attested_by': '23514',
+        },
       },
     ]),
     inserts: TENANT_KEYS.flatMap((key) => [
@@ -1516,6 +1523,8 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     delete: EDITORS,
     columnUpdates: {
       quote: { set: `quote = quote || ' (revisada)'`, rule: EDITORS },
+      // Any member may attest (blocked here: these quotes are matched instead).
+      attested_by: { set: `attested_by = '${USERS.reviewerA}'`, rule: MEMBERS },
       match_status: { set: `match_status = 'matched'`, rule: NOBODY },
       created_by: { set: `created_by = '${USERS.newcomer}'`, rule: NOBODY },
       tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },

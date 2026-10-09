@@ -486,7 +486,9 @@ goes with it (`on delete cascade`); deleting the bytes of a file that still exis
 
 **Citable sources.** Evidence or a checked-document record may cite a source only once it has a stored copy and
 its extraction is `done` (or `not_applicable`, for kinds without text). The source's `party_id` must be null or the
-cell's party: one party's documents never back another party's cell.
+cell's party: one party's documents never back another party's cell. Its kind must be one the methodology admits
+(`admissible_source_kinds` for quotes, `not_mentioned_source_kinds` for checked documents). Triggers check all of
+this when the row is written (`private.evidence_rules()`, `private.checked_document_rules()`), as the writer.
 
 **Sources over time.** A source starts `pending`; its extracted text is added only while it is pending and has a stored
 copy, and `done` needs that copy. Sources can still be added to an archived election, because corrections may cite new
@@ -574,7 +576,8 @@ create table app.draft_evidence (
 -- scanned PDF whose extraction is not_applicable) it is 'attested' only when someone attests: a stored attestation
 -- file in the sources bucket, attested_by = the current user, and that user is not the quote's author (unless the
 -- election doesn't require a second reviewer). Otherwise 'unmatched'. The 15-character minimum stops trivial
--- matches; the 1000-character maximum keeps quotes proportionate (copyright).
+-- matches (it applies to the normalized quote too); the 1000-character maximum keeps quotes proportionate
+-- (copyright).
 
 create table app.draft_checked_documents (             -- backs not_mentioned: the proof of an absence
   assessment_id       uuid not null,
@@ -631,7 +634,14 @@ document):
 - Ratings are checked against the tenant's methodology kind when written. Submitting checks everything publishing
   will: the change kind and default-locale note after the first publish (none before it), a rating and a
   default-locale summary unless withdrawing, and the evidence (a quote, or for "not mentioned" a checked, stored
-  copy of the party's own document of a kind the methodology lists).
+  copy of the party's own document of a kind the methodology lists). Every quote must be matched or attested and
+  every source still of a kind the methodology lists, since the methodology can change after a quote is written.
+
+**Attestation** (`private.evidence_rules()`). Any member other than the quote's author attests (the author too, once a
+platform admin turns off the election's second-reviewer setting; otherwise it is a permission error). It is set once:
+withdraw it (`attested_by = null`) before someone else attests. Any content change of the quote undoes it, and every
+update of the quote checks it again, so one that no longer holds (say, the author's, once a second reviewer is
+required again) lapses to `unmatched`.
 
 ### 3.6 Published revisions (immutable)
 

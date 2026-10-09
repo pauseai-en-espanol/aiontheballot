@@ -762,6 +762,48 @@ CREATE FUNCTION private.cell_content_changed() RETURNS trigger
 ALTER FUNCTION private.cell_content_changed() OWNER TO aiontheballot_owner;
 
 --
+-- Name: checked_document_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.checked_document_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    src record;
+    cell_party uuid;
+  BEGIN
+    SELECT s.kind, s.party_id, s.file_id, s.extraction_status, m.not_mentioned_source_kinds INTO src
+      FROM app.source_documents s
+      LEFT JOIN app.methodologies m ON m.election_id = s.election_id
+     WHERE s.id = NEW.source_document_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'source % is not visible to the writer', NEW.source_document_id
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    SELECT a.party_id INTO cell_party FROM app.assessments a WHERE a.id = NEW.assessment_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'cell % is not visible to the writer', NEW.assessment_id USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF src.file_id IS NULL OR src.extraction_status NOT IN ('done', 'not_applicable') THEN
+      RAISE EXCEPTION 'a checked document is a source with a stored copy whose extraction is done or not applicable'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    IF src.party_id IS NOT NULL AND src.party_id <> cell_party THEN
+      RAISE EXCEPTION 'one party''s source never backs another party''s cell' USING ERRCODE = 'check_violation';
+    END IF;
+    IF NOT coalesce(src.kind = ANY (src.not_mentioned_source_kinds), false) THEN
+      RAISE EXCEPTION 'the methodology does not list % sources for "not mentioned"', src.kind
+        USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NULL;
+  END
+  $$;
+
+
+ALTER FUNCTION private.checked_document_rules() OWNER TO aiontheballot_owner;
+
+--
 -- Name: contributor_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -883,6 +925,114 @@ CREATE FUNCTION private.election_rules() RETURNS trigger
 
 
 ALTER FUNCTION private.election_rules() OWNER TO aiontheballot_owner;
+
+--
+-- Name: evidence_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.evidence_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    not_content text[] := ARRAY['attested_by', 'match_status', 'matched_from_unit', 'matched_to_unit'];
+    src record;
+    cell_party uuid;
+    needle text;
+    attesting boolean;
+    lapsed text;
+  BEGIN
+    -- Read as the writer: a source or cell the writer can't see is never cited by them.
+    SELECT s.kind, s.party_id, s.file_id, s.extraction_status, m.admissible_source_kinds, e.require_second_reviewer
+      INTO src
+      FROM app.source_documents s
+      JOIN app.elections e ON e.id = s.election_id
+      LEFT JOIN app.methodologies m ON m.election_id = s.election_id
+     WHERE s.id = NEW.source_document_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'source % is not visible to the writer', NEW.source_document_id
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    SELECT a.party_id INTO cell_party FROM app.assessments a WHERE a.id = NEW.assessment_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'cell % is not visible to the writer', NEW.assessment_id USING ERRCODE = 'insufficient_privilege';
+    END IF;
+
+    IF src.file_id IS NULL OR src.extraction_status NOT IN ('done', 'not_applicable') THEN
+      RAISE EXCEPTION 'a quote cites a source with a stored copy whose extraction is done or not applicable'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    IF src.party_id IS NOT NULL AND src.party_id <> cell_party THEN
+      RAISE EXCEPTION 'one party''s source never backs another party''s cell' USING ERRCODE = 'check_violation';
+    END IF;
+    IF NOT coalesce(src.kind = ANY (src.admissible_source_kinds), false) THEN
+      RAISE EXCEPTION 'the methodology does not admit % sources', src.kind USING ERRCODE = 'check_violation';
+    END IF;
+
+    attesting := NEW.attested_by IS NOT NULL AND (TG_OP = 'INSERT' OR NEW.attested_by IS DISTINCT FROM OLD.attested_by);
+
+    -- A source with text: matched across its units, never attested.
+    IF src.kind IN ('pdf', 'web_page') AND src.extraction_status = 'done' THEN
+      IF attesting THEN
+        RAISE EXCEPTION 'a quote from a source with text is matched, not attested' USING ERRCODE = 'check_violation';
+      END IF;
+      NEW.attested_by := NULL;
+      needle := private.normalize_for_match(NEW.quote);
+      WITH units AS (
+        SELECT t.unit_index, t.normalized,
+               sum(char_length(t.normalized) + 1) OVER (ORDER BY t.unit_index) - char_length(t.normalized) AS start
+          FROM app.source_texts t
+         WHERE t.source_document_id = NEW.source_document_id
+      ), hit AS (
+        SELECT strpos(string_agg(u.normalized, ' ' ORDER BY u.unit_index), needle) AS at FROM units u
+      )
+      SELECT (SELECT max(u.unit_index) FROM units u WHERE u.start <= hit.at),
+             (SELECT max(u.unit_index) FROM units u WHERE u.start <= hit.at + char_length(needle) - 1)
+        INTO NEW.matched_from_unit, NEW.matched_to_unit
+        FROM hit
+       WHERE hit.at > 0 AND char_length(needle) >= 15;  -- the minimum stops trivial matches
+      NEW.match_status := CASE WHEN NEW.matched_from_unit IS NOT NULL THEN 'matched' ELSE 'unmatched' END;
+      RETURN NEW;
+    END IF;
+
+    -- A source without text: attested by a second person, or unmatched.
+    NEW.matched_from_unit := NULL;
+    NEW.matched_to_unit := NULL;
+    IF attesting AND TG_OP = 'UPDATE' AND OLD.attested_by IS NOT NULL THEN
+      RAISE EXCEPTION 'quote % is already attested: withdraw the attestation first', OLD.id
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF NOT attesting AND TG_OP = 'UPDATE'
+       AND (to_jsonb(NEW) - not_content) IS DISTINCT FROM (to_jsonb(OLD) - not_content) THEN
+      NEW.attested_by := NULL;  -- a changed quote needs a new attestation
+    END IF;
+    IF attesting THEN
+      NEW.attested_by := private.current_user_id();
+    END IF;
+    IF NEW.attested_by IS NOT NULL THEN
+      lapsed := CASE
+        WHEN src.require_second_reviewer
+             AND NEW.attested_by = CASE WHEN TG_OP = 'INSERT' THEN private.current_user_id() ELSE OLD.created_by END
+          THEN 'self'
+        WHEN NOT EXISTS (SELECT 1 FROM app.files f WHERE f.id = NEW.attestation_file_id AND f.bucket = 'sources')
+          THEN 'file'
+      END;
+      IF lapsed = 'self' AND attesting THEN
+        RAISE EXCEPTION 'a quote is attested by someone other than its author' USING ERRCODE = 'insufficient_privilege';
+      ELSIF lapsed = 'file' AND attesting THEN
+        RAISE EXCEPTION 'an attestation needs a stored screenshot or clip in the sources bucket'
+          USING ERRCODE = 'check_violation';
+      ELSIF lapsed IS NOT NULL THEN
+        NEW.attested_by := NULL;  -- an attestation that no longer holds
+      END IF;
+    END IF;
+    NEW.match_status := CASE WHEN NEW.attested_by IS NOT NULL THEN 'attested' ELSE 'unmatched' END;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.evidence_rules() OWNER TO aiontheballot_owner;
 
 --
 -- Name: forbid_mutation(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -1477,6 +1627,38 @@ CREATE FUNCTION private.structure_rules() RETURNS trigger
 
 
 ALTER FUNCTION private.structure_rules() OWNER TO aiontheballot_owner;
+
+--
+-- Name: submitted_evidence_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.submitted_evidence_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM app.draft_evidence q
+                 JOIN app.source_documents s ON s.id = q.source_document_id
+                 LEFT JOIN app.methodologies m ON m.election_id = NEW.election_id
+                WHERE q.assessment_id = NEW.id
+                  AND (q.match_status NOT IN ('matched', 'attested')
+                       OR NOT coalesce(s.kind = ANY (m.admissible_source_kinds), false))) THEN
+      RAISE EXCEPTION 'cell %: every quote must be matched or attested, from a kind the methodology admits', NEW.id
+        USING ERRCODE = 'check_violation';
+    END IF;
+    IF EXISTS (SELECT 1 FROM app.draft_checked_documents d
+                 JOIN app.source_documents s ON s.id = d.source_document_id
+                 LEFT JOIN app.methodologies m ON m.election_id = NEW.election_id
+                WHERE d.assessment_id = NEW.id AND NOT coalesce(s.kind = ANY (m.not_mentioned_source_kinds), false)) THEN
+      RAISE EXCEPTION 'cell %: every checked document must be of a kind listed for "not mentioned"', NEW.id
+        USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NULL;
+  END
+  $$;
+
+
+ALTER FUNCTION private.submitted_evidence_rules() OWNER TO aiontheballot_owner;
 
 --
 -- Name: tenant_dependent_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -3815,6 +3997,20 @@ CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.criteria FOR EACH ROW EXECUT
 
 
 --
+-- Name: draft_checked_documents rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules AFTER INSERT OR UPDATE ON app.draft_checked_documents FOR EACH ROW EXECUTE FUNCTION private.checked_document_rules();
+
+
+--
+-- Name: draft_evidence rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.draft_evidence FOR EACH ROW EXECUTE FUNCTION private.evidence_rules();
+
+
+--
 -- Name: elections rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -4036,6 +4232,13 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.tenant_hostnames FOR EACH RO
 --
 
 CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
+
+
+--
+-- Name: assessments submit_evidence; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER submit_evidence AFTER UPDATE ON app.assessments FOR EACH ROW WHEN (((old.state = 'draft'::app.assessment_state) AND (new.state = 'in_review'::app.assessment_state))) EXECUTE FUNCTION private.submitted_evidence_rules();
 
 
 --
@@ -5897,6 +6100,13 @@ REVOKE ALL ON FUNCTION private.cell_content_changed() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION checked_document_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.checked_document_rules() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION contributor_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -5925,6 +6135,13 @@ GRANT ALL ON FUNCTION private.current_user_id() TO aiontheballot_worker;
 --
 
 REVOKE ALL ON FUNCTION private.election_rules() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION evidence_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.evidence_rules() FROM PUBLIC;
 
 
 --
@@ -5998,6 +6215,7 @@ GRANT ALL ON FUNCTION private.my_tenants(VARIADIC roles app.tenant_role[]) TO ai
 
 REVOKE ALL ON FUNCTION private.normalize_for_match(input text) FROM PUBLIC;
 GRANT ALL ON FUNCTION private.normalize_for_match(input text) TO aiontheballot_worker;
+GRANT ALL ON FUNCTION private.normalize_for_match(input text) TO aiontheballot_admin;
 
 
 --
@@ -6054,6 +6272,13 @@ REVOKE ALL ON FUNCTION private.stamp() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.structure_rules() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION submitted_evidence_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.submitted_evidence_rules() FROM PUBLIC;
 
 
 --

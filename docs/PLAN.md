@@ -281,6 +281,18 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   trigger when the table owner sets the cell `published`; only the owner may, so only the publish trigger can.
 - **R8. `initial` in `draft_change_kind`** is refused when submitting, not when writing a draft.
 
+**Evidence rules (migration `evidence_rules`):**
+
+- **R9. Who attests.** Any member other than the quote's author (spec §6), not only reviewers. Attesting one's own
+  quote while a second reviewer is required is a permission error (42501), like publishing one's own work.
+- **R10. Attestations are set once** and undone by any content change of the quote; every update re-checks them.
+- **R11. The 15-character minimum also applies after normalization,** so a quote padded with soft hyphens can't match
+  almost anything.
+- **R12. Submitting needs every quote matched or attested,** not just one: an unmatched quote couldn't be published
+  anyway (`revision_evidence` admits only matched and attested quotes).
+- **R13. An attestation file only needs to be in the `sources` bucket,** like a source's stored copy; its bytes are
+  not checked separately.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).
