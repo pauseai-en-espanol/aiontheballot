@@ -27,7 +27,7 @@ Each spec is reviewed by Dani before the milestone that builds it starts:
 
 | Spec                                                                                                 | Ready before | Status                                                  |
 | ---------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- |
-| [Data model](spec/data-model.md)                                                                     | M1           | Draft for review                                        |
+| [Data model](spec/data-model.md)                                                                     | M1           | Reviewed                                                |
 | Editorial workflow (user stories and acceptance criteria per role)                                   | M2           | Written during M1                                       |
 | Public site (page content, mobile layouts, display states, share-image layouts, performance budgets) | M3           | Written during M2, with chapter input on public wording |
 

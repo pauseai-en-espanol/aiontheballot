@@ -1,6 +1,6 @@
 # Spec: data model
 
-- **Status:** Draft for review
+- **Status:** Reviewed by Dani; the basis for the M1 migrations
 - **Relates to:** [ADR-0002](../adr/0002-tenancy-and-authorization.md) (rules and isolation),
   [ADR-0003](../adr/0003-application-stack.md) (dbmate, Kysely), BRIEF §2–§5
 
