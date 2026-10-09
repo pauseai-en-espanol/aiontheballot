@@ -472,6 +472,40 @@ CREATE FUNCTION private.audit() RETURNS trigger
 ALTER FUNCTION private.audit() OWNER TO aiontheballot_owner;
 
 --
+-- Name: blob_matches_file(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.blob_matches_file() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    expected_sha text;
+    expected_size bigint;
+  BEGIN
+    IF TG_OP = 'DELETE' THEN
+      IF EXISTS (SELECT 1 FROM app.files f WHERE f.id = OLD.file_id) THEN
+        RAISE EXCEPTION 'delete file %, not just its bytes', OLD.file_id USING ERRCODE = 'restrict_violation';
+      END IF;
+      RETURN OLD;
+    END IF;
+    -- Read as the writer: a file the writer can't see gets no bytes from them.
+    SELECT f.sha256, f.byte_size INTO expected_sha, expected_size FROM app.files f WHERE f.id = NEW.file_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'file % is not visible to the writer', NEW.file_id USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF encode(sha256(NEW.content), 'hex') <> expected_sha OR octet_length(NEW.content) <> expected_size THEN
+      RAISE EXCEPTION 'the bytes of file % do not match its hash and size', NEW.file_id
+        USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.blob_matches_file() OWNER TO aiontheballot_owner;
+
+--
 -- Name: bump_public_version(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -942,6 +976,49 @@ CREATE TABLE app.brand_assets (
 ALTER TABLE app.brand_assets OWNER TO aiontheballot_owner;
 
 --
+-- Name: file_blobs; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.file_blobs (
+    file_id uuid NOT NULL,
+    tenant_id uuid NOT NULL,
+    content bytea NOT NULL
+);
+
+
+ALTER TABLE app.file_blobs OWNER TO aiontheballot_owner;
+
+--
+-- Name: files; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.files (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    bucket app.file_bucket NOT NULL,
+    content_type text NOT NULL,
+    byte_size bigint NOT NULL,
+    sha256 text NOT NULL,
+    original_filename text,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT files_byte_size_check CHECK (((byte_size >= 0) AND (byte_size <= 52428800))),
+    CONSTRAINT files_check CHECK (((bucket <> 'public_assets'::app.file_bucket) OR (content_type = ANY (ARRAY['image/png'::text, 'image/jpeg'::text, 'image/webp'::text])))),
+    CONSTRAINT files_content_type_check CHECK ((content_type ~ '^[a-z]+/[a-z0-9.+-]+$'::text)),
+    CONSTRAINT files_sha256_check CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text))
+);
+
+
+ALTER TABLE app.files OWNER TO aiontheballot_owner;
+
+--
+-- Name: COLUMN files.original_filename; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.files.original_filename IS 'personal data';
+
+
+--
 -- Name: hostname_tombstones; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1208,6 +1285,38 @@ ALTER TABLE ONLY app.brand_assets
 
 
 --
+-- Name: file_blobs file_blobs_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.file_blobs
+    ADD CONSTRAINT file_blobs_pkey PRIMARY KEY (file_id);
+
+
+--
+-- Name: files files_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.files
+    ADD CONSTRAINT files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: files files_tenant_id_bucket_sha256_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.files
+    ADD CONSTRAINT files_tenant_id_bucket_sha256_key UNIQUE (tenant_id, bucket, sha256);
+
+
+--
+-- Name: files files_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.files
+    ADD CONSTRAINT files_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
 -- Name: hostname_tombstones hostname_tombstones_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1451,6 +1560,13 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.brand_assets FOR EA
 
 
 --
+-- Name: files audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.files FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
 -- Name: hostname_tombstones audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1619,6 +1735,20 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.brand_asset_grants FOR 
 
 
 --
+-- Name: file_blobs forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.file_blobs FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: files forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.files FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: invitations forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1675,6 +1805,20 @@ CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.audit_log FOR EACH STATEME
 
 
 --
+-- Name: file_blobs forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.file_blobs FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: files forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.files FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
 -- Name: hostname_tombstones forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1689,10 +1833,31 @@ CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.tenant_hostnames FOR EACH 
 
 
 --
+-- Name: file_blobs forbid_update; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_update BEFORE UPDATE ON app.file_blobs FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: files forbid_update; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_update BEFORE UPDATE ON app.files FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
 -- Name: platform_hostnames is_free; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER is_free BEFORE INSERT ON app.platform_hostnames FOR EACH ROW EXECUTE FUNCTION private.platform_hostname_is_free();
+
+
+--
+-- Name: file_blobs matches_file; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER matches_file BEFORE INSERT OR DELETE ON app.file_blobs FOR EACH ROW EXECUTE FUNCTION private.blob_matches_file();
 
 
 --
@@ -1773,6 +1938,13 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.brand_assets FOR EACH ROW EX
 
 
 --
+-- Name: files stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT ON app.files FOR EACH ROW EXECUTE FUNCTION private.stamp('created_by', 'created_at');
+
+
+--
 -- Name: invitations stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -1850,6 +2022,22 @@ ALTER TABLE ONLY app.brand_asset_grants
 
 ALTER TABLE ONLY app.brand_asset_grants
     ADD CONSTRAINT brand_asset_grants_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: file_blobs file_blobs_tenant_id_file_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.file_blobs
+    ADD CONSTRAINT file_blobs_tenant_id_file_id_fkey FOREIGN KEY (tenant_id, file_id) REFERENCES app.files(tenant_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: files files_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.files
+    ADD CONSTRAINT files_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
 
 
 --
@@ -2057,6 +2245,39 @@ CREATE POLICY country_admin_update ON app.tenants FOR UPDATE TO aiontheballot_ad
 
 
 --
+-- Name: files editor_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_delete ON app.files FOR DELETE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: file_blobs editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_insert ON app.file_blobs FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: files editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_insert ON app.files FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: file_blobs; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.file_blobs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: files; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.files ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: hostname_tombstones; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2090,6 +2311,20 @@ CREATE POLICY member_read ON app.brand_assets FOR SELECT TO aiontheballot_admin 
   WHERE ((g.brand_asset_id = brand_assets.id) AND (g.tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants))))) OR (EXISTS ( SELECT 1
    FROM app.tenant_brand_selections s
   WHERE ((s.brand_asset_id = brand_assets.id) AND (s.tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants))))) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: file_blobs member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.file_blobs FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: files member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.files FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -2651,6 +2886,13 @@ REVOKE ALL ON FUNCTION private.audit() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION blob_matches_file(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.blob_matches_file() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION bump_public_version(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -2828,6 +3070,83 @@ GRANT INSERT(sha256) ON TABLE app.brand_assets TO aiontheballot_admin;
 --
 
 GRANT INSERT(content) ON TABLE app.brand_assets TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE file_blobs; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN file_blobs.file_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(file_id) ON TABLE app.file_blobs TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN file_blobs.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.file_blobs TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN file_blobs.content; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(content) ON TABLE app.file_blobs TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE files; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,DELETE ON TABLE app.files TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN files.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.files TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN files.bucket; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(bucket) ON TABLE app.files TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN files.content_type; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(content_type) ON TABLE app.files TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN files.byte_size; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(byte_size) ON TABLE app.files TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN files.sha256; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(sha256) ON TABLE app.files TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN files.original_filename; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(original_filename) ON TABLE app.files TO aiontheballot_admin;
 
 
 --

@@ -473,6 +473,10 @@ create table app.source_texts (
 );
 ```
 
+**Stored files.** A trigger checks that a blob matches its file's SHA-256 and size; the writer must be able to see the
+file. Neither a file nor its bytes is ever updated. A file is deleted only while nothing references it, and its blob
+goes with it (`on delete cascade`); deleting the bytes of a file that still exists is refused, even for the owner.
+
 **Citable sources.** Evidence or a checked-document record may cite a source only once it has a stored copy and
 its extraction is `done` (or `not_applicable`, for kinds without text). The source's `party_id` must be null or the
 cell's party: one party's documents never back another party's cell.

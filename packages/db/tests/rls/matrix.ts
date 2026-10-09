@@ -121,6 +121,72 @@ export const TENANT_DOCUMENTS = {
   publishedInactive: { id: fixtureId(5, 4), tenant: 'inactive', published: true },
 } as const satisfies Record<string, { id: string; tenant: TenantKey; published: boolean }>;
 
+/**
+ * Fictional stored files. Each has its blob, except the "awaiting" ones (one per tenant), which the insert cases of
+ * file_blobs complete. Content is the UTF-8 of `content`.
+ */
+export const FILES = {
+  sourceA: {
+    id: fixtureId(6, 1),
+    tenant: 'A',
+    bucket: 'sources',
+    type: 'application/pdf',
+    content: 'pdf-a',
+    blob: true,
+  },
+  logoA: {
+    id: fixtureId(6, 2),
+    tenant: 'A',
+    bucket: 'public_assets',
+    type: 'image/png',
+    content: 'png-a',
+    blob: true,
+  },
+  sourceB: {
+    id: fixtureId(6, 3),
+    tenant: 'B',
+    bucket: 'sources',
+    type: 'application/pdf',
+    content: 'pdf-b',
+    blob: true,
+  },
+  sourceInactive: {
+    id: fixtureId(6, 4),
+    tenant: 'inactive',
+    bucket: 'sources',
+    type: 'application/pdf',
+    content: 'pdf-inactivo',
+    blob: true,
+  },
+  awaitingA: {
+    id: fixtureId(6, 5),
+    tenant: 'A',
+    bucket: 'sources',
+    type: 'text/html',
+    content: 'html-a',
+    blob: false,
+  },
+  awaitingB: {
+    id: fixtureId(6, 6),
+    tenant: 'B',
+    bucket: 'sources',
+    type: 'text/html',
+    content: 'html-b',
+    blob: false,
+  },
+  awaitingInactive: {
+    id: fixtureId(6, 7),
+    tenant: 'inactive',
+    bucket: 'sources',
+    type: 'text/html',
+    content: 'html-inactivo',
+    blob: false,
+  },
+} as const satisfies Record<
+  string,
+  { id: string; tenant: TenantKey; bucket: string; type: string; content: string; blob: boolean }
+>;
+
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
   [{ user: USERS.revokedA, tenant: 'A', role: 'editor' }];
@@ -206,6 +272,8 @@ const NOBODY: Rule = {};
 const MEMBERS: Rule = { members: ALL_ROLES, platformAdmin: true };
 const COUNTRY_ADMINS: Rule = { members: ['country_admin'], platformAdmin: true };
 const PLATFORM_ADMIN: Rule = { platformAdmin: true };
+/** Who writes drafts, evidence and sources (ADR-0002, capabilities by role). */
+const EDITORS: Rule = { members: ['editor', 'country_admin'], platformAdmin: true };
 
 const tenantRow = (key: TenantKey): Row => ({
   id: `tenant ${key}`,
@@ -683,6 +751,53 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
       created_by: { set: `created_by = '${USERS.newcomer}'`, rule: NOBODY },
     },
+  },
+
+  'app.files': {
+    rows: Object.entries(FILES)
+      .filter(([, f]) => f.blob)
+      .map(([name, f]) => ({
+        id: `${name} file`,
+        tenant: f.tenant,
+        public: false,
+        where: `id = '${f.id}'`,
+      })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `upload into ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.files (tenant_id, bucket, content_type, byte_size, sha256, original_filename)
+            VALUES ('${TENANTS[key].id}', 'sources', 'application/pdf', 5, encode(sha256('nuevo'), 'hex'),
+                    'programa.pdf')`,
+    })),
+    set: 'content_type = content_type',
+    select: MEMBERS,
+    insert: EDITORS,
+    update: NOBODY,
+    delete: EDITORS,
+  },
+
+  'app.file_blobs': {
+    rows: Object.entries(FILES)
+      .filter(([, f]) => f.blob)
+      .map(([name, f]) => ({
+        id: `${name} blob`,
+        tenant: f.tenant,
+        public: false,
+        where: `file_id = '${f.id}'`,
+      })),
+    inserts: Object.values(FILES)
+      .filter((f) => !f.blob)
+      .map((f) => ({
+        id: `blob of the awaiting file of ${f.tenant}`,
+        tenant: f.tenant,
+        sql: `INSERT INTO app.file_blobs (file_id, tenant_id, content)
+              VALUES ('${f.id}', '${TENANTS[f.tenant].id}', convert_to('${f.content}', 'UTF8'))`,
+      })),
+    set: 'content = content',
+    select: MEMBERS,
+    insert: EDITORS,
+    update: NOBODY,
+    delete: NOBODY,
   },
 
   'app.memberships': {

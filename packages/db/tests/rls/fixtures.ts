@@ -2,6 +2,7 @@ import type pg from 'pg';
 
 import {
   BRAND_ASSETS,
+  FILES,
   HOSTNAMES,
   INVITATION_TOKENS,
   MEMBERSHIPS,
@@ -137,6 +138,20 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
        VALUES ($1, $2, 'privacy_policy', $3, CASE WHEN $4 THEN now() END)`,
       [doc.id, TENANTS[doc.tenant].id, { es: 'Política de privacidad de ejemplo' }, doc.published],
     );
+  }
+  for (const f of Object.values(FILES)) {
+    await client.query(
+      `INSERT INTO app.files (id, tenant_id, bucket, content_type, byte_size, sha256, original_filename)
+       VALUES ($1, $2, $3, $4, octet_length(convert_to($5, 'UTF8')), encode(sha256(convert_to($5, 'UTF8')), 'hex'),
+               'documento-de-ejemplo')`,
+      [f.id, TENANTS[f.tenant].id, f.bucket, f.type, f.content],
+    );
+    if (f.blob) {
+      await client.query(
+        `INSERT INTO app.file_blobs (file_id, tenant_id, content) VALUES ($1, $2, convert_to($3, 'UTF8'))`,
+        [f.id, TENANTS[f.tenant].id, f.content],
+      );
+    }
   }
   await client.query('COMMIT');
 };

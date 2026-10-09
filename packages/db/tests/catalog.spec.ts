@@ -332,6 +332,7 @@ describe('catalog: tables', () => {
 /** Tables written without an audit trigger, and why. Every other table in app must have one. */
 const NOT_AUDITED: Readonly<Record<string, string>> = {
   audit_log: 'the log itself',
+  file_blobs: 'the bytes of a file, whose metadata row is audited',
   public_versions: 'a counter moved only by triggers, whose writes are audited themselves',
 };
 
@@ -339,7 +340,7 @@ const NOT_AUDITED: Readonly<Record<string, string>> = {
 const IMMUTABLE = ['audit_log', 'hostname_tombstones'];
 
 /** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
-const PERSONAL_DATA: readonly string[] = ['invitations.email'];
+const PERSONAL_DATA: readonly string[] = ['files.original_filename', 'invitations.email'];
 
 const DELETE = 8;
 const TRUNCATE = 32;

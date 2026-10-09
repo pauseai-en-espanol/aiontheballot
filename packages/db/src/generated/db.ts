@@ -5,6 +5,8 @@
 
 import type { ColumnType } from 'kysely';
 
+export type AppFileBucket = 'public_assets' | 'sources';
+
 export type AppMethodologyKind = 'demands' | 'descriptive';
 
 export type AppOrgRole = 'endorser' | 'operator';
@@ -62,6 +64,27 @@ export interface AppBrandAssets {
   name: string;
   restricted: Generated<boolean>;
   sha256: string;
+}
+
+export interface AppFileBlobs {
+  content: Buffer;
+  file_id: string;
+  tenant_id: string;
+}
+
+export interface AppFiles {
+  bucket: AppFileBucket;
+  byte_size: Int8;
+  content_type: string;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  /**
+   * personal data
+   */
+  original_filename: string | null;
+  sha256: string;
+  tenant_id: string;
 }
 
 export interface AppHostnameTombstones {
@@ -183,6 +206,8 @@ export interface DB {
   'app.audit_log': AppAuditLog;
   'app.brand_asset_grants': AppBrandAssetGrants;
   'app.brand_assets': AppBrandAssets;
+  'app.file_blobs': AppFileBlobs;
+  'app.files': AppFiles;
   'app.hostname_tombstones': AppHostnameTombstones;
   'app.hostname_verifications': AppHostnameVerifications;
   'app.invitations': AppInvitations;
