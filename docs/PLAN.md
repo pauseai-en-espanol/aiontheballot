@@ -254,6 +254,33 @@ as the LLM pipeline:
 - Apply the reflection-day behaviour agreed under Q8.
 - Archive the election after the results.
 
+## Decisions to review (taken by Claude while Dani was away)
+
+Each entry lists the options, the choice and why. The rule was the most conservative option: stricter security, less
+scope, closest to the spec and ADRs. Revert any of them with a forward migration.
+
+**Cell workflow (migration `assessment_workflow`):**
+
+- **R1. Where a rejection's note comes from.** Options: a comment the rejecter writes in the same transaction; a new
+  column on `assessments`; a session setting; making rejection an insert of a `rejected` event. **Chose the comment:**
+  no schema change, no session flag, and members still insert only comments. The trigger copies its note into the
+  `rejected` event.
+- **R2. How a quote or checked-document change bumps its cell.** Options: a `SECURITY DEFINER` trigger; an `UPDATE`
+  grant on `content_version`; a nested no-op `SET state = 'draft'` that the cell's trigger counts as an edit only at
+  trigger depth > 1. **Chose the nested touch:** no new `SECURITY DEFINER` function and no new grant.
+- **R3. How triggers write review events members may not.** The insert policy admits kinds other than `commented`
+  only at trigger depth > 0. A caller can't run at depth > 0 except through our triggers, which never copy a kind
+  from the caller.
+- **R4. Who submits.** Editors and country admins (and platform admins), not reviewers, who "change only what
+  reviewing needs" (spec §3.5). Recall is open to any contributor of the generation.
+- **R5. A cell with a review trail can't be deleted.** Review events are immutable and reference the cell without
+  cascade, so once submitted, a never-published cell stays (as a draft). The alternative, cascading, would delete
+  history.
+- **R6. Submitting in a draft election is allowed;** publishing there is not (spec §4).
+- **R7. Step 9 of publishing** (next generation, clearing the change kind and note) runs in the cell's transition
+  trigger when the table owner sets the cell `published`; only the owner may, so only the publish trigger can.
+- **R8. `initial` in `draft_change_kind`** is refused when submitting, not when writing a draft.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).

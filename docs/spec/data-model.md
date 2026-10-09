@@ -610,6 +610,29 @@ in the published copy, rather than `interval`, which has no plain JSON or TypeSc
 recalls it to `draft`. Every content-changing trigger and the publish trigger lock the cell row (`for update`), so
 an edit can't slip in between the reviewer's check and the copy.
 
+**How the workflow is enforced** (`private.assessment_transition()` before an update of a cell,
+`private.assessment_trail()` after a write, `private.cell_content_changed()` after a write of a quote or checked
+document):
+
+- A change to a quote or checked document locks its cell and then _touches_ it: a nested `SET state = 'draft'` that
+  changes nothing else, which the cell's trigger counts as an edit (only at trigger depth > 1, so a caller can't
+  fake one). An edit checks the lock, bumps `content_version`, returns a published cell to draft and adds the editor
+  as a contributor. Attesting a quote, or what the match trigger computes, is not an edit.
+- Submitting needs `editor` or `country_admin` (or a platform admin). Coming back from review is a recall when the
+  actor is a contributor of the generation; otherwise it is a rejection, which needs `reviewer` or `country_admin`
+  and a note: a comment the rejecter writes on the cell in the same transaction, copied into the `rejected` event.
+- Only the table owner sets a cell `published`, which only the `SECURITY DEFINER` publish trigger runs as. That
+  update changes nothing else; the transition trigger then starts the next generation and clears the change kind and
+  note (§3.6 step 9). A published cell goes back to draft only by an edit.
+- `review_events` other than comments are written by these triggers only: the insert policy admits other kinds only
+  at trigger depth > 0. Review events are immutable, so a cell with a review trail is never deleted.
+- In an archived election, no new cell is created, and a cell's content changes only while its draft is a
+  correction or a withdrawal (PLAN P16).
+- Ratings are checked against the tenant's methodology kind when written. Submitting checks everything publishing
+  will: the change kind and default-locale note after the first publish (none before it), a rating and a
+  default-locale summary unless withdrawing, and the evidence (a quote, or for "not mentioned" a checked, stored
+  copy of the party's own document of a kind the methodology lists).
+
 ### 3.6 Published revisions (immutable)
 
 **Publishing is one INSERT that names the cell and the version reviewed:**

@@ -281,8 +281,8 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       await client.query('UPDATE app.job_requests SET finished_at = now() WHERE id = $1', [job.id]);
     }
   }
-  // Cells, written by each tenant's author: a draft "not mentioned" backed by a checked copy of the programme, and a
-  // "meets" with one quote, submitted for review.
+  // Cells, written by each tenant's author (who becomes their contributor): a draft "not mentioned" backed by a
+  // checked copy of the programme (with a quote too), and a "meets" with one quote, submitted for review.
   for (const [key, cells] of Object.entries(CELLS) as [TenantKey, (typeof CELLS)[TenantKey]][]) {
     const tenant = TENANTS[key].id;
     const e = cells.election;
@@ -300,13 +300,17 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
     );
     await client.query(
       `INSERT INTO app.draft_evidence (id, tenant_id, election_id, assessment_id, source_document_id, ordinal, quote)
-       VALUES ($1, $2, $3, $4, $5, 1, $6)`,
-      [cells.evidence, tenant, e.id, cells.review, cells.source.id, cells.quote],
-    );
-    await client.query(
-      `INSERT INTO app.assessment_contributors (assessment_id, tenant_id, generation, user_id)
-       VALUES ($1, $2, 0, $4), ($3, $2, 0, $4) ON CONFLICT DO NOTHING`,
-      [cells.draft, tenant, cells.review, cells.author],
+       VALUES ($1, $2, $3, $4, $5, 1, $6), ($7, $2, $3, $8, $5, 1, $6)`,
+      [
+        cells.evidence,
+        tenant,
+        e.id,
+        cells.review,
+        cells.source.id,
+        cells.quote,
+        cells.draftEvidence,
+        cells.draft,
+      ],
     );
     await client.query(`UPDATE app.assessments SET state = 'in_review' WHERE id = $1`, [
       cells.review,

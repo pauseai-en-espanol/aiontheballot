@@ -395,6 +395,8 @@ export interface FixtureCells {
   author: string;
   /** party × criterion: a draft rated "not mentioned", backed by a checked copy of the party's programme. */
   draft: string;
+  /** A quote on the draft cell, so quotes of a draft can be edited. */
+  draftEvidence: string;
   /** party × second criterion: in review, rated "meets", with one quote from the programme. */
   review: string;
   evidence: string;
@@ -408,6 +410,7 @@ export const CELLS = {
     source: SOURCES.liveA,
     author: USERS.editorA,
     draft: fixtureId(9, 51),
+    draftEvidence: fixtureId(9, 60),
     review: fixtureId(9, 52),
     evidence: fixtureId(9, 53),
     quote: 'propone una moratoria de ejemplo sobre los sistemas de prueba',
@@ -417,6 +420,7 @@ export const CELLS = {
     source: SOURCES.liveB,
     author: USERS.countryAdminB,
     draft: fixtureId(9, 54),
+    draftEvidence: fixtureId(9, 61),
     review: fixtureId(9, 55),
     evidence: fixtureId(9, 56),
     quote: 'Texto de ejemplo del programa ficticio',
@@ -426,6 +430,7 @@ export const CELLS = {
     source: SOURCES.liveInactive,
     author: USERS.countryAdminInactive,
     draft: fixtureId(9, 57),
+    draftEvidence: fixtureId(9, 62),
     review: fixtureId(9, 58),
     evidence: fixtureId(9, 59),
     quote: 'Texto de ejemplo del inquilino inactivo',
@@ -510,6 +515,8 @@ export interface Insert {
   id: string;
   tenant: TenantKey | null;
   sql: string;
+  /** Who may perform this insert, when it differs from the relation's insert rule. */
+  rule?: Rule;
   /** The SQLSTATE that stops a permitted principal (an integrity rule), as for Row.blocked. */
   blocked?: string;
 }
@@ -1402,18 +1409,22 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.assessments': {
-    rows: TENANT_KEYS.flatMap((key) => [
+    rows: TENANT_KEYS.flatMap((key): Row[] => [
       {
         id: `draft cell of ${key}`,
         tenant: key,
         public: false,
         where: `id = '${CELLS[key].draft}'`,
+        blocked: { 'update:state (publish)': '23001' },
       },
       {
         id: `cell in review of ${key}`,
         tenant: key,
         public: false,
         where: `id = '${CELLS[key].review}'`,
+        // Leaving it at in_review changes nothing; its content is locked; its review trail keeps it.
+        rules: { 'update:state (submit)': MEMBERS },
+        blocked: { update: '23001', delete: '23503', 'update:state (publish)': '23001' },
       },
     ]),
     inserts: TENANT_KEYS.map((key) => ({
@@ -1429,6 +1440,13 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     update: EDITORS,
     delete: EDITORS,
     columnUpdates: {
+      // Submitting: the draft cells meet every precondition. Recalling and rejecting depend on who contributed, so
+      // they are data-rule tests (workflow.spec.ts).
+      'state (submit)': { set: `state = 'in_review'`, rule: EDITORS },
+      // Only the publish trigger, as the table owner, sets a cell published (blocked on every row).
+      'state (publish)': { set: `state = 'published'`, rule: MEMBERS },
+      // Not content: allowed in review too.
+      recheck_reason: { set: `recheck_reason = 'Motivo de ejemplo'`, rule: EDITORS },
       generation: { set: 'generation = generation + 1', rule: NOBODY },
       content_version: { set: 'content_version = content_version + 1', rule: NOBODY },
       updated_by: { set: `updated_by = '${USERS.newcomer}'`, rule: NOBODY },
@@ -1458,19 +1476,39 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.draft_evidence': {
-    rows: TENANT_KEYS.map((key) => ({
-      id: `quote of ${key}`,
-      tenant: key,
-      public: false,
-      where: `id = '${CELLS[key].evidence}'`,
-    })),
-    inserts: TENANT_KEYS.map((key) => ({
-      id: `quote in ${key}`,
-      tenant: key,
-      sql: `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote)
-            VALUES ('${TENANTS[key].id}', '${CELLS[key].election.id}', '${CELLS[key].draft}',
-                    '${CELLS[key].source.id}', 1, '${CELLS[key].quote}')`,
-    })),
+    rows: TENANT_KEYS.flatMap((key): Row[] => [
+      {
+        id: `quote of the draft cell of ${key}`,
+        tenant: key,
+        public: false,
+        where: `id = '${CELLS[key].draftEvidence}'`,
+      },
+      {
+        id: `quote in review of ${key}`,
+        tenant: key,
+        public: false,
+        where: `id = '${CELLS[key].evidence}'`,
+        // Locked while its cell is in review.
+        blocked: { update: '23001', 'update:quote': '23001', delete: '23001' },
+      },
+    ]),
+    inserts: TENANT_KEYS.flatMap((key) => [
+      {
+        id: `quote for the draft cell of ${key}`,
+        tenant: key,
+        sql: `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote)
+              VALUES ('${TENANTS[key].id}', '${CELLS[key].election.id}', '${CELLS[key].draft}',
+                      '${CELLS[key].source.id}', 2, '${CELLS[key].quote}')`,
+      },
+      {
+        id: `quote for the cell in review of ${key}`,
+        tenant: key,
+        sql: `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote)
+              VALUES ('${TENANTS[key].id}', '${CELLS[key].election.id}', '${CELLS[key].review}',
+                      '${CELLS[key].source.id}', 2, '${CELLS[key].quote}')`,
+        blocked: '23001',
+      },
+    ]),
     set: `section_label = 'Sección de ejemplo'`,
     select: MEMBERS,
     insert: EDITORS,
@@ -1496,6 +1534,8 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       tenant: key,
       sql: `INSERT INTO app.draft_checked_documents (assessment_id, tenant_id, election_id, source_document_id)
             VALUES ('${CELLS[key].review}', '${TENANTS[key].id}', '${CELLS[key].election.id}', '${CELLS[key].source.id}')`,
+      // Locked while its cell is in review.
+      blocked: '23001',
     })),
     set: 'checked_at = checked_at',
     select: MEMBERS,
@@ -1505,13 +1545,28 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.review_events': {
-    rows: [],
-    inserts: TENANT_KEYS.map((key) => ({
-      id: `comment in ${key}`,
+    rows: TENANT_KEYS.map((key) => ({
+      id: `submission of the cell in review of ${key}`,
       tenant: key,
-      sql: `INSERT INTO app.review_events (tenant_id, assessment_id, kind, note)
-            VALUES ('${TENANTS[key].id}', '${CELLS[key].review}', 'commented', 'Comentario de ejemplo')`,
+      public: false,
+      where: `assessment_id = '${CELLS[key].review}' AND kind = 'submitted'`,
     })),
+    inserts: TENANT_KEYS.flatMap((key) => [
+      {
+        id: `comment in ${key}`,
+        tenant: key,
+        sql: `INSERT INTO app.review_events (tenant_id, assessment_id, kind, note)
+              VALUES ('${TENANTS[key].id}', '${CELLS[key].review}', 'commented', 'Comentario de ejemplo')`,
+      },
+      {
+        // The workflow writes every other kind.
+        id: `approval in ${key}`,
+        tenant: key,
+        sql: `INSERT INTO app.review_events (tenant_id, assessment_id, kind)
+              VALUES ('${TENANTS[key].id}', '${CELLS[key].review}', 'approved')`,
+        rule: NOBODY,
+      },
+    ]),
     set: 'note = note',
     select: MEMBERS,
     insert: MEMBERS,

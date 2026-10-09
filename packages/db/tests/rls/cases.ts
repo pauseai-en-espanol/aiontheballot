@@ -115,7 +115,7 @@ export const matrixCases = (): MatrixCase[] =>
             outcome === 'allow' && insert.blocked ? `error ${insert.blocked}` : outcome)(
             principal.role === 'aiontheballot_worker'
               ? workerOutcome(principal, relation, `insert ${insert.id}`, 'insert')
-              : expectedOutcome(principal, spec.insert, insert.tenant, false, true),
+              : expectedOutcome(principal, insert.rule ?? spec.insert, insert.tenant, false, true),
           ),
         });
       }
