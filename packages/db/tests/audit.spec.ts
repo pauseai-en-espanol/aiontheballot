@@ -82,7 +82,7 @@ describe('private.audit', () => {
       ]);
       await client.query('RESET ROLE');
       return {
-        tenants: (await auditOf(client, 'tenants')).filter((r) => r.action === 'update'),
+        tenants: (await auditOf(client, 'tenants')).filter((r) => r.action === 'update' && r.now),
         platform: await auditOf(client, 'platform_admins'),
       };
     });

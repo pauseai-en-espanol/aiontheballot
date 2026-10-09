@@ -941,6 +941,9 @@ live ──(archive)──▶ archived
 - **Archived:** read-only, except corrections and withdrawals (with the same review rule and a public note) and
   report handling.
 - **`require_second_reviewer`** is on by default. Only a platform admin turns it off, audited; ADR-0002 records why.
+- **Once live,** slugs, the type and the territory are fixed; an archived election and its structure are read-only.
+  A tenant's methodology kind is fixed once it has a methodology, and its country code while its territories use it.
+  These rules fire after the permission guards, so a writer without the right is refused as such first.
 
 **Assessment (a cell):**
 

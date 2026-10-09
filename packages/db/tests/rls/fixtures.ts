@@ -206,7 +206,15 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       [e.criterion, tenant, e.id, e.id === ELECTIONS.liveA.id ? CORE_CRITERION : null],
     );
     if (e.status !== 'draft') {
+      // Only an active tenant's election goes live: the inactive tenant is active just for that moment.
+      const inactive = !TENANTS[e.tenant].active;
+      if (inactive) {
+        await client.query('UPDATE app.tenants SET active = true WHERE id = $1', [tenant]);
+      }
       await client.query(`UPDATE app.elections SET status = 'live' WHERE id = $1`, [e.id]);
+      if (inactive) {
+        await client.query('UPDATE app.tenants SET active = false WHERE id = $1', [tenant]);
+      }
     }
     if (e.status === 'archived') {
       await client.query(`UPDATE app.elections SET status = 'archived' WHERE id = $1`, [e.id]);

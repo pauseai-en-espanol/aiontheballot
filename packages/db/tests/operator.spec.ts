@@ -100,16 +100,24 @@ describe('an active tenant has exactly one operator', () => {
     });
   });
 
-  it("audits a platform admin's change of methodology kind", async () => {
+  it("audits a platform admin's change of methodology kind (on a tenant with no methodology yet)", async () => {
     const log = await asPlatformAdmin(async (client) => {
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO app.tenants (slug, country_code, default_locale, enabled_locales, display_name,
+                                  methodology_kind, report_retention_days)
+         VALUES ('test-tipo', 'XT', 'es', '{es}', '{"es": "Inquilino de prueba"}', 'demands', 365)
+         RETURNING id`,
+      );
+      const id = rows[0]?.id;
       await client.query(`UPDATE app.tenants SET methodology_kind = 'descriptive' WHERE id = $1`, [
-        TENANT_A,
+        id,
       ]);
       await client.query('RESET ROLE');
       return (
         await client.query<{ diff: unknown; actor_id: string }>(
-          `SELECT diff, actor_id FROM app.audit_log WHERE table_name = 'tenants' AND row_id = $1 AND at = now()`,
-          [TENANT_A],
+          `SELECT diff, actor_id FROM app.audit_log
+            WHERE table_name = 'tenants' AND row_id = $1 AND action = 'update' AND at = now()`,
+          [id],
         )
       ).rows;
     });

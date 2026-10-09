@@ -323,7 +323,7 @@ export interface Row {
    * Operations a permitted principal still can't complete, with the SQLSTATE that stops them (say, 23503 when a
    * foreign key protects a referenced row). Denied principals must still be stopped by the security layers.
    */
-  blocked?: Partial<Record<'update' | 'delete', string>>;
+  blocked?: Readonly<Record<string, string>>;
 }
 
 export interface Insert {
@@ -383,6 +383,8 @@ const structureRow = (e: FixtureElection, label: string, where: string, deletabl
   public: isPublic(e),
   where,
   rules: { delete: e.status === 'draft' ? deletable : NOBODY },
+  // An archived election is read-only.
+  ...(e.status === 'archived' ? { blocked: { update: '23001' } } : {}),
 });
 
 const tenantRow = (key: TenantKey): Row => ({
@@ -390,6 +392,8 @@ const tenantRow = (key: TenantKey): Row => ({
   tenant: key,
   public: TENANTS[key].active,
   where: `id = '${TENANTS[key].id}'`,
+  // Every fixture tenant has methodologies (the kind is fixed) and a regional election using its country code.
+  blocked: { 'update:methodology_kind': '23001', 'update:country_code': '23514' },
 });
 
 const membershipRow = (key: TenantKey): Row => {
@@ -945,12 +949,21 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       tenant: e.tenant,
       public: isPublic(e),
       where: `id = '${e.id}'`,
-      // Only a draft is deleted, and only once its structure is gone.
+      // Only a draft is deleted, and only once its structure is gone; an archived election is read-only.
       ...(e.status !== 'draft'
         ? { rules: { delete: NOBODY } }
         : e.structure
           ? { blocked: { delete: '23503' } }
           : {}),
+      ...(e.status === 'archived'
+        ? {
+            blocked: {
+              update: '23001',
+              'update:frozen_from': '23001',
+              'update:require_second_reviewer': '23001',
+            },
+          }
+        : {}),
     })),
     inserts: TENANT_KEYS.map((key) => ({
       id: `election in ${key}`,
