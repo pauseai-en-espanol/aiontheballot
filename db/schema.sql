@@ -438,6 +438,65 @@ CREATE FUNCTION private.forbid_tenant_change() RETURNS trigger
 ALTER FUNCTION private.forbid_tenant_change() OWNER TO aiontheballot_owner;
 
 --
+-- Name: is_platform_admin(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.is_platform_admin() RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+    SELECT private.current_aal() = 2
+       AND EXISTS (SELECT 1 FROM app.platform_admins p WHERE p.user_id = private.current_user_id())
+  $$;
+
+
+ALTER FUNCTION private.is_platform_admin() OWNER TO aiontheballot_owner;
+
+--
+-- Name: members_may_change(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.members_may_change() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    open text[] := coalesce(TG_ARGV::text[], '{}') || ARRAY['updated_by', 'updated_at'];
+    changed text;
+  BEGIN
+    SELECT string_agg(n.key, ', ' ORDER BY n.key) INTO changed
+      FROM jsonb_each(to_jsonb(NEW) - open) n
+     WHERE n.value IS DISTINCT FROM (to_jsonb(OLD) - open) -> n.key;
+    IF changed IS NOT NULL AND NOT private.is_platform_admin() THEN
+      RAISE EXCEPTION 'only platform admins may change % of %.%', changed, TG_TABLE_SCHEMA, TG_TABLE_NAME
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.members_may_change() OWNER TO aiontheballot_owner;
+
+--
+-- Name: my_tenants(app.tenant_role[]); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.my_tenants(VARIADIC roles app.tenant_role[]) RETURNS SETOF uuid
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+    SELECT m.tenant_id
+      FROM app.memberships m
+     WHERE private.current_aal() = 2
+       AND m.user_id = private.current_user_id()
+       AND m.role = ANY (roles)
+  $$;
+
+
+ALTER FUNCTION private.my_tenants(VARIADIC roles app.tenant_role[]) OWNER TO aiontheballot_owner;
+
+--
 -- Name: normalize_for_match(text); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -505,6 +564,65 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: memberships; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.memberships (
+    user_id uuid NOT NULL,
+    tenant_id uuid NOT NULL,
+    role app.tenant_role NOT NULL,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE app.memberships OWNER TO aiontheballot_owner;
+
+--
+-- Name: platform_admins; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.platform_admins (
+    user_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE app.platform_admins OWNER TO aiontheballot_owner;
+
+--
+-- Name: tenants; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.tenants (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    slug app.slug NOT NULL,
+    country_code text NOT NULL,
+    default_locale app.locale NOT NULL,
+    enabled_locales app.locale[] NOT NULL,
+    display_name app.localized NOT NULL,
+    theme jsonb DEFAULT '{}'::jsonb NOT NULL,
+    methodology_kind app.methodology_kind NOT NULL,
+    active boolean DEFAULT false NOT NULL,
+    live_edits_need_second_approver boolean DEFAULT false NOT NULL,
+    report_retention_days integer NOT NULL,
+    llm_monthly_cap_usd numeric(10,2) DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT tenants_check CHECK (((default_locale)::text = ANY ((enabled_locales)::text[]))),
+    CONSTRAINT tenants_country_code_check CHECK ((country_code ~ '^[A-Z]{2}$'::text)),
+    CONSTRAINT tenants_llm_monthly_cap_usd_check CHECK ((llm_monthly_cap_usd >= (0)::numeric)),
+    CONSTRAINT tenants_report_retention_days_check CHECK ((report_retention_days > 0)),
+    CONSTRAINT theme_is_colours CHECK (
+CASE
+    WHEN (jsonb_typeof(theme) = 'object'::text) THEN (NOT jsonb_path_exists(theme, '$.keyvalue()?((!(@."key" like_regex "^[a-z]+(_[a-z]+)*$") || @."value".type() != "string") || !(@."value" like_regex "^#[0-9a-f]{6}$"))'::jsonpath))
+    ELSE false
+END)
+);
+
+
+ALTER TABLE app.tenants OWNER TO aiontheballot_owner;
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: aiontheballot_owner
 --
 
@@ -516,12 +634,168 @@ CREATE TABLE public.schema_migrations (
 ALTER TABLE public.schema_migrations OWNER TO aiontheballot_owner;
 
 --
+-- Name: memberships memberships_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.memberships
+    ADD CONSTRAINT memberships_pkey PRIMARY KEY (user_id, tenant_id, role);
+
+
+--
+-- Name: platform_admins platform_admins_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.platform_admins
+    ADD CONSTRAINT platform_admins_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: tenants tenants_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.tenants
+    ADD CONSTRAINT tenants_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: tenants tenants_slug_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.tenants
+    ADD CONSTRAINT tenants_slug_key UNIQUE (slug);
+
+
+--
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: aiontheballot_owner
 --
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
+
+--
+-- Name: memberships_tenant_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX memberships_tenant_id_idx ON app.memberships USING btree (tenant_id);
+
+
+--
+-- Name: memberships forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.memberships FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: tenants members_may_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER members_may_change BEFORE UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.members_may_change('theme', 'report_retention_days', 'llm_monthly_cap_usd');
+
+
+--
+-- Name: memberships stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.memberships FOR EACH ROW EXECUTE FUNCTION private.stamp('created_by', 'created_at');
+
+
+--
+-- Name: platform_admins stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.platform_admins FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
+
+
+--
+-- Name: tenants stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
+
+
+--
+-- Name: memberships memberships_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.memberships
+    ADD CONSTRAINT memberships_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: memberships country_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_delete ON app.memberships FOR DELETE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: memberships country_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_insert ON app.memberships FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: tenants country_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_update ON app.tenants FOR UPDATE TO aiontheballot_admin USING (((id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin))) WITH CHECK (((id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: memberships member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.memberships FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: tenants member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.tenants FOR SELECT TO aiontheballot_admin USING (((id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: memberships; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.memberships ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: tenants platform_admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_insert ON app.tenants FOR INSERT TO aiontheballot_admin WITH CHECK (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: platform_admins platform_admin_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_read ON app.platform_admins FOR SELECT TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
+-- Name: platform_admins; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.platform_admins ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: tenants public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.tenants FOR SELECT TO aiontheballot_web USING (active);
+
+
+--
+-- Name: tenants; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.tenants ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: SCHEMA app; Type: ACL; Schema: -; Owner: aiontheballot_owner
@@ -754,6 +1028,29 @@ REVOKE ALL ON FUNCTION private.forbid_tenant_change() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION is_platform_admin(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.is_platform_admin() FROM PUBLIC;
+GRANT ALL ON FUNCTION private.is_platform_admin() TO aiontheballot_admin;
+
+
+--
+-- Name: FUNCTION members_may_change(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.members_may_change() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION my_tenants(VARIADIC roles app.tenant_role[]); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.my_tenants(VARIADIC roles app.tenant_role[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION private.my_tenants(VARIADIC roles app.tenant_role[]) TO aiontheballot_admin;
+
+
+--
 -- Name: FUNCTION normalize_for_match(input text); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -765,6 +1062,147 @@ REVOKE ALL ON FUNCTION private.normalize_for_match(input text) FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.stamp() FROM PUBLIC;
+
+
+--
+-- Name: TABLE memberships; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,DELETE ON TABLE app.memberships TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN memberships.user_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(user_id) ON TABLE app.memberships TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN memberships.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.memberships TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN memberships.role; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(role) ON TABLE app.memberships TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE platform_admins; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.platform_admins TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE tenants; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(id) ON TABLE app.tenants TO aiontheballot_web;
+
+
+--
+-- Name: COLUMN tenants.slug; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(slug) ON TABLE app.tenants TO aiontheballot_web;
+GRANT INSERT(slug),UPDATE(slug) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.country_code; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(country_code) ON TABLE app.tenants TO aiontheballot_web;
+GRANT INSERT(country_code),UPDATE(country_code) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.default_locale; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(default_locale) ON TABLE app.tenants TO aiontheballot_web;
+GRANT INSERT(default_locale),UPDATE(default_locale) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.enabled_locales; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(enabled_locales) ON TABLE app.tenants TO aiontheballot_web;
+GRANT INSERT(enabled_locales),UPDATE(enabled_locales) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.display_name; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(display_name) ON TABLE app.tenants TO aiontheballot_web;
+GRANT INSERT(display_name),UPDATE(display_name) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.theme; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(theme) ON TABLE app.tenants TO aiontheballot_web;
+GRANT INSERT(theme),UPDATE(theme) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.methodology_kind; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(methodology_kind) ON TABLE app.tenants TO aiontheballot_web;
+GRANT INSERT(methodology_kind),UPDATE(methodology_kind) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.active; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(active) ON TABLE app.tenants TO aiontheballot_web;
+GRANT INSERT(active),UPDATE(active) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.live_edits_need_second_approver; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(live_edits_need_second_approver),UPDATE(live_edits_need_second_approver) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.report_retention_days; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(report_retention_days),UPDATE(report_retention_days) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.llm_monthly_cap_usd; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(llm_monthly_cap_usd),UPDATE(llm_monthly_cap_usd) ON TABLE app.tenants TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenants.created_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(created_at) ON TABLE app.tenants TO aiontheballot_web;
 
 
 --

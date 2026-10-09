@@ -3,4 +3,64 @@
  * Please do not edit it manually.
  */
 
-export interface DB {}
+import type { ColumnType } from 'kysely';
+
+export type AppMethodologyKind = 'demands' | 'descriptive';
+
+export type AppTenantRole = 'country_admin' | 'editor' | 'reviewer';
+
+export type Generated<T> =
+  T extends ColumnType<infer S, infer I, infer U>
+    ? ColumnType<S, I | undefined, U>
+    : ColumnType<T, T | undefined, T>;
+
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [x: string]: JsonValue | undefined;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
+export type Numeric = ColumnType<string, number | string, number | string>;
+
+export type Timestamp = ColumnType<Date, Date | string, Date | string>;
+
+export interface AppMemberships {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  role: AppTenantRole;
+  tenant_id: string;
+  user_id: string;
+}
+
+export interface AppPlatformAdmins {
+  created_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface AppTenants {
+  active: Generated<boolean>;
+  country_code: string;
+  created_at: Generated<Timestamp>;
+  default_locale: string;
+  display_name: Json;
+  enabled_locales: string[];
+  id: Generated<string>;
+  live_edits_need_second_approver: Generated<boolean>;
+  llm_monthly_cap_usd: Generated<Numeric>;
+  methodology_kind: AppMethodologyKind;
+  report_retention_days: number;
+  slug: string;
+  theme: Generated<Json>;
+}
+
+export interface DB {
+  'app.memberships': AppMemberships;
+  'app.platform_admins': AppPlatformAdmins;
+  'app.tenants': AppTenants;
+}

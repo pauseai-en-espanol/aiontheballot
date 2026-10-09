@@ -74,8 +74,141 @@ describe('catalog: closed by default', () => {
         WHERE n.nspname IN ('app', 'private')`,
     );
     expect(functions.filter((f) => !f.pinned).map((f) => f.fn)).toEqual([]);
-    expect(functions.filter((f) => f.definer).map((f) => f.fn)).toEqual([
-      ...SECURITY_DEFINER_ALLOWLIST,
+    expect(
+      functions
+        .filter((f) => f.definer)
+        .map((f) => f.fn)
+        .sort(),
+    ).toEqual([...SECURITY_DEFINER_ALLOWLIST].sort());
+  });
+
+  it('gives aiontheballot_web no way to write any table', async () => {
+    const writable = await rows<{ grant: string }>(
+      `SELECT c.relname || ' ' || p.privilege AS grant
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         CROSS JOIN unnest(ARRAY['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) AS p(privilege)
+        WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p', 'v')
+          AND (has_table_privilege('aiontheballot_web', c.oid, p.privilege)
+               OR (p.privilege IN ('INSERT', 'UPDATE')
+                   AND has_any_column_privilege('aiontheballot_web', c.oid, p.privilege)))`,
+    );
+    expect(writable).toEqual([]);
+  });
+
+  it('never grants TRUNCATE (which skips RLS), REFERENCES or TRIGGER to a runtime role', async () => {
+    const risky = await rows<{ grant: string }>(
+      `SELECT r.role || ' ' || c.relname || ' ' || p.privilege AS grant
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         CROSS JOIN unnest($1::text[]) AS r(role)
+         CROSS JOIN unnest(ARRAY['TRUNCATE', 'REFERENCES', 'TRIGGER']) AS p(privilege)
+        WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p', 'v')
+          AND (has_table_privilege(r.role, c.oid, p.privilege)
+               OR (p.privilege = 'REFERENCES' AND has_any_column_privilege(r.role, c.oid, p.privilege)))`,
+      [RUNTIME_ROLES],
+    );
+    expect(risky).toEqual([]);
+  });
+
+  it('grants PUBLIC nothing on any table or column', async () => {
+    const open = await rows<{ relname: string }>(
+      `SELECT DISTINCT c.relname
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         LEFT JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0
+        WHERE n.nspname IN ('app', 'private')
+          AND (EXISTS (SELECT 1 FROM aclexplode(c.relacl) x WHERE x.grantee = 0)
+               OR EXISTS (SELECT 1 FROM aclexplode(a.attacl) x WHERE x.grantee = 0))`,
+    );
+    expect(open).toEqual([]);
+  });
+});
+
+/**
+ * Tenant ownership (ADR-0002 §4): every table with a tenant_id has the immutability trigger, at least one foreign key
+ * that pins tenant_id (to app.tenants or a tenant-owned parent), and no foreign key to a tenant-owned parent that
+ * leaves tenant_id out or maps it to another column. Returns one line per violation.
+ */
+const tenantOwnershipViolations = async (client: pg.Client): Promise<string[]> => {
+  const tables = (
+    await client.query<{ name: string; immutable: boolean }>(
+      `SELECT c.relname AS name,
+              EXISTS (SELECT 1 FROM pg_trigger t
+                       WHERE t.tgrelid = c.oid AND NOT t.tgisinternal
+                         AND t.tgfoid = to_regprocedure('private.forbid_tenant_change()')
+                         AND (t.tgtype & 19) = 19) AS immutable
+         FROM pg_class c
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_attribute a ON a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped
+        WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p')
+        ORDER BY 1`,
+    )
+  ).rows;
+  const keys = (
+    await client.query<{
+      name: string;
+      ref: string;
+      cols: string[];
+      refcols: string[];
+      tenantOwned: boolean;
+    }>(
+      `SELECT c.relname AS name, r.relname AS ref,
+              ARRAY(SELECT a.attname::text FROM unnest(con.conkey) WITH ORDINALITY k(num, ord)
+                      JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.num ORDER BY k.ord) AS cols,
+              ARRAY(SELECT a.attname::text FROM unnest(con.confkey) WITH ORDINALITY k(num, ord)
+                      JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.num ORDER BY k.ord) AS refcols,
+              EXISTS (SELECT 1 FROM pg_attribute a
+                       WHERE a.attrelid = r.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped) AS "tenantOwned"
+         FROM pg_constraint con
+         JOIN pg_class c ON c.oid = con.conrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_class r ON r.oid = con.confrelid
+        WHERE con.contype = 'f' AND n.nspname = 'app'`,
+    )
+  ).rows;
+
+  return tables.flatMap(({ name, immutable }) => {
+    const violations: string[] = [];
+    if (!immutable) {
+      violations.push(`${name}: no BEFORE UPDATE private.forbid_tenant_change() trigger`);
+    }
+    const own = keys.filter((k) => k.name === name);
+    const pins = (k: (typeof own)[number]): boolean => {
+      const i = k.cols.indexOf('tenant_id');
+      return k.ref === 'tenants'
+        ? k.cols.length === 1 && i === 0 && k.refcols[0] === 'id'
+        : i >= 0 && k.refcols[i] === 'tenant_id';
+    };
+    for (const k of own.filter((k) => (k.ref === 'tenants' || k.tenantOwned) && !pins(k))) {
+      violations.push(
+        `${name}: foreign key (${k.cols.join(', ')}) → ${k.ref} does not pin tenant_id`,
+      );
+    }
+    if (!own.some((k) => (k.ref === 'tenants' || k.tenantOwned) && pins(k))) {
+      violations.push(`${name}: tenant_id is not pinned by any foreign key`);
+    }
+    return violations;
+  });
+};
+
+describe('catalog: tenant ownership', () => {
+  it('holds for every table with a tenant_id', async () => {
+    expect(await inRolledBackTransaction(tenantOwnershipViolations)).toEqual([]);
+  });
+
+  it('reports a missing trigger, an unpinned tenant_id, and a foreign key that skips it', async () => {
+    const violations = await inRolledBackTransaction(async (client) => {
+      await client.query(`
+        CREATE TABLE app.probe_parent (id uuid PRIMARY KEY, tenant_id uuid NOT NULL REFERENCES app.tenants,
+                                       UNIQUE (tenant_id, id));
+        CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.probe_parent
+          FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+        CREATE TABLE app.probe_loose (id uuid PRIMARY KEY, tenant_id uuid NOT NULL,
+                                      parent_id uuid REFERENCES app.probe_parent);`);
+      return tenantOwnershipViolations(client);
+    });
+    expect(violations).toEqual([
+      'probe_loose: no BEFORE UPDATE private.forbid_tenant_change() trigger',
+      'probe_loose: foreign key (parent_id) → probe_parent does not pin tenant_id',
+      'probe_loose: tenant_id is not pinned by any foreign key',
     ]);
   });
 });

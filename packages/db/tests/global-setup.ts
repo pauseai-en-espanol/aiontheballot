@@ -3,11 +3,15 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import pg from 'pg';
 
-import { migrationsDir, ownerUrl } from './env.js';
+import { migrationsDir, ownerUrl, superuserUrl } from './env.js';
+import { loadFixtures } from './rls/fixtures.js';
 
 const run = promisify(execFile);
 
-/** Rebuilds aiontheballot_test from scratch: drop everything the owner created, then apply every migration as the owner. */
+/**
+ * Rebuilds aiontheballot_test from scratch: drop everything the owner created, apply every migration as the owner,
+ * then load the matrix fixtures.
+ */
 export default async function setup(): Promise<void> {
   const client = new pg.Client({ connectionString: ownerUrl() });
   await client.connect();
@@ -33,4 +37,12 @@ export default async function setup(): Promise<void> {
     '--no-dump-schema',
     'up',
   ]);
+
+  const superuser = new pg.Client({ connectionString: superuserUrl() });
+  await superuser.connect();
+  try {
+    await loadFixtures(superuser);
+  } finally {
+    await superuser.end();
+  }
 }

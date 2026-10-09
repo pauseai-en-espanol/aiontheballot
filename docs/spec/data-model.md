@@ -976,6 +976,9 @@ Column-level grants restrict `aiontheballot_web` further: on `source_documents` 
 
 The only write available to `aiontheballot_web` is calling `app.submit_report()`.
 
+These public-visibility policies are for `aiontheballot_web` only. `aiontheballot_admin` sees what memberships give it
+(platform admins: every tenant), and nothing of other tenants, published or not (PLAN, Answered: admin visibility).
+
 ## 6. Enforcement map
 
 | Rule (ADR-0002 / BRIEF)                                                                                        | Mechanism                                                                                                                  | Where                                                                                                 |
@@ -996,7 +999,7 @@ The only write available to `aiontheballot_web` is calling `app.submit_report()`
 | Change requests can't be rewritten                                                                             | Trigger: after insert, only the one decision; no delete once decided; `previous_value` read from the target                | `change_requests`                                                                                     |
 | Live structural changes are public                                                                             | The approval trigger writes an immutable public row                                                                        | `structural_changes`                                                                                  |
 | Exactly one operator                                                                                           | Partial unique index, plus a deferred check whenever a tenant is active (activation, and any later change)                 | `tenant_organizations`, `tenants`                                                                     |
-| Only platform admins change the operator, the methodology kind or `is_pauseai_chapter`, or write organizations | Trigger, plus an audit row                                                                                                 | `tenant_organizations`, `tenants`, `organizations`                                                    |
+| Only platform admins change the operator, the methodology kind or `is_pauseai_chapter`, or write organizations | Trigger (`private.members_may_change()` lists what members may change), plus an audit row                                  | `tenant_organizations`, `tenants`, `organizations`                                                    |
 | A methodology uses the tenant's kind; its demands owner is the operator or an endorser                         | Trigger                                                                                                                    | `methodologies`                                                                                       |
 | A demands methodology names its owner                                                                          | `CHECK`                                                                                                                    | `methodologies`                                                                                       |
 | Restricted assets only for eligible tenants                                                                    | Trigger on selection and on organization logos, with re-check when grants, the operator or `is_pauseai_chapter` change     | `tenant_brand_selections`, `organizations`, `brand_asset_grants`, `tenant_organizations`              |

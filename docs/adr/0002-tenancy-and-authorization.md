@@ -83,6 +83,9 @@ log makes it visible (T23).
 - `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, `submit_report`,
   `accept_invitation`, the publish trigger `publish_revision` and `anonymize_expired_reports` (worker only). All of
   them set `search_path = ''`.
+- The actor helpers (`private.current_user_id`, `private.current_aal`) and the policy helpers
+  (`private.my_tenants`, `private.is_platform_admin`) are executable by `aiontheballot_admin`, whose policies and
+  triggers call them.
 - `private.normalize_for_match` is executable by `aiontheballot_admin` (the match trigger) and
   `aiontheballot_worker` (the generated column on `source_texts`).
 
@@ -172,7 +175,9 @@ cell without a rating (_withdrawn_, distinct from _pending_) and logs a correcti
 
 ## Capabilities by role
 
-"Own" means the member's own tenant. A member of tenant A acting on tenant B gets exactly what `aiontheballot_web` gets.
+"Own" means the member's own tenant. The admin shows each user only what is theirs: a member of tenant A gets nothing
+of tenant B, not even its published content, which they read on the public site like anyone else. Platform admins see
+every tenant, except `reports`.
 
 | Capability                                                                                                                                                                | editor | reviewer | country_admin | platform_admin                      |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------- | ------------- | ----------------------------------- |
@@ -195,6 +200,10 @@ A row is world-readable only when all of these hold:
 - It is in a public-capable table.
 - Its election's `status` is `live` or `archived`.
 - Its tenant is active.
+
+Public-visibility policies apply to `aiontheballot_web` only. `aiontheballot_admin` sees only what memberships give
+it, so the column grants that hide settings and private columns from the public can't leak them to members of other
+tenants.
 
 These platform-wide rows are also public: active `tenants`, verified `tenant_hostnames`, `organizations` and
 `core_criteria`.
@@ -451,13 +460,14 @@ from it.
 
 Exceptions are listed in `matrix.ts`.
 
-| Principal                                                             | Public-capable, own, published      | Public-capable, own, draft or in_review  | Private, own                                                | Any row of another tenant            | Immutable tables                 |
-| --------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------- | ----------------------------------------------------------- | ------------------------------------ | -------------------------------- |
-| `aiontheballot_web`, no actor, no membership, or **any role at aal1** | Read only                           | Deny                                     | Deny                                                        | Published: read only. Otherwise deny | Read published only; never write |
-| editor@A, aal2                                                        | Read; cannot change status directly | Read, insert and update; delete drafts   | Read; write sources; triage reports                         | Same as `aiontheballot_web`          | Read; never update or delete     |
-| reviewer@A, aal2                                                      | Read                                | Read; approve or reject (never own work) | Read; triage reports                                        | Same as `aiontheballot_web`          | Read; never update or delete     |
-| country_admin@A, aal2                                                 | Read                                | Full access to drafts                    | Full, including invitations and memberships; read audit log | Same as `aiontheballot_web`          | Read; never update or delete     |
-| platform_admin, aal2                                                  | All tenants                         | All tenants                              | All, **except `reports`**                                   | All tenants                          | Read; never update or delete     |
+| Principal                                                          | Public-capable, own, published      | Public-capable, own, draft or in_review  | Private, own                                                | Any row of another tenant            | Immutable tables                 |
+| ------------------------------------------------------------------ | ----------------------------------- | ---------------------------------------- | ----------------------------------------------------------- | ------------------------------------ | -------------------------------- |
+| `aiontheballot_web`                                                | Read only                           | Deny                                     | Deny                                                        | Published: read only. Otherwise deny | Read published only; never write |
+| `aiontheballot_admin` with no actor, no membership, or **at aal1** | Deny                                | Deny                                     | Deny                                                        | Deny                                 | Deny                             |
+| editor@A, aal2                                                     | Read; cannot change status directly | Read, insert and update; delete drafts   | Read; write sources; triage reports                         | Deny                                 | Read; never update or delete     |
+| reviewer@A, aal2                                                   | Read                                | Read; approve or reject (never own work) | Read; triage reports                                        | Deny                                 | Read; never update or delete     |
+| country_admin@A, aal2                                              | Read                                | Full access to drafts                    | Full, including invitations and memberships; read audit log | Deny                                 | Read; never update or delete     |
+| platform_admin, aal2                                               | All tenants                         | All tenants                              | All, **except `reports`**                                   | All tenants                          | Read; never update or delete     |
 
 ### Catalog meta-tests
 
