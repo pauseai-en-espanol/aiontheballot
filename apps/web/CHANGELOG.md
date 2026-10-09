@@ -1,5 +1,11 @@
 # @aiontheballot/web
 
+## 0.2.1
+
+### Patch Changes
+
+- 7a6d8c4: Run on Node 26.11.1: the base images (pinned by digest) and the engines range.
+
 ## 0.2.0
 
 ### Minor Changes
