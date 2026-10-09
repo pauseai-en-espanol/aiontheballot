@@ -270,8 +270,9 @@ export interface FixtureSource {
   id: string;
   election: FixtureElection;
   party: string | null;
-  /** The stored copy, if any; its extraction is done and these are its pages. */
+  /** The stored copy, if any. */
   file: string | null;
+  /** The extracted pages: with a copy and pages, its extraction is done; with a copy and none, it is pending. */
   pages: readonly string[];
 }
 
@@ -288,6 +289,14 @@ export const SOURCES = {
     ],
   },
   draftA: { id: fixtureId(6, 52), election: ELECTIONS.draftA, party: null, file: null, pages: [] },
+  /** Stored but not yet extracted: the extract job's source. */
+  pendingA: {
+    id: fixtureId(6, 55),
+    election: ELECTIONS.draftA,
+    party: null,
+    file: FILES.awaitingA.id,
+    pages: [],
+  },
   liveB: {
     id: fixtureId(6, 53),
     election: ELECTIONS.liveB,
@@ -329,6 +338,54 @@ export const LLM_RUNS = {
   { id: string; suggestion: string; source: FixtureSource; election: FixtureElection }
 >;
 
+/**
+ * Fictional job requests in A, requested by the fixture platform admin: one open job of each kind the matrix exercises,
+ * and a finished one, which authorizes nothing.
+ */
+export const JOBS = {
+  fetchA: {
+    id: fixtureId(5, 71),
+    kind: 'fetch_source',
+    source: SOURCES.draftA,
+    llmRun: null,
+    finished: false,
+  },
+  extractA: {
+    id: fixtureId(5, 72),
+    kind: 'extract_source',
+    source: SOURCES.pendingA,
+    llmRun: null,
+    finished: false,
+  },
+  llmA: {
+    id: fixtureId(5, 73),
+    kind: 'llm_run',
+    source: SOURCES.liveA,
+    llmRun: LLM_RUNS.A.id,
+    finished: false,
+  },
+  finishedA: {
+    id: fixtureId(5, 74),
+    kind: 'fetch_source',
+    source: SOURCES.draftA,
+    llmRun: null,
+    finished: true,
+  },
+} as const;
+
+/** The worker principals: the worker running each fixture job, acting for its requester. */
+export const JOB_PRINCIPALS = {
+  'worker: fetch job of A': { id: JOBS.fetchA.id, requester: USERS.platformAdmin },
+  'worker: extract job of A': { id: JOBS.extractA.id, requester: USERS.platformAdmin },
+  'worker: LLM job of A': { id: JOBS.llmA.id, requester: USERS.platformAdmin },
+  'worker: finished job of A': { id: JOBS.finishedA.id, requester: USERS.platformAdmin },
+} as const;
+
+const FETCH = 'worker: fetch job of A';
+const EXTRACT = 'worker: extract job of A';
+const LLM = 'worker: LLM job of A';
+const OPEN_JOBS = [FETCH, EXTRACT, LLM];
+
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
   [{ user: USERS.revokedA, tenant: 'A', role: 'editor' }];
@@ -354,7 +411,12 @@ export const PRINCIPALS: readonly Principal[] = [
     aal: 2,
   },
   { id: 'revoked member of A aal2', role: 'aiontheballot_admin', userId: USERS.revokedA, aal: 2 },
-  { id: 'worker for A', role: 'aiontheballot_worker', jobTenantId: TENANT_A },
+  ...Object.entries(JOB_PRINCIPALS).map(([id, job]) => ({
+    id,
+    role: 'aiontheballot_worker' as const,
+    userId: job.requester,
+    jobRequestId: job.id,
+  })),
 ];
 
 /** Who may perform one operation. Anyone not named is denied, including every principal at aal1. */
@@ -368,6 +430,15 @@ export interface Rule {
   /** Platform admins at aal2, on every row. */
   platformAdmin?: true;
 }
+
+/**
+ * What each worker principal may do (spec §8), by relation, then row id (or `insert <insert id>`), then operation
+ * ('select', 'update', 'update:<column>', 'insert'…): the ids of the worker principals allowed. Everything else is
+ * denied to the worker, which sees nothing but its one open job request and what that request names.
+ */
+export type WorkerAccess = Readonly<
+  Record<string, Readonly<Record<string, Readonly<Record<string, readonly string[]>>>>>
+>;
 
 export interface Row {
   /** Shown in test titles. */
@@ -1152,9 +1223,9 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       tenant: src.election.tenant,
       public: false,
       where: `id = '${src.id}'`,
-      // Once its copy is stored, a source never changes (only its extraction status and archive, by the worker), and
-      // its extracted text keeps it.
-      ...(src.file ? { blocked: { update: '23001', delete: '23503' } } : {}),
+      // Once its copy is stored, a source never changes (only its extraction status and archive, by the worker); its
+      // text, LLM runs or job requests keep it from being deleted.
+      blocked: src.file ? { update: '23001', delete: '23503' } : { delete: '23503' },
     })),
     inserts: TENANT_KEYS.map((key) => ({
       id: `source in ${key}`,
@@ -1251,6 +1322,37 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     },
   },
 
+  'app.job_requests': {
+    rows: Object.entries(JOBS).map(([name, job]) => ({
+      id: `${name} job`,
+      tenant: 'A' as const,
+      public: false,
+      where: `id = '${job.id}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => {
+      const live = Object.values(SOURCES).find(
+        (src) => src.election.tenant === key && src.pages.length > 0,
+      );
+      return {
+        id: `archive job in ${key}`,
+        tenant: key,
+        sql: `INSERT INTO app.job_requests (tenant_id, kind, source_document_id)
+              VALUES ('${TENANTS[key].id}', 'archive_source', '${live?.id ?? ''}')`,
+      };
+    }),
+    set: 'finished_at = now()',
+    select: MEMBERS,
+    insert: EDITORS,
+    update: NOBODY,
+    delete: NOBODY,
+    columnUpdates: {
+      kind: { set: `kind = 'archive_source'`, rule: NOBODY },
+      source_document_id: { set: `source_document_id = '${SOURCES.liveA.id}'`, rule: NOBODY },
+      requested_by: { set: `requested_by = '${USERS.newcomer}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
   'app.memberships': {
     rows: TENANT_KEYS.map(membershipRow),
     inserts: TENANT_KEYS.map((key) => ({
@@ -1270,4 +1372,28 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       created_by: { set: `created_by = '${USERS.newcomer}'`, rule: NOBODY },
     },
   },
+};
+
+export const WORKER_ACCESS: WorkerAccess = {
+  'app.tenants': { 'tenant A': { select: OPEN_JOBS } },
+  'app.job_requests': {
+    'fetchA job': { select: [FETCH], update: [FETCH] },
+    'extractA job': { select: [EXTRACT], update: [EXTRACT] },
+    'llmA job': { select: [LLM], update: [LLM] },
+  },
+  'app.source_documents': {
+    'draftA source': { select: [FETCH] },
+    'pendingA source': { select: [EXTRACT], 'update:extraction_status': [EXTRACT] },
+    'liveA source': { select: [LLM] },
+  },
+  'app.source_texts': { 'first page of liveA': { select: [LLM] } },
+  'app.files': { 'sourceA file': { select: [LLM] }, 'insert upload into A': { insert: [FETCH] } },
+  'app.file_blobs': { 'sourceA blob': { select: [LLM] } },
+  'app.llm_runs': { 'run of A': { select: [LLM], update: [LLM] } },
+  'app.llm_suggestions': {
+    'suggestion of A': { select: [LLM] },
+    'insert suggestion in A': { insert: [LLM] },
+  },
+  'app.parties': { 'party of A live': { select: [LLM] } },
+  'app.criteria': { 'criterion of A live': { select: [LLM] } },
 };

@@ -7,6 +7,8 @@ export const EXECUTE_ALLOWLIST: readonly string[] = [
   'aiontheballot_admin private.current_user_id()',
   'aiontheballot_admin private.is_platform_admin()',
   'aiontheballot_admin private.my_tenants(VARIADIC roles app.tenant_role[])',
+  'aiontheballot_worker private.current_user_id()',
+  'aiontheballot_worker private.normalize_for_match(input text)',
 ];
 
 /** SECURITY DEFINER functions allowed in `app` and `private` (ADR-0002 §6). */

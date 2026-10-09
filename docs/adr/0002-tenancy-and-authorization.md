@@ -89,6 +89,8 @@ log makes it visible (T23).
   triggers call them.
 - `private.normalize_for_match` is executable by `aiontheballot_admin` (the match trigger) and
   `aiontheballot_worker` (the generated column on `source_texts`).
+- The worker may also execute `private.current_user_id`: it sets `app.user_id` to its job request's requester, so what
+  it writes is stamped and audited as theirs, and its policies accept no one else.
 
 ### 7. The public role reads, and can call one function
 

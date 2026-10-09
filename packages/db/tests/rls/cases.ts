@@ -7,6 +7,7 @@ import {
   RELATIONS,
   type Rule,
   type TenantKey,
+  WORKER_ACCESS,
 } from './matrix.js';
 
 export interface MatrixCase extends Case {
@@ -43,6 +44,15 @@ export const expectedOutcome = (
   return tenant !== null && (rule.members ?? []).some(holds) ? 'allow' : 'deny';
 };
 
+/** What WORKER_ACCESS says for a worker principal: allowed only where listed. */
+export const workerOutcome = (
+  principal: Principal,
+  relation: string,
+  key: string,
+  op: string,
+): 'allow' | 'deny' =>
+  WORKER_ACCESS[relation]?.[key]?.[op]?.includes(principal.id) ? 'allow' : 'deny';
+
 /** Every principal × row × operation of every relation in the matrix. */
 export const matrixCases = (): MatrixCase[] =>
   Object.entries(RELATIONS).flatMap(([relation, spec]) =>
@@ -51,7 +61,10 @@ export const matrixCases = (): MatrixCase[] =>
       for (const row of spec.rows) {
         const target = `SELECT * FROM ${relation} WHERE ${row.where}`;
         const add = (op: string, sql: string, rule: Rule, write: boolean): void => {
-          const outcome = expectedOutcome(principal, rule, row.tenant, row.public, write);
+          const outcome =
+            principal.role === 'aiontheballot_worker'
+              ? workerOutcome(principal, relation, row.id, op)
+              : expectedOutcome(principal, rule, row.tenant, row.public, write);
           const blocked = row.blocked?.[op as 'update' | 'delete'];
           cases.push({
             relation,
@@ -98,7 +111,10 @@ export const matrixCases = (): MatrixCase[] =>
           principal,
           sql: insert.sql,
           target: `SELECT count(*) FROM ${relation}`,
-          expected: expectedOutcome(principal, spec.insert, insert.tenant, false, true),
+          expected:
+            principal.role === 'aiontheballot_worker'
+              ? workerOutcome(principal, relation, `insert ${insert.id}`, 'insert')
+              : expectedOutcome(principal, spec.insert, insert.tenant, false, true),
         });
       }
       return cases;

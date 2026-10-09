@@ -737,6 +737,53 @@ CREATE FUNCTION private.is_platform_admin() RETURNS boolean
 ALTER FUNCTION private.is_platform_admin() OWNER TO aiontheballot_owner;
 
 --
+-- Name: job_request_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.job_request_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    source record;
+    ready boolean;
+  BEGIN
+    IF TG_OP = 'UPDATE' THEN
+      IF OLD.finished_at IS NOT NULL THEN
+        RAISE EXCEPTION 'job request % is finished', OLD.id USING ERRCODE = 'restrict_violation';
+      END IF;
+      IF (to_jsonb(NEW) - 'finished_at') IS DISTINCT FROM (to_jsonb(OLD) - 'finished_at') THEN
+        RAISE EXCEPTION 'job request %: only finishing it is allowed', OLD.id USING ERRCODE = 'restrict_violation';
+      END IF;
+      NEW.finished_at := CASE WHEN NEW.finished_at IS NOT NULL THEN now() END;
+      RETURN NEW;
+    END IF;
+
+    SELECT s.url, s.file_id, s.extraction_status, s.archive_url INTO source
+      FROM app.source_documents s WHERE s.id = NEW.source_document_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'source % is not visible to the requester', NEW.source_document_id
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    ready := CASE NEW.kind
+      WHEN 'fetch_source' THEN source.url IS NOT NULL AND source.file_id IS NULL
+      WHEN 'extract_source' THEN source.file_id IS NOT NULL AND source.extraction_status = 'pending'
+      WHEN 'archive_source' THEN source.url IS NOT NULL AND source.archive_url IS NULL
+      WHEN 'llm_run' THEN EXISTS (SELECT 1 FROM app.llm_runs r WHERE r.id = NEW.llm_run_id AND r.status = 'queued')
+    END;
+    IF NOT coalesce(ready, false) THEN
+      RAISE EXCEPTION 'a % job has nothing to do for source %', NEW.kind, NEW.source_document_id
+        USING ERRCODE = 'check_violation';
+    END IF;
+    NEW.finished_at := NULL;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.job_request_rules() OWNER TO aiontheballot_owner;
+
+--
 -- Name: llm_run_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -803,6 +850,9 @@ CREATE FUNCTION private.llm_suggestion_rules() RETURNS trigger
   BEGIN
     IF TG_OP = 'INSERT' THEN
       SELECT t.methodology_kind INTO kind FROM app.tenants t WHERE t.id = NEW.tenant_id;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'tenant % is not visible to the writer', NEW.tenant_id USING ERRCODE = 'insufficient_privilege';
+      END IF;
       IF NOT (CASE kind
                 WHEN 'demands' THEN NEW.suggested_rating IN ('meets', 'partially_meets', 'does_not_meet', 'not_mentioned')
                 ELSE NEW.suggested_rating IN ('green', 'yellow', 'red', 'not_mentioned')
@@ -1292,6 +1342,43 @@ CREATE FUNCTION private.tenant_hostname_rules() RETURNS trigger
 
 ALTER FUNCTION private.tenant_hostname_rules() OWNER TO aiontheballot_owner;
 
+--
+-- Name: worker_job_scope(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.worker_job_scope() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    kind app.job_kind;
+    allowed text[];
+    changed text[];
+  BEGIN
+    IF current_user <> 'aiontheballot_worker' THEN
+      RETURN NEW;
+    END IF;
+    SELECT r.kind INTO kind FROM app.job_requests r WHERE r.finished_at IS NULL AND r.source_document_id = NEW.id;
+    allowed := CASE kind
+      WHEN 'fetch_source' THEN ARRAY['file_id', 'file_origin']
+      WHEN 'extract_source' THEN ARRAY['extraction_status']
+      WHEN 'archive_source' THEN ARRAY['archive_url']
+      ELSE '{}'
+    END;
+    SELECT coalesce(array_agg(n.key), '{}') INTO changed
+      FROM jsonb_each(to_jsonb(NEW)) n
+     WHERE n.value IS DISTINCT FROM to_jsonb(OLD) -> n.key;
+    IF NOT changed <@ allowed OR (kind = 'fetch_source' AND NEW.file_origin IS DISTINCT FROM 'fetched') THEN
+      RAISE EXCEPTION 'a % job may not change % of its source', coalesce(kind::text, 'missing'), changed
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.worker_job_scope() OWNER TO aiontheballot_owner;
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -1525,6 +1612,25 @@ ALTER TABLE app.invitations OWNER TO aiontheballot_owner;
 
 COMMENT ON COLUMN app.invitations.email IS 'personal data';
 
+
+--
+-- Name: job_requests; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.job_requests (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    kind app.job_kind NOT NULL,
+    source_document_id uuid NOT NULL,
+    llm_run_id uuid,
+    requested_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    finished_at timestamp with time zone,
+    CONSTRAINT job_requests_check CHECK (((kind = 'llm_run'::app.job_kind) = (llm_run_id IS NOT NULL)))
+);
+
+
+ALTER TABLE app.job_requests OWNER TO aiontheballot_owner;
 
 --
 -- Name: llm_runs; Type: TABLE; Schema: app; Owner: aiontheballot_owner
@@ -2052,6 +2158,22 @@ ALTER TABLE ONLY app.invitations
 
 
 --
+-- Name: job_requests job_requests_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.job_requests
+    ADD CONSTRAINT job_requests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: job_requests job_requests_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.job_requests
+    ADD CONSTRAINT job_requests_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
 -- Name: llm_runs llm_runs_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2337,6 +2459,20 @@ CREATE INDEX criteria_core_criterion_id_idx ON app.criteria USING btree (core_cr
 
 
 --
+-- Name: job_requests_llm_run_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX job_requests_llm_run_id_idx ON app.job_requests USING btree (llm_run_id);
+
+
+--
+-- Name: job_requests_source_document_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX job_requests_source_document_id_idx ON app.job_requests USING btree (source_document_id);
+
+
+--
 -- Name: llm_runs_tenant_id_created_at_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2516,6 +2652,13 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.hostname_verificati
 --
 
 CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.invitations FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: job_requests audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.job_requests FOR EACH ROW EXECUTE FUNCTION private.audit();
 
 
 --
@@ -2813,6 +2956,13 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.invitations FOR EACH RO
 
 
 --
+-- Name: job_requests forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.job_requests FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: llm_runs forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2967,6 +3117,13 @@ CREATE TRIGGER is_free BEFORE INSERT ON app.platform_hostnames FOR EACH ROW EXEC
 
 
 --
+-- Name: source_documents job_scope; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER job_scope BEFORE UPDATE ON app.source_documents FOR EACH ROW EXECUTE FUNCTION private.worker_job_scope();
+
+
+--
 -- Name: parties logo_is_public_asset; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3044,6 +3201,13 @@ CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.elections FOR EACH ROW EXECU
 
 
 --
+-- Name: job_requests rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.job_requests FOR EACH ROW EXECUTE FUNCTION private.job_request_rules();
+
+
+--
 -- Name: llm_runs rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3089,7 +3253,7 @@ CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.source_documents FOR EACH RO
 -- Name: source_texts rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE TRIGGER rules BEFORE INSERT ON app.source_texts FOR EACH ROW EXECUTE FUNCTION private.source_text_rules();
+CREATE TRIGGER rules AFTER INSERT ON app.source_texts FOR EACH ROW EXECUTE FUNCTION private.source_text_rules();
 
 
 --
@@ -3153,6 +3317,13 @@ CREATE TRIGGER stamp BEFORE INSERT ON app.files FOR EACH ROW EXECUTE FUNCTION pr
 --
 
 CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.invitations FOR EACH ROW EXECUTE FUNCTION private.stamp('created_by', 'created_at');
+
+
+--
+-- Name: job_requests stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.job_requests FOR EACH ROW EXECUTE FUNCTION private.stamp('requested_by', 'created_at');
 
 
 --
@@ -3296,6 +3467,30 @@ ALTER TABLE ONLY app.hostname_verifications
 
 ALTER TABLE ONLY app.invitations
     ADD CONSTRAINT invitations_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: job_requests job_requests_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.job_requests
+    ADD CONSTRAINT job_requests_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: job_requests job_requests_tenant_id_llm_run_id_source_document_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.job_requests
+    ADD CONSTRAINT job_requests_tenant_id_llm_run_id_source_document_id_fkey FOREIGN KEY (tenant_id, llm_run_id, source_document_id) REFERENCES app.llm_runs(tenant_id, id, source_document_id);
+
+
+--
+-- Name: job_requests job_requests_tenant_id_source_document_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.job_requests
+    ADD CONSTRAINT job_requests_tenant_id_source_document_id_fkey FOREIGN KEY (tenant_id, source_document_id) REFERENCES app.source_documents(tenant_id, id);
 
 
 --
@@ -3724,6 +3919,13 @@ CREATE POLICY editor_insert ON app.files FOR INSERT TO aiontheballot_admin WITH 
 
 
 --
+-- Name: job_requests editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY editor_insert ON app.job_requests FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: llm_runs editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3809,6 +4011,12 @@ ALTER TABLE app.hostname_verifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.invitations ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: job_requests; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.job_requests ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: llm_runs; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3871,6 +4079,13 @@ CREATE POLICY member_read ON app.file_blobs FOR SELECT TO aiontheballot_admin US
 --
 
 CREATE POLICY member_read ON app.files FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: job_requests member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.job_requests FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -4382,6 +4597,164 @@ ALTER TABLE app.tenant_organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.tenants ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: source_texts worker_extract; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_extract ON app.source_texts FOR INSERT TO aiontheballot_worker WITH CHECK ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.kind = 'extract_source'::app.job_kind) AND (r.source_document_id = source_texts.source_document_id)))));
+
+
+--
+-- Name: file_blobs worker_fetch; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_fetch ON app.file_blobs FOR INSERT TO aiontheballot_worker WITH CHECK ((EXISTS ( SELECT 1
+   FROM (app.files f
+     JOIN app.job_requests r ON ((r.tenant_id = f.tenant_id)))
+  WHERE ((f.id = file_blobs.file_id) AND (f.created_at = now()) AND (r.finished_at IS NULL) AND (r.kind = 'fetch_source'::app.job_kind)))));
+
+
+--
+-- Name: files worker_fetch; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_fetch ON app.files FOR INSERT TO aiontheballot_worker WITH CHECK (((bucket = 'sources'::app.file_bucket) AND (EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.kind = 'fetch_source'::app.job_kind) AND (r.tenant_id = files.tenant_id) AND (r.requested_by = files.created_by))))));
+
+
+--
+-- Name: job_requests worker_finish; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_finish ON app.job_requests FOR UPDATE TO aiontheballot_worker USING (((id = (NULLIF(current_setting('app.job_request_id'::text, true), ''::text))::uuid) AND (finished_at IS NULL))) WITH CHECK ((id = (NULLIF(current_setting('app.job_request_id'::text, true), ''::text))::uuid));
+
+
+--
+-- Name: job_requests worker_job; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_job ON app.job_requests FOR SELECT TO aiontheballot_worker USING (((id = (NULLIF(current_setting('app.job_request_id'::text, true), ''::text))::uuid) AND ((finished_at IS NULL) OR (finished_at = now()))));
+
+
+--
+-- Name: criteria worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_read ON app.criteria FOR SELECT TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM (app.job_requests r
+     JOIN app.source_documents s ON ((s.id = r.source_document_id)))
+  WHERE ((r.finished_at IS NULL) AND (r.kind = 'llm_run'::app.job_kind) AND (s.election_id = criteria.election_id)))));
+
+
+--
+-- Name: file_blobs worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_read ON app.file_blobs FOR SELECT TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM app.files f
+  WHERE (f.id = file_blobs.file_id))));
+
+
+--
+-- Name: files worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_read ON app.files FOR SELECT TO aiontheballot_worker USING (((EXISTS ( SELECT 1
+   FROM app.source_documents s
+  WHERE (s.file_id = files.id))) OR ((created_at = now()) AND (EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.kind = 'fetch_source'::app.job_kind) AND (r.tenant_id = files.tenant_id)))))));
+
+
+--
+-- Name: llm_runs worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_read ON app.llm_runs FOR SELECT TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.llm_run_id = llm_runs.id)))));
+
+
+--
+-- Name: llm_suggestions worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_read ON app.llm_suggestions FOR SELECT TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.llm_run_id = llm_suggestions.run_id)))));
+
+
+--
+-- Name: parties worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_read ON app.parties FOR SELECT TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM (app.job_requests r
+     JOIN app.source_documents s ON ((s.id = r.source_document_id)))
+  WHERE ((r.finished_at IS NULL) AND (r.kind = 'llm_run'::app.job_kind) AND (s.election_id = parties.election_id)))));
+
+
+--
+-- Name: source_documents worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_read ON app.source_documents FOR SELECT TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.source_document_id = source_documents.id)))));
+
+
+--
+-- Name: source_texts worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_read ON app.source_texts FOR SELECT TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.source_document_id = source_texts.source_document_id)))));
+
+
+--
+-- Name: tenants worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_read ON app.tenants FOR SELECT TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.tenant_id = tenants.id)))));
+
+
+--
+-- Name: llm_runs worker_run; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_run ON app.llm_runs FOR UPDATE TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.llm_run_id = llm_runs.id))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.llm_run_id = llm_runs.id)))));
+
+
+--
+-- Name: llm_suggestions worker_suggest; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_suggest ON app.llm_suggestions FOR INSERT TO aiontheballot_worker WITH CHECK ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.llm_run_id = llm_suggestions.run_id)))));
+
+
+--
+-- Name: source_documents worker_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY worker_update ON app.source_documents FOR UPDATE TO aiontheballot_worker USING ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.source_document_id = source_documents.id))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM app.job_requests r
+  WHERE ((r.finished_at IS NULL) AND (r.source_document_id = source_documents.id)))));
+
+
+--
 -- Name: SCHEMA app; Type: ACL; Schema: -; Owner: aiontheballot_owner
 --
 
@@ -4630,6 +5003,7 @@ GRANT ALL ON FUNCTION private.current_aal() TO aiontheballot_admin;
 
 REVOKE ALL ON FUNCTION private.current_user_id() FROM PUBLIC;
 GRANT ALL ON FUNCTION private.current_user_id() TO aiontheballot_admin;
+GRANT ALL ON FUNCTION private.current_user_id() TO aiontheballot_worker;
 
 
 --
@@ -4669,6 +5043,13 @@ GRANT ALL ON FUNCTION private.is_platform_admin() TO aiontheballot_admin;
 
 
 --
+-- Name: FUNCTION job_request_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.job_request_rules() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION llm_run_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -4702,6 +5083,7 @@ GRANT ALL ON FUNCTION private.my_tenants(VARIADIC roles app.tenant_role[]) TO ai
 --
 
 REVOKE ALL ON FUNCTION private.normalize_for_match(input text) FROM PUBLIC;
+GRANT ALL ON FUNCTION private.normalize_for_match(input text) TO aiontheballot_worker;
 
 
 --
@@ -4779,6 +5161,13 @@ REVOKE ALL ON FUNCTION private.tenant_document_rules() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.tenant_hostname_rules() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION worker_job_scope(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.worker_job_scope() FROM PUBLIC;
 
 
 --
@@ -4887,6 +5276,7 @@ GRANT INSERT(description),UPDATE(description) ON TABLE app.core_criteria TO aion
 
 GRANT SELECT ON TABLE app.criteria TO aiontheballot_web;
 GRANT SELECT,DELETE ON TABLE app.criteria TO aiontheballot_admin;
+GRANT SELECT ON TABLE app.criteria TO aiontheballot_worker;
 
 
 --
@@ -5056,6 +5446,7 @@ GRANT SELECT(created_at) ON TABLE app.elections TO aiontheballot_web;
 
 GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_admin;
 GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_web;
+GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_worker;
 
 
 --
@@ -5063,6 +5454,7 @@ GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_web;
 --
 
 GRANT INSERT(file_id) ON TABLE app.file_blobs TO aiontheballot_admin;
+GRANT INSERT(file_id) ON TABLE app.file_blobs TO aiontheballot_worker;
 
 
 --
@@ -5070,6 +5462,7 @@ GRANT INSERT(file_id) ON TABLE app.file_blobs TO aiontheballot_admin;
 --
 
 GRANT INSERT(tenant_id) ON TABLE app.file_blobs TO aiontheballot_admin;
+GRANT INSERT(tenant_id) ON TABLE app.file_blobs TO aiontheballot_worker;
 
 
 --
@@ -5077,6 +5470,7 @@ GRANT INSERT(tenant_id) ON TABLE app.file_blobs TO aiontheballot_admin;
 --
 
 GRANT INSERT(content) ON TABLE app.file_blobs TO aiontheballot_admin;
+GRANT INSERT(content) ON TABLE app.file_blobs TO aiontheballot_worker;
 
 
 --
@@ -5091,6 +5485,7 @@ GRANT SELECT,DELETE ON TABLE app.files TO aiontheballot_admin;
 --
 
 GRANT SELECT(id) ON TABLE app.files TO aiontheballot_web;
+GRANT SELECT(id) ON TABLE app.files TO aiontheballot_worker;
 
 
 --
@@ -5099,6 +5494,7 @@ GRANT SELECT(id) ON TABLE app.files TO aiontheballot_web;
 
 GRANT INSERT(tenant_id) ON TABLE app.files TO aiontheballot_admin;
 GRANT SELECT(tenant_id) ON TABLE app.files TO aiontheballot_web;
+GRANT SELECT(tenant_id),INSERT(tenant_id) ON TABLE app.files TO aiontheballot_worker;
 
 
 --
@@ -5107,6 +5503,7 @@ GRANT SELECT(tenant_id) ON TABLE app.files TO aiontheballot_web;
 
 GRANT INSERT(bucket) ON TABLE app.files TO aiontheballot_admin;
 GRANT SELECT(bucket) ON TABLE app.files TO aiontheballot_web;
+GRANT SELECT(bucket),INSERT(bucket) ON TABLE app.files TO aiontheballot_worker;
 
 
 --
@@ -5115,6 +5512,7 @@ GRANT SELECT(bucket) ON TABLE app.files TO aiontheballot_web;
 
 GRANT INSERT(content_type) ON TABLE app.files TO aiontheballot_admin;
 GRANT SELECT(content_type) ON TABLE app.files TO aiontheballot_web;
+GRANT SELECT(content_type),INSERT(content_type) ON TABLE app.files TO aiontheballot_worker;
 
 
 --
@@ -5123,6 +5521,7 @@ GRANT SELECT(content_type) ON TABLE app.files TO aiontheballot_web;
 
 GRANT INSERT(byte_size) ON TABLE app.files TO aiontheballot_admin;
 GRANT SELECT(byte_size) ON TABLE app.files TO aiontheballot_web;
+GRANT SELECT(byte_size),INSERT(byte_size) ON TABLE app.files TO aiontheballot_worker;
 
 
 --
@@ -5131,6 +5530,7 @@ GRANT SELECT(byte_size) ON TABLE app.files TO aiontheballot_web;
 
 GRANT INSERT(sha256) ON TABLE app.files TO aiontheballot_admin;
 GRANT SELECT(sha256) ON TABLE app.files TO aiontheballot_web;
+GRANT SELECT(sha256),INSERT(sha256) ON TABLE app.files TO aiontheballot_worker;
 
 
 --
@@ -5138,6 +5538,7 @@ GRANT SELECT(sha256) ON TABLE app.files TO aiontheballot_web;
 --
 
 GRANT INSERT(original_filename) ON TABLE app.files TO aiontheballot_admin;
+GRANT INSERT(original_filename) ON TABLE app.files TO aiontheballot_worker;
 
 
 --
@@ -5145,6 +5546,7 @@ GRANT INSERT(original_filename) ON TABLE app.files TO aiontheballot_admin;
 --
 
 GRANT SELECT(created_at) ON TABLE app.files TO aiontheballot_web;
+GRANT SELECT(created_at) ON TABLE app.files TO aiontheballot_worker;
 
 
 --
@@ -5240,10 +5642,54 @@ GRANT UPDATE(revoked_at) ON TABLE app.invitations TO aiontheballot_admin;
 
 
 --
+-- Name: TABLE job_requests; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.job_requests TO aiontheballot_admin;
+GRANT SELECT ON TABLE app.job_requests TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN job_requests.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.job_requests TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN job_requests.kind; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(kind) ON TABLE app.job_requests TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN job_requests.source_document_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(source_document_id) ON TABLE app.job_requests TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN job_requests.llm_run_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(llm_run_id) ON TABLE app.job_requests TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN job_requests.finished_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(finished_at) ON TABLE app.job_requests TO aiontheballot_worker;
+
+
+--
 -- Name: TABLE llm_runs; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
 GRANT SELECT ON TABLE app.llm_runs TO aiontheballot_admin;
+GRANT SELECT ON TABLE app.llm_runs TO aiontheballot_worker;
 
 
 --
@@ -5282,10 +5728,102 @@ GRANT INSERT(prompt_version) ON TABLE app.llm_runs TO aiontheballot_admin;
 
 
 --
+-- Name: COLUMN llm_runs.status; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(status) ON TABLE app.llm_runs TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_runs.input_tokens; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(input_tokens) ON TABLE app.llm_runs TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_runs.output_tokens; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(output_tokens) ON TABLE app.llm_runs TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_runs.cost_usd; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(cost_usd) ON TABLE app.llm_runs TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_runs.error; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(error) ON TABLE app.llm_runs TO aiontheballot_worker;
+
+
+--
 -- Name: TABLE llm_suggestions; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
 GRANT SELECT ON TABLE app.llm_suggestions TO aiontheballot_admin;
+GRANT SELECT ON TABLE app.llm_suggestions TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_suggestions.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.llm_suggestions TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_suggestions.election_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(election_id) ON TABLE app.llm_suggestions TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_suggestions.run_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(run_id) ON TABLE app.llm_suggestions TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_suggestions.party_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(party_id) ON TABLE app.llm_suggestions TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_suggestions.criterion_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(criterion_id) ON TABLE app.llm_suggestions TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_suggestions.suggested_rating; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(suggested_rating) ON TABLE app.llm_suggestions TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_suggestions.rationale; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(rationale) ON TABLE app.llm_suggestions TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN llm_suggestions.passages; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(passages) ON TABLE app.llm_suggestions TO aiontheballot_worker;
 
 
 --
@@ -5514,6 +6052,7 @@ GRANT INSERT(is_pauseai_chapter),UPDATE(is_pauseai_chapter) ON TABLE app.organiz
 
 GRANT SELECT ON TABLE app.parties TO aiontheballot_web;
 GRANT SELECT,DELETE ON TABLE app.parties TO aiontheballot_admin;
+GRANT SELECT ON TABLE app.parties TO aiontheballot_worker;
 
 
 --
@@ -5640,6 +6179,7 @@ GRANT SELECT ON TABLE app.public_versions TO aiontheballot_web;
 --
 
 GRANT SELECT,DELETE ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT SELECT ON TABLE app.source_documents TO aiontheballot_worker;
 
 
 --
@@ -5703,6 +6243,7 @@ GRANT INSERT(is_programme),UPDATE(is_programme) ON TABLE app.source_documents TO
 --
 
 GRANT INSERT(file_id),UPDATE(file_id) ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT UPDATE(file_id) ON TABLE app.source_documents TO aiontheballot_worker;
 
 
 --
@@ -5710,6 +6251,21 @@ GRANT INSERT(file_id),UPDATE(file_id) ON TABLE app.source_documents TO aiontheba
 --
 
 GRANT INSERT(file_origin),UPDATE(file_origin) ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT UPDATE(file_origin) ON TABLE app.source_documents TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN source_documents.archive_url; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(archive_url) ON TABLE app.source_documents TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN source_documents.extraction_status; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(extraction_status) ON TABLE app.source_documents TO aiontheballot_worker;
 
 
 --
@@ -5717,6 +6273,42 @@ GRANT INSERT(file_origin),UPDATE(file_origin) ON TABLE app.source_documents TO a
 --
 
 GRANT SELECT ON TABLE app.source_texts TO aiontheballot_admin;
+GRANT SELECT ON TABLE app.source_texts TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN source_texts.source_document_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(source_document_id) ON TABLE app.source_texts TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN source_texts.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.source_texts TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN source_texts.unit_index; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(unit_index) ON TABLE app.source_texts TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN source_texts.label; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(label) ON TABLE app.source_texts TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN source_texts.body; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(body) ON TABLE app.source_texts TO aiontheballot_worker;
 
 
 --
@@ -5875,6 +6467,7 @@ GRANT SELECT ON TABLE app.tenants TO aiontheballot_admin;
 --
 
 GRANT SELECT(id) ON TABLE app.tenants TO aiontheballot_web;
+GRANT SELECT(id) ON TABLE app.tenants TO aiontheballot_worker;
 
 
 --
@@ -5931,6 +6524,7 @@ GRANT INSERT(theme),UPDATE(theme) ON TABLE app.tenants TO aiontheballot_admin;
 
 GRANT SELECT(methodology_kind) ON TABLE app.tenants TO aiontheballot_web;
 GRANT INSERT(methodology_kind),UPDATE(methodology_kind) ON TABLE app.tenants TO aiontheballot_admin;
+GRANT SELECT(methodology_kind) ON TABLE app.tenants TO aiontheballot_worker;
 
 
 --

@@ -5,7 +5,7 @@ import { inRolledBackTransaction } from '../db.js';
 import { superuserUrl } from '../env.js';
 import { expectedOutcome, matrixCases } from './cases.js';
 import { type Outcome, runCase } from './harness.js';
-import { PRINCIPALS, RELATIONS } from './matrix.js';
+import { PRINCIPALS, RELATIONS, WORKER_ACCESS } from './matrix.js';
 
 /**
  * A deny must come from the security layers: RLS hiding the row, or a permission error (missing grant, failed
@@ -36,6 +36,29 @@ describe('isolation matrix', () => {
   it('names every principal uniquely', () => {
     const ids = PRINCIPALS.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('lists worker access only for real rows, inserts and worker principals', () => {
+    const workers = new Set(
+      PRINCIPALS.filter((p) => p.role === 'aiontheballot_worker').map((p) => p.id),
+    );
+    const stale = Object.entries(WORKER_ACCESS).flatMap(([relation, keys]) =>
+      Object.entries(keys).flatMap(([key, ops]) => {
+        const spec = RELATIONS[relation];
+        const known =
+          spec !== undefined &&
+          (spec.rows.some((row) => row.id === key) ||
+            spec.inserts.some((ins) => `insert ${ins.id}` === key));
+        const unknownWorkers = Object.values(ops)
+          .flat()
+          .filter((id) => !workers.has(id));
+        return [
+          ...(known ? [] : [`${relation}: ${key}`]),
+          ...unknownWorkers.map((id) => `${relation}: ${id}`),
+        ];
+      }),
+    );
+    expect(stale).toEqual([]);
   });
 
   it('denies everyone when a rule names nobody', () => {

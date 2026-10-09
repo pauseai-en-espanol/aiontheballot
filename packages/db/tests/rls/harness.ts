@@ -2,14 +2,17 @@ import type pg from 'pg';
 
 export type RuntimeRole = 'aiontheballot_web' | 'aiontheballot_admin' | 'aiontheballot_worker';
 
-/** Who runs a case: a runtime role, plus the actor (admin) or the job's tenant (worker). ADR-0002 §2–§3. */
+/**
+ * Who runs a case: a runtime role, plus the actor (admin), or the job request it runs and that request's requester
+ * (worker, spec §8). ADR-0002 §2–§3.
+ */
 export interface Principal {
   /** Stable name used in test titles, e.g. "editor@A aal2". */
   id: string;
   role: RuntimeRole;
   userId?: string;
   aal?: 1 | 2;
-  jobTenantId?: string;
+  jobRequestId?: string;
 }
 
 export interface Case {
@@ -59,11 +62,12 @@ export const runCase = async (client: pg.Client, c: Case): Promise<Outcome> => {
   try {
     await client.query(`SET LOCAL ROLE ${c.principal.role}`);
     await client.query(
-      `SELECT set_config('app.user_id', $1, true), set_config('app.aal', $2, true), set_config('app.tenant_id', $3, true)`,
+      `SELECT set_config('app.user_id', $1, true), set_config('app.aal', $2, true),
+              set_config('app.job_request_id', $3, true)`,
       [
         c.principal.userId ?? '',
         c.principal.aal ? String(c.principal.aal) : '',
-        c.principal.jobTenantId ?? '',
+        c.principal.jobRequestId ?? '',
       ],
     );
 

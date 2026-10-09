@@ -1083,9 +1083,11 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
   need `CREATE`.
 - Only the API enqueues jobs, always inside `withActor`: it inserts a `job_requests` row (§3.10) and puts only that
   row's id in the pg-boss payload.
-- The worker runs as its own role, `aiontheballot_worker`. For each job it sets `app.job_request_id`; its RLS
-  policies admit only the open request, its tenant and its source document, and it finishes by setting
-  `finished_at`. By kind:
+- The worker runs as its own role, `aiontheballot_worker`. For each job it sets `app.job_request_id`, and
+  `app.user_id` to the request's requester (what it writes is stamped and audited as theirs; its policies accept no
+  one else). Its RLS admits only the open request, its tenant and its source document; every worker policy requires the
+  request to be open, so finishing it (`finished_at`, once) ends what it authorizes at once. A trigger limits what each
+  kind may change on the source. By kind:
 
   | Kind             | Reads                                             | Writes                                                   |
   | ---------------- | ------------------------------------------------- | -------------------------------------------------------- |

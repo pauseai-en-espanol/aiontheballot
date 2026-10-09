@@ -7,6 +7,7 @@ import {
   FILES,
   HOSTNAMES,
   INVITATION_TOKENS,
+  JOBS,
   LLM_RUNS,
   MEMBERSHIPS,
   ORGANIZATIONS,
@@ -242,10 +243,12 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
           [src.id, tenant, index + 1, `p. ${index + 1}`, body],
         );
       }
-      await client.query(
-        `UPDATE app.source_documents SET extraction_status = 'done' WHERE id = $1`,
-        [src.id],
-      );
+      if (src.pages.length > 0) {
+        await client.query(
+          `UPDATE app.source_documents SET extraction_status = 'done' WHERE id = $1`,
+          [src.id],
+        );
+      }
     }
   }
   for (const run of Object.values(LLM_RUNS)) {
@@ -261,6 +264,15 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
        VALUES ($1, $2, $3, $4, $5, $6, 'partially_meets', 'Razonamiento de ejemplo', '[]')`,
       [run.suggestion, tenant, run.election.id, run.id, run.election.party, run.election.criterion],
     );
+  }
+  for (const job of Object.values(JOBS)) {
+    await client.query(
+      `INSERT INTO app.job_requests (id, tenant_id, kind, source_document_id, llm_run_id) VALUES ($1, $2, $3, $4, $5)`,
+      [job.id, TENANTS[job.source.election.tenant].id, job.kind, job.source.id, job.llmRun],
+    );
+    if (job.finished) {
+      await client.query('UPDATE app.job_requests SET finished_at = now() WHERE id = $1', [job.id]);
+    }
   }
   await client.query('COMMIT');
 };

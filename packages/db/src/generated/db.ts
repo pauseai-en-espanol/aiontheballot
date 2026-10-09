@@ -13,6 +13,8 @@ export type AppExtractionStatus = 'done' | 'failed' | 'not_applicable' | 'pendin
 
 export type AppFileBucket = 'public_assets' | 'sources';
 
+export type AppJobKind = 'archive_source' | 'extract_source' | 'fetch_source' | 'llm_run';
+
 export type AppMethodologyKind = 'demands' | 'descriptive';
 
 export type AppOrgRole = 'endorser' | 'operator';
@@ -170,6 +172,17 @@ export interface AppInvitations {
   role: AppTenantRole;
   tenant_id: string;
   token_hash: string;
+}
+
+export interface AppJobRequests {
+  created_at: Generated<Timestamp>;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  kind: AppJobKind;
+  llm_run_id: string | null;
+  requested_by: string;
+  source_document_id: string;
+  tenant_id: string;
 }
 
 export interface AppLlmRuns {
@@ -373,6 +386,7 @@ export interface DB {
   'app.hostname_tombstones': AppHostnameTombstones;
   'app.hostname_verifications': AppHostnameVerifications;
   'app.invitations': AppInvitations;
+  'app.job_requests': AppJobRequests;
   'app.llm_runs': AppLlmRuns;
   'app.llm_suggestions': AppLlmSuggestions;
   'app.memberships': AppMemberships;
