@@ -296,7 +296,7 @@ committed, since fixtures stay fictional. The spike checks reading order on real
 
 ### 11. Toolchain, adopted from @slango and gifcept as-is
 
-- Node 26.10, pnpm 12.9, Turbo 2.11, ESM.
+- Node 26.11, pnpm 12.10, Turbo 2.11, ESM.
 - **TypeScript 7 (tsgo)**, via `@slango.configs/typescript`.
 - Linting and formatting:
   - `@slango.configs/oxlint`, run as `--type-aware --max-warnings 0`;
