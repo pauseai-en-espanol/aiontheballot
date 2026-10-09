@@ -338,6 +338,7 @@ const NOT_AUDITED: Readonly<Record<string, string>> = {
     "extracted text, written by the extraction job; the source's status change is audited",
   public_versions: 'a counter moved only by triggers, whose writes are audited themselves',
   report_daily_counts: 'a counter moved only by app.submit_report, whose reports are audited',
+  purge_log: "the record of a purge, which removes the tenant's audit rows with it",
 };
 
 /** Tables in app whose rows are never updated or deleted (ADR-0002 §14), except by purge_tenant. */
@@ -345,6 +346,7 @@ const IMMUTABLE = [
   'assessment_revisions',
   'audit_log',
   'hostname_tombstones',
+  'purge_log',
   'review_events',
   'revision_checked_documents',
   'revision_evidence',

@@ -339,6 +339,17 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 - **R30. "Published" needs a source of the party marked `is_programme`,** with or without a stored copy, as the spec
   says; the stored copy matters for the evidence rules, not for the status.
 
+**Purge (migration `purge`):**
+
+- **R31. `purge_log` names its tenant column `purged_tenant_id`** (and adds the slug and `leftovers`), instead of the
+  spec's `tenant_id`: a `tenant_id` without a foreign key would need an exception in the tenant-ownership catalog
+  test, which stays exception-free.
+- **R32. Audit and cache-key writes are skipped during a purge only for sessions whose role is a member of the
+  owner** (`session_user`), since both triggers run as `SECURITY DEFINER` and can't tell the caller otherwise.
+- **R33. The purge refuses to finish if any table with a `tenant_id` still holds the tenant's rows,** rather than
+  trusting its own list of tables.
+- **R34. `purged_by` is the database session's role,** since a purge runs outside the app, with no actor.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).

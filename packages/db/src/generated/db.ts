@@ -446,6 +446,16 @@ export interface AppPublicVersions {
   version: Generated<Int8>;
 }
 
+export interface AppPurgeLog {
+  at: Generated<Timestamp>;
+  counts: Json;
+  id: Generated<Int8>;
+  leftovers: Json;
+  purged_by: string;
+  purged_tenant_id: string;
+  purged_tenant_slug: string;
+}
+
 export interface AppReportDailyCounts {
   count: number;
   day: Timestamp;
@@ -658,6 +668,7 @@ export interface DB {
   'app.platform_admins': AppPlatformAdmins;
   'app.platform_hostnames': AppPlatformHostnames;
   'app.public_versions': AppPublicVersions;
+  'app.purge_log': AppPurgeLog;
   'app.report_daily_counts': AppReportDailyCounts;
   'app.reports': AppReports;
   'app.review_events': AppReviewEvents;

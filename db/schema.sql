@@ -676,6 +676,9 @@ CREATE FUNCTION private.audit() RETURNS trigger
     changed text[];
     diff jsonb;
   BEGIN
+    IF private.purging(TG_RELID) THEN
+      RETURN NULL;  -- the tenant's audit rows are deleted with it
+    END IF;
     SELECT coalesce(array_agg(a.attname::text), '{}') INTO hidden
       FROM pg_catalog.pg_attribute a
      WHERE a.attrelid = TG_RELID AND a.attnum > 0 AND NOT a.attisdropped
@@ -775,6 +778,9 @@ CREATE FUNCTION private.bump_public_version() RETURNS trigger
     subject jsonb := to_jsonb(CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END);
     tenants uuid[];
   BEGIN
+    IF private.purging(TG_RELID) THEN
+      RETURN NULL;  -- the tenant's counter is deleted with it
+    END IF;
     tenants := CASE
       WHEN TG_TABLE_SCHEMA = 'app' AND TG_TABLE_NAME = 'tenants' THEN ARRAY[(subject ->> 'id')::uuid]
       WHEN TG_TABLE_SCHEMA = 'app' AND TG_TABLE_NAME = 'organizations' THEN ARRAY(
@@ -1900,6 +1906,105 @@ CREATE FUNCTION private.publish_revision() RETURNS trigger
 
 
 ALTER FUNCTION private.publish_revision() OWNER TO aiontheballot_owner;
+
+--
+-- Name: purge_tenant(uuid); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.purge_tenant(tenant uuid) RETURNS bigint
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $_$
+  DECLARE
+    -- Children before parents. Cells take their drafts and contributors with them, files their bytes.
+    tables text[] := ARRAY[
+      'revision_internal', 'revision_evidence', 'revision_checked_documents', 'structural_changes', 'change_requests',
+      'assessment_revisions', 'review_events', 'reports', 'report_daily_counts', 'assessment_contributors',
+      'draft_checked_documents', 'draft_evidence', 'assessments', 'job_requests', 'llm_suggestions', 'llm_runs',
+      'source_texts', 'source_documents', 'methodology_reviewers', 'methodologies', 'criteria', 'parties', 'elections',
+      'file_blobs', 'files', 'tenant_documents', 'invitations', 'memberships', 'tenant_brand_selections',
+      'brand_asset_grants', 'tenant_organizations', 'public_versions', 'tenant_hostnames', 'audit_log'];
+    tenant_slug text;
+    leftovers jsonb;
+    counts jsonb := '{}';
+    t text;
+    n bigint;
+    remaining text;
+    logged bigint;
+  BEGIN
+    PERFORM set_config('app.purge', 'on', true);
+    SELECT t.slug INTO tenant_slug FROM app.tenants t WHERE t.id = tenant FOR UPDATE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'no tenant %', tenant USING ERRCODE = 'no_data_found';
+    END IF;
+
+    leftovers := jsonb_build_object(
+      'organizations', (SELECT coalesce(jsonb_agg(o.organization_id ORDER BY o.organization_id), '[]')
+                          FROM app.tenant_organizations o
+                         WHERE o.tenant_id = tenant
+                           AND NOT EXISTS (SELECT 1 FROM app.tenant_organizations x
+                                            WHERE x.organization_id = o.organization_id AND x.tenant_id <> tenant)),
+      'users', (SELECT coalesce(jsonb_agg(DISTINCT m.user_id), '[]')
+                  FROM app.memberships m
+                 WHERE m.tenant_id = tenant
+                   AND NOT EXISTS (SELECT 1 FROM app.memberships x WHERE x.user_id = m.user_id AND x.tenant_id <> tenant)));
+
+    -- Its hostnames are printed on share images: they can never be claimed again.
+    INSERT INTO app.hostname_tombstones (hostname)
+    SELECT h.hostname FROM app.tenant_hostnames h WHERE h.tenant_id = tenant
+    ON CONFLICT DO NOTHING;
+    DELETE FROM app.hostname_verifications v
+     WHERE v.hostname IN (SELECT h.hostname FROM app.tenant_hostnames h WHERE h.tenant_id = tenant);
+
+    FOREACH t IN ARRAY tables LOOP
+      -- Counted first: some rows go with their parents (drafts with their cells, bytes with their files).
+      EXECUTE format('SELECT count(*) FROM app.%I WHERE tenant_id = $1', t) INTO n USING tenant;
+      IF t NOT IN ('assessment_contributors', 'draft_checked_documents', 'draft_evidence', 'file_blobs') THEN
+        EXECUTE format('DELETE FROM app.%I WHERE tenant_id = $1', t) USING tenant;
+      END IF;
+      counts := counts || jsonb_build_object(t, n);
+    END LOOP;
+
+    -- Every table with a tenant_id must now be empty of it, including any this function doesn't list yet.
+    FOR t IN SELECT c.relname FROM pg_catalog.pg_attribute a
+               JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+               JOIN pg_catalog.pg_namespace s ON s.oid = c.relnamespace
+              WHERE s.nspname = 'app' AND c.relkind IN ('r', 'p') AND a.attname = 'tenant_id' AND NOT a.attisdropped LOOP
+      EXECUTE format('SELECT count(*) FROM app.%I WHERE tenant_id = $1', t) INTO n USING tenant;
+      IF n > 0 THEN
+        remaining := concat_ws(', ', remaining, t);
+      END IF;
+    END LOOP;
+    IF remaining IS NOT NULL THEN
+      RAISE EXCEPTION 'purging tenant % left rows in %', tenant, remaining USING ERRCODE = 'object_in_use';
+    END IF;
+
+    DELETE FROM app.tenants WHERE id = tenant;
+    INSERT INTO app.purge_log (purged_tenant_id, purged_tenant_slug, purged_by, counts, leftovers)
+    VALUES (tenant, tenant_slug, session_user, counts || jsonb_build_object('tenants', 1), leftovers)
+    RETURNING id INTO logged;
+    RETURN logged;
+  END
+  $_$;
+
+
+ALTER FUNCTION private.purge_tenant(tenant uuid) OWNER TO aiontheballot_owner;
+
+--
+-- Name: purging(oid); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.purging(relation oid) RETURNS boolean
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+    SELECT current_setting('app.purge', true) = 'on'
+       AND pg_catalog.pg_has_role(session_user, (SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.oid = relation),
+                                  'MEMBER')
+  $$;
+
+
+ALTER FUNCTION private.purging(relation oid) OWNER TO aiontheballot_owner;
 
 --
 -- Name: report_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -3134,6 +3239,37 @@ CREATE TABLE app.public_versions (
 ALTER TABLE app.public_versions OWNER TO aiontheballot_owner;
 
 --
+-- Name: purge_log; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.purge_log (
+    id bigint NOT NULL,
+    purged_tenant_id uuid NOT NULL,
+    purged_tenant_slug text NOT NULL,
+    purged_by text NOT NULL,
+    counts jsonb NOT NULL,
+    leftovers jsonb NOT NULL,
+    at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE app.purge_log OWNER TO aiontheballot_owner;
+
+--
+-- Name: purge_log_id_seq; Type: SEQUENCE; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.purge_log ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME app.purge_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: report_daily_counts; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3918,6 +4054,14 @@ ALTER TABLE ONLY app.platform_hostnames
 
 ALTER TABLE ONLY app.public_versions
     ADD CONSTRAINT public_versions_pkey PRIMARY KEY (tenant_id);
+
+
+--
+-- Name: purge_log purge_log_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.purge_log
+    ADD CONSTRAINT purge_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -4896,6 +5040,13 @@ CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.hostname_tombstone
 
 
 --
+-- Name: purge_log forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.purge_log FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
 -- Name: review_events forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5208,6 +5359,13 @@ CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.files FOR EACH STATEMENT E
 --
 
 CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.hostname_tombstones FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: purge_log forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.purge_log FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
 
 
 --
@@ -7082,6 +7240,13 @@ CREATE POLICY platform_admin_read ON app.platform_hostnames FOR SELECT TO aionth
 
 
 --
+-- Name: purge_log platform_admin_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY platform_admin_read ON app.purge_log FOR SELECT TO aiontheballot_admin USING (( SELECT private.is_platform_admin() AS is_platform_admin));
+
+
+--
 -- Name: brand_assets platform_admin_update; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -7358,6 +7523,12 @@ ALTER TABLE app.public_versions ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY publisher_insert ON app.assessment_revisions FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
+
+--
+-- Name: purge_log; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.purge_log ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: report_daily_counts; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
@@ -8046,6 +8217,20 @@ REVOKE ALL ON FUNCTION private.programme_rules() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.publish_revision() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION purge_tenant(tenant uuid); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.purge_tenant(tenant uuid) FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION purging(relation oid); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.purging(relation oid) FROM PUBLIC;
 
 
 --
@@ -9586,6 +9771,13 @@ GRANT INSERT(hostname) ON TABLE app.platform_hostnames TO aiontheballot_admin;
 --
 
 GRANT SELECT ON TABLE app.public_versions TO aiontheballot_web;
+
+
+--
+-- Name: TABLE purge_log; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.purge_log TO aiontheballot_admin;
 
 
 --

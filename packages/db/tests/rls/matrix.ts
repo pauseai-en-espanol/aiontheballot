@@ -1910,6 +1910,24 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     delete: NOBODY,
   },
 
+  'app.purge_log': {
+    rows: [],
+    // Written only by private.purge_tenant, which only the owner runs.
+    inserts: [
+      {
+        id: 'purge record',
+        tenant: null,
+        sql: `INSERT INTO app.purge_log (purged_tenant_id, purged_tenant_slug, purged_by, counts, leftovers)
+              VALUES ('${TENANT_B}', 'test-b', 'aiontheballot_admin', '{}', '{}')`,
+      },
+    ],
+    set: 'counts = counts',
+    select: PLATFORM_ADMIN,
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
   'app.memberships': {
     rows: TENANT_KEYS.map(membershipRow),
     inserts: TENANT_KEYS.map((key) => ({

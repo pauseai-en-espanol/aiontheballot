@@ -171,6 +171,8 @@ cell without a rating (_withdrawn_, distinct from _pending_) and logs a correcti
 - Reports are anonymized, never deleted, because corrections cite them: at the end of the tenant's retention period
   or on an erasure request, their personal-data columns are set to null.
 - A purge moves the tenant's hostnames to `hostname_tombstones`, so they can never be claimed again.
+- While purging, the audit and public-cache triggers skip writes only in a session whose role is a member of the table
+  owner: a runtime role setting `app.purge` gets neither that nor the immutability exemption.
 
 ### 15. The Host header never authorizes
 

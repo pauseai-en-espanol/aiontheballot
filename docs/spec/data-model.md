@@ -1010,18 +1010,23 @@ create table app.audit_log (                           -- append-only; no person
   at          timestamptz not null default now()
 );
 
-create table app.purge_log (                           -- written only by purge_tenant()
-  id         bigint generated always as identity primary key,
-  tenant_id  uuid not null,
-  purged_by  text not null,
-  counts     jsonb not null,
-  at         timestamptz not null default now()
+create table app.purge_log (                           -- written only by purge_tenant(); platform admins read it
+  id                  bigint generated always as identity primary key,
+  purged_tenant_id    uuid not null,                   -- no foreign key: the tenant is gone
+  purged_tenant_slug  text not null,
+  purged_by           text not null,                   -- the database role that ran it
+  counts              jsonb not null,                  -- rows deleted, by table
+  leftovers           jsonb not null,                  -- organizations and users the tenant leaves unused
+  at                  timestamptz not null default now()
 );
 ```
 
 **Purge** deletes everything of the tenant, its audit rows included, and keeps one `purge_log` row. Its hostnames
 move to `hostname_tombstones`. Organizations used by no other tenant, and users with no other membership, are listed
-in the purge record for a platform admin to remove. **Export** of one tenant is a query per table filtered on
+in the purge record (`leftovers`) for a platform admin to remove. While purging, the audit and cache-key triggers skip
+writes, but only in a session whose role is a member of the table owner (`private.purging()`), so a runtime role
+that sets `app.purge` changes nothing. The purge refuses to finish if any table with a `tenant_id` still holds a row of
+the tenant, so a table added later can't be forgotten silently. **Export** of one tenant is a query per table filtered on
 `tenant_id`, which every tenant-owned table has; the runbook comes with M5.
 
 ## 4. State machines
