@@ -145,7 +145,9 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       [doc.id, TENANTS[doc.tenant].id, { es: 'Política de privacidad de ejemplo' }, doc.published],
     );
   }
+  // Files are uploaded by each tenant's author, so publishers are never their uploaders.
   for (const f of Object.values(FILES)) {
+    await client.query(`SELECT set_config('app.user_id', $1, true)`, [CELLS[f.tenant].author]);
     await client.query(
       `INSERT INTO app.files (id, tenant_id, bucket, content_type, byte_size, sha256, original_filename)
        VALUES ($1, $2, $3, $4, octet_length(convert_to($5, 'UTF8')), encode(sha256(convert_to($5, 'UTF8')), 'hex'),
@@ -159,6 +161,7 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       );
     }
   }
+  await client.query(`SELECT set_config('app.user_id', $1, true)`, [USERS.platformAdmin]);
   await client.query(
     `INSERT INTO app.core_criteria (id, key, title, description)
      VALUES ($1, 'criterio-comun-de-ejemplo', '{"es": "Criterio común de ejemplo"}', '{"es": "Descripción de ejemplo"}')`,
@@ -233,6 +236,9 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
   // Sources: created bare, then given their stored copy and their extracted text, as the worker will.
   for (const src of Object.values(SOURCES)) {
     const tenant = TENANTS[src.election.tenant].id;
+    await client.query(`SELECT set_config('app.user_id', $1, true)`, [
+      CELLS[src.election.tenant].author,
+    ]);
     await client.query(
       `INSERT INTO app.source_documents (id, tenant_id, election_id, party_id, kind, title, url, is_programme)
        VALUES ($1, $2, $3, $4, 'pdf', 'Programa de ejemplo', 'https://example.org/programa.pdf', $5)`,
@@ -258,6 +264,7 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       }
     }
   }
+  await client.query(`SELECT set_config('app.user_id', $1, true)`, [USERS.platformAdmin]);
   for (const run of Object.values(LLM_RUNS)) {
     const tenant = TENANTS[run.election.tenant].id;
     await client.query(
@@ -315,6 +322,37 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
     await client.query(`UPDATE app.assessments SET state = 'in_review' WHERE id = $1`, [
       cells.review,
     ]);
+  }
+  // A published cell per tenant, through the real flow: written by the author from a party-neutral document, submitted,
+  // then published by someone else.
+  for (const [key, cells] of Object.entries(CELLS) as [TenantKey, (typeof CELLS)[TenantKey]][]) {
+    const tenant = TENANTS[key].id;
+    const e = cells.election;
+    await client.query(`SELECT set_config('app.user_id', $1, true)`, [cells.author]);
+    await client.query(
+      `INSERT INTO app.assessments (id, tenant_id, election_id, party_id, criterion_id, draft_rating, draft_summary)
+       VALUES ($1, $2, $3, $4, $5, 'partially_meets', '{"es": "Resumen de ejemplo publicado"}')`,
+      [cells.published, tenant, e.id, e.secondParty, e.secondCriterion],
+    );
+    await client.query(
+      `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote)
+       VALUES ($1, $2, $3, $4, 1, $5)`,
+      [tenant, e.id, cells.published, cells.neutral.id, cells.publishedQuote],
+    );
+    await client.query(
+      `INSERT INTO app.draft_checked_documents (assessment_id, tenant_id, election_id, source_document_id)
+       VALUES ($1, $2, $3, $4)`,
+      [cells.published, tenant, e.id, cells.neutral.id],
+    );
+    await client.query(`UPDATE app.assessments SET state = 'in_review' WHERE id = $1`, [
+      cells.published,
+    ]);
+    await client.query(`SELECT set_config('app.user_id', $1, true)`, [cells.publisher]);
+    await client.query(
+      `INSERT INTO app.assessment_revisions (assessment_id, reviewed_version)
+       SELECT id, content_version FROM app.assessments WHERE id = $1`,
+      [cells.published],
+    );
   }
   // Right-of-reply reports, one per tenant about its cell in review, sent as the public through app.submit_report (the
   // inactive tenant takes one only while active).

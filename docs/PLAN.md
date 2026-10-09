@@ -306,6 +306,19 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 - **R18. Failure codes of `submit_report()`:** 22023 for a bad tenant, election or cell (the API can answer 404),
   54000 for the cap (429).
 
+**Publishing (migration `publish`):**
+
+- **R19. Uploaders of attestation files count as contributors,** like uploaders of source copies (spec §3.6 step 4
+  says "uploaded files the draft cites"; an attestation file is one).
+- **R20. Error classes:** a missing role or a four-eyes violation is a permission error (42501); state, version,
+  election status and freeze window are 23001; missing content is 23514.
+- **R21. Publishing does not require an active tenant.** Nothing of an inactive tenant is public anyway; requiring
+  activity would block preparing a tenant before launch.
+- **R22. `revision_internal.report_id` stays empty for now:** the draft has no column to carry a report link, and the
+  editorial workflow (M2) decides how a report is attached.
+- **R23. Fixture files are uploaded by each tenant's author,** not the platform admin, so the fixture publishers are
+  never the uploaders of what they publish.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).

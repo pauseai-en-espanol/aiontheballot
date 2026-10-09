@@ -22,4 +22,5 @@ export const SECURITY_DEFINER_ALLOWLIST: readonly string[] = [
   'private.bump_public_version',
   'private.is_platform_admin',
   'private.my_tenants',
+  'private.publish_revision',
 ];

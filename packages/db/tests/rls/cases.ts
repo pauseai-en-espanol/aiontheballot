@@ -85,6 +85,9 @@ export const matrixCases = (): MatrixCase[] =>
             false,
           );
         }
+        if (spec.view) {
+          continue;
+        }
         add(
           'update',
           `UPDATE ${relation} SET ${spec.set} WHERE ${row.where}`,

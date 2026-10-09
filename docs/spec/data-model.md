@@ -672,6 +672,16 @@ ADR-0002 allowlist), does the rest in the same transaction:
 
 Nothing here is ever updated or deleted, except through `purge_tenant`.
 
+**How the publish trigger is built.** One function runs before the insert (steps 1–7, then filling in the revision)
+and after it (copying, `revision_internal`, and setting the cell `published`, whose own trigger does step 9). It
+checks the publisher first, so nobody else learns anything about the cell. A missing role or a four-eyes violation is
+a permission error (42501); the cell's state, the version, the election's status and the freeze window are
+`restrict_violation` (23001); what the content lacks is `check_violation` (23514). The contributors include whoever
+uploaded a source copy or an attestation file the draft cites. Step 6 is a no-op update of the draft's quotes, which
+makes their trigger match and check attestations again. A matched quote's location is its units' labels (`p. 47`, or
+`p. 47–p. 48`); an attested one's is its section label. Publishing does not need an active tenant: an inactive
+tenant's revisions are simply not public.
+
 ```sql
 -- Every column but assessment_id and reviewed_version is set by the publish trigger.
 create table app.assessment_revisions (                -- public

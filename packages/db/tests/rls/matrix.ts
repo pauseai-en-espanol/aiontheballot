@@ -313,6 +313,28 @@ export const SOURCES = {
     file: FILES.sourceInactive.id,
     pages: ['Texto de ejemplo del inquilino inactivo.'],
   },
+  /** Party-neutral documents, cited by the published cells: public once a public revision cites them. */
+  neutralA: {
+    id: fixtureId(6, 56),
+    election: ELECTIONS.liveA,
+    party: null,
+    file: FILES.sourceA.id,
+    pages: ['Documento neutral de ejemplo con una propuesta ficticia de regulación.'],
+  },
+  neutralB: {
+    id: fixtureId(6, 57),
+    election: ELECTIONS.liveB,
+    party: null,
+    file: FILES.sourceB.id,
+    pages: ['Documento neutral de ejemplo con una propuesta ficticia de regulación.'],
+  },
+  neutralInactive: {
+    id: fixtureId(6, 58),
+    election: ELECTIONS.liveInactive,
+    party: null,
+    file: FILES.sourceInactive.id,
+    pages: ['Documento neutral de ejemplo con una propuesta ficticia de regulación.'],
+  },
 } as const satisfies Record<string, FixtureSource>;
 
 /** Fictional LLM runs, one per tenant on its live election's source, each with one open suggestion. */
@@ -401,6 +423,12 @@ export interface FixtureCells {
   review: string;
   evidence: string;
   quote: string;
+  /** Second party × second criterion: published through the real flow, citing a party-neutral document. */
+  published: string;
+  neutral: FixtureSource;
+  publishedQuote: string;
+  /** Publishes it: a reviewer or country admin of the tenant who didn't write it (or the platform admin). */
+  publisher: string;
 }
 
 /** Fictional cells in each tenant's live election, on its first party. */
@@ -414,6 +442,10 @@ export const CELLS = {
     review: fixtureId(9, 52),
     evidence: fixtureId(9, 53),
     quote: 'propone una moratoria de ejemplo sobre los sistemas de prueba',
+    published: fixtureId(9, 63),
+    neutral: SOURCES.neutralA,
+    publishedQuote: 'una propuesta ficticia de regulación',
+    publisher: USERS.reviewerA,
   },
   B: {
     election: ELECTIONS.liveB,
@@ -424,6 +456,10 @@ export const CELLS = {
     review: fixtureId(9, 55),
     evidence: fixtureId(9, 56),
     quote: 'Texto de ejemplo del programa ficticio',
+    published: fixtureId(9, 64),
+    neutral: SOURCES.neutralB,
+    publishedQuote: 'una propuesta ficticia de regulación',
+    publisher: USERS.editorAReviewerB,
   },
   inactive: {
     election: ELECTIONS.liveInactive,
@@ -434,6 +470,10 @@ export const CELLS = {
     review: fixtureId(9, 58),
     evidence: fixtureId(9, 59),
     quote: 'Texto de ejemplo del inquilino inactivo',
+    published: fixtureId(9, 65),
+    neutral: SOURCES.neutralInactive,
+    publishedQuote: 'una propuesta ficticia de regulación',
+    publisher: USERS.platformAdmin,
   },
 } as const satisfies Record<TenantKey, FixtureCells>;
 
@@ -522,6 +562,8 @@ export interface Insert {
 }
 
 export interface Relation {
+  /** A view: read only, so it gets no update or delete cases (Postgres refuses those before checking grants). */
+  view?: true;
   rows: readonly Row[];
   inserts: readonly Insert[];
   /** The SET clause of the plain update case: a change any permitted writer may make. */
@@ -540,6 +582,8 @@ const NOBODY: Rule = {};
 const MEMBERS: Rule = { members: ALL_ROLES, platformAdmin: true };
 const COUNTRY_ADMINS: Rule = { members: ['country_admin'], platformAdmin: true };
 const PLATFORM_ADMIN: Rule = { platformAdmin: true };
+/** Who reviews: publishes cells and decides change requests (ADR-0002, capabilities by role). */
+const REVIEWERS: Rule = { members: ['reviewer', 'country_admin'], platformAdmin: true };
 /** Who triages right-of-reply reports: every member, never a platform admin (ADR-0002, capabilities by role). */
 const TRIAGERS: Rule = { members: ALL_ROLES };
 /** Who writes drafts, evidence and sources (ADR-0002, capabilities by role). */
@@ -1278,7 +1322,8 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     rows: Object.entries(SOURCES).map(([name, src]): Row => ({
       id: `${name} source`,
       tenant: src.election.tenant,
-      public: false,
+      // Public once a public revision cites it: the party-neutral documents the published cells quote.
+      public: Object.values(CELLS).some((c) => c.neutral.id === src.id) && isPublic(src.election),
       where: `id = '${src.id}'`,
       // Once its copy is stored, a source never changes (only its extraction status and archive, by the worker); its
       // text, LLM runs or job requests keep it from being deleted.
@@ -1292,10 +1337,19 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
                     'https://example.org/programa')`,
     })),
     set: `title = 'Título revisado de ejemplo'`,
-    select: MEMBERS,
+    select: { public: true, ...MEMBERS },
     insert: EDITORS,
     update: EDITORS,
     delete: EDITORS,
+    // Never shown to the public, even for a cited source (spec §5).
+    columnReads: {
+      tenant_id: MEMBERS,
+      file_id: MEMBERS,
+      file_origin: MEMBERS,
+      extraction_status: MEMBERS,
+      created_by: MEMBERS,
+      created_at: MEMBERS,
+    },
     columnUpdates: {
       extraction_status: { set: `extraction_status = 'not_applicable'`, rule: NOBODY },
       archive_url: { set: `archive_url = 'https://archive.example.org/x'`, rule: NOBODY },
@@ -1427,6 +1481,19 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
         // Leaving it at in_review changes nothing; its content is locked; its review trail keeps it.
         rules: { 'update:state (submit)': MEMBERS },
         blocked: { update: '23001', delete: '23503', 'update:state (publish)': '23001' },
+      },
+      {
+        id: `published cell of ${key}`,
+        tenant: key,
+        public: false,
+        where: `id = '${CELLS[key].published}'`,
+        // An edit returns it to draft; it is never deleted; it is submitted only after an edit; it stays published.
+        rules: {
+          delete: NOBODY,
+          'update:state (submit)': MEMBERS,
+          'update:state (publish)': MEMBERS,
+        },
+        blocked: { 'update:state (submit)': '23001' },
       },
     ]),
     inserts: TENANT_KEYS.map((key) => ({
@@ -1641,26 +1708,33 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.assessment_revisions': {
-    rows: [],
+    rows: TENANT_KEYS.map((key) => ({
+      id: `revision of the published cell of ${key}`,
+      tenant: key,
+      public: isPublic(CELLS[key].election),
+      where: `assessment_id = '${CELLS[key].published}'`,
+    })),
     // Publishing names the cell and the version reviewed; the publish trigger fills in the rest.
     inserts: TENANT_KEYS.map((key) => ({
       id: `publish the cell in review of ${key}`,
       tenant: key,
       sql: `INSERT INTO app.assessment_revisions (assessment_id, reviewed_version)
             SELECT id, content_version FROM app.assessments WHERE id = '${CELLS[key].review}'`,
-      blocked: '23502',
     })),
     set: 'reviewed_version = reviewed_version',
     select: { public: true, ...MEMBERS },
-    // Until the publish trigger exists, nothing fills in the revision: RLS stops everyone but a platform admin, whom
-    // the missing columns stop.
-    insert: PLATFORM_ADMIN,
+    insert: REVIEWERS,
     update: NOBODY,
     delete: NOBODY,
   },
 
   'app.revision_evidence': {
-    rows: [],
+    rows: TENANT_KEYS.map((key) => ({
+      id: `quote of the published cell of ${key}`,
+      tenant: key,
+      public: isPublic(CELLS[key].election),
+      where: `revision_id IN (SELECT id FROM app.assessment_revisions WHERE assessment_id = '${CELLS[key].published}')`,
+    })),
     // Written only by the publish trigger.
     inserts: TENANT_KEYS.map((key) => ({
       id: `quote into ${key}`,
@@ -1678,7 +1752,12 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.revision_checked_documents': {
-    rows: [],
+    rows: TENANT_KEYS.map((key) => ({
+      id: `checked document of the published cell of ${key}`,
+      tenant: key,
+      public: isPublic(CELLS[key].election),
+      where: `revision_id IN (SELECT id FROM app.assessment_revisions WHERE assessment_id = '${CELLS[key].published}')`,
+    })),
     inserts: TENANT_KEYS.map((key) => ({
       id: `checked document into ${key}`,
       tenant: key,
@@ -1694,7 +1773,12 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.revision_internal': {
-    rows: [],
+    rows: TENANT_KEYS.map((key) => ({
+      id: `internal record of the published cell of ${key}`,
+      tenant: key,
+      public: false,
+      where: `revision_id IN (SELECT id FROM app.assessment_revisions WHERE assessment_id = '${CELLS[key].published}')`,
+    })),
     inserts: TENANT_KEYS.map((key) => ({
       id: `internal record into ${key}`,
       tenant: key,
@@ -1711,7 +1795,13 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.current_revisions': {
-    rows: [],
+    view: true,
+    rows: TENANT_KEYS.map((key) => ({
+      id: `current revision of the published cell of ${key}`,
+      tenant: key,
+      public: isPublic(CELLS[key].election),
+      where: `assessment_id = '${CELLS[key].published}'`,
+    })),
     inserts: [],
     set: 'revision_no = revision_no',
     select: { public: true, ...MEMBERS },
@@ -1741,6 +1831,14 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 };
 
+/** The worker reads every column of the source its job names, including those hidden from the public. */
+const columnReads = (workers: readonly string[]): Record<string, readonly string[]> =>
+  Object.fromEntries(
+    ['tenant_id', 'file_id', 'file_origin', 'extraction_status', 'created_by', 'created_at'].map(
+      (c) => [`select:${c}`, workers],
+    ),
+  );
+
 export const WORKER_ACCESS: WorkerAccess = {
   'app.tenants': { 'tenant A': { select: OPEN_JOBS } },
   'app.job_requests': {
@@ -1749,9 +1847,13 @@ export const WORKER_ACCESS: WorkerAccess = {
     'llmA job': { select: [LLM], update: [LLM] },
   },
   'app.source_documents': {
-    'draftA source': { select: [FETCH] },
-    'pendingA source': { select: [EXTRACT], 'update:extraction_status': [EXTRACT] },
-    'liveA source': { select: [LLM] },
+    'draftA source': { select: [FETCH], ...columnReads([FETCH]) },
+    'pendingA source': {
+      select: [EXTRACT],
+      ...columnReads([EXTRACT]),
+      'update:extraction_status': [EXTRACT],
+    },
+    'liveA source': { select: [LLM], ...columnReads([LLM]) },
   },
   'app.source_texts': { 'first page of liveA': { select: [LLM] } },
   'app.files': { 'sourceA file': { select: [LLM] }, 'insert upload into A': { insert: [FETCH] } },
