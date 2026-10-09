@@ -75,7 +75,7 @@ demo, recorded in [Tracking](#tracking).
 **Demo:** a PR goes green in CI, and the hello-world page loads on `iaenlasurnas.es` over TLS through
 `gateway-public`.
 
-### M1: Schema, RLS, routing and backups
+### M1: Schema, RLS and routing
 
 **Ships:**
 
@@ -86,7 +86,8 @@ demo, recorded in [Tracking](#tracking).
 - **Seeds:** fictional seed data, with a guard that refuses to run against production.
 - **Tests:** the generated isolation matrix and the catalog meta-tests (ADR-0002).
 - **Routing:** `resolve()`, plus integration tests in the CI end-to-end stack, which has the fictional seeds.
-- **Backups:** the backup CronJob (D2) **and a restore test**.
+
+Backups are not part of M1: they come from the cluster's backup plan (D2) and must work before the preview.
 
 **Demo:**
 
@@ -94,7 +95,6 @@ demo, recorded in [Tracking](#tracking).
 - `curl` against production: an unknown host returns 404 and the internal path prefix returns 404. Alias 301s
   need seeded tenants, so they are shown in the CI end-to-end stack.
 - A data-rule test that should fail is shown failing.
-- A dump is restored successfully.
 
 ### M2: Admin and editorial workflow
 
@@ -148,7 +148,12 @@ demo, recorded in [Tracking](#tracking).
 **Ships:** real parties and criteria, every cell _pending_, live on `iaenlasurnas.es` with the
 `elecciones.pauseai.es` alias redirecting to it.
 
-**Before it:** production switches from `main` to the `production` branch (ADR-0001), and D6 is decided.
+**Before it:**
+
+- production switches from `main` to the `production` branch (ADR-0001);
+- D6 is decided;
+- off-node backups work (D2): phases 0 and 1 of the gitops backup plan are done, and a nightly dump of the
+  `aiontheballot` database has been restored into a scratch database.
 
 **Gate:** a preview go/no-go. That is also where the cut list is applied if we're behind.
 
@@ -189,7 +194,7 @@ is done and M2 is on track.
 | ---------------- | ------------------------------------------------------------ |
 | During M1        | The isolation matrix runs in CI                              |
 | During M2        | M4 go/no-go before launch; content from the chapter on track |
-| Preview go/no-go | Ready to show the preview; apply the cut list if behind      |
+| Preview go/no-go | Ready to show; backups restored; apply cut list if behind    |
 | Launch go/no-go  | Launch checklist signed off                                  |
 
 ## Content we need from the chapter
@@ -245,11 +250,10 @@ as the LLM pipeline:
 
 ## Open decisions for Dani
 
-D1 and D3–D5 are decided (see [Answered](#answered)).
+D1–D5 are decided (see [Answered](#answered)).
 
 | #   | Decision                                                      | Recommendation                                                                                                                                                                                                                                                |
 | --- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D2  | Where off-node backups go                                     | An app-owned, encrypted `pg_dump` (hourly during the campaign), sent to whichever off-node target the cluster backup plan uses (MinIO on the Mac, or Google Drive via rclone-crypt). It must work before the preview.                                         |
 | D6  | Where pre-production checks run, now that there is no staging | Rehearse each migration against the latest backup restored into a throwaway database (it doubles as the restore test). Run the M5 load test and the Cloudflare-contingency test against production before launch, at a quiet hour. Decide before the preview. |
 
 ## Questions for the chapter
@@ -261,6 +265,8 @@ D1 and D3–D5 are decided (see [Answered](#answered)).
   the fields in the brief. Proposal: add `registry_entry` and `contact_email` to `organizations`. Please confirm
   with counsel.
 - **Q7. Personal data.** How long should right-of-reply submissions be kept, and who is the privacy contact?
+  Deleted submissions stay in backups until those expire (up to 90 days under the cluster's backup policy), which
+  the privacy policy should say.
 - **Q8. Electoral law.** Has the association had advice on publishing or updating the table during the campaign,
   and on **reflection day**? There will be a per-election _freeze_ switch; whether and when to use it is the
   chapter's call.
@@ -317,6 +323,7 @@ My default is in brackets.
 | D1: non-owner DB roles                                | halyard `postgresql` chart 1.1.0 adds `databases[].extraRoles`: login roles that own nothing, forced `NOSUPERUSER … NOBYPASSRLS`, with `CONNECT` on their database. Our migrations (as owner) grant them table privileges. |
 | Environments                                          | One, production, with no staging (ADR-0001). It tracks `main` until the preview, then a `production` branch the owner fast-forwards.                                                                                       |
 | Names                                                 | `aiontheballot` everywhere: repo, packages (`@aiontheballot/*`), chart, images, Harbor project, namespace, database and roles. The product name is configuration (`PLATFORM_NAME`).                                        |
+| D2: backups                                           | Follow the gitops backup plan (Velero + MinIO + DB dumps): the shared Postgres's nightly `pg_dump`, copied off the node by Velero. Nightly also during the campaign; no app-owned job. Must work before the preview.       |
 
 ## Tracking
 

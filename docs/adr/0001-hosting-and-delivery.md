@@ -86,7 +86,7 @@ Prices and terms were checked against official pages when this ADR was written (
   content hash.
 - **To build:**
   - DB runtime roles (D1).
-  - Off-node backups (D2).
+  - Off-node backups (D2), which come from the cluster's backup plan.
   - A certificate SAN for `iaenlasurnas.es`.
 - **Risks:** a single shared node with a **bus factor of one**.
 
@@ -108,7 +108,7 @@ fix them rather than copy them.
 
 - **Repository:** `pauseai-en-espanol/aiontheballot`.
 - **Umbrella chart:** `helm-charts/aiontheballot`, with one subchart per deployable (`apps/*/helm-chart`: web, admin,
-  API, worker), a migration Job, and the backup CronJob.
+  API, worker) and a migration Job.
 - **Routes:** the halyard `route:` convention (`enabled`/`parentRefs`/`hostnames`/`annotations`) on
   `gateway-public`.
 - **Pods:**
@@ -185,11 +185,12 @@ fix them rather than copy them.
 
 ### Backups
 
-- An app-owned CronJob runs `pg_dump -Fc` as the owner role, encrypts the dump with age, and copies it off the
-  node.
-- It runs **hourly during the campaign** and daily otherwise.
-- The off-node target is decision D2, aligned with the cluster's backup plan.
-- A restore test is part of M1, and a full restore drill plus runbook is part of M5.
+- Backups follow the cluster's backup plan (gitops `docs/backup-policy-plan.md`, PLAN.md D2). There is no
+  app-owned backup job.
+- The shared Postgres dumps every database nightly with `pg_dump -Fc`, `aiontheballot` included. Velero copies
+  the dumps off the node to MinIO, encrypted by kopia. Nightly is enough, also during the campaign.
+- It must work before the preview, including one restore of an `aiontheballot` dump. A full restore drill plus
+  runbook is part of M5.
 
 ### Traffic spikes without a CDN
 

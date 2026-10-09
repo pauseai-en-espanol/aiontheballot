@@ -84,7 +84,7 @@ seal "$APP_DIR/aiontheballot-harbor-pull.yaml" \
       auth: ("\(env.HARBOR_ROBOT):\(env.HARBOR_SECRET)" | @base64)}}}')
 
 seal "$APP_DIR/aiontheballot-owner-db.yaml" \
-  "# DATABASE_URL for aiontheballot_owner (migrations and backups only): $(url aiontheballot_owner '<OWNER_PASSWORD>')" -2 \
+  "# DATABASE_URL for aiontheballot_owner (migrations only): $(url aiontheballot_owner '<OWNER_PASSWORD>')" -2 \
   generic aiontheballot-owner-db -n aiontheballot --from-file=DATABASE_URL=<(url aiontheballot_owner "$owner_pw")
 
 # The runtime URLs are sealed now so each password is generated once; the API and worker use them from M1.

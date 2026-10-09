@@ -36,7 +36,7 @@ The UI repeats some checks, but only for user experience.
 
 | Role                   | Used by                         | Notes                                                                                                                                                    |
 | ---------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `aiontheballot_owner`  | Migration and backup jobs only  | Owns the schemas; never used by the running apps                                                                                                         |
+| `aiontheballot_owner`  | The migration Job only          | Owns the schemas; never used by the running apps                                                                                                         |
 | `aiontheballot_admin`  | API admin routes and the worker | Runtime role                                                                                                                                             |
 | `aiontheballot_web`    | API public routes (read-only)   | Runtime role                                                                                                                                             |
 | `aiontheballot_worker` | Background worker               | Runtime role; only job tables, scoped to the tenant of the job's `job_requests` row, which is the one table it reads across tenants (ids and kinds only) |
