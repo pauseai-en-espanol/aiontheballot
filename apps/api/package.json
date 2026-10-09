@@ -1,6 +1,6 @@
 {
   "name": "@aiontheballot/api",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Fastify API and worker: the only code that talks to Postgres",
   "type": "module",

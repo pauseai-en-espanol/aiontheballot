@@ -1,5 +1,27 @@
 # @aiontheballot/api
 
+## 0.3.0
+
+### Minor Changes
+
+- 685914f: Route the public site by host: the web app's `proxy.ts` runs `resolve()` with routing data from the API's new
+  `GET /public/routing` (read as `aiontheballot_web`), rewriting tenant pages to their internal path, redirecting aliases
+  and platform paths, and answering 404 to everything else. The e2e stack runs on a migrated, seeded database and tests
+  status codes, `Location`, a spoofed `X-Forwarded-Host`, the internal prefix and the absence of cookies.
+
+### Patch Changes
+
+- Updated dependencies [3650ed0]
+- Updated dependencies [30cd780]
+- Updated dependencies [d02ea23]
+- Updated dependencies [60e7e1d]
+- Updated dependencies [ad628fb]
+- Updated dependencies [f89b648]
+- Updated dependencies [bdde473]
+- Updated dependencies [5153712]
+- Updated dependencies [9118d0d]
+  - @aiontheballot/db@0.4.0
+
 ## 0.2.1
 
 ### Patch Changes

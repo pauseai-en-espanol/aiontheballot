@@ -1,5 +1,34 @@
 # @aiontheballot/migrations
 
+## 0.6.0
+
+### Minor Changes
+
+- 3650ed0: Add the cell workflow: submit, recall, reject with a note and publish transitions; the content lock while in review;
+  content versions; contributors and review events written by triggers; and archived elections taking only corrections
+  and withdrawals.
+- 30cd780: Add change control for live elections: `change_requests`, the public `structural_changes` and the `corrections_log`
+  view. A live election's structure changes only through a request approved in the same transaction, applied by the
+  approver, with a second approver when the tenant requires one and no approvals in the freeze window.
+- d02ea23: Add the evidence rules: quotes and checked documents cite only stored, extracted sources of no party or the cell's
+  party, of kinds the methodology admits; quotes are matched verbatim across pages (or attested by a second person for
+  sources without text); submitting needs every quote matched or attested.
+- 60e7e1d: Add the programme-status rules: "published" needs the party's programme among its sources; every update stamps the
+  check date and is refused inside the freeze window; publishing a programme flags the party's "not mentioned" ratings
+  for a recheck.
+- ad628fb: Add publishing: `private.publish_revision()`, the trigger behind `INSERT INTO app.assessment_revisions
+(assessment_id, reviewed_version)`. It checks the publisher, four-eyes, the election and freeze window, the change kind
+  and note, re-runs the verbatim match and the evidence requirement, copies the reviewed draft and starts the next
+  generation.
+- f89b648: Add `private.purge_tenant()`, executable only by the owner: it deletes every row of a tenant (published history and
+  audit rows included), keeps its hostnames as tombstones and records the purge in `purge_log`.
+- bdde473: Add right-of-reply reports: `app.submit_report()` (the public's only write, with a per-tenant daily cap), triage by
+  members (never platform admins), anonymization on request or by the worker's daily
+  `private.anonymize_expired_reports()`, and personal-data columns kept out of the audit log.
+- 5153712: Add published revisions: `assessment_revisions`, `revision_evidence`, `revision_checked_documents`, the private
+  `revision_internal` and the `current_revisions` view. All immutable; publishers insert only the cell and the version
+  reviewed; the public reads revisions of live and archived elections of active tenants and the sources they cite.
+
 ## 0.5.0
 
 ### Minor Changes
