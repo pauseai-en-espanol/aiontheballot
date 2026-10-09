@@ -458,6 +458,7 @@ Each of these must fail:
 - Updating or deleting `assessment_contributors` rows, or inserting one for another user or another revision.
 - Setting `match_status` to `matched` by hand, or updating `source_texts` or a cited source's file.
 - Referencing a party, criterion or source from another election of the same tenant.
+- A territory code, on an election or a party, outside the tenant's country; changing a live election's territory.
 - A worker job whose payload names a different tenant from its `job_requests` row.
 - A `file_blobs` row whose content doesn't match the recorded hash.
 - An audit diff containing a column marked as personal data.

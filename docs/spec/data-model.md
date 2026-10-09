@@ -1,7 +1,7 @@
 # Spec: data model
 
 - **Status:** Draft for review, revised after an adversarial review (actor binding, same-election keys, change
-  control, worker scope, audit privacy)
+  control, worker scope, audit privacy) and extended with election territories
 - **Relates to:** [ADR-0002](../adr/0002-tenancy-and-authorization.md) (rules and isolation),
   [ADR-0003](../adr/0003-application-stack.md) (dbmate, Kysely), BRIEF §2–§5
 
@@ -92,6 +92,7 @@ for example "Cumple", "Cumple parcialmente", "No cumple" and "No lo menciona".
 create table app.tenants (
   id               uuid primary key default uuidv7(),
   slug             text not null unique,                 -- 'es', 'test-a'
+  country_code     text not null check (country_code ~ '^[A-Z]{2}$'),  -- ISO 3166-1; seeds use XA–XZ
   default_locale   text not null,                        -- 'es'
   enabled_locales  text[] not null,                      -- public locales; must contain default_locale
   display_name     jsonb not null,                       -- localized
@@ -219,13 +220,16 @@ create table app.elections (
   tenant_id          uuid not null references app.tenants,
   slug               text not null,                    -- 'generales-2026'
   type               app.election_type not null,
+  territory_code     text check (territory_code ~ '^[A-Z]{2}-[A-Z0-9]{1,3}$'),  -- ISO 3166-2; null = whole country
   name               jsonb not null,
   election_date      date,
   status             app.election_status not null default 'draft',
   publishing_frozen  boolean not null default false,   -- the freeze switch (PLAN Q8)
   created_at         timestamptz not null default now(),
   unique (tenant_id, id),
-  unique (tenant_id, slug)
+  unique (tenant_id, slug),
+  check (type not in ('general', 'european') or territory_code is null),
+  check (type <> 'regional' or territory_code is not null)
 );
 
 create table app.methodologies (                       -- one per election
@@ -263,12 +267,27 @@ create table app.parties (
   website               text,
   programme_status      app.programme_status not null default 'pending',
   programme_checked_at  timestamptz,                   -- "comprobado el …"
+  territory_codes       text[],                        -- ISO 3166-2 codes where it stands; null = everywhere
   unique (tenant_id, id),
   unique (tenant_id, election_id, id),
   foreign key (tenant_id, election_id) references app.elections (tenant_id, id),
-  foreign key (tenant_id, logo_file_id) references app.files (tenant_id, id)
+  foreign key (tenant_id, logo_file_id) references app.files (tenant_id, id),
+  check (territory_codes is null or cardinality(territory_codes) > 0)
 );
+```
 
+**Territories.** A tenant is one country (`country_code`). An election covers either the whole country
+(`territory_code` null: generales, europeas, which Spain votes as one constituency) or one subdivision (a regional
+election, `ES-AN`). Each regional or municipal election is its own election, with its own parties, criteria and
+cells, so several can share a date. A party that stands only in some places lists them in `territory_codes` (for
+example one province in a general election), and the public site can say so; most parties leave it null. A trigger
+checks that every code, on the election and on its parties, starts with the tenant's country code, and that the
+election's `territory_code` can't change once it leaves `draft`. Party territories are structural edits, so in a
+live election they need a change request (§3.7). ISO 3166-2 names autonomous communities (`ES-MD`) and provinces
+(`ES-M`) but not municipalities, and the codes alone don't say which province lies in which region: see
+[open item 7](#9-open-items).
+
+```sql
 create table app.criteria (
   id                 uuid primary key default uuidv7(),
   tenant_id          uuid not null,
@@ -732,37 +751,38 @@ The only write available to `aiontheballot_web` is calling `app.submit_report()`
 
 ## 6. Enforcement map
 
-| Rule (ADR-0002 / BRIEF)                                                                | Mechanism                                                                                                                                                | Where                                                                   |
-| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Tenant id never changes                                                                | `BEFORE UPDATE` trigger                                                                                                                                  | Every tenant-owned table                                                |
-| No cross-tenant references                                                             | Composite foreign keys                                                                                                                                   | Every child table                                                       |
-| No cross-election references within a tenant                                           | `(tenant_id, election_id, …)` foreign keys                                                                                                               | Every election-scoped child table                                       |
-| Actors are who they say they are                                                       | Trigger sets every actor column to `current_user_id()`                                                                                                   | Every table with an actor column                                        |
-| Change-request targets belong to the same tenant and election                          | Trigger                                                                                                                                                  | `change_requests`                                                       |
-| Exactly one operator                                                                   | Partial unique index, plus a deferred check when a tenant becomes active                                                                                 | `tenant_organizations`, `tenants`                                       |
-| Only platform admins change the operator, the methodology kind or `is_pauseai_chapter` | Trigger, plus an audit row                                                                                                                               | `tenant_organizations`, `methodologies`, `organizations`                |
-| A demands methodology names its owner                                                  | `CHECK`                                                                                                                                                  | `methodologies`                                                         |
-| Restricted assets only for eligible tenants                                            | Trigger on selection, with re-check when grants or the operator change                                                                                   | `tenant_brand_selections`, `brand_asset_grants`, `tenant_organizations` |
-| Hostname rules                                                                         | Checks, partial index, no-delete trigger, platform-host rejection                                                                                        | `tenant_hostnames`                                                      |
-| Ratings must be valid for the kind                                                     | Trigger                                                                                                                                                  | `assessments`, `assessment_revisions`, `llm_suggestions`                |
-| Verbatim match                                                                         | Trigger computes `match_status` against `source_texts.normalized`; the caller's value is ignored                                                         | `draft_evidence`                                                        |
-| Attestation is by a named second person                                                | Trigger: `attested_by = current_user_id()`, a stored file, and not the publisher                                                                         | `draft_evidence`, `revision_internal`                                   |
-| The matched text can't be edited                                                       | `source_texts` written once by the worker, no runtime `UPDATE`/`DELETE`; sources immutable except `extraction_status` and `archive_url`                  | `source_texts`, `source_documents`                                      |
-| Stored files are what their hash says                                                  | Trigger checks `sha256(content)` and size                                                                                                                | `file_blobs`                                                            |
-| Only admissible source kinds                                                           | Trigger checks `methodologies.admissible_source_kinds`                                                                                                   | `draft_evidence`, `revision_evidence`                                   |
-| The evidence requirement                                                               | Deferred constraint trigger on revision insert                                                                                                           | `assessment_revisions`                                                  |
-| Four-eyes; publisher identity                                                          | Trigger: `reviewer_id = current_user_id()`, not in `assessment_contributors` for the current base revision (snapshot into `contributor_ids`); role check | `revision_internal`                                                     |
-| Contributors can't be hidden                                                           | Rows added by triggers on every draft edit; only the current user's own row can be inserted; no `UPDATE` or `DELETE`                                     | `assessment_contributors`                                               |
-| Legal state transitions                                                                | Trigger                                                                                                                                                  | `assessments`, `elections`, `change_requests`, `reports`                |
-| Published data is immutable                                                            | `UPDATE`, `DELETE` and `TRUNCATE` triggers, honouring only `app.purge`                                                                                   | `assessment_revisions`, `revision_*`, `audit_log`, `purge_log`          |
-| Live-election structural edits need an approved change request                         | Trigger allows them only if a matching request was approved in the same transaction (`decided_txid`); no session flag                                    | `criteria`, `parties`, `methodologies`                                  |
-| Second approver for live edits, if the tenant requires it                              | Trigger: `decided_by <> proposed_by` when `live_edits_need_second_approver`                                                                              | `change_requests`                                                       |
-| Publishing freeze                                                                      | Trigger                                                                                                                                                  | `assessment_revisions`                                                  |
-| Archived elections are read-only                                                       | Trigger                                                                                                                                                  | Every election-scoped table                                             |
-| Default-locale text is present when public                                             | Trigger on publish and on going live                                                                                                                     | `assessment_revisions`, `elections`                                     |
-| Report cap and status                                                                  | `submit_report()`, using the daily counts                                                                                                                | `reports`, `report_daily_counts`                                        |
-| The worker acts only in the job's own tenant                                           | Tenant read from `job_requests`, never from the payload                                                                                                  | `job_requests`                                                          |
-| No personal data in the audit log                                                      | Audit trigger skips columns commented `personal data`; catalog test                                                                                      | `audit_log`                                                             |
+| Rule (ADR-0002 / BRIEF)                                                                      | Mechanism                                                                                                                                                | Where                                                                   |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Tenant id never changes                                                                      | `BEFORE UPDATE` trigger                                                                                                                                  | Every tenant-owned table                                                |
+| No cross-tenant references                                                                   | Composite foreign keys                                                                                                                                   | Every child table                                                       |
+| No cross-election references within a tenant                                                 | `(tenant_id, election_id, …)` foreign keys                                                                                                               | Every election-scoped child table                                       |
+| Actors are who they say they are                                                             | Trigger sets every actor column to `current_user_id()`                                                                                                   | Every table with an actor column                                        |
+| Change-request targets belong to the same tenant and election                                | Trigger                                                                                                                                                  | `change_requests`                                                       |
+| Exactly one operator                                                                         | Partial unique index, plus a deferred check when a tenant becomes active                                                                                 | `tenant_organizations`, `tenants`                                       |
+| Only platform admins change the operator, the methodology kind or `is_pauseai_chapter`       | Trigger, plus an audit row                                                                                                                               | `tenant_organizations`, `methodologies`, `organizations`                |
+| A demands methodology names its owner                                                        | `CHECK`                                                                                                                                                  | `methodologies`                                                         |
+| Restricted assets only for eligible tenants                                                  | Trigger on selection, with re-check when grants or the operator change                                                                                   | `tenant_brand_selections`, `brand_asset_grants`, `tenant_organizations` |
+| Territory codes stay inside the tenant's country; an election's territory is fixed once live | Format checks, plus a trigger on the country prefix and on `draft`                                                                                       | `elections`, `parties`                                                  |
+| Hostname rules                                                                               | Checks, partial index, no-delete trigger, platform-host rejection                                                                                        | `tenant_hostnames`                                                      |
+| Ratings must be valid for the kind                                                           | Trigger                                                                                                                                                  | `assessments`, `assessment_revisions`, `llm_suggestions`                |
+| Verbatim match                                                                               | Trigger computes `match_status` against `source_texts.normalized`; the caller's value is ignored                                                         | `draft_evidence`                                                        |
+| Attestation is by a named second person                                                      | Trigger: `attested_by = current_user_id()`, a stored file, and not the publisher                                                                         | `draft_evidence`, `revision_internal`                                   |
+| The matched text can't be edited                                                             | `source_texts` written once by the worker, no runtime `UPDATE`/`DELETE`; sources immutable except `extraction_status` and `archive_url`                  | `source_texts`, `source_documents`                                      |
+| Stored files are what their hash says                                                        | Trigger checks `sha256(content)` and size                                                                                                                | `file_blobs`                                                            |
+| Only admissible source kinds                                                                 | Trigger checks `methodologies.admissible_source_kinds`                                                                                                   | `draft_evidence`, `revision_evidence`                                   |
+| The evidence requirement                                                                     | Deferred constraint trigger on revision insert                                                                                                           | `assessment_revisions`                                                  |
+| Four-eyes; publisher identity                                                                | Trigger: `reviewer_id = current_user_id()`, not in `assessment_contributors` for the current base revision (snapshot into `contributor_ids`); role check | `revision_internal`                                                     |
+| Contributors can't be hidden                                                                 | Rows added by triggers on every draft edit; only the current user's own row can be inserted; no `UPDATE` or `DELETE`                                     | `assessment_contributors`                                               |
+| Legal state transitions                                                                      | Trigger                                                                                                                                                  | `assessments`, `elections`, `change_requests`, `reports`                |
+| Published data is immutable                                                                  | `UPDATE`, `DELETE` and `TRUNCATE` triggers, honouring only `app.purge`                                                                                   | `assessment_revisions`, `revision_*`, `audit_log`, `purge_log`          |
+| Live-election structural edits need an approved change request                               | Trigger allows them only if a matching request was approved in the same transaction (`decided_txid`); no session flag                                    | `criteria`, `parties`, `methodologies`                                  |
+| Second approver for live edits, if the tenant requires it                                    | Trigger: `decided_by <> proposed_by` when `live_edits_need_second_approver`                                                                              | `change_requests`                                                       |
+| Publishing freeze                                                                            | Trigger                                                                                                                                                  | `assessment_revisions`                                                  |
+| Archived elections are read-only                                                             | Trigger                                                                                                                                                  | Every election-scoped table                                             |
+| Default-locale text is present when public                                                   | Trigger on publish and on going live                                                                                                                     | `assessment_revisions`, `elections`                                     |
+| Report cap and status                                                                        | `submit_report()`, using the daily counts                                                                                                                | `reports`, `report_daily_counts`                                        |
+| The worker acts only in the job's own tenant                                                 | Tenant read from `job_requests`, never from the payload                                                                                                  | `job_requests`                                                          |
+| No personal data in the audit log                                                            | Audit trigger skips columns commented `personal data`; catalog test                                                                                      | `audit_log`                                                             |
 
 Each row has a matching test, either in the data-rule list or in the matrix (ADR-0002).
 
@@ -798,3 +818,7 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
    co-official languages. If the chapter says names are always one string, they become `text`.
 6. **Report retention** (PLAN Q7) sets `delete_after`. A daily job deletes expired reports and logs only their
    count.
+7. **Municipalities and territory containment.** ISO 3166-2 has no municipal codes, and the codes don't encode
+   which province belongs to which region. When municipal coverage or containment checks are needed, a later
+   migration adds a reference table `app.territories (code, parent_code, kind)` (INE codes for municipalities) and
+   turns the territory columns into foreign keys to it. Existing ISO codes stay valid.
