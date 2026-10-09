@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@aiontheballot/i18n": "workspace:*",
+    "@aiontheballot/observability": "workspace:*",
+    "@sentry/nextjs": "11.4.0",
     "next": "16.3.8",
     "react": "19.3.0",
     "react-dom": "19.3.0"

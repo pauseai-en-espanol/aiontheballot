@@ -28,6 +28,7 @@ A multi-tenant platform that publishes sourced comparisons of political parties'
 - `apps/api`: Fastify API and worker; the only code that touches Postgres (via `packages/db`)
 - `packages/db`: Kysely, generated types, `withActor` · `packages/domain`: pure shared logic
 - `packages/ui`: Panda preset, Ark UI components, fixed rating visuals · `packages/og`: share-image templates
+- `packages/observability`: Sentry privacy options (no personal data leaves the apps) and the browser error relay
 - `db/migrations/*.sql` (dbmate) and `db/schema.sql` (generated dump, review it in every PR)
 
 ## Commands

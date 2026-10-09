@@ -4,7 +4,12 @@ import { loadConfig } from './config.js';
 
 describe('loadConfig', () => {
   it('uses defaults when nothing is set', () => {
-    expect(loadConfig({})).toEqual({ host: '0.0.0.0', port: 3001, logLevel: 'info' });
+    expect(loadConfig({})).toEqual({
+      host: '0.0.0.0',
+      port: 3001,
+      logLevel: 'info',
+      sentryDsn: undefined,
+    });
   });
 
   it('reads values from the environment', () => {
@@ -12,7 +17,21 @@ describe('loadConfig', () => {
       host: '127.0.0.1',
       port: 4000,
       logLevel: 'debug',
+      sentryDsn: undefined,
     });
+  });
+
+  it('reads the GlitchTip DSN', () => {
+    const { sentryDsn } = loadConfig({ SENTRY_DSN: 'http://apikey@glitchtip.test/3' });
+    expect(sentryDsn?.envelopeUrl).toBe(
+      'http://glitchtip.test/api/3/envelope/?sentry_version=7&sentry_key=apikey',
+    );
+  });
+
+  it('rejects an invalid DSN without echoing it', () => {
+    expect(() => loadConfig({ SENTRY_DSN: 'http://apikey@glitchtip.test/nope' })).toThrow(
+      /^SENTRY_DSN [^:]*$/,
+    );
   });
 
   it('rejects an invalid port', () => {

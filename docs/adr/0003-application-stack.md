@@ -186,14 +186,33 @@ cross-country views and an open-data export.
 
 ### 7. Errors and observability: GlitchTip now, OpenTelemetry from day one
 
-- **Error tracking:** self-hosted **GlitchTip** (MIT), receiving errors through the standard Sentry SDKs
-  (`@sentry/nextjs` in both Next apps, `@sentry/node` in the API and worker).
+- **Error tracking:** self-hosted **GlitchTip** (MIT), receiving errors through the standard Sentry SDKs:
+  `@sentry/node` in the API and worker, `@sentry/nextjs` on both Next servers and in the admin's browser, and a
+  minimal `@sentry/browser` client on the public site. **Errors only**: no tracing is enabled. Shared code lives in
+  `packages/observability`.
   - It runs on the cluster as a **cluster-wide** service (gitops `catalog/o11y/glitchtip`), with its database on
     the shared Postgres instance. The UI is **VPN-only** (`gateway-private`).
-  - Server-side SDKs send to its in-cluster Service. Browser SDKs send through a relay endpoint on our own host
-    (Sentry `tunnel`) that forwards in-cluster, so nothing of GlitchTip faces the internet. The relay sets no
-    cookie, caps the payload size and shares the per-IP rate limit; the CSP stays `'self'`.
-  - Personal data (right-of-reply submissions, emails) is scrubbed in `beforeSend` before anything leaves the app.
+  - **Server-side** SDKs send to its in-cluster Service. Each app has its own project, and its DSN is a sealed
+    secret (`scripts/seal-glitchtip-dsns.sh`).
+  - **Browser** SDKs send to `/_relay/errors` on the app's own host (Sentry `tunnel`), so nothing of GlitchTip
+    faces the internet:
+    - The relay is a route handler in each Next app, not in the API, which holds the database credentials.
+    - It forwards only to its own app's project, with the DSN held server-side. The browser gets a placeholder
+      DSN, so neither the key nor GlitchTip's host reaches the page.
+    - It caps the body at 200 KB, forwards no client headers, sets no cookie and shares the per-IP rate limit. The
+      CSP stays `'self'`.
+  - **Public-site weight:** the full Next client SDK would add about 78 KB gzipped to every page. The public site
+    instead installs two small listeners and loads a 20 KB client only on the first error, so a page that hits
+    none downloads no SDK. It has no breadcrumbs. The admin loads the full SDK, with breadcrumbs.
+  - **Personal data** never leaves the app:
+    - Sentry 11 collects cookies, headers, bodies, query strings and local variables by default. Each category is
+      switched off; the user agent is the only header kept.
+    - `beforeSend` drops the user, strips query strings and fragments, and redacts email addresses everywhere.
+    - Free text can't be recognised, so code must never put request bodies into errors, and tokens travel in query
+      strings, never in paths.
+  - **No `withSentryConfig`:** source maps aren't uploaded yet (GlitchTip is VPN-only), and its bundle trimming
+    doesn't apply under Turbopack. Next's `compiler.define` sets `__SENTRY_TRACING__` and `__SENTRY_DEBUG__` to
+    `false` instead.
   - Because the SDKs speak the Sentry protocol, switching backend later is a DSN change.
 - **Observability:** the API, the worker and both Next apps are instrumented with OpenTelemetry from day one
   (traces, metrics, logs), independent of any backend.
@@ -351,6 +370,9 @@ These are smaller choices. Each has a default we'll use unless the owner objects
   - kysely-codegen generated types from a schema with `uuidv7()` keys, an enum and jsonb;
   - satori plus resvg rendered a PNG;
   - pg-boss processed a job.
+- **`@sentry/node` 11 is heavy on disk:** it ships its build plugins and the Sentry CLI as runtime dependencies,
+  adding about 185 MB to the API's production install. Memory is barely affected (about 6 MB more resident). A
+  hand-built `@sentry/core` client would avoid it, but isn't worth owning for now.
 - **What the spike changed:**
   - Web-page extraction uses **jsdom** with Readability. linkedom's types conflict with `lib.dom`.
   - Better Auth has no Fastify helper. It's mounted through the documented `Request` bridge plus `fromNodeHeaders`

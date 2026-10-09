@@ -20,5 +20,8 @@
   },
   "home": {
     "comingSoon": "Coming soon"
+  },
+  "errors": {
+    "unexpected": "Something went wrong. Please try again later."
   }
 }

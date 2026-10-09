@@ -1,6 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
-import { ADMIN_URL, API_URL, PLATFORM_NAME, PORTS, WEB_URL } from './servers.js';
+import {
+  ADMIN_URL,
+  API_URL,
+  DSNS,
+  GLITCHTIP_URL,
+  PLATFORM_NAME,
+  PORTS,
+  WEB_URL,
+} from './servers.js';
 
 // Runs against production builds (turbo builds the apps first), never against dev servers.
 export default defineConfig({
@@ -14,25 +22,31 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
+      name: 'glitchtip',
+      command: 'node fake-glitchtip.ts',
+      url: `${GLITCHTIP_URL}/healthz`,
+      env: { PORT: String(PORTS.glitchtip) },
+    },
+    {
       name: 'web',
       command: `pnpm exec next start --port ${PORTS.web} --hostname 127.0.0.1`,
       cwd: '../apps/web',
       url: `${WEB_URL}/healthz`,
-      env: { PLATFORM_NAME },
+      env: { PLATFORM_NAME, SENTRY_DSN: DSNS.web },
     },
     {
       name: 'api',
       command: 'node dist/server.js',
       cwd: '../apps/api',
       url: `${API_URL}/healthz`,
-      env: { HOST: '127.0.0.1', PORT: String(PORTS.api), LOG_LEVEL: 'warn' },
+      env: { HOST: '127.0.0.1', PORT: String(PORTS.api), LOG_LEVEL: 'warn', SENTRY_DSN: DSNS.api },
     },
     {
       name: 'admin',
       command: `pnpm exec next start --port ${PORTS.admin} --hostname 127.0.0.1`,
       cwd: '../apps/admin',
       url: `${ADMIN_URL}/healthz`,
-      env: { PLATFORM_NAME },
+      env: { PLATFORM_NAME, SENTRY_DSN: DSNS.admin },
     },
   ],
 });

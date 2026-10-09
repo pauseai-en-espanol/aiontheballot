@@ -1,7 +1,9 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
+import { initErrorTracking } from './error-tracking.js';
 
 const config = loadConfig(process.env);
+initErrorTracking(config.sentryDsn);
 const app = buildApp({ logger: { level: config.logLevel } });
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {

@@ -19,9 +19,12 @@
     "docker:push": "docker push \"${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}aiontheballot/api:${npm_package_version}${DOCKER_TAG_SUFFIX:+.${DOCKER_TAG_SUFFIX}}\""
   },
   "dependencies": {
+    "@aiontheballot/observability": "workspace:*",
+    "@sentry/node": "11.4.0",
     "fastify": "5.12.5"
   },
   "devDependencies": {
+    "@sentry/core": "11.4.0",
     "@slango.configs/lint-staged": "2.0.8",
     "@slango.configs/oxlint": "0.1.12",
     "@slango.configs/typescript": "3.0.0",

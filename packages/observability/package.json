@@ -1,0 +1,38 @@
+{
+  "name": "@aiontheballot/observability",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Error tracking shared by the apps: privacy options for the Sentry SDKs and the browser error relay",
+  "type": "module",
+  "exports": {
+    "./*": {
+      "import": "./dist/*.js",
+      "types": "./dist/*.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:watch": "tsc --watch -p tsconfig.build.json",
+    "build:check": "tsc --noEmit",
+    "lint": "oxlint --type-aware --max-warnings 0 .",
+    "lint:fix": "oxlint --type-aware --fix --max-warnings 0 .",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --run --coverage"
+  },
+  "dependencies": {
+    "@sentry/core": "11.4.0"
+  },
+  "devDependencies": {
+    "@slango.configs/lint-staged": "2.0.8",
+    "@slango.configs/oxlint": "0.1.12",
+    "@slango.configs/typescript": "3.0.0",
+    "@slango.configs/vitest": "2.1.0",
+    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/ui": "5.0.3",
+    "oxlint": "1.87.0",
+    "oxlint-tsgolint": "7.0.2003",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

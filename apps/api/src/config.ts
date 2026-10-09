@@ -1,7 +1,11 @@
+import { type Dsn, readDsn } from '@aiontheballot/observability/dsn';
+
 export interface ApiConfig {
   host: string;
   port: number;
   logLevel: string;
+  /** GlitchTip project for the API (in-cluster Service); undefined turns error tracking off. */
+  sentryDsn: Dsn | undefined;
 }
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'];
@@ -16,5 +20,5 @@ export const loadConfig = (env: NodeJS.ProcessEnv): ApiConfig => {
   if (!LOG_LEVELS.includes(logLevel)) {
     throw new Error(`LOG_LEVEL must be one of ${LOG_LEVELS.join(', ')}, got "${logLevel}"`);
   }
-  return { host: env.HOST ?? '0.0.0.0', port, logLevel };
+  return { host: env.HOST ?? '0.0.0.0', port, logLevel, sentryDsn: readDsn(env) };
 };
