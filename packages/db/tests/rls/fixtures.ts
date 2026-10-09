@@ -2,6 +2,7 @@ import type pg from 'pg';
 
 import {
   BRAND_ASSETS,
+  CELLS,
   CORE_CRITERION,
   ELECTIONS,
   FILES,
@@ -208,6 +209,12 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
                '{"es": "Descripción de ejemplo"}', 1, $4)`,
       [e.criterion, tenant, e.id, e.id === ELECTIONS.liveA.id ? CORE_CRITERION : null],
     );
+    await client.query(
+      `INSERT INTO app.criteria (id, tenant_id, election_id, slug, title, description, display_order)
+       VALUES ($1, $2, $3, 'criterio-de-ejemplo-2', '{"es": "Criterio de ejemplo 2"}',
+               '{"es": "Descripción de ejemplo"}', 2)`,
+      [e.secondCriterion, tenant, e.id],
+    );
     if (e.status !== 'draft') {
       // Only an active tenant's election goes live: the inactive tenant is active just for that moment.
       const inactive = !TENANTS[e.tenant].active;
@@ -274,5 +281,37 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       await client.query('UPDATE app.job_requests SET finished_at = now() WHERE id = $1', [job.id]);
     }
   }
+  // Cells, written by each tenant's author: a draft "not mentioned" backed by a checked copy of the programme, and a
+  // "meets" with one quote, submitted for review.
+  for (const [key, cells] of Object.entries(CELLS) as [TenantKey, (typeof CELLS)[TenantKey]][]) {
+    const tenant = TENANTS[key].id;
+    const e = cells.election;
+    await client.query(`SELECT set_config('app.user_id', $1, true)`, [cells.author]);
+    await client.query(
+      `INSERT INTO app.assessments (id, tenant_id, election_id, party_id, criterion_id, draft_rating, draft_summary)
+       VALUES ($1, $2, $3, $4, $5, 'not_mentioned', '{"es": "Resumen de ejemplo"}'),
+              ($6, $2, $3, $4, $7, 'meets', '{"es": "Resumen de ejemplo"}')`,
+      [cells.draft, tenant, e.id, e.party, e.criterion, cells.review, e.secondCriterion],
+    );
+    await client.query(
+      `INSERT INTO app.draft_checked_documents (assessment_id, tenant_id, election_id, source_document_id)
+       VALUES ($1, $2, $3, $4)`,
+      [cells.draft, tenant, e.id, cells.source.id],
+    );
+    await client.query(
+      `INSERT INTO app.draft_evidence (id, tenant_id, election_id, assessment_id, source_document_id, ordinal, quote)
+       VALUES ($1, $2, $3, $4, $5, 1, $6)`,
+      [cells.evidence, tenant, e.id, cells.review, cells.source.id, cells.quote],
+    );
+    await client.query(
+      `INSERT INTO app.assessment_contributors (assessment_id, tenant_id, generation, user_id)
+       VALUES ($1, $2, 0, $4), ($3, $2, 0, $4) ON CONFLICT DO NOTHING`,
+      [cells.draft, tenant, cells.review, cells.author],
+    );
+    await client.query(`UPDATE app.assessments SET state = 'in_review' WHERE id = $1`, [
+      cells.review,
+    ]);
+  }
+  await client.query(`SELECT set_config('app.user_id', $1, true)`, [USERS.platformAdmin]);
   await client.query('COMMIT');
 };

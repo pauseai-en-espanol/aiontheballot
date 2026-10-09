@@ -111,10 +111,12 @@ export const matrixCases = (): MatrixCase[] =>
           principal,
           sql: insert.sql,
           target: `SELECT count(*) FROM ${relation}`,
-          expected:
+          expected: ((outcome) =>
+            outcome === 'allow' && insert.blocked ? `error ${insert.blocked}` : outcome)(
             principal.role === 'aiontheballot_worker'
               ? workerOutcome(principal, relation, `insert ${insert.id}`, 'insert')
               : expectedOutcome(principal, spec.insert, insert.tenant, false, true),
+          ),
         });
       }
       return cases;

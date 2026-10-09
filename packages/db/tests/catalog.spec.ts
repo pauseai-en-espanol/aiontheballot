@@ -339,7 +339,7 @@ const NOT_AUDITED: Readonly<Record<string, string>> = {
 };
 
 /** Tables in app whose rows are never updated or deleted (ADR-0002 §14), except by purge_tenant. */
-const IMMUTABLE = ['audit_log', 'hostname_tombstones', 'source_texts'];
+const IMMUTABLE = ['audit_log', 'hostname_tombstones', 'review_events', 'source_texts'];
 
 /** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
 const PERSONAL_DATA: readonly string[] = [

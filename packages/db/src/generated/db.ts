@@ -5,15 +5,23 @@
 
 import type { ColumnType } from 'kysely';
 
+export type AppAssessmentState = 'draft' | 'in_review' | 'published';
+
+export type AppChangeKind = 'correction' | 'initial' | 'update' | 'withdrawal';
+
 export type AppElectionStatus = 'archived' | 'draft' | 'live';
 
 export type AppElectionType = 'european' | 'general' | 'municipal' | 'other' | 'regional';
+
+export type AppEvidenceOrigin = 'llm' | 'manual' | 'mcp';
 
 export type AppExtractionStatus = 'done' | 'failed' | 'not_applicable' | 'pending';
 
 export type AppFileBucket = 'public_assets' | 'sources';
 
 export type AppJobKind = 'archive_source' | 'extract_source' | 'fetch_source' | 'llm_run';
+
+export type AppMatchStatus = 'attested' | 'matched' | 'unmatched';
 
 export type AppMethodologyKind = 'demands' | 'descriptive';
 
@@ -23,6 +31,8 @@ export type AppProgrammeStatus = 'pending' | 'published';
 
 export type AppRating =
   'does_not_meet' | 'green' | 'meets' | 'not_mentioned' | 'partially_meets' | 'red' | 'yellow';
+
+export type AppReviewEventKind = 'approved' | 'commented' | 'recalled' | 'rejected' | 'submitted';
 
 export type AppSourceKind =
   'audio' | 'party_submission' | 'pdf' | 'social_post' | 'video' | 'web_page';
@@ -60,6 +70,32 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 export type Numeric = ColumnType<string, number | string, number | string>;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
+
+export interface AppAssessmentContributors {
+  assessment_id: string;
+  first_edit_at: Generated<Timestamp>;
+  generation: number;
+  tenant_id: string;
+  user_id: string;
+}
+
+export interface AppAssessments {
+  content_version: Generated<number>;
+  criterion_id: string;
+  draft_change_kind: AppChangeKind | null;
+  draft_public_note: Json | null;
+  draft_rating: AppRating | null;
+  draft_summary: Json | null;
+  election_id: string;
+  generation: Generated<number>;
+  id: Generated<string>;
+  party_id: string;
+  recheck_reason: string | null;
+  state: Generated<AppAssessmentState>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
 
 export interface AppAuditLog {
   action: string;
@@ -106,6 +142,38 @@ export interface AppCriteria {
   slug: string;
   tenant_id: string;
   title: Json;
+}
+
+export interface AppDraftCheckedDocuments {
+  assessment_id: string;
+  checked_at: Generated<Timestamp>;
+  checked_by: string;
+  election_id: string;
+  source_document_id: string;
+  tenant_id: string;
+}
+
+export interface AppDraftEvidence {
+  assessment_id: string;
+  attestation_file_id: string | null;
+  attested_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  election_id: string;
+  id: Generated<string>;
+  llm_suggestion_id: string | null;
+  match_status: Generated<AppMatchStatus>;
+  matched_from_unit: number | null;
+  matched_to_unit: number | null;
+  ordinal: number;
+  origin: Generated<AppEvidenceOrigin>;
+  quote: string;
+  section_label: string | null;
+  source_document_id: string;
+  tenant_id: string;
+  ts_end: Numeric | null;
+  ts_start: Numeric | null;
+  unit_index: number | null;
 }
 
 export interface AppElections {
@@ -296,6 +364,16 @@ export interface AppPublicVersions {
   version: Generated<Int8>;
 }
 
+export interface AppReviewEvents {
+  actor_id: string;
+  assessment_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  kind: AppReviewEventKind;
+  note: string | null;
+  tenant_id: string;
+}
+
 export interface AppSourceDocuments {
   archive_url: string | null;
   created_at: Generated<Timestamp>;
@@ -375,11 +453,15 @@ export interface AppTenants {
 }
 
 export interface DB {
+  'app.assessment_contributors': AppAssessmentContributors;
+  'app.assessments': AppAssessments;
   'app.audit_log': AppAuditLog;
   'app.brand_asset_grants': AppBrandAssetGrants;
   'app.brand_assets': AppBrandAssets;
   'app.core_criteria': AppCoreCriteria;
   'app.criteria': AppCriteria;
+  'app.draft_checked_documents': AppDraftCheckedDocuments;
+  'app.draft_evidence': AppDraftEvidence;
   'app.elections': AppElections;
   'app.file_blobs': AppFileBlobs;
   'app.files': AppFiles;
@@ -397,6 +479,7 @@ export interface DB {
   'app.platform_admins': AppPlatformAdmins;
   'app.platform_hostnames': AppPlatformHostnames;
   'app.public_versions': AppPublicVersions;
+  'app.review_events': AppReviewEvents;
   'app.source_documents': AppSourceDocuments;
   'app.source_texts': AppSourceTexts;
   'app.tenant_brand_selections': AppTenantBrandSelections;

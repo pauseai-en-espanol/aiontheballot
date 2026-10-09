@@ -44,6 +44,18 @@ describe('app.localized', () => {
   });
 });
 
+describe('null values', () => {
+  it.each(['app.localized', 'app.slug', 'app.locale', 'app.hostname'])(
+    'pass the %s domain, so nullable columns can use it',
+    async (domain) => {
+      const code = await inRolledBackTransaction((client) =>
+        errorCode(client, `SELECT NULL::${domain}`),
+      );
+      expect(code).toBeNull();
+    },
+  );
+});
+
 describe('app.slug', () => {
   it('accepts lowercase words joined by single hyphens', async () => {
     const valid = ['es', 'test-a', 'generales-2026', 'criterio-de-ejemplo-3'];

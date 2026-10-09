@@ -212,6 +212,7 @@ export interface FixtureElection {
   party: string;
   secondParty: string;
   criterion: string;
+  secondCriterion: string;
 }
 
 const election = (
@@ -235,6 +236,7 @@ const election = (
   party: fixtureId(7, 20 + n),
   secondParty: fixtureId(7, 40 + n),
   criterion: fixtureId(8, 20 + n),
+  secondCriterion: fixtureId(8, 40 + n),
 });
 
 /**
@@ -307,7 +309,7 @@ export const SOURCES = {
   liveInactive: {
     id: fixtureId(6, 54),
     election: ELECTIONS.liveInactive,
-    party: null,
+    party: ELECTIONS.liveInactive.party,
     file: FILES.sourceInactive.id,
     pages: ['Texto de ejemplo del inquilino inactivo.'],
   },
@@ -385,6 +387,50 @@ const FETCH = 'worker: fetch job of A';
 const EXTRACT = 'worker: extract job of A';
 const LLM = 'worker: LLM job of A';
 const OPEN_JOBS = [FETCH, EXTRACT, LLM];
+
+export interface FixtureCells {
+  election: FixtureElection;
+  source: FixtureSource;
+  /** Writes the tenant's cells: an editor, or a country admin where the tenant has no editor principal. */
+  author: string;
+  /** party × criterion: a draft rated "not mentioned", backed by a checked copy of the party's programme. */
+  draft: string;
+  /** party × second criterion: in review, rated "meets", with one quote from the programme. */
+  review: string;
+  evidence: string;
+  quote: string;
+}
+
+/** Fictional cells in each tenant's live election, on its first party. */
+export const CELLS = {
+  A: {
+    election: ELECTIONS.liveA,
+    source: SOURCES.liveA,
+    author: USERS.editorA,
+    draft: fixtureId(9, 51),
+    review: fixtureId(9, 52),
+    evidence: fixtureId(9, 53),
+    quote: 'propone una moratoria de ejemplo sobre los sistemas de prueba',
+  },
+  B: {
+    election: ELECTIONS.liveB,
+    source: SOURCES.liveB,
+    author: USERS.countryAdminB,
+    draft: fixtureId(9, 54),
+    review: fixtureId(9, 55),
+    evidence: fixtureId(9, 56),
+    quote: 'Texto de ejemplo del programa ficticio',
+  },
+  inactive: {
+    election: ELECTIONS.liveInactive,
+    source: SOURCES.liveInactive,
+    author: USERS.countryAdminInactive,
+    draft: fixtureId(9, 57),
+    review: fixtureId(9, 58),
+    evidence: fixtureId(9, 59),
+    quote: 'Texto de ejemplo del inquilino inactivo',
+  },
+} as const satisfies Record<TenantKey, FixtureCells>;
 
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
@@ -464,6 +510,8 @@ export interface Insert {
   id: string;
   tenant: TenantKey | null;
   sql: string;
+  /** The SQLSTATE that stops a permitted principal (an integrity rule), as for Row.blocked. */
+  blocked?: string;
 }
 
 export interface Relation {
@@ -1351,6 +1399,124 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       requested_by: { set: `requested_by = '${USERS.newcomer}'`, rule: NOBODY },
       tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
     },
+  },
+
+  'app.assessments': {
+    rows: TENANT_KEYS.flatMap((key) => [
+      {
+        id: `draft cell of ${key}`,
+        tenant: key,
+        public: false,
+        where: `id = '${CELLS[key].draft}'`,
+      },
+      {
+        id: `cell in review of ${key}`,
+        tenant: key,
+        public: false,
+        where: `id = '${CELLS[key].review}'`,
+      },
+    ]),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `cell in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.assessments (tenant_id, election_id, party_id, criterion_id, draft_rating, draft_summary)
+            VALUES ('${TENANTS[key].id}', '${CELLS[key].election.id}', '${CELLS[key].election.secondParty}',
+                    '${CELLS[key].election.criterion}', 'meets', '{"es": "Resumen de ejemplo"}')`,
+    })),
+    set: `draft_summary = '{"es": "Resumen revisado de ejemplo"}'`,
+    select: MEMBERS,
+    insert: EDITORS,
+    update: EDITORS,
+    delete: EDITORS,
+    columnUpdates: {
+      generation: { set: 'generation = generation + 1', rule: NOBODY },
+      content_version: { set: 'content_version = content_version + 1', rule: NOBODY },
+      updated_by: { set: `updated_by = '${USERS.newcomer}'`, rule: NOBODY },
+      party_id: { set: `party_id = '${ELECTIONS.liveA.secondParty}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
+  'app.assessment_contributors': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `author of the draft cell of ${key}`,
+      tenant: key,
+      public: false,
+      where: `assessment_id = '${CELLS[key].draft}' AND generation = 0 AND user_id = '${CELLS[key].author}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `someone else into ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.assessment_contributors (assessment_id, tenant_id, generation, user_id)
+            VALUES ('${CELLS[key].review}', '${TENANTS[key].id}', 0, '${USERS.newcomer}')`,
+    })),
+    set: 'generation = generation',
+    select: MEMBERS,
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.draft_evidence': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `quote of ${key}`,
+      tenant: key,
+      public: false,
+      where: `id = '${CELLS[key].evidence}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `quote in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote)
+            VALUES ('${TENANTS[key].id}', '${CELLS[key].election.id}', '${CELLS[key].draft}',
+                    '${CELLS[key].source.id}', 1, '${CELLS[key].quote}')`,
+    })),
+    set: `section_label = 'Sección de ejemplo'`,
+    select: MEMBERS,
+    insert: EDITORS,
+    update: EDITORS,
+    delete: EDITORS,
+    columnUpdates: {
+      quote: { set: `quote = quote || ' (revisada)'`, rule: EDITORS },
+      match_status: { set: `match_status = 'matched'`, rule: NOBODY },
+      created_by: { set: `created_by = '${USERS.newcomer}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
+  'app.draft_checked_documents': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `checked programme of ${key}`,
+      tenant: key,
+      public: false,
+      where: `assessment_id = '${CELLS[key].draft}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `checked programme for the cell in review of ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.draft_checked_documents (assessment_id, tenant_id, election_id, source_document_id)
+            VALUES ('${CELLS[key].review}', '${TENANTS[key].id}', '${CELLS[key].election.id}', '${CELLS[key].source.id}')`,
+    })),
+    set: 'checked_at = checked_at',
+    select: MEMBERS,
+    insert: EDITORS,
+    update: NOBODY,
+    delete: EDITORS,
+  },
+
+  'app.review_events': {
+    rows: [],
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `comment in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.review_events (tenant_id, assessment_id, kind, note)
+            VALUES ('${TENANTS[key].id}', '${CELLS[key].review}', 'commented', 'Comentario de ejemplo')`,
+    })),
+    set: 'note = note',
+    select: MEMBERS,
+    insert: MEMBERS,
+    update: NOBODY,
+    delete: NOBODY,
   },
 
   'app.memberships': {

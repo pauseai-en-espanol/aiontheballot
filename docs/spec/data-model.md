@@ -551,8 +551,8 @@ create table app.draft_evidence (
   quote                text not null check (char_length(btrim(quote)) between 15 and 1000),
   unit_index           int,                            -- the page or section the editor points at (a hint only)
   section_label        text,
-  ts_start             interval,                       -- video and audio
-  ts_end               interval,
+  ts_start             numeric(10, 3),                 -- video and audio, in seconds
+  ts_end               numeric(10, 3),
   match_status         app.match_status not null default 'unmatched',  -- always computed by trigger, see below
   matched_from_unit    int,                            -- set with match_status 'matched'
   matched_to_unit      int,
@@ -599,6 +599,12 @@ create table app.review_events (                       -- private review trail; 
   foreign key (tenant_id, assessment_id) references app.assessments (tenant_id, id)
 );
 ```
+
+**Who writes a cell.** Editors and country admins write the draft content (rating, summary, change kind and note,
+quotes, checked documents) and delete never-published cells, with their drafts and contributor rows; every member reads
+cells. Reviewers change only what reviewing needs: the cell's state, and attesting a quote
+(`private.restrict_columns`). Video and audio positions (`ts_start`, `ts_end`) are seconds (`numeric(10, 3)`), here and
+in the published copy, rather than `interval`, which has no plain JSON or TypeScript form.
 
 **Content is locked while in review.** Any content change to a cell in `in_review` is rejected; an editor first
 recalls it to `draft`. Every content-changing trigger and the publish trigger lock the cell row (`for update`), so
@@ -668,8 +674,8 @@ create table app.revision_evidence (                   -- public; written only b
   source_document_id  uuid not null,
   quote               text not null,
   location_label      text,                            -- the matched units' labels, a section, or timestamps
-  ts_start            interval,
-  ts_end              interval,
+  ts_start            numeric(10, 3),                  -- seconds
+  ts_end              numeric(10, 3),
   match_status        app.match_status not null check (match_status in ('matched', 'attested')),
   primary key (revision_id, ordinal),
   foreign key (tenant_id, revision_id, election_id)
