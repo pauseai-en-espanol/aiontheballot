@@ -83,6 +83,22 @@ export interface AppAssessmentContributors {
   user_id: string;
 }
 
+export interface AppAssessmentRevisions {
+  assessment_id: string;
+  change_kind: AppChangeKind;
+  criterion_id: string;
+  election_id: string;
+  id: Generated<string>;
+  party_id: string;
+  public_note: Json | null;
+  published_at: Generated<Timestamp>;
+  rating: AppRating | null;
+  reviewed_version: number;
+  revision_no: number;
+  summary: Json | null;
+  tenant_id: string;
+}
+
 export interface AppAssessments {
   content_version: Generated<number>;
   criterion_id: string;
@@ -146,6 +162,22 @@ export interface AppCriteria {
   slug: string;
   tenant_id: string;
   title: Json;
+}
+
+export interface AppCurrentRevisions {
+  assessment_id: string | null;
+  change_kind: AppChangeKind | null;
+  criterion_id: string | null;
+  election_id: string | null;
+  id: string | null;
+  party_id: string | null;
+  public_note: Json | null;
+  published_at: Timestamp | null;
+  rating: AppRating | null;
+  reviewed_version: number | null;
+  revision_no: number | null;
+  summary: Json | null;
+  tenant_id: string | null;
 }
 
 export interface AppDraftCheckedDocuments {
@@ -419,6 +451,37 @@ export interface AppReviewEvents {
   tenant_id: string;
 }
 
+export interface AppRevisionCheckedDocuments {
+  checked_at: Timestamp;
+  election_id: string;
+  revision_id: string;
+  source_document_id: string;
+  tenant_id: string;
+}
+
+export interface AppRevisionEvidence {
+  election_id: string;
+  location_label: string | null;
+  match_status: AppMatchStatus;
+  ordinal: number;
+  quote: string;
+  revision_id: string;
+  source_document_id: string;
+  tenant_id: string;
+  ts_end: Numeric | null;
+  ts_start: Numeric | null;
+}
+
+export interface AppRevisionInternal {
+  contributor_ids: string[];
+  provenance: Json;
+  report_id: string | null;
+  reviewer_id: string;
+  revision_id: string;
+  self_reviewed: boolean;
+  tenant_id: string;
+}
+
 export interface AppSourceDocuments {
   archive_url: string | null;
   created_at: Generated<Timestamp>;
@@ -499,12 +562,14 @@ export interface AppTenants {
 
 export interface DB {
   'app.assessment_contributors': AppAssessmentContributors;
+  'app.assessment_revisions': AppAssessmentRevisions;
   'app.assessments': AppAssessments;
   'app.audit_log': AppAuditLog;
   'app.brand_asset_grants': AppBrandAssetGrants;
   'app.brand_assets': AppBrandAssets;
   'app.core_criteria': AppCoreCriteria;
   'app.criteria': AppCriteria;
+  'app.current_revisions': AppCurrentRevisions;
   'app.draft_checked_documents': AppDraftCheckedDocuments;
   'app.draft_evidence': AppDraftEvidence;
   'app.elections': AppElections;
@@ -527,6 +592,9 @@ export interface DB {
   'app.report_daily_counts': AppReportDailyCounts;
   'app.reports': AppReports;
   'app.review_events': AppReviewEvents;
+  'app.revision_checked_documents': AppRevisionCheckedDocuments;
+  'app.revision_evidence': AppRevisionEvidence;
+  'app.revision_internal': AppRevisionInternal;
   'app.source_documents': AppSourceDocuments;
   'app.source_texts': AppSourceTexts;
   'app.tenant_brand_selections': AppTenantBrandSelections;

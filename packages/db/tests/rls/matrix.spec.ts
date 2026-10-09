@@ -70,7 +70,8 @@ describe('isolation matrix', () => {
 
 const cases = matrixCases();
 
-for (const relation of Object.keys(RELATIONS)) {
+// A relation with no fixture rows or inserts yet has no cases; the completeness test above still requires its entry.
+for (const relation of Object.keys(RELATIONS).filter((r) => cases.some((c) => c.relation === r))) {
   describe(`matrix: ${relation}`, () => {
     let client: pg.Client;
 

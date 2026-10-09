@@ -1640,6 +1640,86 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     delete: NOBODY,
   },
 
+  'app.assessment_revisions': {
+    rows: [],
+    // Publishing names the cell and the version reviewed; the publish trigger fills in the rest.
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `publish the cell in review of ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.assessment_revisions (assessment_id, reviewed_version)
+            SELECT id, content_version FROM app.assessments WHERE id = '${CELLS[key].review}'`,
+      blocked: '23502',
+    })),
+    set: 'reviewed_version = reviewed_version',
+    select: { public: true, ...MEMBERS },
+    // Until the publish trigger exists, nothing fills in the revision: RLS stops everyone but a platform admin, whom
+    // the missing columns stop.
+    insert: PLATFORM_ADMIN,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.revision_evidence': {
+    rows: [],
+    // Written only by the publish trigger.
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `quote into ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.revision_evidence (revision_id, tenant_id, election_id, ordinal, source_document_id, quote,
+                                              match_status)
+            VALUES (uuidv7(), '${TENANTS[key].id}', '${CELLS[key].election.id}', 1, '${CELLS[key].source.id}',
+                    '${CELLS[key].quote}', 'matched')`,
+    })),
+    set: 'quote = quote',
+    select: { public: true, ...MEMBERS },
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.revision_checked_documents': {
+    rows: [],
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `checked document into ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.revision_checked_documents (revision_id, tenant_id, election_id, source_document_id,
+                                                       checked_at)
+            VALUES (uuidv7(), '${TENANTS[key].id}', '${CELLS[key].election.id}', '${CELLS[key].source.id}', now())`,
+    })),
+    set: 'checked_at = checked_at',
+    select: { public: true, ...MEMBERS },
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.revision_internal': {
+    rows: [],
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `internal record into ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.revision_internal (revision_id, tenant_id, contributor_ids, reviewer_id, self_reviewed,
+                                              provenance)
+            VALUES (uuidv7(), '${TENANTS[key].id}', ARRAY['${USERS.editorA}'::uuid], '${USERS.reviewerA}', false,
+                    '[]')`,
+    })),
+    set: 'self_reviewed = self_reviewed',
+    select: MEMBERS,
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.current_revisions': {
+    rows: [],
+    inserts: [],
+    set: 'revision_no = revision_no',
+    select: { public: true, ...MEMBERS },
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
   'app.memberships': {
     rows: TENANT_KEYS.map(membershipRow),
     inserts: TENANT_KEYS.map((key) => ({

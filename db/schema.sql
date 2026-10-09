@@ -1960,6 +1960,34 @@ CREATE TABLE app.assessment_contributors (
 ALTER TABLE app.assessment_contributors OWNER TO aiontheballot_owner;
 
 --
+-- Name: assessment_revisions; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.assessment_revisions (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    assessment_id uuid NOT NULL,
+    election_id uuid NOT NULL,
+    party_id uuid NOT NULL,
+    criterion_id uuid NOT NULL,
+    reviewed_version integer NOT NULL,
+    revision_no integer NOT NULL,
+    rating app.rating,
+    summary app.localized,
+    change_kind app.change_kind NOT NULL,
+    public_note app.localized,
+    published_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT assessment_revisions_check CHECK (((change_kind = 'withdrawal'::app.change_kind) = (rating IS NULL))),
+    CONSTRAINT assessment_revisions_check1 CHECK (((change_kind = 'withdrawal'::app.change_kind) OR (summary IS NOT NULL))),
+    CONSTRAINT assessment_revisions_check2 CHECK (((change_kind = 'initial'::app.change_kind) = (revision_no = 1))),
+    CONSTRAINT assessment_revisions_check3 CHECK (((change_kind = 'initial'::app.change_kind) OR (public_note IS NOT NULL))),
+    CONSTRAINT assessment_revisions_revision_no_check CHECK ((revision_no > 0))
+);
+
+
+ALTER TABLE app.assessment_revisions OWNER TO aiontheballot_owner;
+
+--
 -- Name: assessments; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2082,6 +2110,30 @@ CREATE TABLE app.criteria (
 
 
 ALTER TABLE app.criteria OWNER TO aiontheballot_owner;
+
+--
+-- Name: current_revisions; Type: VIEW; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE VIEW app.current_revisions WITH (security_invoker='true') AS
+ SELECT DISTINCT ON (assessment_id) id,
+    tenant_id,
+    assessment_id,
+    election_id,
+    party_id,
+    criterion_id,
+    reviewed_version,
+    revision_no,
+    rating,
+    summary,
+    change_kind,
+    public_note,
+    published_at
+   FROM app.assessment_revisions r
+  ORDER BY assessment_id, revision_no DESC;
+
+
+ALTER VIEW app.current_revisions OWNER TO aiontheballot_owner;
 
 --
 -- Name: draft_checked_documents; Type: TABLE; Schema: app; Owner: aiontheballot_owner
@@ -2585,6 +2637,61 @@ CREATE TABLE app.review_events (
 ALTER TABLE app.review_events OWNER TO aiontheballot_owner;
 
 --
+-- Name: revision_checked_documents; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.revision_checked_documents (
+    revision_id uuid NOT NULL,
+    tenant_id uuid NOT NULL,
+    election_id uuid NOT NULL,
+    source_document_id uuid NOT NULL,
+    checked_at timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE app.revision_checked_documents OWNER TO aiontheballot_owner;
+
+--
+-- Name: revision_evidence; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.revision_evidence (
+    revision_id uuid NOT NULL,
+    tenant_id uuid NOT NULL,
+    election_id uuid NOT NULL,
+    ordinal integer NOT NULL,
+    source_document_id uuid NOT NULL,
+    quote text NOT NULL,
+    location_label text,
+    ts_start numeric(10,3),
+    ts_end numeric(10,3),
+    match_status app.match_status NOT NULL,
+    CONSTRAINT revision_evidence_match_status_check CHECK ((match_status = ANY (ARRAY['matched'::app.match_status, 'attested'::app.match_status])))
+);
+
+
+ALTER TABLE app.revision_evidence OWNER TO aiontheballot_owner;
+
+--
+-- Name: revision_internal; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.revision_internal (
+    revision_id uuid NOT NULL,
+    tenant_id uuid NOT NULL,
+    contributor_ids uuid[] NOT NULL,
+    reviewer_id uuid NOT NULL,
+    self_reviewed boolean NOT NULL,
+    provenance jsonb NOT NULL,
+    report_id uuid,
+    CONSTRAINT revision_internal_check CHECK ((self_reviewed = (reviewer_id = ANY (contributor_ids)))),
+    CONSTRAINT revision_internal_contributor_ids_check CHECK ((cardinality(contributor_ids) > 0))
+);
+
+
+ALTER TABLE app.revision_internal OWNER TO aiontheballot_owner;
+
+--
 -- Name: source_documents; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2748,6 +2855,38 @@ ALTER TABLE public.schema_migrations OWNER TO aiontheballot_owner;
 
 ALTER TABLE ONLY app.assessment_contributors
     ADD CONSTRAINT assessment_contributors_pkey PRIMARY KEY (assessment_id, generation, user_id);
+
+
+--
+-- Name: assessment_revisions assessment_revisions_assessment_id_revision_no_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.assessment_revisions
+    ADD CONSTRAINT assessment_revisions_assessment_id_revision_no_key UNIQUE (assessment_id, revision_no);
+
+
+--
+-- Name: assessment_revisions assessment_revisions_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.assessment_revisions
+    ADD CONSTRAINT assessment_revisions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: assessment_revisions assessment_revisions_tenant_id_id_election_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.assessment_revisions
+    ADD CONSTRAINT assessment_revisions_tenant_id_id_election_id_key UNIQUE (tenant_id, id, election_id);
+
+
+--
+-- Name: assessment_revisions assessment_revisions_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.assessment_revisions
+    ADD CONSTRAINT assessment_revisions_tenant_id_id_key UNIQUE (tenant_id, id);
 
 
 --
@@ -3199,6 +3338,30 @@ ALTER TABLE ONLY app.review_events
 
 
 --
+-- Name: revision_checked_documents revision_checked_documents_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.revision_checked_documents
+    ADD CONSTRAINT revision_checked_documents_pkey PRIMARY KEY (revision_id, source_document_id);
+
+
+--
+-- Name: revision_evidence revision_evidence_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.revision_evidence
+    ADD CONSTRAINT revision_evidence_pkey PRIMARY KEY (revision_id, ordinal);
+
+
+--
+-- Name: revision_internal revision_internal_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.revision_internal
+    ADD CONSTRAINT revision_internal_pkey PRIMARY KEY (revision_id);
+
+
+--
 -- Name: source_documents source_documents_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3300,6 +3463,20 @@ ALTER TABLE ONLY app.tenants
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: assessment_revisions_current_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX assessment_revisions_current_idx ON app.assessment_revisions USING btree (assessment_id, revision_no DESC);
+
+
+--
+-- Name: assessment_revisions_election_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX assessment_revisions_election_id_idx ON app.assessment_revisions USING btree (election_id);
 
 
 --
@@ -3457,6 +3634,27 @@ CREATE INDEX review_events_assessment_id_idx ON app.review_events USING btree (a
 
 
 --
+-- Name: revision_checked_documents_source_document_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX revision_checked_documents_source_document_id_idx ON app.revision_checked_documents USING btree (source_document_id);
+
+
+--
+-- Name: revision_evidence_source_document_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX revision_evidence_source_document_id_idx ON app.revision_evidence USING btree (source_document_id);
+
+
+--
+-- Name: revision_internal_report_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX revision_internal_report_id_idx ON app.revision_internal USING btree (report_id);
+
+
+--
 -- Name: source_documents_election_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3531,6 +3729,13 @@ CREATE CONSTRAINT TRIGGER active_tenant_has_operator AFTER INSERT OR UPDATE OF a
 --
 
 CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.assessment_contributors FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: assessment_revisions audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.assessment_revisions FOR EACH ROW EXECUTE FUNCTION private.audit();
 
 
 --
@@ -3702,6 +3907,27 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.review_events FOR E
 
 
 --
+-- Name: revision_checked_documents audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.revision_checked_documents FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: revision_evidence audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.revision_evidence FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: revision_internal audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.revision_internal FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
 -- Name: source_documents audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3741,6 +3967,13 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.tenant_organization
 --
 
 CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: assessment_revisions bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.assessment_revisions FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
 
 
 --
@@ -3811,6 +4044,27 @@ CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.organ
 --
 
 CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.parties FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: revision_checked_documents bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.revision_checked_documents FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: revision_evidence bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.revision_evidence FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: source_documents bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.source_documents FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
 
 
 --
@@ -3891,6 +4145,13 @@ CREATE TRIGGER forbid_delete BEFORE DELETE ON app.tenant_hostnames FOR EACH ROW 
 
 
 --
+-- Name: assessment_revisions forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.assessment_revisions FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
 -- Name: audit_log forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3912,6 +4173,27 @@ CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.review_events FOR 
 
 
 --
+-- Name: revision_checked_documents forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.revision_checked_documents FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: revision_evidence forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.revision_evidence FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: revision_internal forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.revision_internal FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
 -- Name: source_texts forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3923,6 +4205,13 @@ CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.source_texts FOR E
 --
 
 CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.assessment_contributors FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: assessment_revisions forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.assessment_revisions FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
 
 
 --
@@ -4073,6 +4362,27 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.review_events FOR EACH 
 
 
 --
+-- Name: revision_checked_documents forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.revision_checked_documents FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: revision_evidence forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.revision_evidence FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: revision_internal forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.revision_internal FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: source_documents forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -4115,6 +4425,13 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.tenant_organizations FO
 
 
 --
+-- Name: assessment_revisions forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.assessment_revisions FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
 -- Name: audit_log forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -4147,6 +4464,27 @@ CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.hostname_tombstones FOR EA
 --
 
 CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.review_events FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: revision_checked_documents forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.revision_checked_documents FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: revision_evidence forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.revision_evidence FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: revision_internal forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.revision_internal FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
 
 
 --
@@ -4395,6 +4733,13 @@ CREATE TRIGGER stamp BEFORE INSERT ON app.assessment_contributors FOR EACH ROW E
 
 
 --
+-- Name: assessment_revisions stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT ON app.assessment_revisions FOR EACH ROW EXECUTE FUNCTION private.stamp('published_at');
+
+
+--
 -- Name: assessments stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -4561,6 +4906,14 @@ CREATE TRIGGER transition BEFORE UPDATE ON app.invitations FOR EACH ROW EXECUTE 
 
 ALTER TABLE ONLY app.assessment_contributors
     ADD CONSTRAINT assessment_contributors_tenant_id_assessment_id_fkey FOREIGN KEY (tenant_id, assessment_id) REFERENCES app.assessments(tenant_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: assessment_revisions assessment_revisions_tenant_id_assessment_id_election_id_p_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.assessment_revisions
+    ADD CONSTRAINT assessment_revisions_tenant_id_assessment_id_election_id_p_fkey FOREIGN KEY (tenant_id, assessment_id, election_id, party_id, criterion_id) REFERENCES app.assessments(tenant_id, id, election_id, party_id, criterion_id);
 
 
 --
@@ -4876,6 +5229,54 @@ ALTER TABLE ONLY app.review_events
 
 
 --
+-- Name: revision_checked_documents revision_checked_documents_tenant_id_election_id_source_do_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.revision_checked_documents
+    ADD CONSTRAINT revision_checked_documents_tenant_id_election_id_source_do_fkey FOREIGN KEY (tenant_id, election_id, source_document_id) REFERENCES app.source_documents(tenant_id, election_id, id);
+
+
+--
+-- Name: revision_checked_documents revision_checked_documents_tenant_id_revision_id_election__fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.revision_checked_documents
+    ADD CONSTRAINT revision_checked_documents_tenant_id_revision_id_election__fkey FOREIGN KEY (tenant_id, revision_id, election_id) REFERENCES app.assessment_revisions(tenant_id, id, election_id);
+
+
+--
+-- Name: revision_evidence revision_evidence_tenant_id_election_id_source_document_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.revision_evidence
+    ADD CONSTRAINT revision_evidence_tenant_id_election_id_source_document_id_fkey FOREIGN KEY (tenant_id, election_id, source_document_id) REFERENCES app.source_documents(tenant_id, election_id, id);
+
+
+--
+-- Name: revision_evidence revision_evidence_tenant_id_revision_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.revision_evidence
+    ADD CONSTRAINT revision_evidence_tenant_id_revision_id_election_id_fkey FOREIGN KEY (tenant_id, revision_id, election_id) REFERENCES app.assessment_revisions(tenant_id, id, election_id);
+
+
+--
+-- Name: revision_internal revision_internal_tenant_id_report_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.revision_internal
+    ADD CONSTRAINT revision_internal_tenant_id_report_id_fkey FOREIGN KEY (tenant_id, report_id) REFERENCES app.reports(tenant_id, id);
+
+
+--
+-- Name: revision_internal revision_internal_tenant_id_revision_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.revision_internal
+    ADD CONSTRAINT revision_internal_tenant_id_revision_id_fkey FOREIGN KEY (tenant_id, revision_id) REFERENCES app.assessment_revisions(tenant_id, id);
+
+
+--
 -- Name: source_documents source_documents_tenant_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -4960,6 +5361,12 @@ ALTER TABLE ONLY app.tenant_organizations
 --
 
 ALTER TABLE app.assessment_contributors ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: assessment_revisions; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.assessment_revisions ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: assessments; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
@@ -5395,6 +5802,13 @@ CREATE POLICY member_read ON app.assessment_contributors FOR SELECT TO aiontheba
 
 
 --
+-- Name: assessment_revisions member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.assessment_revisions FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: assessments member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5538,6 +5952,27 @@ CREATE POLICY member_read ON app.reports FOR SELECT TO aiontheballot_admin USING
 --
 
 CREATE POLICY member_read ON app.review_events FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: revision_checked_documents member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.revision_checked_documents FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: revision_evidence member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.revision_evidence FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: revision_internal member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.revision_internal FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -5821,6 +6256,15 @@ ALTER TABLE app.platform_admins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.platform_hostnames ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: assessment_revisions public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.assessment_revisions FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = assessment_revisions.election_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))));
+
+
+--
 -- Name: brand_assets public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5928,6 +6372,35 @@ CREATE POLICY public_read ON app.public_versions FOR SELECT TO aiontheballot_web
 
 
 --
+-- Name: revision_checked_documents public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.revision_checked_documents FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = revision_checked_documents.election_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))));
+
+
+--
+-- Name: revision_evidence public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.revision_evidence FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = revision_evidence.election_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))));
+
+
+--
+-- Name: source_documents public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.source_documents FOR SELECT TO aiontheballot_web USING (((EXISTS ( SELECT 1
+   FROM app.revision_evidence r
+  WHERE (r.source_document_id = source_documents.id))) OR (EXISTS ( SELECT 1
+   FROM app.revision_checked_documents r
+  WHERE (r.source_document_id = source_documents.id)))));
+
+
+--
 -- Name: tenant_brand_selections public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5977,6 +6450,13 @@ CREATE POLICY public_read ON app.tenants FOR SELECT TO aiontheballot_web USING (
 ALTER TABLE app.public_versions ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: assessment_revisions publisher_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY publisher_insert ON app.assessment_revisions FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: report_daily_counts; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5993,6 +6473,24 @@ ALTER TABLE app.reports ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE app.review_events ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: revision_checked_documents; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.revision_checked_documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: revision_evidence; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.revision_evidence ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: revision_internal; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.revision_internal ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: assessment_contributors self_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
@@ -6726,6 +7224,28 @@ GRANT INSERT(user_id) ON TABLE app.assessment_contributors TO aiontheballot_admi
 
 
 --
+-- Name: TABLE assessment_revisions; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.assessment_revisions TO aiontheballot_web;
+GRANT SELECT ON TABLE app.assessment_revisions TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN assessment_revisions.assessment_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(assessment_id) ON TABLE app.assessment_revisions TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN assessment_revisions.reviewed_version; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(reviewed_version) ON TABLE app.assessment_revisions TO aiontheballot_admin;
+
+
+--
 -- Name: TABLE assessments; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -6965,6 +7485,14 @@ GRANT INSERT(core_criterion_id),UPDATE(core_criterion_id) ON TABLE app.criteria 
 --
 
 GRANT UPDATE(retired_at) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE current_revisions; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.current_revisions TO aiontheballot_web;
+GRANT SELECT ON TABLE app.current_revisions TO aiontheballot_admin;
 
 
 --
@@ -8038,11 +8566,41 @@ GRANT INSERT(note) ON TABLE app.review_events TO aiontheballot_admin;
 
 
 --
+-- Name: TABLE revision_checked_documents; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.revision_checked_documents TO aiontheballot_web;
+GRANT SELECT ON TABLE app.revision_checked_documents TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE revision_evidence; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.revision_evidence TO aiontheballot_web;
+GRANT SELECT ON TABLE app.revision_evidence TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE revision_internal; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.revision_internal TO aiontheballot_admin;
+
+
+--
 -- Name: TABLE source_documents; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
 GRANT SELECT,DELETE ON TABLE app.source_documents TO aiontheballot_admin;
 GRANT SELECT ON TABLE app.source_documents TO aiontheballot_worker;
+
+
+--
+-- Name: COLUMN source_documents.id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(id) ON TABLE app.source_documents TO aiontheballot_web;
 
 
 --
@@ -8057,6 +8615,7 @@ GRANT INSERT(tenant_id) ON TABLE app.source_documents TO aiontheballot_admin;
 --
 
 GRANT INSERT(election_id) ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT SELECT(election_id) ON TABLE app.source_documents TO aiontheballot_web;
 
 
 --
@@ -8064,6 +8623,7 @@ GRANT INSERT(election_id) ON TABLE app.source_documents TO aiontheballot_admin;
 --
 
 GRANT INSERT(party_id),UPDATE(party_id) ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT SELECT(party_id) ON TABLE app.source_documents TO aiontheballot_web;
 
 
 --
@@ -8071,6 +8631,7 @@ GRANT INSERT(party_id),UPDATE(party_id) ON TABLE app.source_documents TO aionthe
 --
 
 GRANT INSERT(kind),UPDATE(kind) ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT SELECT(kind) ON TABLE app.source_documents TO aiontheballot_web;
 
 
 --
@@ -8078,6 +8639,7 @@ GRANT INSERT(kind),UPDATE(kind) ON TABLE app.source_documents TO aiontheballot_a
 --
 
 GRANT INSERT(title),UPDATE(title) ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT SELECT(title) ON TABLE app.source_documents TO aiontheballot_web;
 
 
 --
@@ -8085,6 +8647,7 @@ GRANT INSERT(title),UPDATE(title) ON TABLE app.source_documents TO aiontheballot
 --
 
 GRANT INSERT(url),UPDATE(url) ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT SELECT(url) ON TABLE app.source_documents TO aiontheballot_web;
 
 
 --
@@ -8092,6 +8655,7 @@ GRANT INSERT(url),UPDATE(url) ON TABLE app.source_documents TO aiontheballot_adm
 --
 
 GRANT INSERT(language),UPDATE(language) ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT SELECT(language) ON TABLE app.source_documents TO aiontheballot_web;
 
 
 --
@@ -8099,6 +8663,7 @@ GRANT INSERT(language),UPDATE(language) ON TABLE app.source_documents TO aionthe
 --
 
 GRANT INSERT(is_programme),UPDATE(is_programme) ON TABLE app.source_documents TO aiontheballot_admin;
+GRANT SELECT(is_programme) ON TABLE app.source_documents TO aiontheballot_web;
 
 
 --
@@ -8118,10 +8683,25 @@ GRANT UPDATE(file_origin) ON TABLE app.source_documents TO aiontheballot_worker;
 
 
 --
+-- Name: COLUMN source_documents.sha256; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(sha256) ON TABLE app.source_documents TO aiontheballot_web;
+
+
+--
+-- Name: COLUMN source_documents.retrieved_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(retrieved_at) ON TABLE app.source_documents TO aiontheballot_web;
+
+
+--
 -- Name: COLUMN source_documents.archive_url; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
 GRANT UPDATE(archive_url) ON TABLE app.source_documents TO aiontheballot_worker;
+GRANT SELECT(archive_url) ON TABLE app.source_documents TO aiontheballot_web;
 
 
 --

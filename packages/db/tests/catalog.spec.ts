@@ -234,6 +234,7 @@ const STAMPED_ALWAYS = ['updated_by', 'updated_at'];
 /** `table.column` pairs that look stamped but are set elsewhere (copied, or on a later transition), and why. */
 const NOT_STAMPED: Readonly<Record<string, string>> = {
   'tenant_documents.published_at': 'set when a draft is published, by the rules trigger',
+  'revision_checked_documents.checked_at': "copied from the draft's check by the publish trigger",
 };
 
 const ROW = 1;
@@ -340,7 +341,16 @@ const NOT_AUDITED: Readonly<Record<string, string>> = {
 };
 
 /** Tables in app whose rows are never updated or deleted (ADR-0002 §14), except by purge_tenant. */
-const IMMUTABLE = ['audit_log', 'hostname_tombstones', 'review_events', 'source_texts'];
+const IMMUTABLE = [
+  'assessment_revisions',
+  'audit_log',
+  'hostname_tombstones',
+  'review_events',
+  'revision_checked_documents',
+  'revision_evidence',
+  'revision_internal',
+  'source_texts',
+];
 
 /** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
 const PERSONAL_DATA: readonly string[] = [
