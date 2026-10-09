@@ -32,6 +32,13 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.service.port | quote }}
+            # The proxy routes by the API's public routing data (GET /public/routing), inside the cluster.
+            - name: API_URL
+              value: {{ printf "http://%s:%v" (.Values.api.serviceName | default (printf "%s-api" .Release.Name)) .Values.api.servicePort | quote }}
+            {{- with .Values.platformHost }}
+            - name: PLATFORM_HOST
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

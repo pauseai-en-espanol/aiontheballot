@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect, test } from '@playwright/test';
 
-import { ADMIN_URL, DSNS, GLITCHTIP_URL, WEB_URL } from '../servers.js';
+import { ADMIN_URL, DSNS, GLITCHTIP_URL, TENANT_URL } from '../servers.js';
 
 interface Received {
   path: string;
@@ -50,7 +50,8 @@ const parseEnvelope = (body: string) => {
 };
 
 const apps = [
-  { name: 'web', url: WEB_URL, dsn: DSNS.web, project: '1', key: 'e2e-web' },
+  // A tenant's page: every other host gets the proxy's 404.
+  { name: 'web', url: TENANT_URL, dsn: DSNS.web, project: '1', key: 'e2e-web' },
   { name: 'admin', url: ADMIN_URL, dsn: DSNS.admin, project: '2', key: 'e2e-admin' },
 ] as const;
 

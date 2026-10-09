@@ -42,7 +42,7 @@ Copy `.env.example` to `.env` for local database URLs.
 | `pnpm build:check`                                          | Type check                                                                |
 | `pnpm test`                                                 | Unit tests (Vitest)                                                       |
 | `pnpm test:db`                                              | RLS matrix, catalog meta-tests and data rules (needs a local Postgres 18) |
-| `pnpm test:e2e`                                             | Playwright, against a production build                                    |
+| `pnpm test:e2e`                                             | Playwright, against a production build (needs the seeded local database)  |
 | `pnpm db:up` · `pnpm db:down`                               | Start or stop local Postgres 18 (Docker, roles as in production)          |
 | `pnpm db:migrate` · `pnpm db:new <name>` · `pnpm db:status` | Apply migrations (refreshes `db/schema.sql`) · new migration · status     |
 | `pnpm db:seed`                                              | Load the fictional seeds (refuses any database not on this machine)       |

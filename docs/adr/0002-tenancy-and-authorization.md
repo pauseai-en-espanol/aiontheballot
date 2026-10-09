@@ -361,7 +361,10 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 - `www.` gets no special treatment: it is an ordinary alias, and 404 unless registered.
 - `resolve()`, `canonicalBase()` and the routing table live in `packages/domain`. The table is built from public
   hostname data and re-checks the hostname invariants above.
-- The exact mechanics depend on the framework (ADR-0003).
+- The exact mechanics depend on the framework (ADR-0003). In the web app, `proxy.ts` runs `resolve()` on every request
+  but build assets, with a routing table built from `GET /public/routing` on the API, which reads it as
+  `aiontheballot_web` (active tenants and their verified hostnames). The table is refreshed every 30 seconds and the
+  last good one kept; with none, the proxy answers 503, except for system paths, so the health probe keeps working.
 
 ## Threat model (cross-tenant focus)
 

@@ -15,7 +15,8 @@ the checklists.
    ```
 
    For changes to the apps, also run `pnpm test:e2e` (Playwright, against production builds). Install its browser
-   once with `pnpm --filter @aiontheballot/e2e exec playwright install chromium`.
+   once with `pnpm --filter @aiontheballot/e2e exec playwright install chromium`. It needs the local database,
+   migrated and seeded (`pnpm db:up && pnpm db:migrate && pnpm db:seed`), and `WEB_DATABASE_URL` in `.env`.
 
 3. Add a changeset for any change that affects a package (`pnpm release:note`). Use `pnpm release:empty` for docs or
    CI-only changes. The pre-push hook checks for one.

@@ -25,6 +25,7 @@ securityContext:
   readOnlyRootFilesystem: true
   capabilities:
     drop: [ALL]
-# Extra environment (plain values, or secretKeyRef for credentials sealed in gitops)
+# Extra environment (plain values, or secretKeyRef for credentials sealed in gitops). Public routes (the web app's routing
+# data) need WEB_DATABASE_URL, the aiontheballot_web role's connection; without it they answer 503.
 env: []
 envFrom: []

@@ -9,15 +9,24 @@ describe('loadConfig', () => {
       port: 3001,
       logLevel: 'info',
       sentryDsn: undefined,
+      webDatabaseUrl: undefined,
     });
   });
 
   it('reads values from the environment', () => {
-    expect(loadConfig({ HOST: '127.0.0.1', PORT: '4000', LOG_LEVEL: 'debug' })).toEqual({
+    expect(
+      loadConfig({
+        HOST: '127.0.0.1',
+        PORT: '4000',
+        LOG_LEVEL: 'debug',
+        WEB_DATABASE_URL: 'postgres://aiontheballot_web@db.example.test/aiontheballot',
+      }),
+    ).toEqual({
       host: '127.0.0.1',
       port: 4000,
       logLevel: 'debug',
       sentryDsn: undefined,
+      webDatabaseUrl: 'postgres://aiontheballot_web@db.example.test/aiontheballot',
     });
   });
 

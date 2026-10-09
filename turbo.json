@@ -44,7 +44,7 @@
         "@aiontheballot/api#build"
       ],
       "cache": false,
-      "passThroughEnv": ["CI", "PLAYWRIGHT_*"]
+      "passThroughEnv": ["CI", "PLAYWRIGHT_*", "WEB_DATABASE_URL"]
     },
     "docker:build": {
       "cache": false

@@ -361,6 +361,21 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   Spanish and English; `ejemplo-inactivo`, inactive, with a verified hostname that must not be served. `.localhost`
   hostnames resolve to this machine in browsers, so the seeds work locally with no DNS setup.
 
+**Routing (web `proxy.ts`, API `GET /public/routing`):**
+
+- **R37. Without routing data the public site answers 503,** never a default tenant, but system paths (the kubelet's
+  `/healthz`, build assets, the error relay) still pass, so a slow API can't restart the web pods.
+- **R38. Tombstoned hostnames answer 404, not 410** (spec §3.1 says 410): `resolve()` has no 410 and the routing data
+  doesn't include tombstones. Adding 410 is a small change to `packages/domain` if you want it.
+- **R39. Production wiring is left to gitops** (I must not touch it): the API needs `WEB_DATABASE_URL` (the
+  `aiontheballot_web` role's connection, as a `secretKeyRef`), and `PLATFORM_HOST` is optional. The web chart now
+  derives `API_URL` from the API service itself. Until the API has the URL, the public site answers 503; until the
+  production database has the Spain tenant and its hostname, it answers 404.
+- **R40. The platform root page is gone;** only the internal tenant route renders, and only a tenant's home until the
+  public site arrives (M3). Other tenant paths are 404.
+- **R41. The e2e web server binds 0.0.0.0, like the production image:** with `127.0.0.1`, Next treats every tenant
+  rewrite as an external one (it renames the host in the proxy's URLs only).
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).

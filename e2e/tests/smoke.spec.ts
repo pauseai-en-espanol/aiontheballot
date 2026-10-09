@@ -1,16 +1,18 @@
 import { messages } from '@aiontheballot/i18n/messages';
 import { expect, type Response, test } from '@playwright/test';
 
-import { ADMIN_URL, API_URL, PLATFORM_NAME, WEB_URL } from '../servers.js';
+import { ADMIN_URL, API_URL, PLATFORM_NAME, TENANT_URL, WEB_URL } from '../servers.js';
 
 const comingSoon = messages.es.home.comingSoon;
 
 test.describe('public site', () => {
-  test('renders the home page with the configured name and sets no cookies', async ({ page }) => {
+  test("renders a tenant's home page with the configured name and sets no cookies", async ({
+    page,
+  }) => {
     const responses: Response[] = [];
     page.on('response', (response) => responses.push(response));
 
-    const response = await page.goto(WEB_URL);
+    const response = await page.goto(TENANT_URL);
 
     expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(comingSoon);

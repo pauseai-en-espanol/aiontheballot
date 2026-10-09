@@ -17,3 +17,21 @@ export const DSNS = {
   admin: `http://e2e-admin@127.0.0.1:${PORTS.glitchtip}/2`,
   api: `http://e2e-api@127.0.0.1:${PORTS.glitchtip}/3`,
 } as const;
+
+/**
+ * The fictional seeds' public addresses (packages/db/seeds/seed.ts): browsers resolve `.localhost` names to this
+ * machine, so these reach the web server on WEB_URL's port.
+ */
+export const PLATFORM_HOST = 'plataforma.localhost';
+export const SEED_HOSTS = {
+  /** Tenant ejemplo-a's canonical hostname. */
+  canonical: 'ejemplo-a.localhost',
+  /** A verified alias of ejemplo-a. */
+  alias: 'alias-a.localhost',
+  /** Registered for ejemplo-a, but never verified. */
+  unverified: 'pendiente-a.localhost',
+  /** The canonical hostname of an inactive tenant. */
+  inactive: 'ejemplo-inactivo.localhost',
+} as const;
+/** Tenant ejemplo-a's home page. */
+export const TENANT_URL = `http://${SEED_HOSTS.canonical}:${PORTS.web}`;

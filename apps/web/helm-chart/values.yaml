@@ -41,8 +41,12 @@ route:
     enabled: true
   apiPaths: []
 
-# Public API paths routed to the API on public hosts (none yet).
+# The API service: the proxy reads routing data from it (API_URL), and public API paths on public hosts are routed to
+# it (none yet).
 api:
   # Defaults to <release>-api, the API service of the same release.
   serviceName: ''
   servicePort: 3001
+
+# The platform domain, for tenants reachable by path (https://<platformHost>/<slug>/…). Optional (ADR-0002).
+platformHost: ''

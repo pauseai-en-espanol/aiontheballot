@@ -156,6 +156,21 @@ jobs:
     needs: checks
     runs-on: [self-hosted, juggernaut]
     timeout-minutes: 20
+    # The public site routes by data the API reads from the database: a migrated database with the fictional seeds.
+    services:
+      postgres:
+        # Same image as compose.yaml and the cluster's halyard postgresql chart.
+        image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=scram-sha-256
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -163,6 +178,28 @@ jobs:
       - uses: ./.github/actions/setup-node
       - uses: ./.github/actions/setup-pnpm
       - uses: ./.github/actions/install-pnpm-dependencies
+
+      # As in the database job: the owner, the runtime roles and the databases, with CI-only passwords.
+      - name: Create roles and databases
+        env:
+          CONTAINER: ${{ job.services.postgres.id }}
+          PG_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: |
+          docker exec -i \
+            -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -e PGPASSWORD=postgres \
+            -e AIONTHEBALLOT_OWNER_PASSWORD=ci-owner -e AIONTHEBALLOT_WEB_PASSWORD=ci-web \
+            -e AIONTHEBALLOT_ADMIN_PASSWORD=ci-admin -e AIONTHEBALLOT_WORKER_PASSWORD=ci-worker \
+            "$CONTAINER" sh < db/local/init.sh
+          {
+            echo "DATABASE_URL=postgres://aiontheballot_owner:ci-owner@localhost:$PG_PORT/aiontheballot?sslmode=disable"
+            echo "WEB_DATABASE_URL=postgres://aiontheballot_web:ci-web@localhost:$PG_PORT/aiontheballot?sslmode=disable"
+          } >> "$GITHUB_ENV"
+
+      # The fictional seeds; their guard admits this database because it is reached on localhost.
+      - name: Migrate and seed
+        run: |
+          pnpm exec dbmate --migrations-dir db/migrations --no-dump-schema up
+          pnpm db:seed
 
       - name: Cache Turborepo
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
