@@ -1,6 +1,6 @@
 {
   "name": "@aiontheballot/observability",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Error tracking shared by the apps: privacy options for the Sentry SDKs and the browser error relay",
   "type": "module",
