@@ -76,8 +76,8 @@ log makes it visible (T23).
 
 ### 6. Closed by default
 
-- Migrations revoke everything on schemas, tables **and functions** from `PUBLIC`.
-- Default privileges are set so that new functions are not executable by `PUBLIC` either.
+- Migrations revoke everything on schemas, tables, **functions and types** from `PUBLIC`.
+- Default privileges are set so that new functions are not executable by `PUBLIC`, and new types not usable by it.
 - Every grant is explicit.
 - Helper functions live in a `private` schema.
 - `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, `submit_report`,
