@@ -14,6 +14,8 @@ export type Generated<T> =
     ? ColumnType<S, I | undefined, U>
     : ColumnType<T, T | undefined, T>;
 
+export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
+
 export type Json = JsonValue;
 
 export type JsonArray = JsonValue[];
@@ -29,6 +31,17 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 export type Numeric = ColumnType<string, number | string, number | string>;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
+
+export interface AppAuditLog {
+  action: string;
+  actor_id: string | null;
+  at: Generated<Timestamp>;
+  diff: Json | null;
+  id: Generated<Int8>;
+  row_id: string;
+  table_name: string;
+  tenant_id: string | null;
+}
 
 export interface AppMemberships {
   created_at: Generated<Timestamp>;
@@ -60,6 +73,7 @@ export interface AppTenants {
 }
 
 export interface DB {
+  'app.audit_log': AppAuditLog;
   'app.memberships': AppMemberships;
   'app.platform_admins': AppPlatformAdmins;
   'app.tenants': AppTenants;

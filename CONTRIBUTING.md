@@ -47,8 +47,9 @@ and the [data model spec](docs/spec/data-model.md)):
 1. **Classify it** as public-capable or private. A table is never both: private columns go in their own table.
 2. **Tenant ownership:** `tenant_id uuid not null`, `unique (tenant_id, id)`, and composite foreign keys
    `(tenant_id, parent_id)` to every tenant-scoped parent.
-3. **The tenant-immutability trigger,** and a `private.stamp(...)` trigger for its actor columns and event
-   timestamps. Localized text, slugs and locale codes use the domains `app.localized`, `app.slug` and `app.locale`.
+3. **The tenant-immutability trigger,** a `private.stamp(...)` trigger for its actor columns and event
+   timestamps, and the `private.audit()` trigger (or an entry in the catalog test's `NOT_AUDITED`, with a
+   reason). Localized text, slugs and locale codes use the domains `app.localized`, `app.slug` and `app.locale`.
 4. **RLS enabled, with policies:**
    - the public-visibility rule, if the table is public-capable, for `aiontheballot_web` only (the admin role sees
      only what memberships give it);
@@ -57,7 +58,8 @@ and the [data model spec](docs/spec/data-model.md)):
    and nothing to `PUBLIC`.
 6. **If it holds published history:** `UPDATE`/`DELETE`/`TRUNCATE` triggers using `private.forbid_mutation()`,
    which honours `app.purge` only for the table owner.
-7. **Personal data?** Define its retention, and keep it out of `audit_log`.
+7. **Personal data?** Define its retention, and comment each such column `personal data`: the audit trigger never
+   copies those into `audit_log`, and the catalog test's `PERSONAL_DATA` list must name them.
 8. **An entry in `packages/db/tests/rls/matrix.ts`** with the expected outcome for every principal and operation, plus
    data-rule tests for any new trigger.
 9. **Docs:** update the data model spec, and regenerate `db/schema.sql` and the Kysely types.

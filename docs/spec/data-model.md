@@ -877,10 +877,11 @@ create table app.audit_log (                           -- append-only; no person
   id          bigint generated always as identity primary key,
   tenant_id   uuid,                                    -- null for platform-level actions
   actor_id    uuid,
-  action      text not null,                           -- e.g. 'operator.changed', 'revision.published'
+  action      text not null,                           -- 'insert', 'update' or 'delete' (the private.audit trigger)
   table_name  text not null,
-  row_id      text not null,
-  diff        jsonb,                                   -- never includes columns commented 'personal data'
+  row_id      text not null,                           -- the primary key; a JSON object when composite
+  diff        jsonb,                                   -- {new} | {old, new} (changed columns only) | {old};
+                                                       -- never includes columns commented 'personal data'
   at          timestamptz not null default now()
 );
 

@@ -226,6 +226,38 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     },
   },
 
+  'app.audit_log': {
+    rows: [
+      {
+        id: 'platform-level entry',
+        tenant: null,
+        public: false,
+        where: `table_name = 'platform_admins' AND row_id = '${USERS.platformAdmin}'`,
+      },
+      ...TENANT_KEYS.map((key) => ({
+        id: `entry of ${key}`,
+        tenant: key,
+        public: false,
+        where: `table_name = 'tenants' AND action = 'insert' AND row_id = '${TENANTS[key].id}'`,
+      })),
+    ],
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `forged entry in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.audit_log (tenant_id, action, table_name, row_id)
+            VALUES ('${TENANTS[key].id}', 'update', 'tenants', '${TENANTS[key].id}')`,
+    })),
+    set: 'action = action',
+    select: COUNTRY_ADMINS,
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+    columnUpdates: {
+      actor_id: { set: `actor_id = '${USERS.newcomer}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
+  },
+
   'app.memberships': {
     rows: TENANT_KEYS.map(membershipRow),
     inserts: TENANT_KEYS.map((key) => ({

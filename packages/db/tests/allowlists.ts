@@ -9,8 +9,9 @@ export const EXECUTE_ALLOWLIST: readonly string[] = [
   'aiontheballot_admin private.my_tenants(VARIADIC roles app.tenant_role[])',
 ];
 
-/** SECURITY DEFINER functions allowed in `app` and `private` (ADR-0002 §6): the policy helpers so far. */
+/** SECURITY DEFINER functions allowed in `app` and `private` (ADR-0002 §6). */
 export const SECURITY_DEFINER_ALLOWLIST: readonly string[] = [
+  'private.audit',
   'private.is_platform_admin',
   'private.my_tenants',
 ];

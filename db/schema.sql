@@ -369,6 +369,73 @@ CREATE TYPE app.tenant_role AS ENUM (
 ALTER TYPE app.tenant_role OWNER TO aiontheballot_owner;
 
 --
+-- Name: audit(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.audit() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    before jsonb := CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) END;
+    after jsonb := CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) END;
+    subject jsonb := coalesce(after, before);
+    hidden text[];
+    key_columns text[];
+    changed text[];
+    diff jsonb;
+  BEGIN
+    SELECT coalesce(array_agg(a.attname::text), '{}') INTO hidden
+      FROM pg_catalog.pg_attribute a
+      JOIN pg_catalog.pg_description d
+        ON d.objoid = a.attrelid AND d.objsubid = a.attnum AND d.classoid = 'pg_catalog.pg_class'::pg_catalog.regclass
+     WHERE a.attrelid = TG_RELID AND d.description = 'personal data';
+
+    SELECT array_agg(a.attname::text ORDER BY k.ord) INTO key_columns
+      FROM pg_catalog.pg_index i
+     CROSS JOIN LATERAL unnest(i.indkey::int2[]) WITH ORDINALITY k(attnum, ord)
+      JOIN pg_catalog.pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+     WHERE i.indrelid = TG_RELID AND i.indisprimary;
+    IF key_columns IS NULL THEN
+      RAISE EXCEPTION 'private.audit on %.%: the table needs a primary key', TG_TABLE_SCHEMA, TG_TABLE_NAME;
+    END IF;
+
+    IF TG_OP = 'UPDATE' THEN
+      SELECT coalesce(array_agg(n.key), '{}') INTO changed
+        FROM jsonb_each(after) n
+       WHERE n.value IS DISTINCT FROM before -> n.key;
+      IF cardinality(changed) = 0 THEN
+        RETURN NULL;
+      END IF;
+      diff := jsonb_build_object(
+        'old', (SELECT coalesce(jsonb_object_agg(o.key, o.value), '{}') FROM jsonb_each(before) o
+                 WHERE o.key = ANY (changed) AND NOT o.key = ANY (hidden)),
+        'new', (SELECT coalesce(jsonb_object_agg(n.key, n.value), '{}') FROM jsonb_each(after) n
+                 WHERE n.key = ANY (changed) AND NOT n.key = ANY (hidden)));
+    ELSIF TG_OP = 'INSERT' THEN
+      diff := jsonb_build_object('new', after - hidden);
+    ELSE
+      diff := jsonb_build_object('old', before - hidden);
+    END IF;
+
+    INSERT INTO app.audit_log (tenant_id, actor_id, action, table_name, row_id, diff)
+    VALUES (
+      (CASE WHEN TG_TABLE_SCHEMA = 'app' AND TG_TABLE_NAME = 'tenants' THEN subject ->> 'id'
+            ELSE subject ->> 'tenant_id' END)::uuid,
+      private.current_user_id(),
+      lower(TG_OP),
+      TG_TABLE_NAME,
+      CASE WHEN cardinality(key_columns) = 1 THEN subject ->> key_columns[1]
+           ELSE (SELECT jsonb_object_agg(c, subject -> c) FROM unnest(key_columns) c)::text END,
+      diff);
+    RETURN NULL;
+  END
+  $$;
+
+
+ALTER FUNCTION private.audit() OWNER TO aiontheballot_owner;
+
+--
 -- Name: current_aal(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -564,6 +631,38 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: audit_log; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.audit_log (
+    id bigint NOT NULL,
+    tenant_id uuid,
+    actor_id uuid,
+    action text NOT NULL,
+    table_name text NOT NULL,
+    row_id text NOT NULL,
+    diff jsonb,
+    at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE app.audit_log OWNER TO aiontheballot_owner;
+
+--
+-- Name: audit_log_id_seq; Type: SEQUENCE; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.audit_log ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME app.audit_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: memberships; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -634,6 +733,14 @@ CREATE TABLE public.schema_migrations (
 ALTER TABLE public.schema_migrations OWNER TO aiontheballot_owner;
 
 --
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: memberships memberships_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -674,10 +781,52 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: audit_log_tenant_id_at_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX audit_log_tenant_id_at_idx ON app.audit_log USING btree (tenant_id, at DESC);
+
+
+--
 -- Name: memberships_tenant_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE INDEX memberships_tenant_id_idx ON app.memberships USING btree (tenant_id);
+
+
+--
+-- Name: memberships audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.memberships FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: platform_admins audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.platform_admins FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: tenants audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: audit_log forbid_mutation; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_mutation BEFORE DELETE OR UPDATE ON app.audit_log FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: audit_log forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.audit_log FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
 
 
 --
@@ -688,10 +837,24 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.memberships FOR EACH RO
 
 
 --
+-- Name: audit_log forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.audit_log FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
 -- Name: tenants members_may_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER members_may_change BEFORE UPDATE ON app.tenants FOR EACH ROW EXECUTE FUNCTION private.members_may_change('theme', 'report_retention_days', 'llm_monthly_cap_usd');
+
+
+--
+-- Name: audit_log stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT ON app.audit_log FOR EACH ROW EXECUTE FUNCTION private.stamp('actor_id');
 
 
 --
@@ -716,12 +879,26 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.tenants FOR EACH ROW EXECUTE
 
 
 --
+-- Name: audit_log audit_log_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.audit_log
+    ADD CONSTRAINT audit_log_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
 -- Name: memberships memberships_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
 ALTER TABLE ONLY app.memberships
     ADD CONSTRAINT memberships_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
 
+
+--
+-- Name: audit_log; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.audit_log ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: memberships country_admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
@@ -735,6 +912,13 @@ CREATE POLICY country_admin_delete ON app.memberships FOR DELETE TO aiontheballo
 --
 
 CREATE POLICY country_admin_insert ON app.memberships FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: audit_log country_admin_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_read ON app.audit_log FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -998,6 +1182,13 @@ REVOKE ALL ON TYPE app.tenant_role FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION audit(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.audit() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION current_aal(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1062,6 +1253,13 @@ REVOKE ALL ON FUNCTION private.normalize_for_match(input text) FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.stamp() FROM PUBLIC;
+
+
+--
+-- Name: TABLE audit_log; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.audit_log TO aiontheballot_admin;
 
 
 --

@@ -326,3 +326,86 @@ describe('catalog: tables', () => {
     expect(relations).toEqual([]);
   });
 });
+
+/** Tables written without an audit trigger, and why. Every other table in app must have one. */
+const NOT_AUDITED: Readonly<Record<string, string>> = {
+  audit_log: 'the log itself',
+};
+
+/** Tables in app whose rows are never updated or deleted (ADR-0002 §14), except by purge_tenant. */
+const IMMUTABLE = ['audit_log'];
+
+/** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
+const PERSONAL_DATA: readonly string[] = [];
+
+const DELETE = 8;
+const TRUNCATE = 32;
+
+/** Every table in app without an AFTER ROW private.audit() trigger on insert, update and delete, unless listed. */
+const unaudited = async (client: pg.Client): Promise<string[]> =>
+  (
+    await client.query<{ name: string }>(
+      `SELECT c.relname AS name
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p')
+          AND NOT EXISTS (SELECT 1 FROM pg_trigger t
+                           WHERE t.tgrelid = c.oid AND NOT t.tgisinternal
+                             AND t.tgfoid = to_regprocedure('private.audit()')
+                             AND (t.tgtype & ${ROW | BEFORE}) = ${ROW}
+                             AND (t.tgtype & ${INSERT | UPDATE | DELETE}) = ${INSERT | UPDATE | DELETE})
+        ORDER BY 1`,
+    )
+  ).rows
+    .map((r) => r.name)
+    .filter((name) => !(name in NOT_AUDITED));
+
+describe('catalog: audit', () => {
+  it('audits every table but the listed ones', async () => {
+    expect(await inRolledBackTransaction(unaudited)).toEqual([]);
+  });
+
+  it('reports a table without the trigger, or audited on some operations only', async () => {
+    const missing = await inRolledBackTransaction(async (client) => {
+      await client.query(`
+        CREATE TABLE app.probe_silent (id int PRIMARY KEY);
+        CREATE TABLE app.probe_partial (id int PRIMARY KEY);
+        CREATE TRIGGER audit AFTER INSERT OR UPDATE ON app.probe_partial
+          FOR EACH ROW EXECUTE FUNCTION private.audit();`);
+      return unaudited(client);
+    });
+    expect(missing).toEqual(['probe_partial', 'probe_silent']);
+  });
+
+  it('marks exactly the personal-data columns of the spec', async () => {
+    const marked = await rows<{ col: string }>(
+      `SELECT c.relname || '.' || a.attname AS col
+         FROM pg_attribute a
+         JOIN pg_class c ON c.oid = a.attrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         JOIN pg_description d ON d.objoid = c.oid AND d.objsubid = a.attnum
+        WHERE n.nspname = 'app' AND d.description = 'personal data'
+        ORDER BY 1`,
+    );
+    expect(marked.map((m) => m.col)).toEqual([...PERSONAL_DATA].sort());
+  });
+
+  it('protects every immutable table with UPDATE, DELETE and TRUNCATE triggers', async () => {
+    const triggers = await rows<{ name: string; type: number }>(
+      `SELECT c.relname AS name, t.tgtype AS type
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'app' AND NOT t.tgisinternal
+          AND t.tgfoid = to_regprocedure('private.forbid_mutation()') AND (t.tgtype & ${BEFORE}) = ${BEFORE}`,
+    );
+    const covers = (name: string, events: number, row: boolean): boolean =>
+      triggers.some(
+        (t) => t.name === name && (t.type & events) === events && ((t.type & ROW) === ROW) === row,
+      );
+    expect(
+      IMMUTABLE.filter(
+        (name) => !covers(name, UPDATE | DELETE, true) || !covers(name, TRUNCATE, false),
+      ),
+    ).toEqual([]);
+  });
+});
