@@ -55,6 +55,9 @@ for (const relation of Object.keys(RELATIONS)) {
       client = new pg.Client({ connectionString: superuserUrl() });
       await client.connect();
       await client.query('BEGIN');
+      // Deferred checks (such as "an active tenant has an operator") fire at commit, which a case never reaches:
+      // run them after every statement instead.
+      await client.query('SET CONSTRAINTS ALL IMMEDIATE');
     });
 
     afterAll(async () => {

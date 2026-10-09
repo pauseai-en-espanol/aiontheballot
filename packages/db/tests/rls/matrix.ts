@@ -526,6 +526,8 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       tenant: key,
       public: TENANTS[key].active,
       where: `tenant_id = '${TENANTS[key].id}' AND organization_id = '${ORGANIZATIONS[key].id}'`,
+      // An active tenant always has its operator.
+      ...(TENANTS[key].active ? { blocked: { delete: '23514' } } : {}),
     })),
     inserts: TENANT_KEYS.map((key) => ({
       id: `endorser of ${key}`,

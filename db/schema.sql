@@ -379,6 +379,29 @@ CREATE TYPE app.tenant_role AS ENUM (
 ALTER TYPE app.tenant_role OWNER TO aiontheballot_owner;
 
 --
+-- Name: active_tenant_has_operator(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.active_tenant_has_operator() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    tenant uuid := CASE WHEN TG_TABLE_NAME = 'tenants' THEN (to_jsonb(NEW) ->> 'id')::uuid
+                        ELSE (to_jsonb(OLD) ->> 'tenant_id')::uuid END;
+  BEGIN
+    IF EXISTS (SELECT 1 FROM app.tenants t WHERE t.id = tenant AND t.active)
+       AND NOT EXISTS (SELECT 1 FROM app.tenant_organizations o WHERE o.tenant_id = tenant AND o.role = 'operator') THEN
+      RAISE EXCEPTION 'tenant % is active, so it needs an operator', tenant USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NULL;
+  END
+  $$;
+
+
+ALTER FUNCTION private.active_tenant_has_operator() OWNER TO aiontheballot_owner;
+
+--
 -- Name: audit(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1281,6 +1304,20 @@ CREATE UNIQUE INDEX tenant_organizations_one_operator_idx ON app.tenant_organiza
 --
 
 CREATE INDEX tenant_organizations_organization_id_idx ON app.tenant_organizations USING btree (organization_id);
+
+
+--
+-- Name: tenant_organizations active_tenant_has_operator; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE CONSTRAINT TRIGGER active_tenant_has_operator AFTER DELETE OR UPDATE ON app.tenant_organizations DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION private.active_tenant_has_operator();
+
+
+--
+-- Name: tenants active_tenant_has_operator; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE CONSTRAINT TRIGGER active_tenant_has_operator AFTER INSERT OR UPDATE OF active ON app.tenants DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION private.active_tenant_has_operator();
 
 
 --
@@ -2360,6 +2397,13 @@ REVOKE ALL ON TYPE app.tenant_document_kind FROM PUBLIC;
 --
 
 REVOKE ALL ON TYPE app.tenant_role FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION active_tenant_has_operator(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.active_tenant_has_operator() FROM PUBLIC;
 
 
 --
