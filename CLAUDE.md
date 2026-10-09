@@ -45,6 +45,7 @@ Copy `.env.example` to `.env` for local database URLs.
 | `pnpm test:e2e`                                             | Playwright, against a production build                                    |
 | `pnpm db:up` · `pnpm db:down`                               | Start or stop local Postgres 18 (Docker, roles as in production)          |
 | `pnpm db:migrate` · `pnpm db:new <name>` · `pnpm db:status` | Apply migrations (refreshes `db/schema.sql`) · new migration · status     |
+| `pnpm db:seed`                                              | Load the fictional seeds (refuses any database not on this machine)       |
 | `pnpm release:note`                                         | Add a changeset (pre-push and CI require one)                             |
 
 ## Conventions

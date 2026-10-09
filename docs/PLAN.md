@@ -350,6 +350,17 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   trusting its own list of tables.
 - **R34. `purged_by` is the database session's role,** since a purge runs outside the app, with no actor.
 
+**Seeds (`pnpm db:seed`, `packages/db/seeds/seed.ts`):**
+
+- **R35. The production guard is "the database is on this machine"** (loopback host only, and never with
+  `NODE_ENV=production`), with no override; it also refuses a database that holds any tenant but the seeds'. CI's
+  service container is reached on localhost, so the CI end-to-end stack can use it.
+- **R36. Seed content:** three fictional tenants (country codes XA, XB, XC): `ejemplo-a` on `ejemplo-a.localhost`
+  with a verified alias and an unverified hostname, a live election, two parties, two criteria, a stored programme
+  and one cell published through the real flow; `ejemplo-b` reachable only by path on `plataforma.localhost`, in
+  Spanish and English; `ejemplo-inactivo`, inactive, with a verified hostname that must not be served. `.localhost`
+  hostnames resolve to this machine in browsers, so the seeds work locally with no DNS setup.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).
