@@ -849,6 +849,7 @@ create table app.llm_runs (
   output_tokens       int,
   cost_usd            numeric(10, 4),
   error               text,
+  created_at          timestamptz not null default now(),  -- the month its cost counts towards
   unique (tenant_id, id),
   unique (tenant_id, id, election_id),
   unique (tenant_id, id, source_document_id),
@@ -875,7 +876,10 @@ create table app.llm_suggestions (
 );
 ```
 
-A run is refused once the tenant's spend this month (the sum of `cost_usd`) reaches `tenants.llm_monthly_cap_usd`.
+A run is refused once the tenant's spend this month (the sum of `cost_usd` of runs created this UTC month) reaches
+`tenants.llm_monthly_cap_usd`; a cap of 0 turns LLM assistance off. A run moves queued → running → done or failed,
+with its start and finish stamped, and only its progress changes. A suggestion is open when written, with a rating of
+the tenant's scale, and is accepted or rejected once, by the actor, at the transaction time.
 
 ### 3.10 Jobs
 

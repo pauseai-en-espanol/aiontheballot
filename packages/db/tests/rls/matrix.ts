@@ -304,6 +304,31 @@ export const SOURCES = {
   },
 } as const satisfies Record<string, FixtureSource>;
 
+/** Fictional LLM runs, one per tenant on its live election's source, each with one open suggestion. */
+export const LLM_RUNS = {
+  A: {
+    id: fixtureId(5, 51),
+    suggestion: fixtureId(5, 61),
+    source: SOURCES.liveA,
+    election: ELECTIONS.liveA,
+  },
+  B: {
+    id: fixtureId(5, 52),
+    suggestion: fixtureId(5, 62),
+    source: SOURCES.liveB,
+    election: ELECTIONS.liveB,
+  },
+  inactive: {
+    id: fixtureId(5, 53),
+    suggestion: fixtureId(5, 63),
+    source: SOURCES.liveInactive,
+    election: ELECTIONS.liveInactive,
+  },
+} as const satisfies Record<
+  TenantKey,
+  { id: string; suggestion: string; source: FixtureSource; election: FixtureElection }
+>;
+
 /** Memberships the fixtures create and then delete: the principal must lose access at once. */
 export const REVOKED_MEMBERSHIPS: readonly { user: string; tenant: TenantKey; role: TenantRole }[] =
   [{ user: USERS.revokedA, tenant: 'A', role: 'editor' }];
@@ -1174,6 +1199,56 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     insert: NOBODY,
     update: NOBODY,
     delete: NOBODY,
+  },
+
+  'app.llm_runs': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `run of ${key}`,
+      tenant: key,
+      public: false,
+      where: `id = '${LLM_RUNS[key].id}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `run in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.llm_runs (tenant_id, election_id, source_document_id, model, prompt_version)
+            VALUES ('${TENANTS[key].id}', '${LLM_RUNS[key].election.id}', '${LLM_RUNS[key].source.id}',
+                    'modelo-de-ejemplo', 'v1')`,
+    })),
+    set: `status = 'running'`,
+    select: MEMBERS,
+    insert: EDITORS,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.llm_suggestions': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `suggestion of ${key}`,
+      tenant: key,
+      public: false,
+      where: `id = '${LLM_RUNS[key].suggestion}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `suggestion in ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.llm_suggestions (tenant_id, election_id, run_id, party_id, criterion_id, suggested_rating,
+                                             rationale, passages)
+            VALUES ('${TENANTS[key].id}', '${LLM_RUNS[key].election.id}', '${LLM_RUNS[key].id}',
+                    '${LLM_RUNS[key].election.party}', '${LLM_RUNS[key].election.criterion}', 'meets',
+                    'Razonamiento de ejemplo', '[]')`,
+    })),
+    set: `state = 'rejected'`,
+    select: MEMBERS,
+    insert: NOBODY,
+    update: EDITORS,
+    delete: NOBODY,
+    columnUpdates: {
+      suggested_rating: { set: `suggested_rating = 'does_not_meet'`, rule: NOBODY },
+      passages: { set: `passages = '[]'`, rule: NOBODY },
+      decided_by: { set: `decided_by = '${USERS.newcomer}'`, rule: NOBODY },
+      tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+    },
   },
 
   'app.memberships': {

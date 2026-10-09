@@ -7,6 +7,7 @@ import {
   FILES,
   HOSTNAMES,
   INVITATION_TOKENS,
+  LLM_RUNS,
   MEMBERSHIPS,
   ORGANIZATIONS,
   PLATFORM_ADMINS,
@@ -45,8 +46,8 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
   ][]) {
     await client.query(
       `INSERT INTO app.tenants (id, slug, country_code, default_locale, enabled_locales, display_name,
-                               methodology_kind, active, report_retention_days)
-       VALUES ($1, $2, $3, 'es', '{es}', $4, 'demands', $5, 365)`,
+                               methodology_kind, active, report_retention_days, llm_monthly_cap_usd)
+       VALUES ($1, $2, $3, 'es', '{es}', $4, 'demands', $5, 365, 50)`,
       [tenant.id, tenant.slug, COUNTRY[key], { es: `Inquilino de prueba ${key}` }, tenant.active],
     );
   }
@@ -246,6 +247,20 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
         [src.id],
       );
     }
+  }
+  for (const run of Object.values(LLM_RUNS)) {
+    const tenant = TENANTS[run.election.tenant].id;
+    await client.query(
+      `INSERT INTO app.llm_runs (id, tenant_id, election_id, source_document_id, model, prompt_version)
+       VALUES ($1, $2, $3, $4, 'modelo-de-ejemplo', 'v1')`,
+      [run.id, tenant, run.election.id, run.source.id],
+    );
+    await client.query(
+      `INSERT INTO app.llm_suggestions (id, tenant_id, election_id, run_id, party_id, criterion_id, suggested_rating,
+                                        rationale, passages)
+       VALUES ($1, $2, $3, $4, $5, $6, 'partially_meets', 'Razonamiento de ejemplo', '[]')`,
+      [run.suggestion, tenant, run.election.id, run.id, run.election.party, run.election.criterion],
+    );
   }
   await client.query('COMMIT');
 };

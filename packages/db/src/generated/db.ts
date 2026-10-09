@@ -19,8 +19,13 @@ export type AppOrgRole = 'endorser' | 'operator';
 
 export type AppProgrammeStatus = 'pending' | 'published';
 
+export type AppRating =
+  'does_not_meet' | 'green' | 'meets' | 'not_mentioned' | 'partially_meets' | 'red' | 'yellow';
+
 export type AppSourceKind =
   'audio' | 'party_submission' | 'pdf' | 'social_post' | 'video' | 'web_page';
+
+export type AppSuggestionState = 'accepted' | 'open' | 'rejected';
 
 export type AppTenantDocumentKind = 'about_operator' | 'privacy_policy' | 'right_of_reply_policy';
 
@@ -165,6 +170,39 @@ export interface AppInvitations {
   role: AppTenantRole;
   tenant_id: string;
   token_hash: string;
+}
+
+export interface AppLlmRuns {
+  cost_usd: Numeric | null;
+  created_at: Generated<Timestamp>;
+  election_id: string;
+  error: string | null;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  input_tokens: number | null;
+  model: string;
+  output_tokens: number | null;
+  prompt_version: string;
+  requested_by: string;
+  source_document_id: string;
+  started_at: Timestamp | null;
+  status: Generated<string>;
+  tenant_id: string;
+}
+
+export interface AppLlmSuggestions {
+  criterion_id: string;
+  decided_at: Timestamp | null;
+  decided_by: string | null;
+  election_id: string;
+  id: Generated<string>;
+  party_id: string;
+  passages: Json;
+  rationale: string;
+  run_id: string;
+  state: Generated<AppSuggestionState>;
+  suggested_rating: AppRating;
+  tenant_id: string;
 }
 
 export interface AppMemberships {
@@ -335,6 +373,8 @@ export interface DB {
   'app.hostname_tombstones': AppHostnameTombstones;
   'app.hostname_verifications': AppHostnameVerifications;
   'app.invitations': AppInvitations;
+  'app.llm_runs': AppLlmRuns;
+  'app.llm_suggestions': AppLlmSuggestions;
   'app.memberships': AppMemberships;
   'app.methodologies': AppMethodologies;
   'app.methodology_reviewers': AppMethodologyReviewers;
