@@ -1,5 +1,12 @@
 # @aiontheballot/migrations
 
+## 0.13.0
+
+### Minor Changes
+
+- 4f5e76a: Better Auth's tables, in the `auth` schema that only `aiontheballot_auth` reaches (migration `auth_schema`,
+  ADR-0002 §2), and `createAuthPool` for its connections. Nothing signs in yet.
+
 ## 0.12.1
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @aiontheballot/api
 
+## 0.8.2
+
+### Patch Changes
+
+- 4f5e76a: Better Auth's tables, in the `auth` schema that only `aiontheballot_auth` reaches (migration `auth_schema`,
+  ADR-0002 §2), and `createAuthPool` for its connections. Nothing signs in yet.
+- Updated dependencies [4f5e76a]
+  - @aiontheballot/db@0.11.0
+
 ## 0.8.1
 
 ### Patch Changes
