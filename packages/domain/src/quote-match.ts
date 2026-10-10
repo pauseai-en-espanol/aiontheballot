@@ -6,13 +6,17 @@ import { normalizeForMatch } from './matching.js';
  * mirrors it step for step, and a database test checks the two agree on every case:
  *
  * - each unit (a page or a section) is normalised on its own, and the units are joined in order with one space;
- * - the quote, normalised, must have at least 15 characters and appear in that text; the first occurrence counts;
+ * - the quote, as stored, has 15 to 1,000 characters once the spaces at either end are set aside (its column's
+ *   CHECK, which refuses the save); normalised, it must have at least 15 and appear in that text; the first
+ *   occurrence counts;
  * - the match spans from the last unit starting at or before its first character to the last unit starting at or
  *   before its last one; the public sees those units' labels, `p. 47` or `p. 47–p. 48`.
  */
 
-/** The fewest characters a quote may have once normalised, so it can't match almost anything. */
+/** The fewest characters a quote may have, as stored and once normalised, so it can't match almost anything. */
 export const MIN_QUOTE_LENGTH = 15;
+/** The most characters a quote may have as stored. */
+export const MAX_QUOTE_LENGTH = 1000;
 
 /** One extracted unit of a source: a PDF's page or a web page's section. */
 export interface SourceUnit {
@@ -30,7 +34,7 @@ export interface UnitSpan {
 
 export type QuoteMatch =
   | { kind: 'matched'; span: UnitSpan }
-  | { kind: 'too-short'; length: number }
+  | { kind: 'too-short' | 'too-long'; length: number }
   | {
       kind: 'unmatched';
       /**
@@ -43,6 +47,18 @@ export type QuoteMatch =
 /** A text's characters (code points), as the database counts them: not UTF-16 units, nor what readers see as one. */
 const codePoints = (text: string): string[] => Array.from(text);
 const characters = (text: string): number => codePoints(text).length;
+
+/** The text without the spaces at either end, as the database's `btrim` leaves it: only spaces, not other blanks. */
+const trimSpaces = (text: string): string => {
+  let [start, end] = [0, text.length];
+  while (start < end && text[start] === ' ') {
+    start += 1;
+  }
+  while (end > start && text[end - 1] === ' ') {
+    end -= 1;
+  }
+  return text.slice(start, end);
+};
 
 /**
  * The longest prefix (or suffix) of `needle` found in `haystack`, by binary search on its length: a shorter part of a
@@ -65,6 +81,14 @@ const longestFound = (needle: string[], haystack: string, part: 'start' | 'end')
 };
 
 export const matchQuote = (quote: string, units: readonly SourceUnit[]): QuoteMatch => {
+  // The column's CHECK first: normalising can lengthen a quote (a ligature becomes two letters), never make it savable.
+  const stored = characters(trimSpaces(quote));
+  if (stored > MAX_QUOTE_LENGTH) {
+    return { kind: 'too-long', length: stored };
+  }
+  if (stored < MIN_QUOTE_LENGTH) {
+    return { kind: 'too-short', length: stored };
+  }
   const needle = normalizeForMatch(quote);
   const length = characters(needle);
   if (length < MIN_QUOTE_LENGTH) {

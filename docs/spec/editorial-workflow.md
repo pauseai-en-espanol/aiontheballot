@@ -374,7 +374,7 @@ _As an editor, I write a rating backed by verbatim quotes, and see at once wheth
 4. A quote cites a citable source of the cell's party, or a party-neutral one, of a kind the methodology admits. [DB:
    `evidence_rules`]
 5. A quote has 15 to 1,000 characters, and at least 15 after normalization. [DB: check, `evidence_rules`]
-6. As the editor types, the cell editor shows whether the quote matches and on which pages ("pp. 47–48"), or that it
+6. As the editor types, the cell editor shows whether the quote matches and on which pages ("p. 47–p. 48"), or that it
    doesn't, with the longest matching part highlighted to help find the difference (W13). [API; UI]
 7. On save, the database computes the match itself; a status sent by the client is ignored. If the two ever
    disagree, the database wins and the difference is reported as an error. [DB: `evidence_rules`; API]

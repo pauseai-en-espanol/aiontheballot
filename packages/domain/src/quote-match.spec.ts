@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { matchQuote, MIN_QUOTE_LENGTH, type SourceUnit } from './quote-match.js';
+import { matchQuote, MAX_QUOTE_LENGTH, MIN_QUOTE_LENGTH, type SourceUnit } from './quote-match.js';
 
 /** A fictional programme, a page per unit. */
 const pages = (...bodies: string[]): SourceUnit[] =>
@@ -62,6 +62,27 @@ describe('the live match of a quote', () => {
     const votes = pages('Votos 🗳🗳🗳 de ejemplo.');
     expect(matchQuote('🗳🗳 de ejemplo.', votes)).toEqual({ kind: 'too-short', length: 14 });
     expect(matchQuote('🗳🗳🗳 de ejemplo.', votes)).toMatchObject({ kind: 'matched' });
+  });
+
+  it('counts a quote as its column does too: spaces at either end aside, before normalising', () => {
+    const source = pages('Sobre la financiación de ejemplo.');
+    // 14 characters as stored, 15 once its ligature is two letters: the database refuses to save it.
+    expect(matchQuote('la ﬁnanciación', source)).toEqual({ kind: 'too-short', length: 14 });
+    expect(matchQuote('   la financiación   ', source)).toMatchObject({ kind: 'matched' });
+    expect(matchQuote('  la ﬁnanciació  ', source)).toEqual({ kind: 'too-short', length: 13 });
+    // Only spaces: a tab at either end counts, as stored, and normalising drops it.
+    expect(matchQuote('\tla ﬁnanciación', source)).toMatchObject({ kind: 'matched' });
+  });
+
+  it(`refuses a quote longer than ${MAX_QUOTE_LENGTH} characters as stored`, () => {
+    const long = `${'palabra '.repeat(124)}palabras`;
+    expect(Array.from(long)).toHaveLength(MAX_QUOTE_LENGTH);
+    expect(matchQuote(` ${long} `, pages(long))).toMatchObject({ kind: 'matched' });
+    expect(matchQuote(`${long}x`, pages(long))).toEqual({ kind: 'too-long', length: 1001 });
+    expect(matchQuote(`${long.slice(0, -1)}🗳🗳`, pages(long))).toEqual({
+      kind: 'too-long',
+      length: 1001,
+    });
   });
 
   it('shows how much of an unmatched quote does match: its longest start, with where it is', () => {

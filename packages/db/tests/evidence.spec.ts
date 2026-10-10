@@ -184,6 +184,35 @@ describe("the editor's live match (W13)", () => {
       });
     });
   });
+
+  it.each([
+    ['of fourteen characters as stored, fifteen once normalised', 'la ﬁnanciación', 'too-short'],
+    ['of fourteen characters between spaces', '   la financiació   ', 'too-short'],
+    ['of more than a thousand characters', `${'palabra '.repeat(125)}x`, 'too-long'],
+  ])('agrees with the database in refusing a quote %s', async (_name, quote, kind) => {
+    await actingAs(USERS.editorA, async (client) => {
+      const src = await source(client, { pages: [`Sobre ${quote.trim()} de ejemplo.`] });
+      const live = matchQuote(quote, [
+        { index: 1, label: 'p. 1', body: `Sobre ${quote} de ejemplo.` },
+      ]);
+      expect(live.kind).toBe(kind);
+      expect(await errorCode(client, quoteSql(await newCell(client), src, `'${quote}'`))).toBe(
+        CHECK_VIOLATION,
+      );
+    });
+  });
+
+  it('agrees with the database in saving a quote of fifteen characters between spaces', async () => {
+    await actingAs(USERS.editorA, async (client) => {
+      const quote = '   la financiación   ';
+      const body = 'Sobre la financiación de ejemplo.';
+      const src = await source(client, { pages: [body] });
+      expect(matchQuote(quote, [{ index: 1, label: 'p. 1', body }]).kind).toBe('matched');
+      expect(await addQuote(client, await newCell(client), src, quote)).toMatchObject({
+        match_status: 'matched',
+      });
+    });
+  });
 });
 
 describe('the verbatim match', () => {

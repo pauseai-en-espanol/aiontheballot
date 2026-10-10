@@ -503,7 +503,7 @@ documents.
 
 **Matching across units.** The verbatim check runs on a source's units joined in order with a single space, so a
 quote that crosses a page break still matches. The trigger records the first and last unit the match spans; the
-public sees those units' labels (for example "pp. 47–48"), never a page the editor typed.
+public sees those units' labels (for example "p. 47–p. 48"), never a page the editor typed.
 
 ### 3.5 Assessments (cells): the working copy
 
