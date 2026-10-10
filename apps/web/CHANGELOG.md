@@ -1,5 +1,17 @@
 # @aiontheballot/web
 
+## 0.7.0
+
+### Minor Changes
+
+- 2a30cfe: Link previews get their own shorter description (under 125 characters, which phones show), and search keeps the full
+  sentence.
+
+### Patch Changes
+
+- Updated dependencies [2a30cfe]
+  - @aiontheballot/i18n@0.4.0
+
 ## 0.6.0
 
 ### Minor Changes
