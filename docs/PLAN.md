@@ -380,6 +380,34 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 - **R41. The e2e web server binds 0.0.0.0, like the production image:** with `127.0.0.1`, Next treats every tenant
   rewrite as an external one (it renames the host in the proxy's URLs only).
 
+**Coming soon (pulled forward from M3 at Dani's request; branch `coming-soon`):**
+
+- **R42. The tenant home is the coming-soon page, in direction A** (the orange poster on the design canvas), until
+  the public site arrives. Everything on it comes from data: the tenant's name, the operator's name, website and
+  contact address, and the next public election. Whatever the operator hasn't given is left out, never a
+  placeholder. Its wording is provisional, pending the chapter (as for all public wording, M3).
+- **R43. Two promises from the mockup were reworded to what the platform guarantees.** "Revisión a cuatro ojos" is
+  gone: a platform admin can turn the second reviewer off per election (P14), and the public can't see the setting.
+  "Cada valoración enlaza al texto exacto del programa" became "muestra sus fuentes, y cada cita se comprueba contra
+  el documento original": a "No lo menciona" rating has no quote, and sources aren't only programmes. The third
+  promise is the page history and "last updated", which BRIEF requires on every cell.
+- **R44. Not on the page yet:** logos (they come only from brand assets, which have no upload path before M2), the
+  methodology link and the legal and privacy links (their pages are M3). The legal notice may be needed before
+  then: see Q6.
+- **R45. The data comes from a new `GET /public/tenants/{slug}/home`,** read as `aiontheballot_web` like the routing
+  data. The web app keeps each tenant's copy for 60 seconds and serves the last good one when the API fails
+  (ADR-0003 guardrail 3); on-publish revalidation is M2's. The next election is the soonest one that RLS shows and
+  that isn't archived or past, so today only a live one.
+- **R46. Colours are semantic tokens by role** (`bg.*`, `fg.*`, `border.*`, `packages/ui/src/brand.ts`), light only:
+  a dark mode or a tenant's colours redefine them. A test checks every text colour against each background it may
+  sit on; orange is never text on a light background (2.2:1).
+- **R47. Fonts are self-hosted** from Fontsource through `next/font/local`, Latin subset only, so no request leaves
+  the site (an e2e test checks). Roboto Slab bold waits for the scorecard, since every face is preloaded.
+- **R48. The page title is the tenant's name plus "Próximamente",** not `PLATFORM_NAME`, which the admin app still
+  uses. The content carries `lang`; `<html lang>` stays `es` until M3 renders it per locale.
+- **R49. Seeds:** `ejemplo-a`'s operator now has a website and a contact address, on the reserved `.example` TLD;
+  `ejemplo-b`'s has neither, so the e2e tests cover both.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)).

@@ -146,9 +146,18 @@ export const seed = async (client: pg.Client): Promise<'seeded' | 'already seede
           t.active,
         ],
       );
+      // A's operator has a website and a contact address (on the reserved .example TLD); B's has neither.
+      const contact = key === 'A' ? `organizacion-${t.slug}.example` : undefined;
       await client.query(
-        `INSERT INTO app.organizations (id, display_name, legal_name) VALUES ($1, $2, $3)`,
-        [t.operator, { es: `Organización de ejemplo ${key}` }, `Organización de Ejemplo ${key}`],
+        `INSERT INTO app.organizations (id, display_name, legal_name, url, contact_email)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          t.operator,
+          { es: `Organización de ejemplo ${key}`, en: `Example organisation ${key}` },
+          `Organización de Ejemplo ${key}`,
+          contact && `https://${contact}/`,
+          contact && `contacto@${contact}`,
+        ],
       );
       await client.query(
         `INSERT INTO app.tenant_organizations (tenant_id, organization_id, role) VALUES ($1, $2, 'operator')`,

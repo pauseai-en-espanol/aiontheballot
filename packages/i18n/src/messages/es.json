@@ -19,7 +19,30 @@
     "programmePending": "Programa aún no publicado (comprobado el {checkedAt, date, long})"
   },
   "home": {
-    "comingSoon": "Próximamente"
+    "comingSoon": "Próximamente",
+    "question": "¿Qué proponen los partidos frente a los riesgos de la IA?",
+    "description": {
+      "demands": "Compararemos lo que proponen los partidos sobre la IA avanzada con las demandas de {operator}. Cada valoración, con sus fuentes.",
+      "descriptive": "Analizaremos lo que proponen los partidos sobre la IA avanzada. Cada valoración, con sus fuentes."
+    },
+    "election": "{name} · {date, date, long}",
+    "learnMore": "Conoce {operator}",
+    "how": {
+      "title": "Cómo lo haremos",
+      "quotes": {
+        "title": "Citas comprobadas",
+        "body": "Cada valoración muestra sus fuentes, y cada cita se comprueba contra el documento original."
+      },
+      "history": {
+        "title": "Cambios a la vista",
+        "body": "Cada valoración indica cuándo se actualizó y guarda su historial."
+      },
+      "corrections": {
+        "title": "Correcciones públicas",
+        "body": "Si nos equivocamos, lo corregimos y lo anotamos en un registro público."
+      }
+    },
+    "contact": "Contacto"
   },
   "errors": {
     "unexpected": "Algo ha fallado. Vuelve a intentarlo más tarde."

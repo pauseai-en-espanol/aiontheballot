@@ -19,7 +19,30 @@
     "programmePending": "Programme not yet published (checked on {checkedAt, date, long})"
   },
   "home": {
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "question": "What do the parties propose on the risks of AI?",
+    "description": {
+      "demands": "We will compare what the parties propose on advanced AI with {operator}'s demands. Every rating comes with its sources.",
+      "descriptive": "We will review what the parties propose on advanced AI. Every rating comes with its sources."
+    },
+    "election": "{name} · {date, date, long}",
+    "learnMore": "About {operator}",
+    "how": {
+      "title": "How we will do it",
+      "quotes": {
+        "title": "Checked quotes",
+        "body": "Every rating shows its sources, and every quote is checked against the original document."
+      },
+      "history": {
+        "title": "Changes in the open",
+        "body": "Every rating shows when it was last updated and keeps its history."
+      },
+      "corrections": {
+        "title": "Public corrections",
+        "body": "If we get something wrong, we fix it and record it in a public log."
+      }
+    },
+    "contact": "Contact"
   },
   "errors": {
     "unexpected": "Something went wrong. Please try again later."

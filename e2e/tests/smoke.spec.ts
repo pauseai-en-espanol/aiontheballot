@@ -6,17 +6,16 @@ import { ADMIN_URL, API_URL, PLATFORM_NAME, TENANT_URL, WEB_URL } from '../serve
 const comingSoon = messages.es.home.comingSoon;
 
 test.describe('public site', () => {
-  test("renders a tenant's home page with the configured name and sets no cookies", async ({
-    page,
-  }) => {
+  test("renders a tenant's home page and sets no cookies", async ({ page }) => {
     const responses: Response[] = [];
     page.on('response', (response) => responses.push(response));
 
     const response = await page.goto(TENANT_URL);
 
     expect(response?.status()).toBe(200);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(comingSoon);
-    await expect(page).toHaveTitle(PLATFORM_NAME);
+    // Named from the tenant's data (packages/db/seeds/seed.ts), not the platform's configuration.
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Inquilino de ejemplo A');
+    await expect(page).toHaveTitle(`Inquilino de ejemplo A · ${comingSoon}`);
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
 
     // ADR-0002 T8: the public app has no session code, so no response the page loads may set a cookie.

@@ -3,6 +3,7 @@ import type { PropsWithChildren } from 'react';
 
 import { connection } from 'next/server';
 
+import { montserrat, robotoSlab, sairaCondensed } from './fonts';
 import './globals.css';
 
 // Names come from configuration, never from code (CLAUDE.md). Without connection(), Next prerenders this at build
@@ -19,7 +20,10 @@ export const viewport: Viewport = {
 };
 
 const RootLayout = ({ children }: Readonly<PropsWithChildren>) => (
-  <html lang="es">
+  <html
+    lang="es"
+    className={`${sairaCondensed.variable} ${robotoSlab.variable} ${montserrat.variable}`}
+  >
     <body>{children}</body>
   </html>
 );

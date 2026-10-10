@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@aiontheballot/i18n": "workspace:*",
+    "@axe-core/playwright": "4.13.0",
     "@playwright/test": "1.63.0",
     "@slango.configs/lint-staged": "2.0.8",
     "@slango.configs/oxlint": "0.1.12",

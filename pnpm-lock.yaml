@@ -358,6 +358,15 @@ importers:
       '@aiontheballot/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@fontsource/montserrat':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/roboto-slab':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/saira-condensed':
+        specifier: 5.3.0
+        version: 5.3.0
       '@sentry/browser':
         specifier: 11.4.0
         version: 11.4.0
@@ -439,6 +448,9 @@ importers:
       '@aiontheballot/i18n':
         specifier: workspace:*
         version: link:../packages/i18n
+      '@axe-core/playwright':
+        specifier: 4.13.0
+        version: 4.13.0(playwright-core@1.63.0)
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
@@ -675,6 +687,11 @@ packages:
   '@asamuzakjp/dom-selector@9.2.4':
     resolution: {integrity: sha512-YnVzxDxLaqL0t7Q4wfcgHZjg55Wm6y5EaO7Bhu3q9J7wq/8iw3PhsnWiOQhYekx4VexnbkgWpTT6n+QIV7kczw==}
     engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
+
+  '@axe-core/playwright@4.13.0':
+    resolution: {integrity: sha512-6YLx+kxXu5GJceG4ozFg+33a2EMTdjYwWGloJ3sb9Kta5pp+ZNS53uxGVog5JetIY8s++P5UrtX+cri+u0VAVg==}
+    peerDependencies:
+      playwright-core: '>= 1.0.0'
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -937,6 +954,15 @@ packages:
 
   '@fastify/proxy-addr@5.1.1':
     resolution: {integrity: sha512-zv07Y9GEuDsJPegZoDFd4SDWaZOW8N2pa0GSrYmKpId/tjt1Hgo3BjZBVjdVpfVrHaA+Qv5jawtS2O50J5xM9g==}
+
+  '@fontsource/montserrat@5.3.0':
+    resolution: {integrity: sha512-iQPDtZOnmM5ih4JBGaMSXisRap0ixb9bAUw2hDtY7EjVfaqiiNlKtVuJl9XclxUwtwMMHNcWXfQR6zI9x05+Tg==}
+
+  '@fontsource/roboto-slab@5.3.0':
+    resolution: {integrity: sha512-nrl4sOt5OIoMV3VecGVOnNAADU/8vz6+CLtLr4cCAf106hVtSLCTObPN8Z2KdZ03U01UDvgIp3hsu2TX3jen6w==}
+
+  '@fontsource/saira-condensed@5.3.0':
+    resolution: {integrity: sha512-e5ZTpIy/pE8CbB23mpm1b+dCmeapNheSrtQDXtbfDbGpm1r2oIfs5TzTpY2nzETEwei3DEFL9smm0rmFURzJtw==}
 
   '@formatjs/fast-memoize@3.1.7':
     resolution: {integrity: sha512-zXfhLpvA6T7+efdt9JLbBwZ00tT7NsBMDVnDu8rpHeNNv8KfRZAMo2gkG0k9lK/Nzc//3kJ9pImsfuJxk3KhUA==}
@@ -2784,6 +2810,10 @@ packages:
   avvio@9.3.0:
     resolution: {integrity: sha512-g2tQ7LE7oOSqDfwEm3M+ZCMTJc7KiZCdJ4UwyZJb5ckTKyYu50OYmvv0mCFXPuYXoM4zkSt8zM9XQ9KCvxA74A==}
 
+  axe-core@4.13.0:
+    resolution: {integrity: sha512-UzGt8zg7Ny8djbYMhxl2zuEevVa7r2gJjYY5Lwr1xM7+XU2nd6CkIWFTVcCIbAP63vSz71NaVyyuSk9lHKcy0A==}
+    engines: {node: '>=4'}
+
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
@@ -4411,6 +4441,11 @@ snapshots:
       is-potential-custom-element-name: 1.0.1
       lru-cache: 11.5.3
 
+  '@axe-core/playwright@4.13.0(playwright-core@1.63.0)':
+    dependencies:
+      axe-core: 4.13.0
+      playwright-core: 1.63.0
+
   '@babel/code-frame@7.29.7':
     dependencies:
       '@babel/helper-validator-identifier': 7.29.7
@@ -4701,6 +4736,12 @@ snapshots:
     dependencies:
       '@fastify/forwarded': 3.0.2
       ipaddr.js: 2.5.0
+
+  '@fontsource/montserrat@5.3.0': {}
+
+  '@fontsource/roboto-slab@5.3.0': {}
+
+  '@fontsource/saira-condensed@5.3.0': {}
 
   '@formatjs/fast-memoize@3.1.7': {}
 
@@ -6111,6 +6152,8 @@ snapshots:
     dependencies:
       '@fastify/error': 4.2.0
       fastq: 1.20.3
+
+  axe-core@4.13.0: {}
 
   balanced-match@4.0.4: {}
 
