@@ -1,6 +1,6 @@
 {
   "name": "@aiontheballot/migrations",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "private": true,
   "description": "SQL migrations (dbmate), shipped as the image the chart's migration Job runs",
   "scripts": {

@@ -1,5 +1,12 @@
 # @aiontheballot/db
 
+## 0.10.1
+
+### Patch Changes
+
+- 9d44cb0: Better Auth gets its own database role, `aiontheballot_auth` (ADR-0002 §2), created locally and in CI and kept
+  out of `app` and `private` by the catalog tests. Nothing uses it yet.
+
 ## 0.10.0
 
 ### Minor Changes
