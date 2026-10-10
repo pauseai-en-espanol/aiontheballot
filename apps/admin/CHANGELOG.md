@@ -1,5 +1,13 @@
 # @aiontheballot/admin
 
+## 0.2.2
+
+### Patch Changes
+
+- Updated dependencies [2f43760]
+- Updated dependencies [d167b29]
+  - @aiontheballot/i18n@0.2.0
+
 ## 0.2.1
 
 ### Patch Changes

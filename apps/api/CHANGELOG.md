@@ -1,5 +1,25 @@
 # @aiontheballot/api
 
+## 0.4.0
+
+### Minor Changes
+
+- 2f43760: A tenant's home is now its coming-soon page, in PauseAI's brand: the tenant's name, what the site will do, the next
+  public election and the operator's links, all from data, in Spanish and English, on a desktop and a phone. The API
+  serves it at `GET /public/tenants/{slug}/home` (read as `aiontheballot_web`); the web app caches each tenant's copy
+  and keeps it when the API fails. The shared preset gains the brand colours as semantic tokens, contrast-tested, and
+  the self-hosted fonts. The e2e suite checks the page with axe at both sizes.
+- d167b29: The coming-soon page offers the operator's newsletter ("Avísame cuando se publique"), from the new
+  `organizations.newsletter_url` (migration `organization_newsletter`); the platform collects no addresses. The ballot is
+  now an SVG that scales down to a phone, and the tenant's name is sized by its longest word, which never breaks.
+
+### Patch Changes
+
+- Updated dependencies [2f43760]
+- Updated dependencies [d167b29]
+  - @aiontheballot/domain@0.3.0
+  - @aiontheballot/db@0.5.0
+
 ## 0.3.0
 
 ### Minor Changes
