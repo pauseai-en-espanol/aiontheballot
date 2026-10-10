@@ -616,8 +616,10 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   with that slug would be unreachable (`og`, two letters, is also refused as locale-shaped; it is listed anyway, so the
   list doesn't lean on that rule). The list is `RESERVED_ELECTION_SLUGS` in `packages/domain`; a web test fails
   when a first path segment the public site serves, under the tenant's root or before any tenant (`SYSTEM_PATHS`), is
-  neither in it nor something no slug can be (`favicon.ico`). It follows Next's metadata files (`icon.tsx` answers
-  `/icon`), route groups, slots and intercepting routes. The
+  neither in it nor something no slug can be (`favicon.ico`), the slug's shape read from `app.slug` in the schema.
+  It follows Next's metadata files (`icon.tsx` answers `/icon`, a `sitemap.ts` with `generateSitemaps` `/sitemap/…`),
+  route groups, slots and intercepting routes; a metadata file inside a group or slot is always refused, since Next
+  adds a hash to its name that no reserved list can hold. The
   public site's own pages (methodology, legal notice and the like) get paths in its spec (M3); each needs adding then,
   or a prefix of its own. Tenant slugs, on the platform host, aren't covered.
 
