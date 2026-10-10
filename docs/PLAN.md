@@ -498,7 +498,7 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   declare huge dimensions).
   Accepted consequence: the restricted-asset rule (BRIEF invariant 5) now guards the platform's catalogue only; a
   tenant may upload any image, a copy of a protected logo included, as its own responsibility (ADR-0002 amended).
-  To do with the public site (M3): an election's slug must never be `brand` or `og`, which these routes take.
+  An election's slug can never be `brand` or `og`, which these routes take (R76).
 - **R60. Uploads made by SQL before M2 record the nil UUID as their author:** no accounts exist yet, and
   `files.created_by` is required. It reads as "the database owner, by SQL"; real users get uuidv7 ids, so it can't
   collide. It also lands in the audit log's actor, where earlier owner scripts left none; a future foreign key from
@@ -600,6 +600,17 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   `--allow-many`; it never deletes a file stored or reused within a day of the list's snapshot (`put` marks reused
   bytes, and the sweep re-checks a file after moving it aside); one runs at a time. Without `--delete` it only
   records and reports. Scheduling it needs a new grant: D7.
+
+**Reserved election slugs:**
+
+- **R76. An election's slug can never be `brand`, `og` or `healthz`** (migration `reserved_election_slugs`, a check
+  on `elections`), since an election's pages live at `/{slug}` and the public site serves those paths itself:
+  `healthz` is added to Dani's two because the health probe answers it on every host before routing, so an election
+  with that slug would be unreachable (`og`, two letters, is also refused as locale-shaped; it is listed anyway, so the
+  list doesn't lean on that rule). The list is `RESERVED_ELECTION_SLUGS` in `packages/domain`; a web test fails
+  when a route under the tenant's root is neither in it nor has a dot (`favicon.ico`, which no slug can take). The
+  public site's own pages (methodology, legal notice and the like) get paths in its spec (M3); each needs adding then,
+  or a prefix of its own. Tenant slugs, on the platform host, aren't covered.
 
 ## Open decisions for Dani
 

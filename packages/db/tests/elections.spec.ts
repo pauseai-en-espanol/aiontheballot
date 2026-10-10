@@ -1,5 +1,6 @@
 import type pg from 'pg';
 
+import { RESERVED_ELECTION_SLUGS } from '@aiontheballot/domain/routing';
 import { describe, expect, it } from 'vitest';
 
 import { errorCode, inRolledBackTransaction } from './db.js';
@@ -50,6 +51,32 @@ describe('app.elections', () => {
     expect(await actingAs(USERS.editorA, (c) => errorCode(c, newElection(columns)))).toBe(
       CHECK_VIOLATION,
     );
+  });
+
+  it.each(RESERVED_ELECTION_SLUGS)(
+    'refuses the slug %s, a path the public site serves itself',
+    async (slug) => {
+      expect(
+        await actingAs(USERS.editorA, (c) => errorCode(c, newElection({ slug: `'${slug}'` }))),
+      ).toBe(CHECK_VIOLATION);
+      expect(
+        await actingAs(USERS.editorA, (c) =>
+          errorCode(
+            c,
+            `UPDATE app.elections SET slug = '${slug}' WHERE id = '${ELECTIONS.draftA.id}'`,
+          ),
+        ),
+      ).toBe(CHECK_VIOLATION);
+    },
+  );
+
+  it('takes a slug that only starts like a reserved one', async () => {
+    for (const slug of ['brands', 'og-2030', 'healthz-check']) {
+      expect(
+        await actingAs(USERS.editorA, (c) => errorCode(c, newElection({ slug: `'${slug}'` }))),
+        slug,
+      ).toBeNull();
+    }
   });
 
   it('refuses a freeze window that ends before it starts', async () => {

@@ -2948,6 +2948,7 @@ CREATE TABLE app.elections (
     CONSTRAINT elections_check1 CHECK (((type <> 'regional'::app.election_type) OR (territory_code IS NOT NULL))),
     CONSTRAINT elections_check2 CHECK (((frozen_until IS NULL) OR ((frozen_from IS NOT NULL) AND (frozen_until > frozen_from)))),
     CONSTRAINT elections_slug_check CHECK (((slug)::text !~ '^[a-z]{2}(-[a-z]{2})?$'::text)),
+    CONSTRAINT elections_slug_not_reserved CHECK (((slug)::text <> ALL (ARRAY['brand'::text, 'healthz'::text, 'og'::text]))),
     CONSTRAINT elections_territory_code_check CHECK ((territory_code ~ '^[A-Z]{2}-[A-Z0-9]{1,3}$'::text))
 );
 

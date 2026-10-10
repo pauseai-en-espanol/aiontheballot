@@ -59,7 +59,8 @@ lives. Any example data here is fictional.
     live, and when a change request is approved.
 - **Slugs:** the domain `app.slug`, lowercase, matching `^[a-z0-9]+(-[a-z0-9]+)*$`. Election, party and criterion
   slugs are fixed once the election leaves `draft`, because share images carry their URLs. An election slug is never
-  locale-shaped (`^[a-z]{2}(-[a-z]{2})?$`), since `/ca/…` is a locale prefix.
+  locale-shaped (`^[a-z]{2}(-[a-z]{2})?$`), since `/ca/…` is a locale prefix, and never one of the paths the public
+  site serves itself (`brand`, `healthz`, `og`: `RESERVED_ELECTION_SLUGS` in `packages/domain`).
 - **Domains** (`app.localized`, `app.slug`, `app.locale`) check with built-in functions only, so writing them needs
   no `EXECUTE` grant to a runtime role. The illustrative SQL below writes their base types, `jsonb` and `text`.
 - **Emails:** stored lowercased (`check (email = lower(email))`).

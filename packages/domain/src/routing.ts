@@ -56,6 +56,14 @@ export const INTERNAL_PREFIX = '/_tenant';
 const SYSTEM_PREFIXES = ['/_next/', '/_relay/'];
 const SYSTEM_PATHS = ['/healthz'];
 
+/**
+ * What an election's slug can never be. An election's pages live at `/{slug}` (ADR-0003 §6), and these first segments
+ * are paths the public site serves itself on a tenant's address: brand images and site icons (`/brand/…`), share
+ * images (`/og/…`) and the health probe (`/healthz`, answered on every host before routing). The database refuses
+ * them (migration `reserved_election_slugs`); a web test checks every route is here or has a dot, which no slug has.
+ */
+export const RESERVED_ELECTION_SLUGS = ['brand', 'healthz', 'og'] as const;
+
 const NOT_FOUND: Resolution = { kind: 'not-found' };
 
 /**
