@@ -20,6 +20,7 @@ const home = (name: string): PublicHome => ({
     newsletterUrl: null,
   },
   election: null,
+  brand: {},
 });
 
 const respond = (body: unknown, status = 200): Response =>
@@ -57,6 +58,12 @@ describe('the home data loader', () => {
     await load('ejemplo-a', { fresh: true });
     await load('ejemplo-a', { fresh: true });
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("fills in fields an older API doesn't send yet, so a rollout can't break pages", async () => {
+    const { brand: _brand, ...older } = home('Ejemplo');
+    const load = createHomeLoader({ apiUrl: API, fetch: async () => respond(older) });
+    expect(await load('ejemplo-a')).toEqual({ kind: 'found', home: home('Ejemplo') });
   });
 
   it('keeps each tenant apart', async () => {

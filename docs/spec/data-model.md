@@ -208,9 +208,12 @@ create table app.brand_asset_grants (
 -- The only source of tenant logos on public pages and share images.
 create table app.tenant_brand_selections (
   tenant_id       uuid references app.tenants,
-  slot            text not null,                       -- e.g. 'product_logo', 'header_mark'
-  brand_asset_id  uuid not null references app.brand_assets,
-  primary key (tenant_id, slot)
+  slot            text not null,                       -- e.g. 'operator_logo_on_accent', 'operator_mark'
+  brand_asset_id  uuid references app.brand_assets,    -- a platform asset, or
+  file_id         uuid,                                -- the tenant's own upload (public_assets), PLAN R59
+  primary key (tenant_id, slot),
+  foreign key (tenant_id, file_id) references app.files (tenant_id, id),
+  check (num_nonnulls(brand_asset_id, file_id) = 1)
 );
 
 -- Versioned policy texts the operator writes. Published versions are immutable; the public sees the latest one.
@@ -1093,7 +1096,7 @@ purge moves it to `hostname_tombstones`.
 | `assessment_revisions`, `revision_evidence`, `revision_checked_documents`    | Same; the full revision history is public                                          |
 | `structural_changes`                                                         | Same                                                                               |
 | `source_documents`                                                           | Cited by a public revision; public columns only (below)                            |
-| `files` and `file_blobs`                                                     | `public_assets` images referenced by a public row (a party logo)                   |
+| `files` and `file_blobs`                                                     | `public_assets` images a public row shows (a party logo, a brand selection)        |
 | `current_revisions`, `corrections_log`                                       | Through the rules above (`security_invoker`)                                       |
 
 Column-level grants restrict `aiontheballot_web` further: on `source_documents` it reads only `id`, `election_id`,

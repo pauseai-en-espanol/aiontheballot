@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 
 import { pickLocalized } from '@aiontheballot/domain/localized';
+import { BRAND_SLOTS } from '@aiontheballot/domain/public-home';
 import { getTranslator, isLocale } from '@aiontheballot/i18n/messages';
 import { LINK_PREVIEW, SHARE_SIZES } from '@aiontheballot/og/sizes';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 
+import { brandImagePath } from '@/brand-images';
 import { ComingSoon } from '@/components/coming-soon';
 import { warmHomeImage } from '@/home-image';
 import { homeCardContent, homeCardHash, imagePath, ogLocale, pageUrl } from '@/share';
@@ -76,7 +78,8 @@ export const generateMetadata = async (props: TenantPageProps): Promise<Metadata
       description,
       // Only for the tenant's own language (es_ES): `en_ES` is no Facebook locale, and og:locale:alternate means the
       // same URL in another language, while ours are separate pages (hreflang says so).
-      ...(locale === tenant.defaultLocale
+      // (Nor while an older API, mid-rollout, leaves the country out.)
+      ...(locale === tenant.defaultLocale && home.tenant.countryCode
         ? { locale: ogLocale(locale, home.tenant.countryCode) }
         : {}),
       images: [image],
@@ -90,8 +93,24 @@ export const generateMetadata = async (props: TenantPageProps): Promise<Metadata
  * anyone asking for that path directly). The public site itself is M3; until then the home is the coming-soon page.
  */
 const TenantHome = async (props: TenantPageProps) => {
-  const { home, locale } = await homeFor(props);
-  return <ComingSoon home={home} locale={locale} />;
+  const { home, locale, base } = await homeFor(props);
+  // Root-relative, from the canonical base's path: `/brand/…`, or `/{slug}/brand/…` on the platform host.
+  const root = new URL(base).pathname.replace(/\/$/, '');
+  const logo = (slot: string) => {
+    const image = home.brand[slot];
+    const path = image && brandImagePath(image);
+    return path ? `${root}${path}` : undefined;
+  };
+  return (
+    <ComingSoon
+      home={home}
+      locale={locale}
+      logos={{
+        onAccent: logo(BRAND_SLOTS.operatorLogoOnAccent),
+        onCanvas: logo(BRAND_SLOTS.operatorLogoOnCanvas),
+      }}
+    />
+  );
 };
 
 export default TenantHome;

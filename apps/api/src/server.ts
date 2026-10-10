@@ -3,7 +3,7 @@ import { createDatabase } from '@aiontheballot/db/client';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { initErrorTracking } from './error-tracking.js';
-import { createHomeSource } from './home-data.js';
+import { createBrandImageSource, createHomeSource } from './home-data.js';
 import { createRoutingSource } from './routing-data.js';
 
 const config = loadConfig(process.env);
@@ -19,6 +19,7 @@ const app = buildApp({
   logger: { level: config.logLevel },
   routing: web ? createRoutingSource(web) : undefined,
   home: web ? createHomeSource(web) : undefined,
+  brandImages: web ? createBrandImageSource(web) : undefined,
 });
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {

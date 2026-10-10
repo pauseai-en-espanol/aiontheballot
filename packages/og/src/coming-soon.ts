@@ -1,6 +1,6 @@
 import { palette } from '@aiontheballot/ui/brand';
 
-import { h, type OgNode } from './node.js';
+import { h, img, type OgNode } from './node.js';
 import { SHARE_SIZES, type ShareSize } from './sizes.js';
 
 /** What the coming-soon card shows. Every text comes from the tenant's data and the i18n messages. */
@@ -12,8 +12,17 @@ export interface ComingSoonCard {
   question: string;
   /** The tenant's canonical address without the scheme (BRIEF §3, invariant 4: large on every card). */
   address: string;
-  /** "Una iniciativa de {operator}": the operator's mark, as text until tenants have logos. */
+  /** "Una iniciativa de {operator}": the operator line when there is no logo. */
   initiative: string;
+  /** "Una iniciativa de": before the operator's logo, when the tenant has one. */
+  initiativeLead: string;
+  /** The operator's logo for an orange background, by content hash: part of the card's content, so of its hash. */
+  operatorLogo?: { sha256: string; contentType: string };
+}
+
+/** The images a card draws, resolved from its content when it is rendered. */
+export interface CardImages {
+  operatorLogo?: { src: string; width: number; height: number };
 }
 
 interface Layout {
@@ -183,7 +192,11 @@ const ballot = (width: number): OgNode => {
  * The coming-soon card in direction A (the orange poster): the label, the name as big as the space allows with the
  * ballot beside its first line, the question, then the address large and the operator small.
  */
-export const comingSoonCard = (card: ComingSoonCard, size: ShareSize): OgNode => {
+export const comingSoonCard = (
+  card: ComingSoonCard,
+  size: ShareSize,
+  images: CardImages = {},
+): OgNode => {
   const { width, height } = SHARE_SIZES[size];
   const l = LAYOUTS[size];
   const inner = width - 2 * l.pad;
@@ -274,7 +287,22 @@ export const comingSoonCard = (card: ComingSoonCard, size: ShareSize): OgNode =>
         { display: 'flex', fontFamily: 'Saira Condensed', fontWeight: 700, fontSize: l.address },
         card.address,
       ),
-      h('div', { display: 'flex', fontSize: l.small }, card.initiative),
+      operatorLine(card, images, l.small),
     ),
+  );
+};
+
+/** "Una iniciativa de" and the operator's logo, about two lines of text tall; or the line in words. */
+const operatorLine = (card: ComingSoonCard, images: CardImages, fontSize: number): OgNode => {
+  const logo = images.operatorLogo;
+  if (!card.operatorLogo || !logo) {
+    return h('div', { display: 'flex', fontSize }, card.initiative);
+  }
+  const height = Math.round(fontSize * 2.6);
+  return h(
+    'div',
+    { display: 'flex', alignItems: 'center', gap: fontSize * 0.6, fontSize },
+    card.initiativeLead,
+    img(logo.src, Math.round((height * logo.width) / logo.height), height),
   );
 };

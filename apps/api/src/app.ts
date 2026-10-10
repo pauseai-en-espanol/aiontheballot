@@ -1,6 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
-import type { HomeSource } from './home-data.js';
+import type { BrandImageSource, HomeSource } from './home-data.js';
 import type { RoutingSource } from './routing-data.js';
 
 export interface AppOptions {
@@ -9,9 +9,16 @@ export interface AppOptions {
   routing?: RoutingSource;
   /** A tenant's public home data, read as aiontheballot_web; without it the route answers 503. */
   home?: HomeSource;
+  /** A tenant's public brand images; without it the route answers 503. */
+  brandImages?: BrandImageSource;
 }
 
-export const buildApp = ({ logger = false, routing, home }: AppOptions = {}): FastifyInstance => {
+export const buildApp = ({
+  logger = false,
+  routing,
+  home,
+  brandImages,
+}: AppOptions = {}): FastifyInstance => {
   const app = Fastify({
     logger,
     // Longer than the Envoy Gateway idle timeout (60s), so the gateway closes idle connections first.
@@ -55,6 +62,33 @@ export const buildApp = ({ logger = false, routing, home }: AppOptions = {}): Fa
         return reply.code(404).send({ error: 'Not found' });
       }
       return data;
+    },
+  );
+
+  // A brand image's bytes, by the SHA-256 that the home data names. The web app caches it by that hash.
+  app.get<{ Params: { slug: string; sha256: string } }>(
+    '/public/tenants/:slug/brand/:sha256',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: {
+            slug: { type: 'string', pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', maxLength: 63 },
+            sha256: { type: 'string', pattern: '^[0-9a-f]{64}$' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      void reply.header('cache-control', 'no-store');
+      if (!brandImages) {
+        return reply.code(503).send({ error: 'Public data is not configured' });
+      }
+      const image = await brandImages(request.params.slug, request.params.sha256);
+      if (!image) {
+        return reply.code(404).send({ error: 'Not found' });
+      }
+      return reply.type(image.contentType).send(Buffer.from(image.content));
     },
   );
 

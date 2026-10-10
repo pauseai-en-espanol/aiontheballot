@@ -767,6 +767,30 @@ CREATE FUNCTION private.blob_matches_file() RETURNS trigger
 ALTER FUNCTION private.blob_matches_file() OWNER TO aiontheballot_owner;
 
 --
+-- Name: brand_file_is_public_asset(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.brand_file_is_public_asset() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    -- Only a file the writer can see is checked here. Anyone who can't see it is refused by RLS, with the error the
+    -- isolation matrix expects, and the composite foreign key keeps other tenants' files out either way.
+    IF NEW.file_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM app.files f
+                    WHERE f.id = NEW.file_id AND (f.bucket <> 'public_assets' OR f.byte_size > 2097152)) THEN
+      RAISE EXCEPTION 'a brand image must be an image of at most 2 MB in the public_assets bucket'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.brand_file_is_public_asset() OWNER TO aiontheballot_owner;
+
+--
 -- Name: bump_public_version(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1923,7 +1947,7 @@ CREATE FUNCTION private.purge_tenant(tenant uuid) RETURNS bigint
       'assessment_revisions', 'review_events', 'reports', 'report_daily_counts', 'assessment_contributors',
       'draft_checked_documents', 'draft_evidence', 'assessments', 'job_requests', 'llm_suggestions', 'llm_runs',
       'source_texts', 'source_documents', 'methodology_reviewers', 'methodologies', 'criteria', 'parties', 'elections',
-      'file_blobs', 'files', 'tenant_documents', 'invitations', 'memberships', 'tenant_brand_selections',
+      'tenant_brand_selections', 'file_blobs', 'files', 'tenant_documents', 'invitations', 'memberships',
       'brand_asset_grants', 'tenant_organizations', 'public_versions', 'tenant_hostnames', 'audit_log'];
     tenant_slug text;
     leftovers jsonb;
@@ -3524,7 +3548,9 @@ ALTER TABLE app.source_texts OWNER TO aiontheballot_owner;
 CREATE TABLE app.tenant_brand_selections (
     tenant_id uuid NOT NULL,
     slot text NOT NULL,
-    brand_asset_id uuid NOT NULL,
+    brand_asset_id uuid,
+    file_id uuid,
+    CONSTRAINT tenant_brand_selections_one_source CHECK ((num_nonnulls(brand_asset_id, file_id) = 1)),
     CONSTRAINT tenant_brand_selections_slot_check CHECK ((slot ~ '^[a-z]+(_[a-z]+)*$'::text))
 );
 
@@ -4534,6 +4560,13 @@ CREATE INDEX tenant_brand_selections_brand_asset_id_idx ON app.tenant_brand_sele
 
 
 --
+-- Name: tenant_brand_selections_file_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX tenant_brand_selections_file_idx ON app.tenant_brand_selections USING btree (tenant_id, file_id);
+
+
+--
 -- Name: tenant_hostnames_one_canonical_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5049,6 +5082,13 @@ CREATE TRIGGER editor_columns BEFORE UPDATE ON app.assessments FOR EACH ROW EXEC
 --
 
 CREATE TRIGGER editor_columns BEFORE UPDATE ON app.draft_evidence FOR EACH ROW EXECUTE FUNCTION private.restrict_columns('country_admin,editor', 'source_document_id', 'ordinal', 'quote', 'unit_index', 'section_label', 'ts_start', 'ts_end', 'attestation_file_id');
+
+
+--
+-- Name: tenant_brand_selections file_is_public_asset; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER file_is_public_asset BEFORE INSERT OR UPDATE OF file_id ON app.tenant_brand_selections FOR EACH ROW EXECUTE FUNCTION private.brand_file_is_public_asset();
 
 
 --
@@ -6375,6 +6415,14 @@ ALTER TABLE ONLY app.tenant_brand_selections
 
 
 --
+-- Name: tenant_brand_selections tenant_brand_selections_file_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.tenant_brand_selections
+    ADD CONSTRAINT tenant_brand_selections_file_fkey FOREIGN KEY (tenant_id, file_id) REFERENCES app.files(tenant_id, id);
+
+
+--
 -- Name: tenant_brand_selections tenant_brand_selections_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -7425,9 +7473,11 @@ CREATE POLICY public_read ON app.file_blobs FOR SELECT TO aiontheballot_web USIN
 -- Name: files public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE POLICY public_read ON app.files FOR SELECT TO aiontheballot_web USING (((bucket = 'public_assets'::app.file_bucket) AND (EXISTS ( SELECT 1
+CREATE POLICY public_read ON app.files FOR SELECT TO aiontheballot_web USING (((bucket = 'public_assets'::app.file_bucket) AND ((EXISTS ( SELECT 1
    FROM app.parties p
-  WHERE (p.logo_file_id = files.id)))));
+  WHERE (p.logo_file_id = files.id))) OR (EXISTS ( SELECT 1
+   FROM app.tenant_brand_selections s
+  WHERE (s.file_id = files.id))))));
 
 
 --
@@ -8089,6 +8139,13 @@ REVOKE ALL ON FUNCTION private.audit() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.blob_matches_file() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION brand_file_is_public_asset(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.brand_file_is_public_asset() FROM PUBLIC;
 
 
 --
@@ -10162,6 +10219,13 @@ GRANT INSERT(slot) ON TABLE app.tenant_brand_selections TO aiontheballot_admin;
 --
 
 GRANT INSERT(brand_asset_id),UPDATE(brand_asset_id) ON TABLE app.tenant_brand_selections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN tenant_brand_selections.file_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(file_id),UPDATE(file_id) ON TABLE app.tenant_brand_selections TO aiontheballot_admin;
 
 
 --

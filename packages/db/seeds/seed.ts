@@ -99,6 +99,11 @@ const CRITERIA = [id(4, 5), id(4, 6)] as const;
 const FILE = id(4, 7);
 const SOURCE = id(4, 8);
 const CELLS = { published: id(4, 9), draft: id(4, 10) } as const;
+/** A's uploaded operator logo: a fictional mark (two bars and a line, 240×64), not anyone's logo. */
+const LOGO = {
+  file: id(5, 3),
+  png: 'iVBORw0KGgoAAAANSUhEUgAAAPAAAABACAYAAAAkn/rnAAAA60lEQVR4nO3ToQ2AQBAFUSjh+i/ySgAcjgQSxMB7Zt1+NesCZAkYwgQMYQKGMAFDmIAhTMAQJmAIW8cY23Fvm3Nexv/WX+AkYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAh7HMBP92FIgFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGGfCxj+RMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5hYIEzAECZgCBMwhAkYwgQMYQKGMAFD2A4/mJNwL4ieyQAAAABJRU5ErkJggg==',
+} as const;
 const PAGES = [
   'El Partido Ejemplo A propone una moratoria ficticia sobre los sistemas de prueba más avanzados.',
   'También pide crear una agencia de supervisión de ejemplo, con un presupuesto inventado.',
@@ -289,6 +294,25 @@ export const seed = async (client: pg.Client): Promise<'seeded' | 'already seede
        VALUES ($1, $2, $3, $4)`,
       [CELLS.draft, A.id, ELECTION, SOURCE],
     );
+    // A's operator logo, uploaded by its country admin and shown on the orange and on the white surfaces.
+    await as(SEED_USERS.countryAdminA);
+    const logo = Buffer.from(LOGO.png, 'base64');
+    await client.query(
+      `INSERT INTO app.files (id, tenant_id, bucket, content_type, byte_size, sha256)
+       VALUES ($1, $2, 'public_assets', 'image/png', $3, encode(sha256($4), 'hex'))`,
+      [LOGO.file, A.id, logo.byteLength, logo],
+    );
+    await client.query(
+      'INSERT INTO app.file_blobs (file_id, tenant_id, content) VALUES ($1, $2, $3)',
+      [LOGO.file, A.id, logo],
+    );
+    for (const slot of ['operator_logo_on_accent', 'operator_logo_on_canvas']) {
+      await client.query(
+        'INSERT INTO app.tenant_brand_selections (tenant_id, slot, file_id) VALUES ($1, $2, $3)',
+        [A.id, slot, LOGO.file],
+      );
+    }
+    await as(SEED_USERS.editorA);
     await client.query(`UPDATE app.assessments SET state = 'in_review' WHERE id = $1`, [
       CELLS.published,
     ]);

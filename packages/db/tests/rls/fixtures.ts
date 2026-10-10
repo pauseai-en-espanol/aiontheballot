@@ -161,6 +161,16 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       );
     }
   }
+  // Each tenant's uploaded logo, selected as its brand image (the inactive tenant's must stay private).
+  for (const [key, file] of [
+    ['A', FILES.brandA],
+    ['inactive', FILES.brandInactive],
+  ] as const) {
+    await client.query(
+      `INSERT INTO app.tenant_brand_selections (tenant_id, slot, file_id) VALUES ($1, 'operator_logo_on_canvas', $2)`,
+      [TENANTS[key].id, file.id],
+    );
+  }
   await client.query(`SELECT set_config('app.user_id', $1, true)`, [USERS.platformAdmin]);
   await client.query(
     `INSERT INTO app.core_criteria (id, key, title, description)

@@ -94,6 +94,7 @@ export const GET = async (request: Request, { params }: ImageContext): Promise<R
       'content-type': 'image/png',
       'content-length': String(png.byteLength),
       'cache-control': IMMUTABLE,
+      'x-content-type-options': 'nosniff',
       etag,
     },
   });

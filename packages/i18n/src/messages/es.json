@@ -1,6 +1,7 @@
 {
   "layout": {
     "initiativeOf": "Una iniciativa de {operator}",
+    "initiativeLead": "Una iniciativa de",
     "methodology": "Metodología"
   },
   "rating": {

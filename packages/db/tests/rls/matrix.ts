@@ -142,7 +142,24 @@ export const FILES = {
     content: 'png-a',
     blob: true,
   },
-  /** An image no party shows: it must stay private. */
+  /** Uploaded brand images, each its tenant's selected logo: public for an active tenant only. */
+  brandA: {
+    id: fixtureId(6, 9),
+    tenant: 'A',
+    bucket: 'public_assets',
+    type: 'image/png',
+    content: 'png-logo-a',
+    blob: true,
+  },
+  brandInactive: {
+    id: fixtureId(6, 10),
+    tenant: 'inactive',
+    bucket: 'public_assets',
+    type: 'image/png',
+    content: 'png-logo-inactivo',
+    blob: true,
+  },
+  /** An image no party or brand selection shows: it must stay private. */
   unusedImageA: {
     id: fixtureId(6, 8),
     tenant: 'A',
@@ -195,6 +212,9 @@ export const FILES = {
   string,
   { id: string; tenant: TenantKey; bucket: string; type: string; content: string; blob: boolean }
 >;
+
+/** Public images: the live party's logo, and the brand image an active tenant selected. */
+const PUBLIC_FILES: readonly string[] = [FILES.logoA.id, FILES.brandA.id];
 
 export type ElectionStatus = 'draft' | 'live' | 'archived';
 
@@ -1062,13 +1082,27 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
         public: TENANTS[key].active,
         where: `tenant_id = '${TENANTS[key].id}' AND slot = 'product_logo'`,
       })),
+      ...(['A', 'inactive'] as const).map((key) => ({
+        id: `uploaded logo of ${key}`,
+        tenant: key,
+        public: TENANTS[key].active,
+        where: `tenant_id = '${TENANTS[key].id}' AND slot = 'operator_logo_on_canvas'`,
+      })),
     ],
-    inserts: TENANT_KEYS.map((key) => ({
-      id: `footer mark of ${key}`,
-      tenant: key,
-      sql: `INSERT INTO app.tenant_brand_selections (tenant_id, slot, brand_asset_id)
-            VALUES ('${TENANTS[key].id}', 'footer_mark', '${BRAND_ASSETS.shared.id}')`,
-    })),
+    inserts: [
+      ...TENANT_KEYS.map((key) => ({
+        id: `footer mark of ${key}`,
+        tenant: key,
+        sql: `INSERT INTO app.tenant_brand_selections (tenant_id, slot, brand_asset_id)
+              VALUES ('${TENANTS[key].id}', 'footer_mark', '${BRAND_ASSETS.shared.id}')`,
+      })),
+      {
+        id: 'uploaded image as a logo of A',
+        tenant: 'A' as const,
+        sql: `INSERT INTO app.tenant_brand_selections (tenant_id, slot, file_id)
+              VALUES ('${TENANT_A}', 'operator_logo_on_accent', '${FILES.unusedImageA.id}')`,
+      },
+    ],
     set: 'brand_asset_id = brand_asset_id',
     select: { public: true, ...MEMBERS },
     insert: COUNTRY_ADMINS,
@@ -1076,6 +1110,7 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     delete: COUNTRY_ADMINS,
     columnUpdates: {
       tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
+      file_id: { set: 'file_id = file_id', rule: COUNTRY_ADMINS },
     },
   },
 
@@ -1115,12 +1150,17 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       .map(([name, f]) => ({
         id: `${name} file`,
         tenant: f.tenant,
-        public: f.id === FILES.logoA.id,
+        public: PUBLIC_FILES.includes(f.id),
         where: `id = '${f.id}'`,
-        // A party shows it, or a source keeps it as its stored copy, so it can't be deleted.
-        ...([FILES.logoA.id, FILES.sourceA.id, FILES.sourceB.id, FILES.sourceInactive.id].includes(
-          f.id,
-        )
+        // A party or a brand selection shows it, or a source keeps it as its stored copy, so it can't be deleted.
+        ...([
+          FILES.logoA.id,
+          FILES.brandA.id,
+          FILES.brandInactive.id,
+          FILES.sourceA.id,
+          FILES.sourceB.id,
+          FILES.sourceInactive.id,
+        ].includes(f.id)
           ? { blocked: { delete: '23503' } }
           : {}),
       })),
@@ -1145,7 +1185,7 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       .map(([name, f]) => ({
         id: `${name} blob`,
         tenant: f.tenant,
-        public: f.id === FILES.logoA.id,
+        public: PUBLIC_FILES.includes(f.id),
         where: `file_id = '${f.id}'`,
       })),
     inserts: Object.values(FILES)

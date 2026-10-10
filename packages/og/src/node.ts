@@ -4,7 +4,13 @@
  */
 export interface OgNode {
   type: string;
-  props: { style?: Style; children?: OgChild | OgChild[] };
+  props: {
+    style?: Style;
+    children?: OgChild | OgChild[];
+    src?: string;
+    width?: number;
+    height?: number;
+  };
 }
 
 export type OgChild = OgNode | string;
@@ -19,4 +25,10 @@ export const h = (type: string, style: Style, ...children: OgChild[]): OgNode =>
     children.length === 0
       ? { style }
       : { style, children: children.length === 1 ? children[0] : children },
+});
+
+/** An image from a data URI; satori needs its size. */
+export const img = (src: string, width: number, height: number): OgNode => ({
+  type: 'img',
+  props: { src, width, height, style: { width, height } },
 });

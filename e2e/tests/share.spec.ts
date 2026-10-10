@@ -164,3 +164,46 @@ test.describe('link previews (fictional seeds)', () => {
     expect((await get(image)).status).toBe(200);
   });
 });
+
+test.describe("tenants' own logos (fictional seeds)", () => {
+  test("show on each surface, served once from the tenant's address and cached as immutable", async ({
+    page,
+  }) => {
+    await page.goto(TENANT_URL);
+
+    const header = page.locator('header img');
+    const footer = page.locator('footer img');
+    await expect(header).toHaveAttribute('alt', 'Organización de ejemplo A');
+    const src = (await header.getAttribute('src')) ?? '';
+    expect(src).toMatch(/^\/brand\/[0-9a-f]{64}\.png$/);
+    expect(await footer.getAttribute('src')).toBe(src);
+    // The seeds' fictional logo is 240×64.
+    await expect(header).toHaveJSProperty('naturalWidth', 240);
+
+    const image = await get(`${CANONICAL_A}${src}`);
+    expect(image.status).toBe(200);
+    expect(image.headers['content-type']).toBe('image/png');
+    expect(image.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+    expect(pngSize(image.body)).toEqual({ width: 240, height: 64 });
+    expect(
+      (await get(`${CANONICAL_A}${src}`, { 'if-none-match': image.headers.etag ?? '' })).status,
+    ).toBe(304);
+  });
+
+  test("serve nothing the tenant doesn't show, and leave the line in words without one", async ({
+    page,
+  }) => {
+    for (const path of [
+      `/brand/${'0'.repeat(64)}.png`,
+      `/brand/${'0'.repeat(64)}.gif`,
+      '/brand/logo.png',
+    ]) {
+      expect((await get(`${CANONICAL_A}${path}`)).status, path).toBe(404);
+    }
+    await page.goto(`http://${PLATFORM_HOST}:${PORTS.web}/ejemplo-b`);
+    expect(await page.locator('img').count()).toBe(0);
+    await expect(
+      page.getByText('Una iniciativa de Organización de ejemplo B').first(),
+    ).toBeVisible();
+  });
+});

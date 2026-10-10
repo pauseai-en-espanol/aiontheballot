@@ -8,7 +8,39 @@ import { css, cx } from '@styled-system/css';
 interface ComingSoonProps {
   home: PublicHome;
   locale: Locale;
+  /** The operator's logo for each surface, as image URLs, when the tenant has uploaded them. */
+  logos: { onAccent?: string; onCanvas?: string };
 }
+
+interface OperatorLineProps {
+  logo: string | undefined;
+  logoClass: string;
+  lead: string;
+  line: string;
+  operator: string;
+  url: string | null;
+}
+
+/** "Una iniciativa de" and the operator's logo for this surface, or the line in words; a link when there's a site. */
+const OperatorLine = ({ logo, logoClass, lead, line, operator, url }: OperatorLineProps) => {
+  const content = logo ? (
+    <span className={css({ display: 'inline-flex', alignItems: 'center', gap: '12px' })}>
+      <span>{lead}</span>
+      {/* A plain img: a small logo the brand route serves once, cached for a year; nothing for next/image to do. */}
+      {/* oxlint-disable-next-line next/no-img-element */}
+      <img src={logo} alt={operator} className={logoClass} />
+    </span>
+  ) : (
+    line
+  );
+  return url ? (
+    <a className={focusRing} href={url}>
+      {content}
+    </a>
+  ) : (
+    content
+  );
+};
 
 const wrap = css({
   width: '100%',
@@ -137,7 +169,7 @@ const PROMISES = ['quotes', 'history', 'corrections'] as const;
  * A tenant's home until its site goes public (PLAN M3, coming soon): the tenant's name, what the site will do, the
  * next public election if there is one, and how the operator works. Every name, link and date comes from the data.
  */
-export const ComingSoon = ({ home, locale }: ComingSoonProps) => {
+export const ComingSoon = ({ home, locale, logos }: ComingSoonProps) => {
   const t = getTranslator(locale);
   const local = (value: PublicHome['tenant']['displayName']) =>
     pickLocalized(value, locale, home.tenant.defaultLocale) ?? '';
@@ -187,7 +219,16 @@ export const ComingSoon = ({ home, locale }: ComingSoonProps) => {
           <PauseBars />
           {t('home.comingSoon')}
         </p>
-        <p className={css({ fontSize: '16px' })}>{t('layout.initiativeOf', { operator })}</p>
+        <p className={css({ fontSize: '16px' })}>
+          <OperatorLine
+            logo={logos.onAccent}
+            logoClass={css({ display: 'block', height: '32px', width: 'auto' })}
+            lead={t('layout.initiativeLead')}
+            line={t('layout.initiativeOf', { operator })}
+            operator={operator}
+            url={logos.onAccent ? operatorUrl : null}
+          />
+        </p>
       </header>
 
       <main className={css({ flex: '1' })}>
@@ -393,13 +434,14 @@ export const ComingSoon = ({ home, locale }: ComingSoonProps) => {
           )}
         >
           <p>
-            {operatorUrl ? (
-              <a className={focusRing} href={operatorUrl}>
-                {t('layout.initiativeOf', { operator })}
-              </a>
-            ) : (
-              t('layout.initiativeOf', { operator })
-            )}
+            <OperatorLine
+              logo={logos.onCanvas}
+              logoClass={css({ display: 'block', height: '40px', width: 'auto' })}
+              lead={t('layout.initiativeLead')}
+              line={t('layout.initiativeOf', { operator })}
+              operator={operator}
+              url={operatorUrl}
+            />
           </p>
           {home.operator.contactEmail && (
             <p>

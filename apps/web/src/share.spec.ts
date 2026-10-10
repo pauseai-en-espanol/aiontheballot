@@ -2,6 +2,7 @@ import type { PublicHome } from '@aiontheballot/domain/public-home';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { isDrawableLogo } from './home-image';
 import { createImageCache } from './image-cache';
 import {
   homeCardContent,
@@ -26,6 +27,7 @@ const home: PublicHome = {
     newsletterUrl: null,
   },
   election: { name: { es: 'Elecciones de ejemplo' }, date: '2030-01-15' },
+  brand: {},
 };
 
 describe('pageUrl', () => {
@@ -73,7 +75,27 @@ describe('the home card', () => {
       question: '¿Qué proponen los partidos frente a los riesgos de la IA?',
       address: 'ejemplo.example.test',
       initiative: 'Una iniciativa de Organización de ejemplo',
+      initiativeLead: 'Una iniciativa de',
     });
+  });
+
+  it("names the operator's logo for orange, which then changes its hash", () => {
+    const logo = { sha256: 'a'.repeat(64), contentType: 'image/png' };
+    const withLogo = { ...home, brand: { operator_logo_on_accent: logo } };
+    const card = homeCardContent(withLogo, 'es', 'https://ejemplo.example.test');
+    expect(card.operatorLogo).toEqual(logo);
+    const plain = homeCardContent(home, 'es', 'https://ejemplo.example.test');
+    expect(homeCardHash(card, '1200x630')).not.toBe(homeCardHash(plain, '1200x630'));
+  });
+
+  it('leaves a WebP logo out of the card, which satori cannot draw', () => {
+    const withWebp = {
+      ...home,
+      brand: { operator_logo_on_accent: { sha256: 'a'.repeat(64), contentType: 'image/webp' } },
+    };
+    expect(
+      homeCardContent(withWebp, 'es', 'https://ejemplo.example.test').operatorLogo,
+    ).toBeUndefined();
   });
 
   it('gets a new hash when anything on it changes', () => {
@@ -122,5 +144,16 @@ describe('the image cache', () => {
     const cache = createImageCache();
     await expect(cache('a', async () => Promise.reject(new Error('boom')))).rejects.toThrow('boom');
     await expect(cache('a', async () => png(2))).resolves.toEqual(png(2));
+  });
+});
+
+describe('a logo on a card', () => {
+  it('is drawn only when it is what it claims, at a sane size', () => {
+    const png = { width: 878, height: 240, type: 'image/png' } as const;
+    expect(isDrawableLogo(png, 'image/png')).toBe(true);
+    expect(isDrawableLogo(png, 'image/jpeg')).toBe(false);
+    expect(isDrawableLogo({ ...png, width: 8000, height: 8000 }, 'image/png')).toBe(false);
+    expect(isDrawableLogo({ ...png, height: 0 }, 'image/png')).toBe(false);
+    expect(isDrawableLogo(undefined, 'image/png')).toBe(false);
   });
 });

@@ -217,6 +217,11 @@ tenants.
 These platform-wide rows are also public: active `tenants`, verified `tenant_hostnames`, `organizations` and
 `core_criteria`.
 
+**Images.** A tenant's uploaded image (a `files` row in the `public_assets` bucket, PNG, JPEG or WebP, and its blob)
+is public while a public row shows it: a party of a live or archived election (its logo), or an active tenant's
+brand selection (its logos; amended for tenants' own logos, PLAN R59). Every other upload, and every source
+document, stays private.
+
 ## Data rules (BRIEF §4), enforced by triggers
 
 ### Evidence requirement
@@ -292,7 +297,9 @@ These platform-wide rows are also public: active `tenants`, verified `tenant_hos
   - A tenant can select one only if its operator has `is_pauseai_chapter = true` **and** a platform admin has
     granted that asset to the tenant.
   - Revoking the grant, or changing the operator, re-checks the selection.
-  - The shared layout re-checks again when rendering.
+  - This covers the platform's catalogue only. A tenant's own uploads (PLAN R59) can be any image, a copy of a
+    protected logo included: they are the tenant's responsibility, as all its content is, and the platform's
+    moderation is a takedown, not a check. PauseAI España uploads its own chapter logo this way.
 
 ## Hostnames
 
@@ -403,7 +410,7 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 | T14 | One compromised editor publishes a false rating                            | A5     | Four-eyes (residual risk accepted while a platform admin has turned it off for an election); MFA (aal2); audit log; public corrections | DB-rule tests                         |
 | T15 | One person uses a second ("sock-puppet") account to pass four-eyes         | A5     | Invite-only accounts vetted by the country admin; audit trail. **Residual risk accepted**                                              | Process                               |
 | T16 | Platform admin abuses access                                               | A6     | Few admins, all with MFA; changes audited; no reading `reports` in the app                                                             | Matrix and invariant tests            |
-| T17 | An ineligible tenant uses a restricted brand asset                         | A4     | DB check plus render-time check                                                                                                        | Invariant tests                       |
+| T17 | An ineligible tenant uses a restricted brand asset                         | A4     | DB check on catalogue assets; uploads are the tenant's responsibility (R59)                                                            | Invariant tests                       |
 | T18 | Stored XSS through quotes, party names or methodology                      | A3, A8 | Render as text only; sanitized Markdown; CSP                                                                                           | Unit and E2E tests                    |
 | T19 | Prompt injection in a programme sways the LLM's suggestions                | A8     | LLM only suggests; unmatched quotes dropped; humans decide with four-eyes; LLM has no tools                                            | M4 tests                              |
 | T20 | Report spam or denial of service                                           | A1     | A single function as the only write path; per-tenant cap; honeypot; Envoy per-IP rate limit                                            | Integration tests                     |

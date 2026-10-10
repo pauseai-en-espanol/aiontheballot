@@ -591,7 +591,8 @@ export interface AppStructuralChanges {
 }
 
 export interface AppTenantBrandSelections {
-  brand_asset_id: string;
+  brand_asset_id: string | null;
+  file_id: string | null;
   slot: string;
   tenant_id: string;
 }

@@ -1,7 +1,7 @@
-import type { PublicHome } from '@aiontheballot/domain/public-home';
 import type { ComingSoonCard } from '@aiontheballot/og/coming-soon';
 
 import { pickLocalized } from '@aiontheballot/domain/localized';
+import { BRAND_SLOTS, type PublicHome } from '@aiontheballot/domain/public-home';
 import { getTranslator, type Locale } from '@aiontheballot/i18n/messages';
 import { cardHash } from '@aiontheballot/og/hash';
 import { isShareSize, type ShareSize } from '@aiontheballot/og/sizes';
@@ -45,6 +45,10 @@ export const homeCardContent = (home: PublicHome, locale: Locale, base: string):
   const local = (value: PublicHome['tenant']['displayName']) =>
     pickLocalized(value, locale, home.tenant.defaultLocale) ?? '';
   const { election } = home;
+  // satori draws PNG and JPEG; a WebP logo leaves the operator line in words.
+  const logo = home.brand[BRAND_SLOTS.operatorLogoOnAccent];
+  const drawable =
+    logo && ['image/png', 'image/jpeg'].includes(logo.contentType) ? logo : undefined;
   const electionText =
     election &&
     (election.date
@@ -59,6 +63,10 @@ export const homeCardContent = (home: PublicHome, locale: Locale, base: string):
     question: t('home.question'),
     address: base.replace(/^https:\/\//, ''),
     initiative: t('layout.initiativeOf', { operator: local(home.operator.displayName) }),
+    initiativeLead: t('layout.initiativeLead'),
+    ...(drawable
+      ? { operatorLogo: { sha256: drawable.sha256, contentType: drawable.contentType } }
+      : {}),
   };
 };
 

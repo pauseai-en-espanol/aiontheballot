@@ -23,4 +23,22 @@ export interface PublicHome {
   };
   /** The next election the public may see: the soonest one not archived whose date hasn't passed, if any. */
   election: { name: Localized; date: string | null } | null;
+  /**
+   * The tenant's brand images by slot (`operator_logo_on_accent`, `operator_logo_on_canvas`…): an upload of the
+   * tenant's or a platform asset, named by the SHA-256 of its bytes.
+   */
+  brand: Readonly<Record<string, BrandImage>>;
 }
+
+export interface BrandImage {
+  sha256: string;
+  contentType: string;
+}
+
+/** The brand slots the public pages use, each for the background it sits on. */
+export const BRAND_SLOTS = {
+  operatorLogoOnAccent: 'operator_logo_on_accent',
+  operatorLogoOnCanvas: 'operator_logo_on_canvas',
+  operatorLogoOnInverse: 'operator_logo_on_inverse',
+  operatorMark: 'operator_mark',
+} as const;

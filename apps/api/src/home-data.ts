@@ -7,6 +7,12 @@ import { sql } from 'kysely';
 /** A tenant's home data by slug; undefined when no active tenant has that slug. */
 export type HomeSource = (slug: string) => Promise<PublicHome | undefined>;
 
+/** One of a tenant's brand images, by the SHA-256 of its bytes; undefined unless the tenant shows it publicly. */
+export type BrandImageSource = (
+  slug: string,
+  sha256: string,
+) => Promise<{ contentType: string; content: Uint8Array } | undefined>;
+
 const localized = (value: unknown, column: string): Localized => {
   if (!isLocalized(value)) {
     throw new Error(`${column} is not localized text`);
@@ -29,7 +35,7 @@ export const createHomeSource =
     if (!tenant) {
       return undefined;
     }
-    const [operator, election] = await Promise.all([
+    const [operator, election, brand] = await Promise.all([
       db
         .selectFrom('app.tenant_organizations as link')
         .innerJoin('app.organizations as o', 'o.id', 'link.organization_id')
@@ -53,6 +59,18 @@ export const createHomeSource =
         .orderBy('created_at')
         .limit(1)
         .executeTakeFirst(),
+      // As the public role: an upload shows only while an active tenant selects it (ADR-0002).
+      db
+        .selectFrom('app.tenant_brand_selections as s')
+        .leftJoin('app.files as f', 'f.id', 's.file_id')
+        .leftJoin('app.brand_assets as a', 'a.id', 's.brand_asset_id')
+        .select([
+          's.slot',
+          sql<string | null>`coalesce(f.sha256, a.sha256)`.as('sha256'),
+          sql<string | null>`coalesce(f.content_type, a.content_type)`.as('content_type'),
+        ])
+        .where('s.tenant_id', '=', tenant.id)
+        .execute(),
     ]);
     return {
       tenant: {
@@ -70,5 +88,33 @@ export const createHomeSource =
       election: election
         ? { name: localized(election.name, 'elections.name'), date: election.date }
         : null,
+      brand: Object.fromEntries(
+        brand.flatMap(({ slot, sha256, content_type: contentType }) =>
+          sha256 && contentType ? [[slot, { sha256, contentType }]] : [],
+        ),
+      ),
     };
+  };
+
+/** Reads a brand image's bytes as aiontheballot_web, only if the tenant's selections name it. */
+export const createBrandImageSource =
+  (db: Database): BrandImageSource =>
+  async (slug, sha256) => {
+    const row = await db
+      .selectFrom('app.tenant_brand_selections as s')
+      .innerJoin('app.tenants as t', 't.id', 's.tenant_id')
+      .leftJoin('app.files as f', 'f.id', 's.file_id')
+      .leftJoin('app.file_blobs as b', 'b.file_id', 'f.id')
+      .leftJoin('app.brand_assets as a', 'a.id', 's.brand_asset_id')
+      .select([
+        sql<string | null>`coalesce(f.content_type, a.content_type)`.as('content_type'),
+        sql<Uint8Array | null>`coalesce(b.content, a.content)`.as('content'),
+      ])
+      .where('t.slug', '=', slug)
+      .where(sql<boolean>`coalesce(f.sha256, a.sha256) = ${sha256}`)
+      .limit(1)
+      .executeTakeFirst();
+    return row?.content && row.content_type
+      ? { contentType: row.content_type, content: row.content }
+      : undefined;
   };

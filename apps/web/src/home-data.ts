@@ -18,6 +18,15 @@ export interface HomeLoaderOptions {
   now?: () => number;
 }
 
+/**
+ * Fields newer than the API: web and API roll out together, so a new web pod can read an old API pod for a while.
+ * Missing ones get their empty value rather than failing the page.
+ */
+const withDefaults = (home: PublicHome): PublicHome => ({
+  ...home,
+  brand: (home as Partial<PublicHome>).brand ?? {},
+});
+
 interface Entry {
   result: Exclude<HomeResult, { kind: 'unavailable' }>;
   loadedAt: number;
@@ -54,7 +63,7 @@ export const createHomeLoader = ({
       if (!response.ok) {
         throw new Error(`GET /public/tenants/${slug}/home answered ${response.status}`);
       }
-      const home = (await response.json()) as PublicHome;
+      const home = withDefaults((await response.json()) as PublicHome);
       entries.set(slug, { result: { kind: 'found', home }, loadedAt: now() });
     } catch (error) {
       console.error(`Could not refresh the home data of ${slug}; keeping the last copy`, error);

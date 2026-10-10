@@ -1,3 +1,4 @@
+import { Resvg } from '@resvg/resvg-js';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
@@ -12,6 +13,23 @@ const card = {
   question: '¿Qué proponen los partidos frente a los riesgos de la IA?',
   address: 'ejemplo-a.example.test',
   initiative: 'Una iniciativa de Organización de ejemplo A',
+  initiativeLead: 'Una iniciativa de',
+};
+
+/** A fictional logo: an ink bar on transparency, 300×80. */
+const logoPng = (): Uint8Array =>
+  new Resvg(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80"><rect x="0" y="20" width="300" height="40" fill="#111111"/></svg>',
+  )
+    .render()
+    .asPng();
+const logo = () => {
+  const png = logoPng();
+  return {
+    src: `data:image/png;base64,${Buffer.from(png).toString('base64')}`,
+    width: 300,
+    height: 80,
+  };
 };
 
 const SIZES = Object.keys(SHARE_SIZES) as ShareSize[];
@@ -55,6 +73,48 @@ describe('the coming-soon card', () => {
     expect(pngSize(png)).toEqual(SHARE_SIZES[size]);
     // WhatsApp drops previews over about 300 KB.
     expect(png.byteLength).toBeLessThan(300 * 1024);
+  });
+});
+
+describe("the operator's logo", () => {
+  it('replaces the operator line, after its lead', async () => {
+    const withLogo = {
+      ...card,
+      operatorLogo: { sha256: 'a'.repeat(64), contentType: 'image/png' },
+    };
+    const svg = await renderSvg(
+      comingSoonCard(withLogo, '1200x630', { operatorLogo: logo() }),
+      '1200x630',
+      {
+        text: true,
+      },
+    );
+    expect(svgText(svg)).toContain('Una iniciativa de');
+    expect(svgText(svg)).not.toContain('Organización de ejemplo A');
+    expect(svg).toContain('<image');
+  });
+
+  it('falls back to the line in words when the image is missing', async () => {
+    const withLogo = {
+      ...card,
+      operatorLogo: { sha256: 'a'.repeat(64), contentType: 'image/png' },
+    };
+    const svg = await renderSvg(comingSoonCard(withLogo, '1200x630'), '1200x630', { text: true });
+    expect(svgText(svg)).toContain(card.initiative);
+  });
+
+  it.each(SIZES)('renders at %s', async (size) => {
+    const png = await renderPng(
+      comingSoonCard(
+        { ...card, operatorLogo: { sha256: 'a'.repeat(64), contentType: 'image/png' } },
+        size,
+        {
+          operatorLogo: logo(),
+        },
+      ),
+      size,
+    );
+    expect(pngSize(png)).toEqual(SHARE_SIZES[size]);
   });
 });
 

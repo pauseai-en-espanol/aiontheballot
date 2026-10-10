@@ -469,8 +469,27 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   it doesn't recognise, such as Mastodon's and Bluesky's, which read only the head. `og:locale` is set only for the
   tenant's own language (`es_ES`), with no `og:locale:alternate`: the locales are separate pages, as `hreflang`
   says. The renderer loads only when an image renders, so a failure there could never break a page.
+
+**Logos (tenants' own uploads; Dani's direction):**
+
+- **R59. A tenant's logos are its own uploads** (migration `tenant_brand_uploads`): a brand selection names either a
+  platform brand asset, as before, or a file the tenant uploaded into its public assets, like a party logo. Such a
+  file is public while an active tenant selects it (ADR-0002, amended); the tenant purge removes selections before
+  files. The page shows the operator's logo for orange in the header and for white in the footer, at
+  `/brand/{sha256}.{ext}`, cached as immutable; the share cards draw it (PNG or JPEG) and their hash covers it. A
+  tenant without logos keeps the operator line in words. Slots: `operator_logo_on_accent`, `_on_canvas`,
+  `_on_inverse` and `operator_mark`. Brand images are at most 2 MB, as platform assets are, and a card draws a logo
+  only if its bytes are the declared format and no side exceeds 4,096 px (a small file can declare huge dimensions).
+  Accepted consequence: the restricted-asset rule (BRIEF invariant 5) now guards the platform's catalogue only; a
+  tenant may upload any image, a copy of a protected logo included, as its own responsibility (ADR-0002 amended).
+  To do with the public site (M3): an election's slug must never be `brand` or `og`, which these routes take.
+- **R60. Uploads made by SQL before M2 record the nil UUID as their author:** no accounts exist yet, and
+  `files.created_by` is required. It reads as "the database owner, by SQL"; real users get uuidv7 ids, so it can't
+  collide. It also lands in the audit log's actor, where earlier owner scripts left none; a future foreign key from
+  `created_by` to users would have to allow it. `~/upload-spain-logos.sql` uploads PauseAI España's logos from the
+  brand kit, rendered to PNG (uploads can't be SVG, which can carry script).
 - **R55. The coming-soon cards carry no methodology link** (BRIEF invariant 4): there is no methodology page yet.
-  Cards for published views will. The operator is text until logos come from brand assets.
+  Cards for published views will. Without a logo, the operator line is in words (R59).
 - **R56. The hero is sized by the viewport's height too,** so on a 1080p screen "Cómo lo haremos" starts above the
   fold (Dani's feedback).
 

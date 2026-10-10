@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { errorCode, inRolledBackTransaction } from './db.js';
 import {
   BRAND_ASSETS,
+  FILES,
   ORGANIZATIONS,
   TENANT_A,
   TENANT_B,
@@ -14,6 +15,7 @@ import {
 
 const CHECK_VIOLATION = '23514';
 const UNIQUE_VIOLATION = '23505';
+const FOREIGN_KEY_VIOLATION = '23503';
 
 /** Runs `fn` as the superuser with the fixture platform admin as actor. */
 const asPlatform = <T>(fn: (client: pg.Client) => Promise<T>): Promise<T> =>
@@ -168,5 +170,45 @@ describe('brand assets in the audit log', () => {
     expect(diffs).toHaveLength(1);
     expect(diffs[0]?.diff.new).not.toHaveProperty('content');
     expect(diffs[0]?.diff.new).toHaveProperty('sha256');
+  });
+});
+
+describe("a tenant's uploaded brand images (migration tenant_brand_uploads)", () => {
+  const select = (tenant: string, columns: string) =>
+    `INSERT INTO app.tenant_brand_selections (tenant_id, slot, brand_asset_id, file_id)
+     VALUES ('${tenant}', 'operator_logo_on_dark', ${columns})`;
+
+  it.each([
+    [
+      'both a platform asset and an upload',
+      `'${BRAND_ASSETS.shared.id}', '${FILES.unusedImageA.id}'`,
+    ],
+    ['neither', 'NULL, NULL'],
+  ])('refuses a selection naming %s', async (_name, columns) => {
+    expect(await asPlatform((c) => errorCode(c, select(TENANT_A, columns)))).toBe(CHECK_VIOLATION);
+  });
+
+  it('takes an upload only from the public_assets bucket, so no source document can become public', async () => {
+    expect(
+      await asPlatform((c) => errorCode(c, select(TENANT_A, `NULL, '${FILES.sourceA.id}'`))),
+    ).toBe(CHECK_VIOLATION);
+  });
+
+  it('takes an upload of at most 2 MB, like a platform brand asset', async () => {
+    const code = await asPlatform(async (c) => {
+      const { rows } = await c.query<{ id: string }>(
+        `INSERT INTO app.files (tenant_id, bucket, content_type, byte_size, sha256)
+         VALUES ('${TENANT_A}', 'public_assets', 'image/png', 2097153, encode(sha256('grande'), 'hex'))
+         RETURNING id`,
+      );
+      return errorCode(c, select(TENANT_A, `NULL, '${rows[0]?.id}'`));
+    });
+    expect(code).toBe(CHECK_VIOLATION);
+  });
+
+  it("takes only the tenant's own files", async () => {
+    expect(
+      await asPlatform((c) => errorCode(c, select(TENANT_B, `NULL, '${FILES.unusedImageA.id}'`))),
+    ).toBe(FOREIGN_KEY_VIOLATION);
   });
 });
