@@ -245,8 +245,9 @@ _As an editor, I set up an election so we can start preparing it in private._
 2. A party logo is an image in the `public_assets` bucket, never a source document. The API also limits logos to
    1 MB. [DB: `party_logo_is_public_asset`; API]
 3. Party territories must be inside the tenant's country. [DB: `structure_rules`]
-4. Editors and country admins add criteria: title and description (per locale), slug, order, and optionally a core
-   criterion. [DB: RLS]
+4. Editors and country admins add criteria: title, short title and description (per locale), slug, order, and
+   optionally a core criterion. The short title heads the criterion's column in the public table, so the form shows
+   it at that width (W22). [DB: RLS; `short_title` is _new_]
 5. Lists can be reordered by drag and by keyboard. [UI]
 6. Once live, both change only through change requests (CR1), except a party's programme status (PS1). [DB]
 
@@ -256,8 +257,8 @@ _As a country admin, I make the election public. Every cell without a published 
 
 1. Only country admins and platform admins change an election's status. [DB: `restrict_columns`]
 2. A checklist mirrors the database's conditions: an active tenant, an operator, a methodology, and default-locale
-   text for the election's name, the methodology, every party's names and every criterion. [UI; DB:
-   `election_rules`]
+   text for the election's name, the methodology, every party's names and every criterion, short title included.
+   [UI; DB: `election_rules`]
 3. It also warns, without blocking, about an election with no parties or no criteria, a methodology with no external
    reviewers, and unpublished policy texts (W9, O3). [UI]
 4. Going live can't be undone, so the dialog asks the user to type the election's slug. [UI; DB: transitions]
@@ -349,9 +350,9 @@ A cell is one party × criterion assessment. Its working copy is private; the pu
 
 ### C1. The cell grid
 
-1. Each election has a grid of criteria × parties. Each cell shows its working state (none, draft, in review,
-   published, published with a newer draft), the current published rating as icon, text and colour, and flags:
-   rejected with a note, recheck needed. [UI]
+1. Each election has a grid with parties down the side and criteria across the top, as in the public table. Each
+   cell shows its working state (none, draft, in review, published, published with a newer draft), the current
+   published rating as icon, text and colour, and flags: rejected with a note, recheck needed. [UI]
 2. Queues on the tenant dashboard: my drafts, drafts returned to me, cells awaiting review that I didn't work on,
    recheck flags, pending change requests, new reports, sources that failed. [UI]
 
@@ -598,6 +599,7 @@ _As a member, I triage what the public reports, and link the corrections it lead
 1. This spec reviewed.
 2. The extraction spike against real programme PDFs from the chapter, kept outside the repository (ADR-0003 §9).
 3. Better Auth's tables in the `auth` schema with uuid ids, or the fallback (data model, open item 2), and O2.
+4. A migration for `criteria.short_title` (W22).
 
 ## 17. Decisions to review
 
@@ -644,6 +646,9 @@ Taken while drafting; each can be changed before M2 starts.
   private.
 - **W21. Correction or update** is the editor's choice, with guidance on screen; the reviewer checks it like the rest
   of the draft.
+- **W22. Criteria get a short title** (`criteria.short_title`, localized, like parties' `short_name`), because the
+  public table always puts parties down the side and criteria across the top (decided by Dani; PLAN, Answered). It
+  is change-controlled once live like the rest of the criterion, and going live needs it in the default locale.
 
 ## 18. Open questions for Dani
 
