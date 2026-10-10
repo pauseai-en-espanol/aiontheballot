@@ -14,7 +14,8 @@ spec:
       labels:
         {{- include "aiontheballot-api.selectorLabels" . | nindent 8 }}
       annotations:
-        # Velero's file-system backup (gitops backup plan) copies the file volume; the scratch folder holds nothing.
+        # Velero's file-system backup (gitops backup plan) copies the file volume; the scratch volume `tmp` (below)
+        # holds nothing to keep. Rename them together.
         backup.velero.io/backup-volumes-excludes: tmp
     spec:
       # preStop sleep + time to drain in-flight requests

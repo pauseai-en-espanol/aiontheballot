@@ -548,8 +548,9 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 - **R67. Backups: each volume copy is taken after the database dump it goes with;** the sweep keeps unnamed bytes for
   at least as long as the oldest database dump that could be restored. With the gitops plan's numbers (weekly Velero
   backups kept 90 days, each holding the last 14 nightly dumps) that is 104 days, 111 with a week's margin for
-  backups that expire late; I propose 120. The API's pods tell Velero to skip their scratch folder
-  (`backup.velero.io/backup-volumes-excludes: tmp`), so only the file volume is copied.
+  backups that expire late; I propose 120. Every pod tells Velero to skip its scratch volumes
+  (`backup.velero.io/backup-volumes-excludes`), so the API's file volume is all it copies of the namespace. Still to
+  do in gitops (the brief has the steps): add the namespace to the backup plan's schedules, after the dump.
 - **R68. ADR-0004 records the move.** CLAUDE.md asks for an ADR when the security model changes, and "a stored file is
   what its hash says" left the database for the store. ADR-0002's must-fail item for it now names the store's unit
   tests and the API's database tests.

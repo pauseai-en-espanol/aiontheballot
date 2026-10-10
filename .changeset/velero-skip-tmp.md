@@ -1,5 +1,7 @@
 ---
 '@aiontheballot/api': patch
+'@aiontheballot/web': patch
+'@aiontheballot/admin': patch
 ---
 
-The API's pods tell Velero's file-system backup to skip their scratch folder; the file volume is what it copies.
+The pods tell Velero's file-system backup to skip their scratch volumes: of the API's, only the file volume is copied.

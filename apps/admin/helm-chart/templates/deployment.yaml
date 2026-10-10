@@ -13,6 +13,10 @@ spec:
     metadata:
       labels:
         {{- include "aiontheballot-admin.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Velero's file-system backup (gitops backup plan) copies every pod volume unless told: these two scratch
+        # volumes (named below) hold nothing to keep. Rename them together.
+        backup.velero.io/backup-volumes-excludes: next-cache,tmp
     spec:
       # preStop sleep + time to drain in-flight requests
       terminationGracePeriodSeconds: 30
