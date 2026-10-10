@@ -612,6 +612,16 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   public site's own pages (methodology, legal notice and the like) get paths in its spec (M3); each needs adding then,
   or a prefix of its own. Tenant slugs, on the platform host, aren't covered.
 
+**M2 (editorial workflow), slices taken while Dani was away:**
+
+- **R77. The cell editor's live match (W13) is in `packages/domain`** (`matchQuote`), mirroring the database's trigger
+  step for step (each page normalised on its own, joined with one space, the first occurrence, 15 characters counted
+  as the database counts them), and a database test runs the same quotes through both. When a quote doesn't match,
+  "the longest matching part" (C2.6) is the longest start or end of the quote that appears, found by binary search (a
+  few dozen searches of the text), rather than the longest common substring of quote and source, which would cost
+  the quote's length times the programme's on every keystroke. It shows the editor where the difference begins. The
+  API route that serves it waits for sign-in (O2).
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)). D7 and D8 came with the file volume (ADR-0004).

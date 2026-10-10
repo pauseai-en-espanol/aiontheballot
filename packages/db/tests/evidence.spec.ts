@@ -1,5 +1,6 @@
 import type pg from 'pg';
 
+import { matchQuote } from '@aiontheballot/domain/quote-match';
 import { describe, expect, it } from 'vitest';
 
 import { errorCode, inRolledBackTransaction } from './db.js';
@@ -146,6 +147,44 @@ const evidence = async (client: pg.Client, id: string) =>
 const checkSql = (cell: string, src: string): string =>
   `INSERT INTO app.draft_checked_documents (assessment_id, tenant_id, election_id, source_document_id)
    VALUES ('${cell}', '${TENANT_A}', '${draftA.id}', '${src}')`;
+
+/** Pages that exercise every rule of the match: normalisation, an empty page between two, characters beyond UTF-16. */
+const PARITY_PAGES = [
+  'Primera página: una «propuesta» de super-\nvisión ﬁcticia.',
+  '',
+  'Tercera página con votos 🗳🗳🗳 de ejemplo y más texto.',
+  'Cuarta página, que sigue a la tercera sin más.',
+];
+
+describe("the editor's live match (W13)", () => {
+  it.each([
+    ['within a page, after normalisation', '"propuesta" de supervisión ficticia'],
+    ['across a page break', 'y más texto. Cuarta página'],
+    ['starting on the first character of a page', 'Cuarta página, que sigue'],
+    ['across the empty page, which leaves two spaces', 'ficticia. Tercera página'],
+    ['with characters beyond UTF-16', 'votos 🗳🗳🗳 de ejemplo'],
+    ['of fourteen characters once normalised (sixteen UTF-16 units)', '🗳🗳 de ejemplo.\u00AD\u00AD'],
+    ['nowhere', 'nada de esto aparece en el documento'],
+  ])('agrees with the database on a quote %s', async (_name, quote) => {
+    await actingAs(USERS.editorA, async (client) => {
+      const src = await source(client, { pages: PARITY_PAGES });
+      const saved = await addQuote(client, await newCell(client), src, quote.replaceAll("'", "''"));
+      const live = matchQuote(
+        quote,
+        PARITY_PAGES.map((body, i) => ({ index: i + 1, label: `p. ${i + 1}`, body })),
+      );
+      expect({
+        status: live.kind === 'matched' ? 'matched' : 'unmatched',
+        from: live.kind === 'matched' ? live.span.fromUnit : null,
+        to: live.kind === 'matched' ? live.span.toUnit : null,
+      }).toEqual({
+        status: saved.match_status,
+        from: saved.matched_from_unit,
+        to: saved.matched_to_unit,
+      });
+    });
+  });
+});
 
 describe('the verbatim match', () => {
   it('matches a quote within a page and records the page', async () => {
