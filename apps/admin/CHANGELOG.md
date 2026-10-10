@@ -1,5 +1,13 @@
 # @aiontheballot/admin
 
+## 0.2.6
+
+### Patch Changes
+
+- 07fb157: The pods tell Velero's file-system backup to skip their scratch volumes: of the API's, only the file volume is copied.
+- Updated dependencies [01a9f7f]
+  - @aiontheballot/i18n@0.5.0
+
 ## 0.2.5
 
 ### Patch Changes

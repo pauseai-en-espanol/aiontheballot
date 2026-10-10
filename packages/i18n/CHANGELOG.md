@@ -1,5 +1,13 @@
 # @aiontheballot/i18n
 
+## 0.5.0
+
+### Minor Changes
+
+- 01a9f7f: The admin API's answer to a database refusal (editorial workflow §2.3): its SQLSTATE becomes the HTTP status and a
+  message key, in English and Spanish, never the database's own message. A missing grant is reported as the fault it
+  is.
+
 ## 0.4.0
 
 ### Minor Changes

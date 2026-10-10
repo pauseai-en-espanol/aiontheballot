@@ -1,5 +1,19 @@
 # @aiontheballot/db
 
+## 0.10.0
+
+### Minor Changes
+
+- 70a6a4e: The orphan-bytes sweep (ADR-0004 §5): `node dist/sweep-files.js` reads the owner's list of every file row, brand asset
+  and file a row stopped naming (`--print-query` prints the query) and, with `--delete`, deletes bytes no row has named
+  for longer than the grace period (120 days, never less than 111), never ones stored or reused within a day of the list,
+  and nothing in a run after a database restore.
+
+### Patch Changes
+
+- f10bcac: An election's slug can never be `brand`, `og` or `healthz`, paths the public site serves itself (migration
+  `reserved_election_slugs`; `RESERVED_ELECTION_SLUGS` in `packages/domain`).
+
 ## 0.9.0
 
 ### Minor Changes

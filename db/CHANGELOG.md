@@ -1,5 +1,12 @@
 # @aiontheballot/migrations
 
+## 0.12.0
+
+### Minor Changes
+
+- f10bcac: An election's slug can never be `brand`, `og` or `healthz`, paths the public site serves itself (migration
+  `reserved_election_slugs`; `RESERVED_ELECTION_SLUGS` in `packages/domain`).
+
 ## 0.11.0
 
 ### Minor Changes

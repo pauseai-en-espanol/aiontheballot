@@ -1,5 +1,33 @@
 # @aiontheballot/api
 
+## 0.8.0
+
+### Minor Changes
+
+- 52998e4: The cell grid's data (editorial workflow C1.1): `cellGrid` reads an election's parties, criteria and cells in the
+  actor's transaction, with each cell's working state, published rating and flags.
+- 01a9f7f: The admin API's answer to a database refusal (editorial workflow §2.3): its SQLSTATE becomes the HTTP status and a
+  message key, in English and Spanish, never the database's own message. A missing grant is reported as the fault it
+  is.
+- 70a6a4e: The orphan-bytes sweep (ADR-0004 §5): `node dist/sweep-files.js` reads the owner's list of every file row, brand asset
+  and file a row stopped naming (`--print-query` prints the query) and, with `--delete`, deletes bytes no row has named
+  for longer than the grace period (120 days, never less than 111), never ones stored or reused within a day of the list,
+  and nothing in a run after a database restore.
+
+### Patch Changes
+
+- 944fcc8: The cell editor's live quote match (editorial workflow C2.6, W13): `matchQuote` in `packages/domain` says whether a
+  quote matches its source verbatim and on which pages, exactly as the database will, how much of it does if not, or
+  that it is too short or too long to save.
+- f10bcac: An election's slug can never be `brand`, `og` or `healthz`, paths the public site serves itself (migration
+  `reserved_election_slugs`; `RESERVED_ELECTION_SLUGS` in `packages/domain`).
+- 07fb157: The pods tell Velero's file-system backup to skip their scratch volumes: of the API's, only the file volume is copied.
+- Updated dependencies [944fcc8]
+- Updated dependencies [70a6a4e]
+- Updated dependencies [f10bcac]
+  - @aiontheballot/domain@0.7.0
+  - @aiontheballot/db@0.10.0
+
 ## 0.7.2
 
 ### Patch Changes

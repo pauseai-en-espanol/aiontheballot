@@ -1,5 +1,24 @@
 # @aiontheballot/web
 
+## 0.8.1
+
+### Patch Changes
+
+- 01a9f7f: The admin API's answer to a database refusal (editorial workflow §2.3): its SQLSTATE becomes the HTTP status and a
+  message key, in English and Spanish, never the database's own message. A missing grant is reported as the fault it
+  is.
+- 944fcc8: The cell editor's live quote match (editorial workflow C2.6, W13): `matchQuote` in `packages/domain` says whether a
+  quote matches its source verbatim and on which pages, exactly as the database will, how much of it does if not, or
+  that it is too short or too long to save.
+- f10bcac: An election's slug can never be `brand`, `og` or `healthz`, paths the public site serves itself (migration
+  `reserved_election_slugs`; `RESERVED_ELECTION_SLUGS` in `packages/domain`).
+- 07fb157: The pods tell Velero's file-system backup to skip their scratch volumes: of the API's, only the file volume is copied.
+- Updated dependencies [01a9f7f]
+- Updated dependencies [944fcc8]
+- Updated dependencies [f10bcac]
+  - @aiontheballot/i18n@0.5.0
+  - @aiontheballot/domain@0.7.0
+
 ## 0.8.0
 
 ### Minor Changes
