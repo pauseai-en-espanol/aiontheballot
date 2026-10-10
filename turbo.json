@@ -31,6 +31,10 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "@aiontheballot/web#test": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/db/schema.sql"]
+    },
     "test:db": {
       "dependsOn": ["^build"],
       "cache": false,
