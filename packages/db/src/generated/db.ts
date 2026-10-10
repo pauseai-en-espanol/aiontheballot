@@ -205,6 +205,7 @@ export interface AppCriteria {
   election_id: string;
   id: Generated<string>;
   retired_at: Timestamp | null;
+  short_title: Json | null;
   slug: string;
   tenant_id: string;
   title: Json;

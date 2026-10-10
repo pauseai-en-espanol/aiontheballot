@@ -400,6 +400,7 @@ create table app.criteria (
   election_id        uuid not null,
   slug               text not null,                    -- criterion pages and share images
   title              jsonb not null,
+  short_title        jsonb,                            -- the public table's column header; needed to go live
   description        jsonb not null,
   display_order      int not null,
   core_criterion_id  uuid references app.core_criteria,
@@ -1155,7 +1156,7 @@ Members also read the unrestricted brand-asset catalogue, to choose their tenant
 | Second approver for live edits, if the tenant requires it                                                      | Trigger: `decided_by <> proposed_by` when `live_edits_need_second_approver`; only platform admins set it                   | `change_requests`, `tenants`                                                                          |
 | Freeze window                                                                                                  | Trigger: no public-visible change inside the window; only country admins set it                                            | Publish trigger, `change_requests`, `parties`, `elections`                                            |
 | Archived elections are read-only, except corrections and reports                                               | Trigger                                                                                                                    | Every election-scoped table                                                                           |
-| Default-locale text is present when public                                                                     | Trigger on publish, on going live and on approval                                                                          | `assessment_revisions`, `elections`, `change_requests`, `tenant_documents`                            |
+| Default-locale text is present when public                                                                     | Trigger on publish, on going live, on approval and on writing a public election's criteria                                 | `assessment_revisions`, `elections`, `change_requests`, `tenant_documents`, `criteria`                |
 | A programme marked published has a source; "not mentioned" gets rechecked                                      | Trigger                                                                                                                    | `parties`                                                                                             |
 | Report cap and status                                                                                          | `submit_report()`, using the daily counts                                                                                  | `reports`, `report_daily_counts`                                                                      |
 | Reports are anonymized, never deleted                                                                          | `anonymize_expired_reports()`; trigger allows only nulling the personal-data columns                                       | `reports`                                                                                             |

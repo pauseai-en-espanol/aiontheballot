@@ -1319,7 +1319,13 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.criteria': {
-    rows: structured.map((e) => structureRow(e, 'criterion', `id = '${e.criterion}'`, EDITORS)),
+    rows: structured.map((e) => {
+      const row = structureRow(e, 'criterion', `id = '${e.criterion}'`, EDITORS);
+      // Once live, the short title is change-controlled like the rest; archived, read-only.
+      return e.status === 'draft'
+        ? row
+        : { ...row, blocked: { ...row.blocked, 'update:short_title': '23001' } };
+    }),
     inserts: TENANT_KEYS.map((key) => ({
       id: `criterion in ${key}`,
       tenant: key,
@@ -1333,6 +1339,7 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     update: EDITORS,
     delete: EDITORS,
     columnUpdates: {
+      short_title: { set: `short_title = '{"es": "Ejemplo revisado"}'`, rule: EDITORS },
       election_id: { set: `election_id = '${ELECTIONS.emptyA.id}'`, rule: NOBODY },
       tenant_id: { set: `tenant_id = '${TENANT_B}'`, rule: NOBODY },
     },

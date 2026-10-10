@@ -344,6 +344,45 @@ describe('approving a change', () => {
     });
   });
 
+  it("changes a criterion's short title through a change request", async () => {
+    await actingAs(USERS.countryAdminA, async (client) => {
+      await proposedThenApproved(client, {
+        kind: 'criterion',
+        target: live.criterion,
+        field: 'short_title',
+        value: `'{"es": "Ejemplo revisado"}'`,
+      });
+      expect(
+        (await client.query('SELECT short_title FROM app.criteria WHERE id = $1', [live.criterion]))
+          .rows,
+      ).toEqual([{ short_title: { es: 'Ejemplo revisado' } }]);
+    });
+  });
+
+  it('adds a criterion only with its short title in the default locale', async () => {
+    const criterion = (shortTitle: string) =>
+      `'{"slug": "criterio-de-ejemplo-3", "title": {"es": "Criterio de ejemplo 3"}, ${shortTitle}
+         "description": {"es": "Descripción de ejemplo"}, "display_order": 3}'`;
+    const codes = await Promise.all(
+      ['', `"short_title": {"en": "Example 3"},`, `"short_title": {"es": "Ejemplo 3"},`].map(
+        (shortTitle) =>
+          actingAs(USERS.countryAdminA, async (client) => {
+            await setActor(client, USERS.editorA);
+            const id = await propose(client, {
+              action: 'add',
+              kind: 'criterion',
+              target: null,
+              field: null,
+              value: criterion(shortTitle),
+            });
+            await setActor(client, USERS.countryAdminA);
+            return errorCode(client, decide(id));
+          }),
+      ),
+    );
+    expect(codes).toEqual([CHECK_VIOLATION, CHECK_VIOLATION, null]);
+  });
+
   it('adds an external reviewer once: the same row again needs another request', async () => {
     await actingAs(USERS.countryAdminA, async (client) => {
       await proposedThenApproved(client, {

@@ -224,14 +224,15 @@ export const seed = async (client: pg.Client): Promise<'seeded' | 'already seede
     }
     for (const [i, criterion] of CRITERIA.entries()) {
       await client.query(
-        `INSERT INTO app.criteria (id, tenant_id, election_id, slug, title, description, display_order)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO app.criteria (id, tenant_id, election_id, slug, title, short_title, description, display_order)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           criterion,
           A.id,
           ELECTION,
           `criterio-de-ejemplo-${i + 1}`,
           { es: `Criterio de ejemplo ${i + 1}` },
+          { es: `Ejemplo ${i + 1}` },
           { es: 'Descripción inventada de un criterio de ejemplo.' },
           i + 1,
         ],

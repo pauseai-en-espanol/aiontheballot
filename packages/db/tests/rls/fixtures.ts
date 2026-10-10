@@ -207,14 +207,15 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
       );
     }
     await client.query(
-      `INSERT INTO app.criteria (id, tenant_id, election_id, slug, title, description, display_order, core_criterion_id)
-       VALUES ($1, $2, $3, 'criterio-de-ejemplo-1', '{"es": "Criterio de ejemplo 1"}',
+      `INSERT INTO app.criteria (id, tenant_id, election_id, slug, title, short_title, description, display_order,
+                                 core_criterion_id)
+       VALUES ($1, $2, $3, 'criterio-de-ejemplo-1', '{"es": "Criterio de ejemplo 1"}', '{"es": "Ejemplo 1"}',
                '{"es": "Descripción de ejemplo"}', 1, $4)`,
       [e.criterion, tenant, e.id, e.id === ELECTIONS.liveA.id ? CORE_CRITERION : null],
     );
     await client.query(
-      `INSERT INTO app.criteria (id, tenant_id, election_id, slug, title, description, display_order)
-       VALUES ($1, $2, $3, 'criterio-de-ejemplo-2', '{"es": "Criterio de ejemplo 2"}',
+      `INSERT INTO app.criteria (id, tenant_id, election_id, slug, title, short_title, description, display_order)
+       VALUES ($1, $2, $3, 'criterio-de-ejemplo-2', '{"es": "Criterio de ejemplo 2"}', '{"es": "Ejemplo 2"}',
                '{"es": "Descripción de ejemplo"}', 2)`,
       [e.secondCriterion, tenant, e.id],
     );

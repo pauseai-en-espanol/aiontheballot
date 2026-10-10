@@ -855,7 +855,7 @@ CREATE FUNCTION private.change_control() RETURNS trigger
       WHEN 'methodology' THEN ARRAY['demands_owner_id', 'body', 'admissible_source_kinds', 'not_mentioned_source_kinds']
       WHEN 'methodology_reviewer' THEN ARRAY['name', 'affiliation', 'display_order']
       WHEN 'party' THEN ARRAY['name', 'short_name', 'logo_file_id', 'colour', 'display_order', 'website', 'territory_codes']
-      ELSE ARRAY['title', 'description', 'display_order', 'core_criterion_id'] END;
+      ELSE ARRAY['title', 'short_title', 'description', 'display_order', 'core_criterion_id'] END;
     target_election uuid;
     status app.election_status;
     col text;
@@ -919,16 +919,17 @@ CREATE FUNCTION private.change_request_rules() RETURNS trigger
       WHEN 'methodology' THEN ARRAY['demands_owner_id', 'body', 'admissible_source_kinds', 'not_mentioned_source_kinds']
       WHEN 'methodology_reviewer' THEN ARRAY['name', 'affiliation', 'display_order']
       WHEN 'party' THEN ARRAY['name', 'short_name', 'logo_file_id', 'colour', 'display_order', 'website', 'territory_codes']
-      ELSE ARRAY['title', 'description', 'display_order', 'core_criterion_id'] END;
+      ELSE ARRAY['title', 'short_title', 'description', 'display_order', 'core_criterion_id'] END;
     -- Elections and methodologies are never added or retired.
     addable text[] := CASE NEW.target_kind
       WHEN 'methodology_reviewer' THEN ARRAY['name', 'affiliation', 'display_order']
       WHEN 'party' THEN ARRAY['slug', 'name', 'short_name', 'logo_file_id', 'colour', 'display_order', 'website',
                               'territory_codes']
-      WHEN 'criterion' THEN ARRAY['slug', 'title', 'description', 'display_order', 'core_criterion_id'] END;
+      WHEN 'criterion' THEN ARRAY['slug', 'title', 'short_title', 'description', 'display_order', 'core_criterion_id']
+        END;
     localized text[] := CASE NEW.target_kind
       WHEN 'election' THEN ARRAY['name'] WHEN 'methodology' THEN ARRAY['body'] WHEN 'party' THEN ARRAY['name', 'short_name']
-      WHEN 'criterion' THEN ARRAY['title', 'description'] ELSE '{}' END;
+      WHEN 'criterion' THEN ARRAY['title', 'short_title', 'description'] ELSE '{}' END;
     -- The target, read as the writer: it must be in the request's election.
     find_target text := format('SELECT to_jsonb(x) FROM app.%I x WHERE x.id = $1 AND %s', tbl, CASE NEW.target_kind
       WHEN 'election' THEN 'x.id = $2'
@@ -2175,6 +2176,42 @@ CREATE FUNCTION private.revision_contributors(cell uuid) RETURNS uuid[]
 ALTER FUNCTION private.revision_contributors(cell uuid) OWNER TO aiontheballot_owner;
 
 --
+-- Name: short_title_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.short_title_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    -- As jsonb: a record has no field the other table lacks, even in a branch that isn't taken.
+    election_id uuid := (to_jsonb(NEW) ->> CASE TG_TABLE_NAME WHEN 'elections' THEN 'id' ELSE 'election_id' END)::uuid;
+    default_locale text;
+    status app.election_status;
+  BEGIN
+    SELECT t.default_locale, e.status INTO default_locale, status
+      FROM app.elections e JOIN app.tenants t ON t.id = e.tenant_id
+     WHERE e.id = election_id;
+    IF TG_TABLE_NAME = 'elections' THEN
+      IF EXISTS (SELECT 1 FROM app.criteria c
+                  WHERE c.election_id = NEW.id AND NOT coalesce(c.short_title ? default_locale, false)) THEN
+        RAISE EXCEPTION 'election % cannot go live without every criterion''s short title in the default locale',
+          NEW.id USING ERRCODE = 'check_violation';
+      END IF;
+    -- An election the writer can't see leaves status null and passes here: RLS refuses that write itself, with the
+    -- permission error the isolation matrix expects.
+    ELSIF status <> 'draft' AND NOT coalesce(NEW.short_title ? default_locale, false) THEN
+      RAISE EXCEPTION 'a criterion of % election % needs its short title in the default locale, %', status,
+        election_id, default_locale USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.short_title_rules() OWNER TO aiontheballot_owner;
+
+--
 -- Name: source_document_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -2809,7 +2846,8 @@ CREATE TABLE app.criteria (
     description app.localized NOT NULL,
     display_order integer NOT NULL,
     core_criterion_id uuid,
-    retired_at timestamp with time zone
+    retired_at timestamp with time zone,
+    short_title app.localized
 );
 
 
@@ -5686,6 +5724,20 @@ CREATE TRIGGER rules_programme_checked BEFORE UPDATE OF programme_status ON app.
 
 
 --
+-- Name: criteria short_title_rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER short_title_rules BEFORE INSERT OR UPDATE ON app.criteria FOR EACH ROW EXECUTE FUNCTION private.short_title_rules();
+
+
+--
+-- Name: elections short_title_rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER short_title_rules BEFORE UPDATE OF status ON app.elections FOR EACH ROW WHEN (((old.status = 'draft'::app.election_status) AND (new.status = 'live'::app.election_status))) EXECUTE FUNCTION private.short_title_rules();
+
+
+--
 -- Name: assessment_contributors stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -8264,6 +8316,13 @@ REVOKE ALL ON FUNCTION private.revision_contributors(cell uuid) FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION short_title_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.short_title_rules() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION source_document_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -8786,6 +8845,13 @@ GRANT INSERT(core_criterion_id),UPDATE(core_criterion_id) ON TABLE app.criteria 
 --
 
 GRANT UPDATE(retired_at) ON TABLE app.criteria TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN criteria.short_title; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(short_title),UPDATE(short_title) ON TABLE app.criteria TO aiontheballot_admin;
 
 
 --

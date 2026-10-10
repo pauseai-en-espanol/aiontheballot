@@ -73,6 +73,20 @@ describe('going live', () => {
       ELECTIONS.draftA.id,
     ],
     [
+      'with a criterion that has no short title',
+      [
+        `UPDATE app.criteria SET short_title = NULL WHERE id = '${ELECTIONS.draftA.secondCriterion}'`,
+      ],
+      ELECTIONS.draftA.id,
+    ],
+    [
+      'with an untranslated short title',
+      [
+        `UPDATE app.criteria SET short_title = '{"en": "Example"}' WHERE id = '${ELECTIONS.draftA.criterion}'`,
+      ],
+      ELECTIONS.draftA.id,
+    ],
+    [
       'with an untranslated criterion',
       [
         `UPDATE app.criteria SET description = '{"en": "Example"}' WHERE id = '${ELECTIONS.draftA.criterion}'`,
@@ -95,6 +109,33 @@ describe('going live', () => {
         errorCode(c, status(ELECTIONS.draftInactive.id, 'live')),
       ),
     ).toBe(CHECK_VIOLATION);
+  });
+});
+
+describe("a public election's criteria", () => {
+  it('keep their short title in the default locale, whoever writes', async () => {
+    const codes = await inRolledBackTransaction(async (client) => [
+      await errorCode(
+        client,
+        `UPDATE app.criteria SET short_title = NULL WHERE id = '${ELECTIONS.liveA.criterion}'`,
+      ),
+      await errorCode(
+        client,
+        `UPDATE app.criteria SET short_title = '{"en": "Example"}' WHERE id = '${ELECTIONS.liveA.criterion}'`,
+      ),
+    ]);
+    expect(codes).toEqual([CHECK_VIOLATION, CHECK_VIOLATION]);
+  });
+
+  it('may lack one while the election is a draft', async () => {
+    expect(
+      await asCountryAdminA((client) =>
+        errorCode(
+          client,
+          `UPDATE app.criteria SET short_title = NULL WHERE id = '${ELECTIONS.draftA.criterion}'`,
+        ),
+      ),
+    ).toBeNull();
   });
 });
 
