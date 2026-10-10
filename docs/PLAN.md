@@ -660,6 +660,20 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   event is a rejection (comments don't count; resubmitting records a newer event); flagged while it has a recheck
   reason. Its route waits for sign-in (editorial workflow spec §18, O2).
 
+**Chart packaging:**
+
+- **R80. The umbrella chart's subcharts are no longer committed** (`helm-charts/aiontheballot/charts/` is ignored). Argo
+  CD (v3.5.4 on the cluster) runs `helm dependency build` when `helm template` finds a chart's dependencies missing,
+  building them from their `file://` sources in the same checkout, which it cleans at every new revision; CI does the
+  same before `helm lint`. This replaces the vendored `.tgz` files of M0, and the check that they matched their sources,
+  which put a binary diff in every chart change. Checked before the switch: clean clones with and without them render
+  the same 13 objects, byte for byte, with Helm 4.3 and inside Argo's own image. If Argo ever failed to build them, the
+  application would show a ComparisonError (`error building helm chart dependencies`) and neither sync nor prune, so the
+  running version stays; to go back, revert, run `helm dependency update helm-charts/aiontheballot` and commit the
+  tarballs (the reverted ones may be stale). A subchart's new version still needs `helm dependency update` for
+  `Chart.lock`. Should the application ever get a `manifest-generate-paths` annotation, it must include the subcharts'
+  folders, or their changes would go unseen.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)). D7 and D8 came with the file volume (ADR-0004), D9 with the live

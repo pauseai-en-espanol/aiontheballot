@@ -95,10 +95,9 @@ jobs:
           for chart in apps/*/helm-chart db/helm-chart; do
             helm lint --strict "$chart"
           done
+          # The subcharts aren't committed: built from their sources, as Argo CD does with its own Helm (PLAN R80).
+          helm dependency build helm-charts/aiontheballot
           helm lint --strict helm-charts/aiontheballot --values helm-charts/aiontheballot/ci/example-values.yaml
-
-      - name: Vendored subcharts match their sources
-        run: scripts/check-chart-vendoring.sh
 
   database:
     name: Database
