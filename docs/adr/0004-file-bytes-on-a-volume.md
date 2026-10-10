@@ -52,7 +52,7 @@ the folder without touching callers.
   at `/data`, read-write (`put-file` runs in its pods); the store's root is `FILES_ROOT=/data/files`.
 - Whether the worker mounts it too, once it exists, is left open: it parses hostile documents (threat A8), and its RLS
   today limits it to the one file of its job. A read-only mount, or the bytes handed over by the API, would keep that
-  limit (PLAN, open questions).
+  limit (PLAN, D8).
 
 ### 2. Each row reaches only its own space
 
@@ -99,10 +99,25 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   standard input: the owner's query prints `purged <tenant-id>` only for a tenant that `purge_log` records and that no
   longer exists, so a mistyped id, or an inactive tenant that still exists, deletes nothing. Without `--delete` it
   only says what it would delete.
-- **Sweep.** Bytes that no row names are deleted only after they have gone unnamed for a **grace period at least as
+- **Sweep.** Bytes that no row names are deleted only after no row has named them for a **grace period at least as
   long as the oldest database backup that could be restored**, so restoring an older dump never finds its bytes gone.
-  With the backup plan's numbers (weekly Velero backups kept 90 days, each holding the last 14 nightly dumps) that is
-  at least 104 days. The sweep is built separately (PLAN).
+  With the backup plan's numbers (weekly Velero backups kept 90 days, each holding the last 14 nightly dumps, plus a
+  week for backups that expire late) that is 111 days; the sweep refuses less, and defaults to 120. If the plan keeps
+  backups longer, the minimum (`MIN_GRACE_DAYS`) must grow with it.
+- **How the sweep knows since when.** A file's dates say when it was written, not when its row went away. The audit
+  log keeps every deleted file row (tenant, bucket, hash) for good, so the owner's list gives the last time a row
+  naming each file was deleted; a ledger on the volume adds when the sweep first saw a file unnamed, for bytes no row
+  ever named (an upload whose transaction failed). The later of the two counts, so a file named again and dropped
+  again waits its full time again.
+- **How it runs.** No runtime role can list every tenant's files, so the owner pipes the list from Postgres, as
+  `postgres` with row security off, into `sweep-files` in an API pod (`--print-query` prints the query). The command
+  refuses a list that doesn't end with its own count, a list that names nothing while files are stored, and one that
+  names files the volume lacks (another database, or a wrong volume); it deletes more than half the stored files only
+  with `--allow-many`; one sweep runs at a time (a lock file). Without `--delete` it records and reports. A file stored
+  or reused within a day of the list's snapshot is never deleted: `put` marks reused bytes as just written, and the
+  sweep moves a file aside and checks it again before deleting it, so an upload of the same bytes at that moment gets
+  them back. Running it on a schedule needs a role that can read that list: a new grant, so an ADR-0002 decision (PLAN,
+  D7).
 
 ### 6. The volume
 
@@ -125,7 +140,7 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   isn't running yet: until it is, the volume, like the database, has no off-node copy.
 - **Each volume copy is taken after the database dump it goes with.** Rows are written after their bytes, so every row
   in a dump names bytes already on the volume when the dump was taken; a copy taken after the dump contains them,
-  because nothing deletes bytes that a row named less than the grace period ago.
+  because the sweep deletes nothing a row named less than the grace period ago (§5) and purges are deliberate.
 - **Restoring:** a dump and the volume copy taken after it restore together. Restoring only the database from an
   older dump onto the live volume works too, within the grace period. The preview's restore check covers both.
 - A purge deletes a tenant's bytes at once; copies in older backups expire with them, as for the database.

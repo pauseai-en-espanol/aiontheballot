@@ -1,5 +1,16 @@
 import { createHash } from 'node:crypto';
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -132,5 +143,108 @@ describe('the file store', () => {
     } finally {
       await chmod(join(readOnly, 'tmp'), 0o755);
     }
+  });
+
+  it('lists every stored file by space, and reports anything else without touching it', async () => {
+    const store = createFileStore(root);
+    await store.put(SOURCES_A, bytes);
+    await store.put(ASSETS_B, bytes);
+    await store.put('platform', bytes);
+    await store.writeLedger('{}');
+    await writeFile(join(root, 'stray.txt'), 'x');
+    await mkdir(join(root, TENANT_A, 'logos'), { recursive: true });
+    await writeFile(join(root, TENANT_A, 'sources', 'stray'), 'x');
+    await writeFile(join(pathIn(TENANT_A, 'sources'), '..', 'not-a-hash'), 'x');
+    await mkdir(join(root, 'platform', 'sha256', 'abc', 'de'), { recursive: true });
+    const { stored, unexpected } = await store.list();
+    expect(stored).toEqual(
+      expect.arrayContaining([
+        { space: SOURCES_A, sha256 },
+        { space: ASSETS_B, sha256 },
+        { space: 'platform', sha256 },
+      ]),
+    );
+    expect(stored).toHaveLength(3);
+    expect(unexpected.sort()).toEqual(
+      [
+        'stray.txt',
+        join(TENANT_A, 'logos'),
+        join(TENANT_A, 'sources', 'stray'),
+        join(TENANT_A, 'sources', 'sha256', sha256.slice(0, 2), sha256.slice(2, 4), 'not-a-hash'),
+        join('platform', 'sha256', 'abc'),
+      ].sort(),
+    );
+  });
+
+  it("never lists one space's bytes as another's through a link", async () => {
+    const store = createFileStore(root);
+    await store.put(SOURCES_A, bytes);
+    await mkdir(join(root, TENANT_B, 'sources'), { recursive: true });
+    await symlink(
+      join(root, TENANT_A, 'sources', 'sha256'),
+      join(root, TENANT_B, 'sources', 'sha256'),
+    );
+    await symlink(join(root, TENANT_A, 'sources'), join(root, TENANT_B, 'public_assets'));
+    const { stored, unexpected } = await store.list();
+    expect(stored).toEqual([{ space: SOURCES_A, sha256 }]);
+    expect(unexpected.sort()).toEqual(
+      [join(TENANT_B, 'sources', 'sha256'), join(TENANT_B, 'public_assets')].sort(),
+    );
+  });
+
+  it('lists the root it was given with or without a trailing slash', async () => {
+    await createFileStore(root).put(SOURCES_A, bytes);
+    await writeFile(join(root, 'stray.txt'), 'x');
+    expect((await createFileStore(`${root}/`).list()).unexpected).toEqual(['stray.txt']);
+  });
+
+  it('lists nothing on an empty volume', async () => {
+    expect(await createFileStore(join(root, 'missing')).list()).toEqual({
+      stored: [],
+      unexpected: [],
+    });
+  });
+
+  it('marks bytes as in use whenever it stores or reuses them', async () => {
+    const store = createFileStore(root);
+    await store.put(SOURCES_A, bytes);
+    const old = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000);
+    await utimes(pathIn(TENANT_A, 'sources'), old, old);
+    const before = Date.now() - 1000;
+    await store.put(SOURCES_A, bytes);
+    expect((await stat(pathIn(TENANT_A, 'sources'))).mtimeMs).toBeGreaterThanOrEqual(before);
+  });
+
+  it('retires bytes not used since a time, from one space only, and keeps what was used since', async () => {
+    const store = createFileStore(root);
+    await store.put(SOURCES_A, bytes);
+    await store.put(ASSETS_A, bytes);
+    const later = new Date(Date.now() + 60_000);
+    const earlier = new Date(Date.now() - 60_000);
+    expect(await store.retire(SOURCES_A, sha256, earlier)).toBe('kept');
+    expect(await store.get(SOURCES_A, sha256)).toEqual(bytes);
+    expect(await store.retire(SOURCES_A, sha256, later)).toBe('deleted');
+    expect(await store.get(SOURCES_A, sha256)).toBeUndefined();
+    expect(await store.retire(SOURCES_A, sha256, later)).toBe('gone');
+    expect(await store.get(ASSETS_A, sha256)).toEqual(bytes);
+    expect(await readdir(join(root, 'tmp'))).toEqual([]);
+    await expect(store.retire(SOURCES_A, '../x', later)).rejects.toThrow(TypeError);
+  });
+
+  it('keeps one sweep at a time', async () => {
+    const store = createFileStore(root);
+    const release = await store.lockSweep();
+    await expect(store.lockSweep()).rejects.toThrow('Another sweep');
+    await release();
+    const again = await store.lockSweep();
+    await again();
+  });
+
+  it('keeps the sweep ledger on the volume', async () => {
+    const store = createFileStore(root);
+    expect(await store.readLedger()).toBeUndefined();
+    await store.writeLedger('{"version":1}');
+    expect(await store.readLedger()).toBe('{"version":1}');
+    expect(await readdir(join(root, 'tmp'))).toEqual([]);
   });
 });

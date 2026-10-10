@@ -1,6 +1,8 @@
+import type { Dirent } from 'node:fs';
+
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, open, readdir, readFile, rename, rm, stat } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { lstat, mkdir, open, readdir, readFile, rename, rm, stat, utimes } from 'node:fs/promises';
+import { dirname, join, relative } from 'node:path';
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -22,7 +24,10 @@ export type FileSpace = { tenantId: string; bucket: FileBucket } | 'platform';
  * them, from that row's space.
  */
 export interface FileStore {
-  /** Stores the bytes, unless the same bytes are stored already, and returns their SHA-256. */
+  /**
+   * Stores the bytes, unless the same bytes are stored already, and returns their SHA-256. Either way the file's
+   * modification time becomes now, which the sweep reads as "in use" (ADR-0004 §5).
+   */
   put: (space: FileSpace, bytes: Uint8Array) => Promise<string>;
   /** The bytes with this SHA-256 in this space, or undefined if none are stored. Throws if they don't match it. */
   get: (space: FileSpace, sha256: string) => Promise<Uint8Array | undefined>;
@@ -32,7 +37,33 @@ export interface FileStore {
   removeStaleTemporaryFiles: (maxAgeMs: number) => Promise<number>;
   /** Writes, syncs and deletes a probe file, so a server can say at startup whether it can store anything. */
   probe: () => Promise<void>;
+  /** Every stored file, and the paths of anything else found among them (never deleted by the sweep). */
+  list: () => Promise<{ stored: StoredFile[]; unexpected: string[] }>;
+  /**
+   * Deletes one file's bytes for the sweep (ADR-0004 §5), unless they were stored or reused at or after `inUseSince`.
+   * The file is moved aside first and checked again, so a `put` that reuses it at the same moment either finds it gone
+   * and writes it again, or touches it and gets it put back.
+   */
+  retire: (
+    space: FileSpace,
+    sha256: string,
+    inUseSince: Date,
+  ) => Promise<'deleted' | 'kept' | 'gone'>;
+  /** The sweep's ledger, kept on the volume beside the bytes it describes. */
+  readLedger: () => Promise<string | undefined>;
+  writeLedger: (text: string) => Promise<void>;
+  /** Takes the sweep's lock, so two sweeps never run at once; resolves to its release, or throws if it is taken. */
+  lockSweep: () => Promise<() => Promise<void>>;
 }
+
+export interface StoredFile {
+  space: FileSpace;
+  sha256: string;
+}
+
+const LEDGER = 'sweep-ledger.json';
+const LOCK = 'sweep.lock';
+const PREFIX = /^[0-9a-f]{2}$/;
 
 const sha256Of = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
@@ -82,6 +113,77 @@ const syncDirectory = async (path: string): Promise<void> => {
   }
 };
 
+/** A folder's entries, or none if it doesn't exist. */
+const entriesIn = async (path: string): Promise<Dirent[]> => {
+  try {
+    return await readdir(path, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+};
+
+/** Whether a path is a real folder, not a link to one: a link could make one space's bytes look like another's. */
+const isRealFolder = async (path: string): Promise<boolean> => {
+  try {
+    const info = await lstat(path);
+    return info.isDirectory() && !info.isSymbolicLink();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+};
+
+/**
+ * The files under a space's `sha256/ab/cd/` folders. Anything that doesn't fit that layout, links included, goes to
+ * `unexpected`, as paths relative to the root.
+ */
+const listSpace = async (
+  root: string,
+  space: FileSpace,
+  stored: StoredFile[],
+  unexpected: string[],
+): Promise<void> => {
+  const folder = spaceDirectory(root, space);
+  const base = join(folder, 'sha256');
+  const at = (...parts: string[]) => relative(root, join(folder, ...parts));
+  for (const entry of await entriesIn(folder)) {
+    if (entry.name !== 'sha256' || !(await isRealFolder(base))) {
+      unexpected.push(at(entry.name));
+    }
+  }
+  if (!(await isRealFolder(base))) {
+    return;
+  }
+  for (const first of await entriesIn(base)) {
+    if (!first.isDirectory() || !PREFIX.test(first.name)) {
+      unexpected.push(at('sha256', first.name));
+      continue;
+    }
+    for (const second of await entriesIn(join(base, first.name))) {
+      if (!second.isDirectory() || !PREFIX.test(second.name)) {
+        unexpected.push(at('sha256', first.name, second.name));
+        continue;
+      }
+      for (const file of await entriesIn(join(base, first.name, second.name))) {
+        if (
+          file.isFile() &&
+          SHA256.test(file.name) &&
+          file.name.startsWith(first.name + second.name)
+        ) {
+          stored.push({ space, sha256: file.name });
+        } else {
+          unexpected.push(at('sha256', first.name, second.name, file.name));
+        }
+      }
+    }
+  }
+};
+
 export const createFileStore = (root: string): FileStore => {
   const temporaryDirectory = join(root, 'tmp');
 
@@ -108,7 +210,16 @@ export const createFileStore = (root: string): FileStore => {
       // replaced by a good copy rather than trusted for its name.
       const existing = await readIfPresent(target);
       if (existing && existing.byteLength === bytes.byteLength && sha256Of(existing) === sha256) {
-        return sha256;
+        try {
+          // In use again: the sweep leaves it alone. Gone since it was read (the sweep moved it): write it again.
+          const now = new Date();
+          await utimes(target, now, now);
+          return sha256;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+            throw error;
+          }
+        }
       }
       await writeAtomically(target, bytes);
       return sha256;
@@ -151,6 +262,92 @@ export const createFileStore = (root: string): FileStore => {
         }
       }
       return removed;
+    },
+    list: async () => {
+      const stored: StoredFile[] = [];
+      const unexpected: string[] = [];
+      for (const entry of await entriesIn(root)) {
+        if (
+          (entry.name === 'tmp' && entry.isDirectory()) ||
+          ([LEDGER, LOCK].includes(entry.name) && entry.isFile())
+        ) {
+          continue;
+        }
+        if (entry.name === 'platform' && entry.isDirectory()) {
+          await listSpace(root, 'platform', stored, unexpected);
+        } else if (isTenantId(entry.name) && entry.isDirectory()) {
+          for (const bucket of await entriesIn(join(root, entry.name))) {
+            const known = FILE_BUCKETS.find((name) => name === bucket.name);
+            if (known && bucket.isDirectory()) {
+              await listSpace(root, { tenantId: entry.name, bucket: known }, stored, unexpected);
+            } else {
+              unexpected.push(relative(root, join(root, entry.name, bucket.name)));
+            }
+          }
+        } else {
+          unexpected.push(entry.name);
+        }
+      }
+      return { stored, unexpected };
+    },
+    retire: async (space, sha256, inUseSince) => {
+      if (!SHA256.test(sha256)) {
+        throw new TypeError(`Not a SHA-256: ${sha256}`);
+      }
+      const target = pathOf(root, space, sha256);
+      await mkdir(temporaryDirectory, { recursive: true });
+      const aside = join(temporaryDirectory, `retired-${randomUUID()}`);
+      try {
+        await rename(target, aside);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return 'gone';
+        }
+        throw error;
+      }
+      // Stored or reused since `inUseSince`, the move included (a put that read it just before touched it): it goes
+      // back. A put that comes after the move finds it gone and writes it again.
+      if ((await lstat(aside)).mtime >= inUseSince) {
+        if (await readIfPresent(target)) {
+          await rm(aside, { force: true });
+        } else {
+          await rename(aside, target);
+        }
+        return 'kept';
+      }
+      await rm(aside, { force: true });
+      return 'deleted';
+    },
+    readLedger: async () => {
+      try {
+        return await readFile(join(root, LEDGER), 'utf8');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          return undefined;
+        }
+        throw error;
+      }
+    },
+    writeLedger: async (text) => {
+      await writeAtomically(join(root, LEDGER), new TextEncoder().encode(text));
+    },
+    lockSweep: async () => {
+      const path = join(root, LOCK);
+      try {
+        await writeSynced(
+          path,
+          new TextEncoder().encode(`${process.pid} ${new Date().toISOString()}\n`),
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+          throw new Error(
+            `Another sweep holds ${path}. If none is running (one stopped halfway), delete that file and run again.`,
+            { cause: error },
+          );
+        }
+        throw error;
+      }
+      return () => rm(path, { force: true });
     },
     probe: async () => {
       await mkdir(temporaryDirectory, { recursive: true });
