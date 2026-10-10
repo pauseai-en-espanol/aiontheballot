@@ -624,15 +624,17 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 **M2 (editorial workflow), slices taken while Dani was away:**
 
 - **R77. The cell editor's live match (W13) is in `packages/domain`** (`matchQuote`), mirroring the database's trigger
-  step for step (each page normalised on its own, joined with one space, the first occurrence, 15 characters counted
-  as the database counts them), and a database test runs the same quotes through both. When a quote doesn't match,
-  "the longest matching part" (C2.6) is the longest start or end of the quote that appears, found by binary search (a
-  few dozen searches of the text), rather than the longest common substring of quote and source, which would cost
-  the quote's length times the programme's on every keystroke. It shows the editor where the difference begins. It
-  also applies the column's limits (15 to 1,000 characters as stored), so it never calls a quote the database refuses
-  a match. That part is given normalised; the editor will need it mapped back onto the quote as typed. The API route
-  that serves it, which should keep each source's normalised pages rather than redo them per keystroke, waits for
-  sign-in (editorial workflow spec §18, O2). The two normalisers still differ on rare characters: D9.
+  step for step (each page normalised on its own, joined with one space, the first occurrence, 15 characters counted as
+  the database counts them), and a database test runs the same quotes through both. When a quote doesn't match, "the
+  longest matching part" (C2.6) is the longest start or end of the quote that appears, found by binary search (a few
+  dozen searches of the text), rather than the longest common substring of quote and source, which would cost the
+  quote's length times the programme's on every keystroke. It shows the editor where the difference begins. It also
+  applies the column's limits (15 to 1,000 characters as stored), so it never calls a quote the column refuses a match,
+  and says which count fell short (as stored, refused on save; or normalised, saved but never matched). The longest
+  matching part is given normalised; the editor will need it mapped back onto the quote as typed. Text Postgres can't
+  hold at all (a NUL character) is refused on save as invalid. The API route that serves it, which should keep each
+  source's normalised pages rather than redo them per keystroke, waits for sign-in (editorial workflow spec §18, O2).
+  The two normalisers still differ on rare characters: D9.
 - **R78. Database refusals become HTTP answers by SQLSTATE** (editorial workflow §2.3): 42501 → 403, 23001, 40001
   and 40P01 → 409 ("reload"), 23514 → 422, 23505 → 409, 23503 → 409 ("linked"), 54000 → 429, invalid values → 400,
   each with a message key in `packages/i18n` (English and Spanish), plus the constraint's name for unique, foreign key

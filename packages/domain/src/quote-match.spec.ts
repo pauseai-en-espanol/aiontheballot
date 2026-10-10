@@ -57,19 +57,32 @@ describe('the live match of a quote', () => {
     expect(matchQuote('una  moratoria\u00AD', PROGRAMME)).toEqual({
       kind: 'too-short',
       length: 13,
+      counted: 'normalised',
     });
     // Characters, not UTF-16 units: 14 characters (16 units) is too short, 15 is enough.
     const votes = pages('Votos 🗳🗳🗳 de ejemplo.');
-    expect(matchQuote('🗳🗳 de ejemplo.', votes)).toEqual({ kind: 'too-short', length: 14 });
+    expect(matchQuote('🗳🗳 de ejemplo.', votes)).toEqual({
+      kind: 'too-short',
+      length: 14,
+      counted: 'stored',
+    });
     expect(matchQuote('🗳🗳🗳 de ejemplo.', votes)).toMatchObject({ kind: 'matched' });
   });
 
   it('counts a quote as its column does too: spaces at either end aside, before normalising', () => {
     const source = pages('Sobre la financiación de ejemplo.');
     // 14 characters as stored, 15 once its ligature is two letters: the database refuses to save it.
-    expect(matchQuote('la ﬁnanciación', source)).toEqual({ kind: 'too-short', length: 14 });
+    expect(matchQuote('la ﬁnanciación', source)).toEqual({
+      kind: 'too-short',
+      length: 14,
+      counted: 'stored',
+    });
     expect(matchQuote('   la financiación   ', source)).toMatchObject({ kind: 'matched' });
-    expect(matchQuote('  la ﬁnanciació  ', source)).toEqual({ kind: 'too-short', length: 13 });
+    expect(matchQuote('  la ﬁnanciació  ', source)).toEqual({
+      kind: 'too-short',
+      length: 13,
+      counted: 'stored',
+    });
     // Only spaces: a tab at either end counts, as stored, and normalising drops it.
     expect(matchQuote('\tla ﬁnanciación', source)).toMatchObject({ kind: 'matched' });
   });

@@ -34,7 +34,13 @@ export interface UnitSpan {
 
 export type QuoteMatch =
   | { kind: 'matched'; span: UnitSpan }
-  | { kind: 'too-short' | 'too-long'; length: number }
+  /**
+   * Under 15 characters: as stored (spaces at either end aside), which the database refuses to save, or once
+   * normalised, which it saves but never matches.
+   */
+  | { kind: 'too-short'; length: number; counted: 'stored' | 'normalised' }
+  /** Over 1,000 characters as stored, which the database refuses to save. */
+  | { kind: 'too-long'; length: number }
   | {
       kind: 'unmatched';
       /**
@@ -87,12 +93,12 @@ export const matchQuote = (quote: string, units: readonly SourceUnit[]): QuoteMa
     return { kind: 'too-long', length: stored };
   }
   if (stored < MIN_QUOTE_LENGTH) {
-    return { kind: 'too-short', length: stored };
+    return { kind: 'too-short', length: stored, counted: 'stored' };
   }
   const needle = normalizeForMatch(quote);
   const length = characters(needle);
   if (length < MIN_QUOTE_LENGTH) {
-    return { kind: 'too-short', length };
+    return { kind: 'too-short', length, counted: 'normalised' };
   }
   const ordered = [...units].sort((a, b) => a.index - b.index);
   const texts = ordered.map((unit) => normalizeForMatch(unit.body));
