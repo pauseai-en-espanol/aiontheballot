@@ -130,6 +130,8 @@ fix them rather than copy them.
 - **Sync order:** the gitops Secrets and the default ServiceAccount patch (wave -2), then the migration Job (a
   Sync hook in wave -1), then everything else. Not a PreSync hook: on a first sync it would run before the Secrets
   and the pull secret exist. Migrations are expand/contract, because old pods serve until the rollout finishes.
+  Argo CD syncs only when a regular resource differs, and never compares hooks, so the umbrella chart carries a
+  ConfigMap of the release's image tags: a release that changes only the migration image still syncs and runs it.
 - **One environment: production.** There is no staging instance:
   - Until the preview, production publishes nothing (it shows "coming soon"), so it is where deployments are
     tried.

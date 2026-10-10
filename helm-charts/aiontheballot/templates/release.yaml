@@ -1,0 +1,20 @@
+# What this release deploys. Argo CD starts an automated sync only when a regular resource differs from the cluster,
+# and never compares hooks: a release that changed only the migration Job (a Sync hook) would never run it. This
+# ConfigMap changes with every image tag and with any change to the migration Job's values, so each such release is a
+# full sync, which runs the migrations first (wave -1). A manual sync of selected resources skips hooks: sync the whole
+# app. Nothing reads it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-release
+  labels:
+    helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  migrations: {{ index .Values "aiontheballot-migrations" "image" "tag" | quote }}
+  migrations-values: {{ toYaml (index .Values "aiontheballot-migrations") | sha256sum | quote }}
+  api: {{ index .Values "aiontheballot-api" "image" "tag" | quote }}
+  web: {{ index .Values "aiontheballot-web" "image" "tag" | quote }}
+  admin: {{ index .Values "aiontheballot-admin" "image" "tag" | quote }}
