@@ -56,8 +56,9 @@ const KINDS: Readonly<Record<string, Kind>> = {
   '22P02': { status: 400, error: 'invalid' },
   '22007': { status: 400, error: 'invalid' },
   '22008': { status: 400, error: 'invalid' },
-  // Text Postgres can't hold: a NUL character.
+  // Text Postgres can't hold: a NUL character, in a text column or in localized jsonb.
   '22021': { status: 400, error: 'invalid' },
+  '22P05': { status: 400, error: 'invalid' },
 };
 
 /**
@@ -69,8 +70,9 @@ const KINDS: Readonly<Record<string, Kind>> = {
 const GRANT_CHECKS = new Set([
   'aclcheck_error',
   'aclcheck_error_col',
-  'aclcheck_error_type',
   'nextval_internal',
+  'currval_oid',
+  'lastval',
   'do_setval',
   'check_enable_rls',
 ]);

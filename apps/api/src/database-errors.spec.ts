@@ -20,6 +20,7 @@ describe('a database refusal', () => {
     ['22007', 400, 'invalid'],
     ['22008', 400, 'invalid'],
     ['22021', 400, 'invalid'],
+    ['22P05', 400, 'invalid'],
   ])('answers %s with %i and the key %s', (code, status, error) => {
     expect(databaseRefusal(pgError(code))).toMatchObject({ status, error, report: false });
   });
@@ -36,8 +37,9 @@ describe('a database refusal', () => {
     for (const routine of [
       'aclcheck_error',
       'aclcheck_error_col',
-      'aclcheck_error_type',
       'nextval_internal',
+      'currval_oid',
+      'lastval',
       'do_setval',
       'check_enable_rls',
     ]) {

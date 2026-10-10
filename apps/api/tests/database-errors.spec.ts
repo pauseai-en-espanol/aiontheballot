@@ -52,7 +52,11 @@ describe('a database refusal, as Postgres raises it', () => {
       );
       const malformed = await refusalOf(trx, sql`SELECT ${'no-es-un-id'}::uuid`);
       const nul = await refusalOf(trx, sql`SELECT ${'una cita\u0000 de ejemplo'}::text`);
-      return { reserved, malformed, nul };
+      const nulInJson = await refusalOf(
+        trx,
+        sql`SELECT (${JSON.stringify({ es: 'una cita\u0000 de ejemplo' })}::jsonb) ->> 'es'`,
+      );
+      return { reserved, malformed, nul, nulInJson };
     });
     expect(answers.reserved).toEqual({
       status: 422,
@@ -62,6 +66,7 @@ describe('a database refusal, as Postgres raises it', () => {
     });
     expect(answers.malformed).toEqual({ status: 400, error: 'invalid', report: false });
     expect(answers.nul).toEqual({ status: 400, error: 'invalid', report: false });
+    expect(answers.nulInJson).toEqual({ status: 400, error: 'invalid', report: false });
   });
 
   it("reports a limit of Postgres's own, such as an index entry too large, as a fault", async () => {
