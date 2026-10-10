@@ -21,7 +21,8 @@ DB_HOST="postgresql.postgresql.svc.cluster.local:5432"
 
 files=("$PG_DIR/aiontheballot-db-credentials.yaml" "$APP_DIR/aiontheballot-harbor-pull.yaml"
   "$APP_DIR/aiontheballot-owner-db.yaml" "$APP_DIR/aiontheballot-web-db.yaml" "$APP_DIR/aiontheballot-admin-db.yaml"
-  "$APP_DIR/aiontheballot-worker-db.yaml" "$APP_DIR/aiontheballot-auth-db.yaml")
+  "$APP_DIR/aiontheballot-worker-db.yaml" "$APP_DIR/aiontheballot-auth-db.yaml"
+  "$APP_DIR/aiontheballot-better-auth.yaml")
 for f in "${files[@]}"; do
   if [ -e "$f" ]; then
     echo "Refusing to overwrite $f" >&2
@@ -66,6 +67,7 @@ web_pw="$(openssl rand -hex 32)"
 admin_pw="$(openssl rand -hex 32)"
 worker_pw="$(openssl rand -hex 32)"
 auth_pw="$(openssl rand -hex 32)"
+auth_secret="$(openssl rand -hex 32)"
 url() { printf 'postgres://%s:%s@%s/aiontheballot?sslmode=disable' "$1" "$2" "$DB_HOST"; }
 
 seal "$PG_DIR/aiontheballot-db-credentials.yaml" \
@@ -107,5 +109,9 @@ seal "$APP_DIR/aiontheballot-auth-db.yaml" \
   "# DATABASE_URL for aiontheballot_auth (Better Auth, in the API): $(url aiontheballot_auth '<AUTH_PASSWORD>')" -2 \
   generic aiontheballot-auth-db -n aiontheballot --from-file=DATABASE_URL=<(url aiontheballot_auth "$auth_pw")
 
-unset HARBOR_SECRET owner_pw web_pw admin_pw worker_pw auth_pw
+seal "$APP_DIR/aiontheballot-better-auth.yaml" \
+  "# BETTER_AUTH_SECRET: the key Better Auth signs sessions and tokens with (openssl rand -hex 32)." -2 \
+  generic aiontheballot-better-auth -n aiontheballot --from-file=BETTER_AUTH_SECRET=<(printf %s "$auth_secret")
+
+unset HARBOR_SECRET owner_pw web_pw admin_pw worker_pw auth_pw auth_secret
 echo "Done. Review with: git -C \"$GITOPS\" status"
