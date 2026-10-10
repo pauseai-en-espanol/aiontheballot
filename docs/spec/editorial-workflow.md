@@ -188,7 +188,10 @@ _As a country admin, I set up how my tenant looks and what it says about us._
 3. Country admins upload the tenant's logos (PNG, JPEG or WebP, into its public assets) and assign each to a slot:
    the operator's logo for orange, white and dark surfaces, and its mark. Logos are the tenant's data, never code.
    [DB: `brand_file_is_public_asset`, one source per slot; API: image size; UI]
-4. A slot can instead take a platform brand asset from the catalogue. Restricted assets appear only when the tenant
+4. They may also upload the site icon (the `site_icon` slot): a whole, square PNG of 512 to 1,024 pixels a side. The
+   upload screen refuses anything else, with the same check as the public site, which would show the platform's
+   default icon instead (PLAN R72). [UI; web]
+5. A slot can instead take a platform brand asset from the catalogue. Restricted assets appear only when the tenant
    is eligible. [DB: eligibility trigger; UI]
 
 ### T2. Policy texts

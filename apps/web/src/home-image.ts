@@ -67,8 +67,9 @@ export const warmHomeImage = (...args: Parameters<typeof homeImage>): void => {
 };
 
 /**
- * Pre-renders every tenant's link preview, in each of its locales: run once a server has started, so whichever
- * replica a crawler reaches already has the images its pages name. Failures are logged; the route renders on demand.
+ * Pre-renders every tenant's link preview, in each of its locales, and decides whether its own site icon is usable:
+ * run once a server has started, so whichever replica a crawler reaches already has the images its pages name, and no
+ * page waits for an icon's bytes. Failures are logged; the routes render on demand.
  */
 export const warmAllHomeImages = async (): Promise<void> => {
   const [
@@ -76,11 +77,13 @@ export const warmAllHomeImages = async (): Promise<void> => {
     { LINK_PREVIEW },
     { homeCardContent, homeCardHash },
     { loadRoutingTable, loadTenantPage },
+    { siteIconSource },
   ] = await Promise.all([
     import('@aiontheballot/i18n/messages'),
     import('@aiontheballot/og/sizes'),
     import('./share'),
     import('./tenant-data'),
+    import('./site-icon'),
   ]);
   const table = await loadRoutingTable();
   for (const { slug, enabledLocales } of table?.tenantsBySlug.values() ?? []) {
@@ -88,6 +91,7 @@ export const warmAllHomeImages = async (): Promise<void> => {
     if (page.kind !== 'found') {
       continue;
     }
+    await siteIconSource(slug, page.home);
     for (const locale of enabledLocales.filter(isLocale)) {
       const card = homeCardContent(page.home, locale, page.base);
       await homeImage(slug, locale, LINK_PREVIEW, homeCardHash(card, LINK_PREVIEW), card).catch(

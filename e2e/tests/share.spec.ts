@@ -1,55 +1,15 @@
 import { messages } from '@aiontheballot/i18n/messages';
 import { expect, type Page, test } from '@playwright/test';
-import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 
+import { get, pngSize } from '../fetch-by-host.js';
 import { PLATFORM_HOST, PORTS, SEED_HOSTS, TENANT_URL } from '../servers.js';
 
 /** The seeds' canonical bases: https, as every share URL is built from the routing table, never the request. */
 const CANONICAL_A = `https://${SEED_HOSTS.canonical}`;
 const CANONICAL_B = `https://${PLATFORM_HOST}/ejemplo-b`;
 
-interface Answer {
-  status: number;
-  headers: IncomingHttpHeaders;
-  body: Buffer;
-}
-
-/**
- * GETs a URL from the e2e web server by its Host header, the way the gateway forwards it: canonical https addresses
- * included, and without resolving `*.localhost`, which browsers do but Node doesn't on every system.
- */
-const get = (url: string, headers: Record<string, string> = {}): Promise<Answer> => {
-  const { hostname, pathname, search } = new URL(url);
-  return new Promise((resolve, reject) => {
-    const req = httpRequest(
-      {
-        host: '127.0.0.1',
-        port: PORTS.web,
-        path: `${pathname}${search}`,
-        headers: { host: hostname, ...headers },
-      },
-      (res) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () =>
-          resolve({
-            status: res.statusCode ?? 0,
-            headers: res.headers,
-            body: Buffer.concat(chunks),
-          }),
-        );
-      },
-    );
-    req.on('error', reject);
-    req.end();
-  });
-};
-
 const meta = (page: Page, key: string) =>
   page.locator(`meta[property="${key}"], meta[name="${key}"]`).getAttribute('content');
-
-/** Width and height from a PNG's IHDR chunk. */
-const pngSize = (png: Buffer) => ({ width: png.readUInt32BE(16), height: png.readUInt32BE(20) });
 
 test.describe('link previews (fictional seeds)', () => {
   test('give crawlers the canonical address, the texts and a share image', async ({ page }) => {

@@ -35,10 +35,14 @@ export interface BrandImage {
   contentType: string;
 }
 
-/** The brand slots the public pages use, each for the background it sits on. */
+/**
+ * The brand slots the public pages use: the operator's logos, each for the background it sits on, its mark, and the
+ * tenant's own site icon (a square PNG of at least 512 px; without one, the platform's default icon).
+ */
 export const BRAND_SLOTS = {
   operatorLogoOnAccent: 'operator_logo_on_accent',
   operatorLogoOnCanvas: 'operator_logo_on_canvas',
   operatorLogoOnInverse: 'operator_logo_on_inverse',
   operatorMark: 'operator_mark',
+  siteIcon: 'site_icon',
 } as const;

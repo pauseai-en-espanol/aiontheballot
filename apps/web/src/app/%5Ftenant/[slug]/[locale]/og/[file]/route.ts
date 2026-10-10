@@ -3,6 +3,7 @@ import type { ShareSize } from '@aiontheballot/og/sizes';
 import { isLocale, type Locale } from '@aiontheballot/i18n/messages';
 
 import { homeImage } from '@/home-image';
+import { IMMUTABLE, matchesEtag, plain } from '@/http-cache';
 import {
   homeCardContent,
   homeCardHash,
@@ -16,23 +17,6 @@ import { loadTenantPage, type TenantPage } from '@/tenant-data';
 interface ImageContext {
   params: Promise<{ slug: string; locale: string; file: string }>;
 }
-
-const plain = (status: number, body: string, cache = 'no-store'): Response =>
-  new Response(body, {
-    status,
-    headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': cache },
-  });
-
-/** A year, and never revalidated: a new picture always gets a new URL (ADR-0003 §8). */
-const IMMUTABLE = 'public, max-age=31536000, immutable';
-
-/** Whether If-None-Match names this ETag: a list, weak or strong, or `*`. */
-const matches = (header: string | null, etag: string): boolean =>
-  header !== null &&
-  header.split(',').some((value) => {
-    const tag = value.trim().replace(/^W\//, '');
-    return tag === etag || tag === '*';
-  });
 
 /** The image's current content and hash, and its address, from the tenant's data. */
 const currentImage = (
@@ -85,7 +69,7 @@ export const GET = async (request: Request, { params }: ImageContext): Promise<R
     });
   }
   const etag = `"${hash}"`;
-  if (matches(request.headers.get('if-none-match'), etag)) {
+  if (matchesEtag(request.headers.get('if-none-match'), etag)) {
     return new Response(null, { status: 304, headers: { etag, 'cache-control': IMMUTABLE } });
   }
   const png = await homeImage(slug, locale, requested.size, hash, card);

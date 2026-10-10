@@ -20,9 +20,9 @@ the checklists.
    The seeds' file bytes go to `.data/files` (or `FILES_ROOT`, see `.env.example`); `pnpm db:seed` writes them again
    on every run.
 
-   **Refreshing an already-seeded local database.** When a migration can't apply to data the seeds wrote earlier
-   (`files_on_volume`, for instance, refuses to drop stored bytes), start again from an empty database. This deletes
-   only local, fictional data:
+   **Refreshing an already-seeded local database.** The seeds add nothing to a database they already seeded, so after
+   a change to them, or when a migration can't apply to data they wrote earlier (`files_on_volume`, for instance,
+   refuses to drop stored bytes), start again from an empty database. This deletes only local, fictional data:
 
    ```sh
    docker compose down -v   # stop Postgres and delete its volume

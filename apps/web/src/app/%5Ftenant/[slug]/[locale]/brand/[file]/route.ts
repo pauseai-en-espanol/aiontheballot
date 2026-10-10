@@ -1,17 +1,12 @@
 import { isLocale } from '@aiontheballot/i18n/messages';
 
 import { loadBrandImage, parseBrandImageFile } from '@/brand-images';
+import { IMMUTABLE, matchesEtag, plain } from '@/http-cache';
 import { loadTenantPage, type TenantPage } from '@/tenant-data';
 
 interface BrandImageContext {
   params: Promise<{ slug: string; locale: string; file: string }>;
 }
-
-const plain = (status: number, body: string): Response =>
-  new Response(body, {
-    status,
-    headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' },
-  });
 
 /**
  * One of the tenant's brand images, at /brand/{sha256}.{ext}: only one its home data names, so the URL can't reach
@@ -40,17 +35,8 @@ export const GET = async (request: Request, { params }: BrandImageContext): Prom
     return plain(404, 'Not found');
   }
   const etag = `"${requested.sha256}"`;
-  const headers = {
-    etag,
-    'cache-control': 'public, max-age=31536000, immutable',
-    'x-content-type-options': 'nosniff',
-  };
-  if (
-    request.headers
-      .get('if-none-match')
-      ?.split(',')
-      .some((tag) => tag.trim() === etag)
-  ) {
+  const headers = { etag, 'cache-control': IMMUTABLE, 'x-content-type-options': 'nosniff' };
+  if (matchesEtag(request.headers.get('if-none-match'), etag)) {
     return new Response(null, { status: 304, headers });
   }
   const bytes = await loadBrandImage(slug, requested.sha256);

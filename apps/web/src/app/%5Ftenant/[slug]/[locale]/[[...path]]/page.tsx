@@ -11,6 +11,7 @@ import { brandImagePath } from '@/brand-images';
 import { ComingSoon } from '@/components/coming-soon';
 import { warmHomeImage } from '@/home-image';
 import { homeCardContent, homeCardHash, imagePath, ogLocale, pageUrl } from '@/share';
+import { siteIconPath, siteIconSource } from '@/site-icon';
 import { loadTenantPage } from '@/tenant-data';
 
 interface TenantPageProps {
@@ -61,9 +62,19 @@ export const generateMetadata = async (props: TenantPageProps): Promise<Metadata
     alt: `${name}: ${t('home.question')}`,
     type: 'image/png',
   };
+  // Root-relative, from the canonical base's path, like the logos: the same icons in every locale.
+  const root = new URL(base).pathname.replace(/\/$/, '');
+  const icon = await siteIconSource(slug, home);
+  const png = (size: 16 | 32 | 180) => ({
+    url: `${root}${siteIconPath(icon, size)}`,
+    sizes: `${size}x${size}`,
+    type: 'image/png',
+  });
   return {
     title,
     description,
+    icons: { icon: [png(32), png(16)], shortcut: `${root}/favicon.ico`, apple: [png(180)] },
+    manifest: `${root}/manifest.webmanifest`,
     alternates: {
       canonical: url,
       languages: Object.fromEntries([

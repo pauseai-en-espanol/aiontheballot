@@ -470,6 +470,10 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   it doesn't recognise, such as Mastodon's and Bluesky's, which read only the head. `og:locale` is set only for the
   tenant's own language (`es_ES`), with no `og:locale:alternate`: the locales are separate pages, as `hreflang`
   says. The renderer loads only when an image renders, so a failure there could never break a page.
+- **R55. The coming-soon cards carry no methodology link** (BRIEF invariant 4): there is no methodology page yet.
+  Cards for published views will. Without a logo, the operator line is in words (R59).
+- **R56. The hero is sized by the viewport's height too,** so on a 1080p screen "Cómo lo haremos" starts above the
+  fold (Dani's feedback).
 
 **Logos (tenants' own uploads; Dani's direction):**
 
@@ -479,8 +483,9 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   files. The page shows the operator's logo for orange in the header and for white in the footer, at
   `/brand/{sha256}.{ext}`, cached as immutable; the share cards draw it (PNG or JPEG) and their hash covers it. A
   tenant without logos keeps the operator line in words. Slots: `operator_logo_on_accent`, `_on_canvas`,
-  `_on_inverse` and `operator_mark`. Brand images are at most 2 MB, as platform assets are, and a card draws a logo
-  only if its bytes are the declared format and no side exceeds 4,096 px (a small file can declare huge dimensions).
+  `_on_inverse` and `operator_mark` (and `site_icon`, R72). Brand images are at most 2 MB, as platform assets are,
+  and a card draws a logo only if its bytes are the declared format and no side exceeds 4,096 px (a small file can
+  declare huge dimensions).
   Accepted consequence: the restricted-asset rule (BRIEF invariant 5) now guards the platform's catalogue only; a
   tenant may upload any image, a copy of a protected logo included, as its own responsibility (ADR-0002 amended).
   To do with the public site (M3): an election's slug must never be `brand` or `og`, which these routes take.
@@ -543,10 +548,34 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   `FILES_ROOT` is in `.env.example` commented out: only an absolute path works for the API, the seeds and the tests,
   which run from different folders.
 
-- **R55. The coming-soon cards carry no methodology link** (BRIEF invariant 4): there is no methodology page yet.
-  Cards for published views will. Without a logo, the operator line is in words (R59).
-- **R56. The hero is sized by the viewport's height too,** so on a 1080p screen "Cómo lo haremos" starts above the
-  fold (Dani's feedback).
+**Site icon (favicon):**
+
+- **R71. The platform's default icon is the coming-soon page's ballot going into the slot of a ballot box, marked
+  with the AI sparkle instead of a cross,** on an orange tile: the tile carries the marks' contrast with it (ink on
+  orange and on white), so the icon reads on light and dark tabs alike. No text, no tenant's branding. 16 and 32 px
+  have their own drawings on the pixel grid (at 16 px the sparkle is seven pixels across and reads more as a bold mark
+  than as a sparkle); from 180 px the tile fills the square, since home screens cut their own corners. A test pins
+  each drawing, and the URLs' hash covers the drawing itself.
+- **R72. A tenant replaces it through a `site_icon` logo slot:** a PNG, used only if a decoder will draw it whole
+  (every chunk's checksum; a colour type and bit depth the format allows, which also bounds what inflating costs; a
+  palette when it needs one; image data that inflates to what its header says, every row with a known filter: a file
+  cut short passes a header check and then draws nothing), square, and 512 to 1,024 pixels a side (512 so every size
+  served is a reduction; 1,024 since nothing larger is served and every pixel costs the renderer). The web app decides
+  once per upload, by its hash, at startup or on first use, and remembers it for the whole process; the database
+  doesn't know an image's dimensions. Anything else, and an icon whose
+  bytes can't be read (asked again after a minute), gets the platform's default, never another organization's mark.
+  The slot can also take a platform brand asset, like any logo slot, eligibility rules included. Tenant icons are
+  scaled down by halving, so fine lines turn grey instead of vanishing, and land on white from 180 px. While an
+  upload can't be read, `/favicon.ico` is cached a minute instead of a day.
+- **R73. Icons are served by content hash** at `/brand/icon/{size}.{hash}.png` under the tenant's root (16, 32, 180,
+  192 and 512), cached a year as immutable; a stale hash redirects (307) like a share image's (R54). Using `/brand/`
+  adds no path an election slug could take. `/favicon.ico` holds the 16, 32 and 48 px PNGs and is cached a day with
+  an ETag, since its name has no hash. The pages name them through Next's metadata (`icon`, `apple-touch-icon`,
+  `shortcut icon`), plus a web manifest (`/manifest.webmanifest`, cached an hour) with the tenant's name and the 192
+  and 512 px icons, `display: browser`, so nothing offers to install the site as an app. Rendered icons have their own
+  cache, apart from the share images.
+- **R74. Seeds:** `ejemplo-a` has a fictional 512 px icon (a white frame on teal); `ejemplo-b` has none, so the e2e
+  tests cover both and check the pixels each shows.
 
 ## Open decisions for Dani
 
