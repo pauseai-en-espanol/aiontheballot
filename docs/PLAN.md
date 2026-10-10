@@ -612,7 +612,9 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   `healthz` is added to Dani's two because the health probe answers it on every host before routing, so an election
   with that slug would be unreachable (`og`, two letters, is also refused as locale-shaped; it is listed anyway, so the
   list doesn't lean on that rule). The list is `RESERVED_ELECTION_SLUGS` in `packages/domain`; a web test fails
-  when a route under the tenant's root is neither in it nor has a dot (`favicon.ico`, which no slug can take). The
+  when a first path segment the public site serves, under the tenant's root or before any tenant (`SYSTEM_PATHS`), is
+  neither in it nor something no slug can be (`favicon.ico`). It follows Next's metadata files (`icon.tsx` answers
+  `/icon`), route groups, slots and intercepting routes. The
   public site's own pages (methodology, legal notice and the like) get paths in its spec (M3); each needs adding then,
   or a prefix of its own. Tenant slugs, on the platform host, aren't covered.
 
