@@ -450,7 +450,17 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   manage. For Spain, `~/update-spain-operator.sql` sets the website, contact address and newsletter from pauseai.es
   (a dry run unless piped with `COMMIT`), once this is deployed.
 
-**Social sharing (Dani's priority; R51 is the `announced-elections` branch's):**
+**Announced elections (a change to ADR-0002):**
+
+- **R51. A country admin may announce a draft election,** so the coming-soon page names it and gives its date
+  (migration `announced_elections`, `elections.announced`). It widens the public-visibility rule by one row: the
+  public sees the announced draft's own row and nothing under it, since every policy below the election checks its
+  status itself (a test reads the methodology, reviewers, parties and criteria as the public and finds none). Nobody
+  creates an election already announced, an announced election keeps its name in the default locale, and the flag is
+  fixed once the election goes live. The other option, a tenant-level "next election" setting, would duplicate the
+  election's name and date outside the election. ADR-0002 and the data-model spec are amended.
+
+**Social sharing (Dani's priority):**
 
 - **R52. satori 0.35.1:** the newest release past the workspace's three-day rule (`minimumReleaseAge`); satori
   released 24 times in 30 days. `@resvg/resvg-js` 2.6.2 ships the musl binary the Alpine image needs (checked in a

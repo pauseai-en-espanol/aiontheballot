@@ -175,8 +175,17 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
   for (const e of Object.values(ELECTIONS)) {
     const tenant = TENANTS[e.tenant].id;
     await client.query(
-      `INSERT INTO app.elections (id, tenant_id, slug, type, territory_code, name) VALUES ($1, $2, $3, $4, $5, $6)`,
-      [e.id, tenant, e.slug, e.type, e.territory, { es: `Elecciones de ejemplo ${e.slug}` }],
+      `INSERT INTO app.elections (id, tenant_id, slug, type, territory_code, name, announced)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        e.id,
+        tenant,
+        e.slug,
+        e.type,
+        e.territory,
+        { es: `Elecciones de ejemplo ${e.slug}` },
+        e.announced,
+      ],
     );
     if (!e.structure) {
       continue;

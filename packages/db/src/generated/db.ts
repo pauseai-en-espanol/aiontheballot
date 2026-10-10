@@ -260,6 +260,7 @@ export interface AppDraftEvidence {
 }
 
 export interface AppElections {
+  announced: Generated<boolean>;
   created_at: Generated<Timestamp>;
   election_date: Timestamp | null;
   frozen_from: Timestamp | null;

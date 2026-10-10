@@ -102,6 +102,8 @@ const CRITERIA = [id(4, 5), id(4, 6)] as const;
 const FILE = id(4, 7);
 const SOURCE = id(4, 8);
 const CELLS = { published: id(4, 9), draft: id(4, 10) } as const;
+/** B's drafts: one announced, one not (and sooner, so the coming-soon page would pick it if it leaked). */
+const B_DRAFTS = { announced: id(5, 1), unannounced: id(5, 2) } as const;
 /** A's uploaded operator logo: a fictional mark (two bars and a line, 240×64), not anyone's logo. */
 const LOGO = {
   file: id(5, 3),
@@ -346,6 +348,21 @@ export const seed = async (
       `INSERT INTO app.assessment_revisions (assessment_id, reviewed_version)
        SELECT id, content_version FROM app.assessments WHERE id = $1`,
       [CELLS.published],
+    );
+    // Dates relative to today, so they stay in the future: no date is written into the code.
+    await as(SEED_USERS.countryAdminB);
+    const B = SEED_TENANTS.B;
+    await client.query(
+      `INSERT INTO app.elections (id, tenant_id, slug, type, territory_code, name, election_date, announced)
+       VALUES ($1, $2, 'autonomicas-de-ejemplo', 'regional', 'XB-01', $3, current_date + 400, true),
+              ($4, $2, 'municipales-de-ejemplo', 'municipal', NULL, $5, current_date + 200, false)`,
+      [
+        B_DRAFTS.announced,
+        B.id,
+        { es: 'Elecciones autonómicas de ejemplo', en: 'Example regional election' },
+        B_DRAFTS.unannounced,
+        { es: 'Elecciones municipales de ejemplo', en: 'Example local election' },
+      ],
     );
     return 'seeded';
   }

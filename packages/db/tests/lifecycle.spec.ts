@@ -54,7 +54,8 @@ describe('going live', () => {
     [
       'with an untranslated election name',
       [
-        `UPDATE app.elections SET name = '{"en": "Example election"}' WHERE id = '${ELECTIONS.draftA.id}'`,
+        // Withdrawn first: an announced election can't lose its default-locale name (elections.spec.ts).
+        `UPDATE app.elections SET announced = false, name = '{"en": "Example election"}' WHERE id = '${ELECTIONS.draftA.id}'`,
       ],
       ELECTIONS.draftA.id,
     ],

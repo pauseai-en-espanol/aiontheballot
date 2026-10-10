@@ -227,6 +227,8 @@ export interface FixtureElection {
   territory: string | null;
   /** Whether it has a methodology, an external reviewer, two parties and a criterion. */
   structure: boolean;
+  /** Announced while a draft: the public sees its row, never its structure. */
+  announced: boolean;
   methodology: string;
   reviewer: string;
   party: string;
@@ -243,6 +245,7 @@ const election = (
   type: FixtureElection['type'],
   territory: string | null,
   structure = true,
+  announced = false,
 ): FixtureElection => ({
   id: fixtureId(7, n),
   tenant,
@@ -251,6 +254,7 @@ const election = (
   type,
   territory,
   structure,
+  announced,
   methodology: fixtureId(8, n),
   reviewer: fixtureId(9, n),
   party: fixtureId(7, 20 + n),
@@ -261,11 +265,12 @@ const election = (
 
 /**
  * Fictional elections (ADR-0002, fixtures): a live, a draft and an archived one in A and B, a live and a draft one in
- * the inactive tenant, and an empty draft (no structure) in each tenant, for the insert cases.
+ * the inactive tenant, and an empty draft (no structure) in each tenant, for the insert cases. The drafts with
+ * structure in A and in the inactive tenant are announced; B's is not.
  */
 export const ELECTIONS = {
   liveA: election(1, 'A', 'live', 'generales-de-ejemplo', 'general', null),
-  draftA: election(2, 'A', 'draft', 'autonomicas-de-ejemplo', 'regional', 'XA-01'),
+  draftA: election(2, 'A', 'draft', 'autonomicas-de-ejemplo', 'regional', 'XA-01', true, true),
   archivedA: election(3, 'A', 'archived', 'europeas-de-ejemplo', 'european', null),
   emptyA: election(4, 'A', 'draft', 'municipales-de-ejemplo', 'municipal', null, false),
   liveB: election(5, 'B', 'live', 'generales-de-ejemplo', 'general', null),
@@ -273,7 +278,16 @@ export const ELECTIONS = {
   archivedB: election(7, 'B', 'archived', 'europeas-de-ejemplo', 'european', null),
   emptyB: election(8, 'B', 'draft', 'municipales-de-ejemplo', 'municipal', null, false),
   liveInactive: election(9, 'inactive', 'live', 'generales-de-ejemplo', 'general', null),
-  draftInactive: election(10, 'inactive', 'draft', 'autonomicas-de-ejemplo', 'regional', 'XC-01'),
+  draftInactive: election(
+    10,
+    'inactive',
+    'draft',
+    'autonomicas-de-ejemplo',
+    'regional',
+    'XC-01',
+    true,
+    true,
+  ),
   emptyInactive: election(
     11,
     'inactive',
@@ -616,7 +630,11 @@ const TRIAGERS: Rule = { members: ALL_ROLES };
 /** Who writes drafts, evidence and sources (ADR-0002, capabilities by role). */
 const EDITORS: Rule = { members: ['editor', 'country_admin'], platformAdmin: true };
 
+/** Whether an election's structure and content are public: only once it is live (or archived). */
 const isPublic = (e: FixtureElection): boolean => e.status !== 'draft' && TENANTS[e.tenant].active;
+/** Whether an election's own row is public: also while it is an announced draft. */
+const isListed = (e: FixtureElection): boolean =>
+  isPublic(e) || (e.status === 'draft' && e.announced && TENANTS[e.tenant].active);
 const structured: readonly FixtureElection[] = Object.values(ELECTIONS).filter((e) => e.structure);
 /** The draft election with structure of a tenant, where insert cases add rows. */
 const draftOf = (key: TenantKey): FixtureElection => {
@@ -1209,7 +1227,7 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     rows: Object.entries(ELECTIONS).map(([name, e]): Row => ({
       id: `${name} election`,
       tenant: e.tenant,
-      public: isPublic(e),
+      public: isListed(e),
       where: `id = '${e.id}'`,
       // Only a draft is deleted, and only once its structure is gone; an archived election is read-only.
       ...(e.status !== 'draft'
@@ -1223,11 +1241,12 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
               update: '23001',
               'update:frozen_from': '23001',
               'update:require_second_reviewer': '23001',
+              'update:announced': '23001',
             },
           }
-        : // Renaming a live election needs an approved change request.
+        : // Renaming a live election needs an approved change request; the announcement is fixed once live.
           e.status === 'live'
-          ? { blocked: { update: '23001' } }
+          ? { blocked: { update: '23001', 'update:announced': '23001' } }
           : {}),
     })),
     inserts: TENANT_KEYS.map((key) => ({
@@ -1248,6 +1267,7 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     },
     columnUpdates: {
       frozen_from: { set: 'frozen_from = now()', rule: COUNTRY_ADMINS },
+      announced: { set: 'announced = NOT announced', rule: COUNTRY_ADMINS },
       require_second_reviewer: {
         set: 'require_second_reviewer = NOT require_second_reviewer',
         rule: PLATFORM_ADMIN,

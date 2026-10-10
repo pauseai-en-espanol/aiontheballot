@@ -1169,6 +1169,10 @@ CREATE FUNCTION private.election_rules() RETURNS trigger
       RAISE EXCEPTION 'territory % is outside the tenant''s country, %', NEW.territory_code, tenant.country_code
         USING ERRCODE = 'check_violation';
     END IF;
+    IF NEW.announced AND NOT NEW.name ? tenant.default_locale THEN
+      RAISE EXCEPTION 'an announced election needs its name in the default locale, %', tenant.default_locale
+        USING ERRCODE = 'check_violation';
+    END IF;
 
     IF TG_OP = 'INSERT' THEN
       IF NEW.status <> 'draft' THEN
@@ -1189,6 +1193,10 @@ CREATE FUNCTION private.election_rules() RETURNS trigger
     IF OLD.status <> 'draft'
        AND (NEW.slug, NEW.type, NEW.territory_code) IS DISTINCT FROM (OLD.slug, OLD.type, OLD.territory_code) THEN
       RAISE EXCEPTION 'election %: the slug, type and territory are fixed once it leaves draft', OLD.id
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF OLD.status <> 'draft' AND NEW.announced IS DISTINCT FROM OLD.announced THEN
+      RAISE EXCEPTION 'election %: the announcement is fixed once it leaves draft', OLD.id
         USING ERRCODE = 'restrict_violation';
     END IF;
 
@@ -2935,6 +2943,7 @@ CREATE TABLE app.elections (
     frozen_from timestamp with time zone,
     frozen_until timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    announced boolean DEFAULT false NOT NULL,
     CONSTRAINT elections_check CHECK (((type <> ALL (ARRAY['general'::app.election_type, 'european'::app.election_type])) OR (territory_code IS NULL))),
     CONSTRAINT elections_check1 CHECK (((type <> 'regional'::app.election_type) OR (territory_code IS NOT NULL))),
     CONSTRAINT elections_check2 CHECK (((frozen_until IS NULL) OR ((frozen_from IS NOT NULL) AND (frozen_until > frozen_from)))),
@@ -5005,7 +5014,7 @@ CREATE TRIGGER content AFTER INSERT OR DELETE OR UPDATE ON app.draft_evidence FO
 -- Name: elections country_admin_columns; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE TRIGGER country_admin_columns BEFORE UPDATE ON app.elections FOR EACH ROW EXECUTE FUNCTION private.restrict_columns('country_admin', 'status', 'frozen_from', 'frozen_until');
+CREATE TRIGGER country_admin_columns BEFORE UPDATE ON app.elections FOR EACH ROW EXECUTE FUNCTION private.restrict_columns('country_admin', 'status', 'frozen_from', 'frozen_until', 'announced');
 
 
 --
@@ -7337,7 +7346,7 @@ CREATE POLICY public_read ON app.criteria FOR SELECT TO aiontheballot_web USING 
 -- Name: elections public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE POLICY public_read ON app.elections FOR SELECT TO aiontheballot_web USING (((status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status])) AND (EXISTS ( SELECT 1
+CREATE POLICY public_read ON app.elections FOR SELECT TO aiontheballot_web USING ((((status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status])) OR ((status = 'draft'::app.election_status) AND announced)) AND (EXISTS ( SELECT 1
    FROM app.tenants t
   WHERE ((t.id = elections.tenant_id) AND t.active)))));
 
@@ -9009,6 +9018,13 @@ GRANT UPDATE(frozen_until) ON TABLE app.elections TO aiontheballot_admin;
 --
 
 GRANT SELECT(created_at) ON TABLE app.elections TO aiontheballot_web;
+
+
+--
+-- Name: COLUMN elections.announced; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(announced) ON TABLE app.elections TO aiontheballot_admin;
 
 
 --

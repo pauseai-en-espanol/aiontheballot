@@ -307,6 +307,7 @@ create table app.elections (
   name               jsonb not null,
   election_date      date,
   status             app.election_status not null default 'draft',
+  announced          boolean not null default false,   -- a draft whose row is public (PLAN R51); country admins
   went_live_at       timestamptz,                      -- set by trigger
   require_second_reviewer  boolean not null default true,  -- four-eyes on cells; only a platform_admin turns it off
   frozen_from        timestamptz,                      -- the freeze window (PLAN Q8): see §4
@@ -371,11 +372,11 @@ create table app.parties (
 ```
 
 **Who writes the structure** (PLAN, Answered: election structure). Editors and country admins write elections (name,
-date, slug, type, territory), parties and criteria; country admins set the status and freeze window and write the
-methodology and its external reviewers; only platform admins change `require_second_reviewer`. Column grants make every
-new election a draft with four-eyes on and no freeze; `private.restrict_columns(roles, columns…)` guards the rest.
-Structure is deleted only while its election is a draft. A party's logo must be an image in the `public_assets`
-bucket, so no source document can become public through it.
+date, slug, type, territory), parties and criteria; country admins set the status, the announcement and the freeze
+window and write the methodology and its external reviewers; only platform admins change `require_second_reviewer`.
+Column grants make every new election an unannounced draft with four-eyes on and no freeze;
+`private.restrict_columns(roles, columns…)` guards the rest. Structure is deleted only while its election is a draft.
+A party's logo must be an image in the `public_assets` bucket, so no source document can become public through it.
 
 **Territories.** A tenant is one country (`country_code`). An election covers either the whole country
 (`territory_code` null: generales, europeas, which Spain votes as one constituency) or one subdivision (a regional

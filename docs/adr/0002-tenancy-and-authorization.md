@@ -101,7 +101,7 @@ log makes it visible (T23).
 ### 7. The public role reads, and can call one function
 
 - `aiontheballot_web` can `SELECT` public-capable tables. RLS limits it to published rows in live or archived elections
-  of active tenants.
+  of active tenants, plus the row of an announced draft election (see the public-visibility rule).
 - It can `EXECUTE` `app.submit_report(...)`, which is `SECURITY DEFINER`. The function checks the tenant is
   active, inserts the report with `status='new'`, and enforces a per-tenant daily cap.
 - It has no table write grants at all.
@@ -200,7 +200,7 @@ every tenant, except `reports`.
 | Approve and publish revisions (not own work while the election requires a second reviewer) and change requests (own allowed unless the tenant requires a second approver) | –      | ✓        | ✓             | ✓                                   |
 | Triage right-of-reply reports                                                                                                                                             | ✓      | ✓        | ✓             | –                                   |
 | Invite members and manage memberships in own tenant                                                                                                                       | –      | –        | ✓             | ✓                                   |
-| Tenant theme, election status and freeze window, methodology **body**, policy texts, report retention, LLM cap                                                            | –      | –        | ✓             | ✓                                   |
+| Tenant theme, election status, announcement and freeze window, methodology **body**, policy texts, report retention, LLM cap                                              | –      | –        | ✓             | ✓                                   |
 | Operator, organizations, methodology **kind**, `is_pauseai_chapter`, restricted-asset grants, hostnames, tenant `active`, review settings                                 | –      | –        | –             | ✓ (audited)                         |
 | Read the audit log                                                                                                                                                        | –      | –        | ✓             | ✓                                   |
 
@@ -214,6 +214,13 @@ A row is world-readable only when all of these hold:
 - It is in a public-capable table.
 - Its election's `status` is `live` or `archived`.
 - Its tenant is active.
+
+**Announced elections** (amended for the coming-soon page, PLAN R51). A country admin may announce a draft election,
+so the tenant's coming-soon page can give its name and date. The public then sees that election's own row (name,
+date, type, territory, slug) and nothing under it: its methodology, parties, criteria, cells and sources still follow
+the rule above, because each of their policies checks the election's status itself, never the election's visibility.
+Nobody creates an election already announced, an announced election keeps its name in the default locale, and the
+announcement is fixed once the election goes live.
 
 Public-visibility policies apply to `aiontheballot_web` only. `aiontheballot_admin` sees only what memberships give
 it, so the column grants that hide settings and private columns from the public can't leak them to members of other
@@ -455,6 +462,7 @@ All fixture data is fictional:
   - parties ("Partido Ejemplo A", "Partido Ejemplo B") and criteria;
   - a source file, a report and an invitation.
 - One inactive tenant that still has a live election.
+- An announced draft in `test-a` and in the inactive tenant; `test-b`'s draft is not announced.
 - Unverified and retired hostnames.
 
 ### Dimensions

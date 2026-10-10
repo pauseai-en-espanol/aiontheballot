@@ -60,7 +60,7 @@ test.describe('the coming-soon home (fictional seeds)', () => {
     ]);
   });
 
-  test('leaves out what the operator has not given: no links, no contact, no election', async ({
+  test('names an announced election with its date, never an unannounced one, and leaves out what the operator has not given', async ({
     page,
   }) => {
     await page.goto(TENANT_B_EN);
@@ -71,6 +71,12 @@ test.describe('the coming-soon home (fictional seeds)', () => {
     await expect(
       page.getByText("Example organisation B's demands", { exact: false }),
     ).toBeVisible();
+    // B's announced draft (packages/db/seeds/seed.ts), not its unannounced one, though that one is sooner.
+    await expect(
+      page.getByText(/^Example regional election · [A-Z][a-z]+ \d{1,2}, \d{4}$/),
+    ).toBeVisible();
+    await expect(page.getByText('Example local election')).toHaveCount(0);
+    // B's operator has no website, contact address or newsletter.
     await expect(page.getByRole('link')).toHaveCount(0);
   });
 

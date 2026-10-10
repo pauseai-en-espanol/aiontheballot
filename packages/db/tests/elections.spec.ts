@@ -63,9 +63,10 @@ describe('app.elections', () => {
     ).toBe(CHECK_VIOLATION);
   });
 
-  it('always starts as a draft, with four-eyes review on and no freeze', async () => {
+  it('always starts as an unannounced draft, with four-eyes review on and no freeze', async () => {
     const attempts: Record<string, string>[] = [
       { status: `'live'` },
+      { announced: 'true' },
       { require_second_reviewer: 'false' },
       { frozen_from: 'now()' },
       { went_live_at: 'now()' },
@@ -91,6 +92,70 @@ describe('app.elections', () => {
         ),
       ),
     ).toBeNull();
+  });
+});
+
+describe('an announced election (PLAN R51)', () => {
+  const asPublic = <T>(fn: (client: pg.Client) => Promise<T>): Promise<T> =>
+    inRolledBackTransaction(async (client) => {
+      await client.query('SET LOCAL ROLE aiontheballot_web');
+      return fn(client);
+    });
+
+  it('shows the public its own row and nothing under it, and only in an active tenant', async () => {
+    const seen = await asPublic(async (client) => {
+      const count = async (table: string, where: string): Promise<number> =>
+        Number(
+          (
+            await client.query<{ n: string }>(
+              `SELECT count(*) AS n FROM app.${table} WHERE ${where}`,
+            )
+          ).rows[0]?.n,
+        );
+      const { draftA, draftB, draftInactive } = ELECTIONS;
+      return {
+        election: await count('elections', `id = '${draftA.id}'`),
+        methodology: await count('methodologies', `election_id = '${draftA.id}'`),
+        reviewers: await count('methodology_reviewers', `methodology_id = '${draftA.methodology}'`),
+        parties: await count('parties', `election_id = '${draftA.id}'`),
+        criteria: await count('criteria', `election_id = '${draftA.id}'`),
+        unannounced: await count('elections', `id = '${draftB.id}'`),
+        inactiveTenant: await count('elections', `id = '${draftInactive.id}'`),
+      };
+    });
+    expect(seen).toEqual({
+      election: 1,
+      methodology: 0,
+      reviewers: 0,
+      parties: 0,
+      criteria: 0,
+      unannounced: 0,
+      inactiveTenant: 0,
+    });
+  });
+
+  it("needs its name in the tenant's default locale", async () => {
+    const english = `'{"en": "Example election"}'`;
+    expect(
+      await actingAs(USERS.countryAdminA, (c) =>
+        errorCode(
+          c,
+          `UPDATE app.elections SET announced = true, name = ${english} WHERE id = '${ELECTIONS.emptyA.id}'`,
+        ),
+      ),
+    ).toBe(CHECK_VIOLATION);
+    // Nor can a rename drop it once announced; an unannounced draft may lack it until it goes live.
+    const renames = await actingAs(USERS.editorA, async (c) => [
+      await errorCode(
+        c,
+        `UPDATE app.elections SET name = ${english} WHERE id = '${ELECTIONS.draftA.id}'`,
+      ),
+      await errorCode(
+        c,
+        `UPDATE app.elections SET name = ${english} WHERE id = '${ELECTIONS.emptyA.id}'`,
+      ),
+    ]);
+    expect(renames).toEqual([CHECK_VIOLATION, null]);
   });
 });
 
