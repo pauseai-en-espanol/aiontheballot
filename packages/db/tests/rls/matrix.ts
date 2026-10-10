@@ -122,8 +122,8 @@ export const TENANT_DOCUMENTS = {
 } as const satisfies Record<string, { id: string; tenant: TenantKey; published: boolean }>;
 
 /**
- * Fictional stored files. Each has its blob, except the "awaiting" ones (one per tenant), which the insert cases of
- * file_blobs complete. Content is the UTF-8 of `content`.
+ * Fictional stored files: their rows (the bytes live on the volume, under their hash, ADR-0001). The hash is of the
+ * UTF-8 of `content`. The matrix covers the ones with `blob` set; the "awaiting" ones are files the fetch tests use.
  */
 export const FILES = {
   sourceA: {
@@ -1028,9 +1028,8 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       {
         id: 'new asset',
         tenant: null,
-        sql: `INSERT INTO app.brand_assets (name, content_type, sha256, content)
-              VALUES ('Logo nuevo de ejemplo', 'image/png', encode(sha256('\\x89504e47'::bytea), 'hex'),
-                      '\\x89504e47'::bytea)`,
+        sql: `INSERT INTO app.brand_assets (name, content_type, sha256, byte_size)
+              VALUES ('Logo nuevo de ejemplo', 'image/png', encode(sha256('\\x89504e47'::bytea), 'hex'), 4)`,
       },
     ],
     set: `name = name || ' v2'`,
@@ -1039,8 +1038,9 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     update: PLATFORM_ADMIN,
     delete: PLATFORM_ADMIN,
     columnUpdates: {
-      content: { set: `content = '\\x00'::bytea`, rule: NOBODY },
+      // An asset's bytes never change: its hash and size are fixed (the bytes are on the volume, under the hash).
       sha256: { set: `sha256 = encode(sha256('\\x00'::bytea), 'hex')`, rule: NOBODY },
+      byte_size: { set: 'byte_size = byte_size + 1', rule: NOBODY },
     },
   },
 
@@ -1177,30 +1177,6 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     update: NOBODY,
     delete: EDITORS,
     columnReads: { original_filename: MEMBERS, created_by: MEMBERS },
-  },
-
-  'app.file_blobs': {
-    rows: Object.entries(FILES)
-      .filter(([, f]) => f.blob)
-      .map(([name, f]) => ({
-        id: `${name} blob`,
-        tenant: f.tenant,
-        public: PUBLIC_FILES.includes(f.id),
-        where: `file_id = '${f.id}'`,
-      })),
-    inserts: Object.values(FILES)
-      .filter((f) => !f.blob)
-      .map((f) => ({
-        id: `blob of the awaiting file of ${f.tenant}`,
-        tenant: f.tenant,
-        sql: `INSERT INTO app.file_blobs (file_id, tenant_id, content)
-              VALUES ('${f.id}', '${TENANTS[f.tenant].id}', convert_to('${f.content}', 'UTF8'))`,
-      })),
-    set: 'content = content',
-    select: { public: true, ...MEMBERS },
-    insert: EDITORS,
-    update: NOBODY,
-    delete: NOBODY,
   },
 
   'app.core_criteria': {
@@ -2022,7 +1998,6 @@ export const WORKER_ACCESS: WorkerAccess = {
   },
   'app.source_texts': { 'first page of liveA': { select: [LLM] } },
   'app.files': { 'sourceA file': { select: [LLM] }, 'insert upload into A': { insert: [FETCH] } },
-  'app.file_blobs': { 'sourceA blob': { select: [LLM] } },
   'app.llm_runs': { 'run of A': { select: [LLM], update: [LLM] } },
   'app.llm_suggestions': {
     'suggestion of A': { select: [LLM] },

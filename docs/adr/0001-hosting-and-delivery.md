@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-08
 - **Relates to:** BRIEF §6, §8, §9, §10, §11; [ADR-0002](0002-tenancy-and-authorization.md),
-  [ADR-0003](0003-application-stack.md)
+  [ADR-0003](0003-application-stack.md), [ADR-0004](0004-file-bytes-on-a-volume.md)
 
 The brief asked for one ADR covering stack and hosting. The owner wants to choose the application stack a little
 later, so this ADR covers **hosting and delivery** only. The framework, auth library and tooling choices are in
@@ -180,10 +180,23 @@ fix them rather than copy them.
 
 ### Files
 
-- Stored **in Postgres**: `app.files` holds metadata and `app.file_blobs` holds the bytes (bytea), addressed by
-  SHA-256 and immutable.
-- RLS protects them like any other table, and the database backup covers them.
-- Limit of 50 MB per file. Above 2 GB in total, move the bytes to S3-compatible storage behind the same interface.
+Amended: bytes first lived in Postgres (`app.file_blobs`); the owner moved them out before any were stored (PLAN R61).
+[ADR-0004](0004-file-bytes-on-a-volume.md) has the design.
+
+- **Bytes on a persistent volume:** a `local-path` volume of type `local`, mounted by the API at `/data` (and by the
+  worker, once it exists). Each file sits under its tenant, bucket and SHA-256
+  (`files/{tenant}/{bucket}/sha256/ab/cd/…`; `files/platform/…` for brand assets), written once through a store that
+  computes the hash, checks it again on every read, and never changes the bytes.
+- **The rules stay in Postgres.** `app.files` keeps each file's row (tenant, bucket, type, size, hash), and RLS decides
+  who sees it; the API reads bytes only for a row it can see, from that row's own folder.
+- Bytes are written before their row, so a row never names missing bytes. Bytes no row names are swept after a grace
+  period at least as long as the database backups are kept.
+- Limit of 50 MB per file (2 MB for brand images). `local-path` doesn't enforce the volume's size: the node's disk is
+  the limit.
+- **One node:** `local-path` is a folder on that node, so every replica shares it. A second node would need shared
+  storage, or object storage behind the same store interface.
+- **Backups:** the database dump doesn't cover the volume. The cluster's backup plan is to copy it with Velero, each
+  copy taken after the database dump it goes with (ADR-0004); like the rest of the plan, that isn't running yet.
 
 ### Backups
 
@@ -191,6 +204,7 @@ fix them rather than copy them.
   app-owned backup job.
 - The shared Postgres dumps every database nightly with `pg_dump -Fc`, `aiontheballot` included. Velero copies
   the dumps off the node to MinIO, encrypted by kopia. Nightly is enough, also during the campaign.
+- Stored files' bytes are on the API's volume, which Velero must copy too, **after** the database dump (ADR-0004).
 - It must work before the preview, including one restore of an `aiontheballot` dump. A full restore drill plus
   runbook is part of M5.
 

@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-08
-- **Relates to:** BRIEF §2–4, §8; [ADR-0001](0001-hosting-and-delivery.md)
+- **Relates to:** BRIEF §2–4, §8; [ADR-0001](0001-hosting-and-delivery.md),
+  [ADR-0004](0004-file-bytes-on-a-volume.md) (file bytes)
 
 This ADR assumes only PostgreSQL 18. The framework and auth library are chosen in
 [ADR-0003](0003-application-stack.md).
@@ -70,9 +71,12 @@ log makes it visible (T23).
   `revision_checked_documents`.
 - Drafts, sign-offs, review notes and tokens live in private tables.
 - **Storage is tables too:**
-  - `app.files(tenant_id, bucket, …)` holds metadata and `app.file_blobs` holds the bytes, under the same RLS.
+  - `app.files(tenant_id, bucket, …)` holds each file's row under RLS; its bytes are on the file volume, read only
+    for a row RLS shows and only from that row's own tenant and bucket ([ADR-0004](0004-file-bytes-on-a-volume.md)).
+    A row can't reach another tenant's or another bucket's bytes by naming their hash.
   - `bucket` is `public_assets` or `sources`. Platform brand assets live in their own table, `brand_assets`.
-  - This is how the brief's "storage buckets under RLS" is met.
+  - This is how the brief's "storage buckets under RLS" is met: each file's row is under RLS, and its bytes are
+    reached only through a row the reader can see (ADR-0004).
 
 ### 6. Closed by default
 
@@ -162,7 +166,8 @@ cell without a rating (_withdrawn_, distinct from _pending_) and logs a correcti
 - Triggers reject `UPDATE`, `DELETE` and `TRUNCATE` on revisions and their child tables, `structural_changes`,
   `review_events`, `audit_log` and `purge_log`. These triggers fire even for the owner role. The corrections log is
   a view over revisions and `structural_changes`, so it can't be edited either.
-- Stored files are immutable, and deletable only while nothing references them.
+- Stored files are immutable, and deletable only while nothing references them. A purge deletes the tenant's bytes
+  from the file volume with `purge-tenant-files`, after the rows (ADR-0004).
 - The only exception is `private.purge_tenant(tenant_id)`:
   - Only `aiontheballot_owner` can execute it.
   - It sets a transaction-local `app.purge` flag that the triggers honour, and writes a platform-level purge record.
@@ -217,7 +222,7 @@ tenants.
 These platform-wide rows are also public: active `tenants`, verified `tenant_hostnames`, `organizations` and
 `core_criteria`.
 
-**Images.** A tenant's uploaded image (a `files` row in the `public_assets` bucket, PNG, JPEG or WebP, and its blob)
+**Images.** A tenant's uploaded image (a `files` row in the `public_assets` bucket, PNG, JPEG or WebP, and its bytes)
 is public while a public row shows it: a party of a live or archived election (its logo), or an active tenant's
 brand selection (its logos; amended for tenants' own logos, PLAN R59). Every other upload, and every source
 document, stays private.
@@ -392,32 +397,32 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 
 ### Threats
 
-| #   | Threat                                                                     | Actor  | Mitigation                                                                                                                             | Proven by                             |
-| --- | -------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| T1  | Read B's drafts, sources, reports or audit log                             | A2–A4  | Membership-based RLS; `aiontheballot_web` has no grants on private tables                                                              | Matrix                                |
-| T2  | Write into B by forging `tenant_id`                                        | A3–A4  | `WITH CHECK` on membership                                                                                                             | Matrix                                |
-| T3  | Reference across tenants (A's evidence or source on B's cell)              | A3     | Composite FKs                                                                                                                          | DB-rule tests                         |
-| T4  | Move a row from one tenant to another                                      | A3–A4  | Immutability trigger plus composite FK                                                                                                 | DB-rule tests                         |
-| T5  | Escalate privileges (gain a role in A, or platform admin)                  | A4     | Policies on memberships and invitations; `platform_admins` has no app write path                                                       | Matrix                                |
-| T6  | Claim A's hostname, or a domain the attacker doesn't own                   | A4, A7 | Hostname primary key; TXT verification; platform-admin-only writes; gitops PR only after verification                                  | Routing and DB tests                  |
-| T7  | Spoof the Host header to mix branding or poison a cache                    | A1     | Host only selects content; tenant is in the internal path; internal prefix blocked; absolute URLs built from the DB                    | Routing integration tests             |
-| T8  | Sessions or authorization appearing on public hosts                        | A1     | Public app has no session code; one admin host                                                                                         | E2E: no `Set-Cookie` on public hosts  |
-| T9  | Read or overwrite another tenant's files                                   | A3     | RLS on `app.files` and `file_blobs`; tenant is part of the key                                                                         | Matrix and endpoint integration tests |
-| T10 | A `SECURITY DEFINER` function or function grant leaks access               | —      | Allowlist; `search_path=''`; `EXECUTE` revoked from `PUBLIC`                                                                           | Catalog meta-tests                    |
-| T11 | A runtime role drifts into ownership or `BYPASSRLS`                        | —      | Role-attribute meta-test                                                                                                               | Catalog meta-tests                    |
-| T12 | The database is exposed outside the cluster                                | A1     | ClusterIP only; no NodePort                                                                                                            | Deploy check                          |
-| T13 | Secrets leak                                                               | A9     | SealedSecrets; CI holds no cluster credentials (GitOps pull); no `pull_request_target`                                                 | CI review                             |
-| T14 | One compromised editor publishes a false rating                            | A5     | Four-eyes (residual risk accepted while a platform admin has turned it off for an election); MFA (aal2); audit log; public corrections | DB-rule tests                         |
-| T15 | One person uses a second ("sock-puppet") account to pass four-eyes         | A5     | Invite-only accounts vetted by the country admin; audit trail. **Residual risk accepted**                                              | Process                               |
-| T16 | Platform admin abuses access                                               | A6     | Few admins, all with MFA; changes audited; no reading `reports` in the app                                                             | Matrix and invariant tests            |
-| T17 | An ineligible tenant uses a restricted brand asset                         | A4     | DB check on catalogue assets; uploads are the tenant's responsibility (R59)                                                            | Invariant tests                       |
-| T18 | Stored XSS through quotes, party names or methodology                      | A3, A8 | Render as text only; sanitized Markdown; CSP                                                                                           | Unit and E2E tests                    |
-| T19 | Prompt injection in a programme sways the LLM's suggestions                | A8     | LLM only suggests; unmatched quotes dropped; humans decide with four-eyes; LLM has no tools                                            | M4 tests                              |
-| T20 | Report spam or denial of service                                           | A1     | A single function as the only write path; per-tenant cap; honeypot; Envoy per-IP rate limit                                            | Integration tests                     |
-| T21 | A retired or alias domain expires and someone else buys it                 | A7     | Association-owned registrar with auto-renew; hostnames never deleted or detached; uptime monitor per hostname                          | Ops checklist                         |
-| T22 | Per-tenant export or purge touches another tenant                          | —      | Owner-only `purge_tenant`; tenant-scoped export                                                                                        | Integration tests                     |
-| T23 | Compromised API impersonates users                                         | A10    | Accepted. Small admin surface; immutable audit log; MFA; alert on unusual publish volume                                               | Audit review                          |
-| T24 | A live criterion is reworded, changing what already-published ratings mean | A5     | Change requests always create a public corrections entry; a second approver if the tenant requires it                                  | DB-rule tests                         |
+| #   | Threat                                                                     | Actor  | Mitigation                                                                                                                             | Proven by                            |
+| --- | -------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| T1  | Read B's drafts, sources, reports or audit log                             | A2–A4  | Membership-based RLS; `aiontheballot_web` has no grants on private tables                                                              | Matrix                               |
+| T2  | Write into B by forging `tenant_id`                                        | A3–A4  | `WITH CHECK` on membership                                                                                                             | Matrix                               |
+| T3  | Reference across tenants (A's evidence or source on B's cell)              | A3     | Composite FKs                                                                                                                          | DB-rule tests                        |
+| T4  | Move a row from one tenant to another                                      | A3–A4  | Immutability trigger plus composite FK                                                                                                 | DB-rule tests                        |
+| T5  | Escalate privileges (gain a role in A, or platform admin)                  | A4     | Policies on memberships and invitations; `platform_admins` has no app write path                                                       | Matrix                               |
+| T6  | Claim A's hostname, or a domain the attacker doesn't own                   | A4, A7 | Hostname primary key; TXT verification; platform-admin-only writes; gitops PR only after verification                                  | Routing and DB tests                 |
+| T7  | Spoof the Host header to mix branding or poison a cache                    | A1     | Host only selects content; tenant is in the internal path; internal prefix blocked; absolute URLs built from the DB                    | Routing integration tests            |
+| T8  | Sessions or authorization appearing on public hosts                        | A1     | Public app has no session code; one admin host                                                                                         | E2E: no `Set-Cookie` on public hosts |
+| T9  | Read or overwrite another tenant's files                                   | A3     | RLS on `app.files`; bytes read only for a visible row, from its own tenant and bucket (ADR-0004)                                       | Matrix and API database tests        |
+| T10 | A `SECURITY DEFINER` function or function grant leaks access               | —      | Allowlist; `search_path=''`; `EXECUTE` revoked from `PUBLIC`                                                                           | Catalog meta-tests                   |
+| T11 | A runtime role drifts into ownership or `BYPASSRLS`                        | —      | Role-attribute meta-test                                                                                                               | Catalog meta-tests                   |
+| T12 | The database is exposed outside the cluster                                | A1     | ClusterIP only; no NodePort                                                                                                            | Deploy check                         |
+| T13 | Secrets leak                                                               | A9     | SealedSecrets; CI holds no cluster credentials (GitOps pull); no `pull_request_target`                                                 | CI review                            |
+| T14 | One compromised editor publishes a false rating                            | A5     | Four-eyes (residual risk accepted while a platform admin has turned it off for an election); MFA (aal2); audit log; public corrections | DB-rule tests                        |
+| T15 | One person uses a second ("sock-puppet") account to pass four-eyes         | A5     | Invite-only accounts vetted by the country admin; audit trail. **Residual risk accepted**                                              | Process                              |
+| T16 | Platform admin abuses access                                               | A6     | Few admins, all with MFA; changes audited; no reading `reports` in the app                                                             | Matrix and invariant tests           |
+| T17 | An ineligible tenant uses a restricted brand asset                         | A4     | DB check on catalogue assets; uploads are the tenant's responsibility (R59)                                                            | Invariant tests                      |
+| T18 | Stored XSS through quotes, party names or methodology                      | A3, A8 | Render as text only; sanitized Markdown; CSP                                                                                           | Unit and E2E tests                   |
+| T19 | Prompt injection in a programme sways the LLM's suggestions                | A8     | LLM only suggests; unmatched quotes dropped; humans decide with four-eyes; LLM has no tools                                            | M4 tests                             |
+| T20 | Report spam or denial of service                                           | A1     | A single function as the only write path; per-tenant cap; honeypot; Envoy per-IP rate limit                                            | Integration tests                    |
+| T21 | A retired or alias domain expires and someone else buys it                 | A7     | Association-owned registrar with auto-renew; hostnames never deleted or detached; uptime monitor per hostname                          | Ops checklist                        |
+| T22 | Per-tenant export or purge touches another tenant                          | —      | Owner-only `purge_tenant`; tenant-scoped export                                                                                        | Integration tests                    |
+| T23 | Compromised API impersonates users                                         | A10    | Accepted. Small admin surface; immutable audit log; MFA; alert on unusual publish volume                                               | Audit review                         |
+| T24 | A live criterion is reworded, changing what already-published ratings mean | A5     | Change requests always create a public corrections entry; a second approver if the tenant requires it                                  | DB-rule tests                        |
 
 ## Test matrix (BRIEF §8)
 
@@ -536,7 +541,6 @@ Each of these must fail:
 - Referencing a party, criterion or source from another election of the same tenant.
 - A territory code, on an election or a party, outside the tenant's country; changing a live election's territory.
 - A worker job whose payload names a different tenant from its `job_requests` row.
-- A `file_blobs` row whose content doesn't match the recorded hash.
 - An audit diff containing a column marked as personal data.
 - A country admin changing the operator or the methodology kind.
 - Anyone other than a platform admin setting `is_pauseai_chapter`.
@@ -545,6 +549,12 @@ Each of these must fail:
 - A second canonical hostname for the same tenant.
 - An unverified canonical hostname.
 - Deleting a hostname.
+
+These must fail too, but are no longer database rules since the bytes left Postgres
+([ADR-0004](0004-file-bytes-on-a-volume.md)): the file store's unit tests and the API's database tests prove them.
+
+- Storing or serving bytes whose hash doesn't match the one their row records.
+- Serving bytes from a space other than their row's: another tenant's, another bucket's, or the platform's.
 
 And each of these must succeed:
 

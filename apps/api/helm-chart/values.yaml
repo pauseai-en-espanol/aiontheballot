@@ -18,6 +18,8 @@ podSecurityContext:
   runAsUser: 1000
   runAsGroup: 1000
   fsGroup: 1000
+  # The file volume's group is set once, not walked file by file at every start.
+  fsGroupChangePolicy: OnRootMismatch
   seccompProfile:
     type: RuntimeDefault
 securityContext:
@@ -29,3 +31,17 @@ securityContext:
 # data) need WEB_DATABASE_URL, the aiontheballot_web role's connection; without it they answer 503.
 env: []
 envFrom: []
+
+# Stored files' bytes (ADR-0001, files; ADR-0004): a persistent volume every API pod mounts, holding each file under
+# its tenant, bucket and SHA-256 (FILES_ROOT). No database dump covers it, so it needs its own backup (gitops backup
+# plan), taken after the database dump.
+persistence:
+  enabled: true
+  # local-path enforces no quota and expands nothing: this is a label, and the volume can fill the node's disk.
+  size: 5Gi
+  # A folder on the node: with one node, every replica shares it (ReadWriteOnce is per node).
+  storageClass: local-path
+  # `local`, not `hostPath`: Velero's file-system backup can copy local volumes but not hostPath ones. Read only when
+  # the volume is created, so it can't be changed later.
+  volumeType: local
+  mountPath: /data

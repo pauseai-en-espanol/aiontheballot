@@ -328,12 +328,19 @@ describe('catalog: tables', () => {
     );
     expect(relations).toEqual([]);
   });
+
+  it("stores no file bytes: those live on the file volume, in their row's tenant and bucket (ADR-0004)", async () => {
+    const binary = await rows<{ column: string }>(
+      `SELECT c.table_name || '.' || c.column_name AS column FROM information_schema.columns c
+        WHERE c.table_schema IN ('app', 'private') AND c.data_type = 'bytea'`,
+    );
+    expect(binary).toEqual([]);
+  });
 });
 
 /** Tables written without an audit trigger, and why. Every other table in app must have one. */
 const NOT_AUDITED: Readonly<Record<string, string>> = {
   audit_log: 'the log itself',
-  file_blobs: 'the bytes of a file, whose metadata row is audited',
   source_texts:
     "extracted text, written by the extraction job; the source's status change is audited",
   public_versions: 'a counter moved only by triggers, whose writes are audited themselves',

@@ -55,8 +55,8 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
   }
   for (const [key, asset] of Object.entries(BRAND_ASSETS)) {
     await client.query(
-      `INSERT INTO app.brand_assets (id, name, restricted, content_type, sha256, content)
-       VALUES ($1, $2, $3, 'image/png', encode(sha256($4::bytea), 'hex'), $4::bytea)`,
+      `INSERT INTO app.brand_assets (id, name, restricted, content_type, sha256, byte_size)
+       VALUES ($1, $2, $3, 'image/png', encode(sha256($4::bytea), 'hex'), octet_length($4::bytea))`,
       [asset.id, `Marca de ejemplo ${key}`, asset.restricted, Buffer.from(`png-${key}`)],
     );
   }
@@ -154,12 +154,6 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
                'documento-de-ejemplo')`,
       [f.id, TENANTS[f.tenant].id, f.bucket, f.type, f.content],
     );
-    if (f.blob) {
-      await client.query(
-        `INSERT INTO app.file_blobs (file_id, tenant_id, content) VALUES ($1, $2, convert_to($3, 'UTF8'))`,
-        [f.id, TENANTS[f.tenant].id, f.content],
-      );
-    }
   }
   // Each tenant's uploaded logo, selected as its brand image (the inactive tenant's must stay private).
   for (const [key, file] of [

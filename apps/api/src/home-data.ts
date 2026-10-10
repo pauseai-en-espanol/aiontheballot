@@ -1,4 +1,5 @@
 import type { Database } from '@aiontheballot/db/client';
+import type { FileSpace, FileStore } from '@aiontheballot/db/file-store';
 import type { PublicHome } from '@aiontheballot/domain/public-home';
 
 import { isLocalized, type Localized } from '@aiontheballot/domain/localized';
@@ -96,25 +97,35 @@ export const createHomeSource =
     };
   };
 
-/** Reads a brand image's bytes as aiontheballot_web, only if the tenant's selections name it. */
+/**
+ * Reads a brand image's bytes: its row as aiontheballot_web, so only one the tenant's selections name and RLS shows,
+ * then the bytes under its hash, in that row's own space on the file store (ADR-0004): the uploading tenant's
+ * public_assets bucket, or the platform's for a brand asset. A row can't reach bytes stored for anyone else.
+ */
 export const createBrandImageSource =
-  (db: Database): BrandImageSource =>
+  (db: Database, store: FileStore): BrandImageSource =>
   async (slug, sha256) => {
     const row = await db
       .selectFrom('app.tenant_brand_selections as s')
       .innerJoin('app.tenants as t', 't.id', 's.tenant_id')
       .leftJoin('app.files as f', 'f.id', 's.file_id')
-      .leftJoin('app.file_blobs as b', 'b.file_id', 'f.id')
       .leftJoin('app.brand_assets as a', 'a.id', 's.brand_asset_id')
       .select([
+        'f.tenant_id as file_tenant_id',
+        'f.bucket as file_bucket',
         sql<string | null>`coalesce(f.content_type, a.content_type)`.as('content_type'),
-        sql<Uint8Array | null>`coalesce(b.content, a.content)`.as('content'),
       ])
       .where('t.slug', '=', slug)
       .where(sql<boolean>`coalesce(f.sha256, a.sha256) = ${sha256}`)
       .limit(1)
       .executeTakeFirst();
-    return row?.content && row.content_type
-      ? { contentType: row.content_type, content: row.content }
-      : undefined;
+    if (!row?.content_type) {
+      return undefined;
+    }
+    const space: FileSpace =
+      row.file_tenant_id && row.file_bucket
+        ? { tenantId: row.file_tenant_id, bucket: row.file_bucket }
+        : 'platform';
+    const content = await store.get(space, sha256);
+    return content ? { contentType: row.content_type, content } : undefined;
   };

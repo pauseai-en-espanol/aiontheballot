@@ -36,6 +36,11 @@
       "cache": false,
       "passThroughEnv": ["TEST_DATABASE_URL", "TEST_SUPERUSER_DATABASE_URL"]
     },
+    "@aiontheballot/api#test:db": {
+      "dependsOn": ["^build", "@aiontheballot/db#test:db"],
+      "cache": false,
+      "passThroughEnv": ["TEST_DATABASE_URL", "TEST_SUPERUSER_DATABASE_URL"]
+    },
     "test:e2e": {
       "dependsOn": [
         "^build",

@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import {
   ADMIN_URL,
@@ -61,6 +62,9 @@ export default defineConfig({
         LOG_LEVEL: 'warn',
         SENTRY_DSN: DSNS.api,
         WEB_DATABASE_URL,
+        // Where `pnpm db:seed` put the seeds' file bytes (ADR-0004: the volume, here a folder).
+        FILES_ROOT:
+          process.env.FILES_ROOT || fileURLToPath(new URL('../.data/files', import.meta.url)),
       },
     },
     {

@@ -50,10 +50,6 @@ describe('a fetch job', () => {
     await asWorker(JOBS.fetchA.id, async (client) => {
       const { rows } = await client.query<{ id: string }>(fetchedFile());
       const file = rows[0]?.id ?? '';
-      await client.query(
-        `INSERT INTO app.file_blobs (file_id, tenant_id, content) VALUES ($1, $2, 'obtenido')`,
-        [file, TENANT_A],
-      );
       const attached = await client.query(
         `UPDATE app.source_documents SET file_id = $1, file_origin = 'fetched' WHERE id = $2
          RETURNING sha256 = encode(sha256('obtenido'), 'hex') AS hash`,
@@ -97,10 +93,6 @@ describe('a fetch job', () => {
   it('records its copy as fetched, not uploaded', async () => {
     await asWorker(JOBS.fetchA.id, async (client) => {
       const { rows } = await client.query<{ id: string }>(fetchedFile());
-      await client.query(
-        `INSERT INTO app.file_blobs (file_id, tenant_id, content) VALUES ($1, $2, 'obtenido')`,
-        [rows[0]?.id, TENANT_A],
-      );
       expect(
         await errorCode(
           client,

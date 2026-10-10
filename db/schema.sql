@@ -733,40 +733,6 @@ CREATE FUNCTION private.audit() RETURNS trigger
 ALTER FUNCTION private.audit() OWNER TO aiontheballot_owner;
 
 --
--- Name: blob_matches_file(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
---
-
-CREATE FUNCTION private.blob_matches_file() RETURNS trigger
-    LANGUAGE plpgsql
-    SET search_path TO ''
-    AS $$
-  DECLARE
-    expected_sha text;
-    expected_size bigint;
-  BEGIN
-    IF TG_OP = 'DELETE' THEN
-      IF EXISTS (SELECT 1 FROM app.files f WHERE f.id = OLD.file_id) THEN
-        RAISE EXCEPTION 'delete file %, not just its bytes', OLD.file_id USING ERRCODE = 'restrict_violation';
-      END IF;
-      RETURN OLD;
-    END IF;
-    -- Read as the writer: a file the writer can't see gets no bytes from them.
-    SELECT f.sha256, f.byte_size INTO expected_sha, expected_size FROM app.files f WHERE f.id = NEW.file_id;
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'file % is not visible to the writer', NEW.file_id USING ERRCODE = 'insufficient_privilege';
-    END IF;
-    IF encode(sha256(NEW.content), 'hex') <> expected_sha OR octet_length(NEW.content) <> expected_size THEN
-      RAISE EXCEPTION 'the bytes of file % do not match its hash and size', NEW.file_id
-        USING ERRCODE = 'check_violation';
-    END IF;
-    RETURN NEW;
-  END
-  $$;
-
-
-ALTER FUNCTION private.blob_matches_file() OWNER TO aiontheballot_owner;
-
---
 -- Name: brand_file_is_public_asset(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1941,13 +1907,13 @@ CREATE FUNCTION private.purge_tenant(tenant uuid) RETURNS bigint
     SET search_path TO ''
     AS $_$
   DECLARE
-    -- Children before parents. Cells take their drafts and contributors with them, files their bytes.
+    -- Children before parents. Cells take their drafts and contributors with them.
     tables text[] := ARRAY[
       'revision_internal', 'revision_evidence', 'revision_checked_documents', 'structural_changes', 'change_requests',
       'assessment_revisions', 'review_events', 'reports', 'report_daily_counts', 'assessment_contributors',
       'draft_checked_documents', 'draft_evidence', 'assessments', 'job_requests', 'llm_suggestions', 'llm_runs',
       'source_texts', 'source_documents', 'methodology_reviewers', 'methodologies', 'criteria', 'parties', 'elections',
-      'tenant_brand_selections', 'file_blobs', 'files', 'tenant_documents', 'invitations', 'memberships',
+      'tenant_brand_selections', 'files', 'tenant_documents', 'invitations', 'memberships',
       'brand_asset_grants', 'tenant_organizations', 'public_versions', 'tenant_hostnames', 'audit_log'];
     tenant_slug text;
     leftovers jsonb;
@@ -1982,9 +1948,9 @@ CREATE FUNCTION private.purge_tenant(tenant uuid) RETURNS bigint
      WHERE v.hostname IN (SELECT h.hostname FROM app.tenant_hostnames h WHERE h.tenant_id = tenant);
 
     FOREACH t IN ARRAY tables LOOP
-      -- Counted first: some rows go with their parents (drafts with their cells, bytes with their files).
+      -- Counted first: some rows go with their parents (drafts and contributors with their cells).
       EXECUTE format('SELECT count(*) FROM app.%I WHERE tenant_id = $1', t) INTO n USING tenant;
-      IF t NOT IN ('assessment_contributors', 'draft_checked_documents', 'draft_evidence', 'file_blobs') THEN
+      IF t NOT IN ('assessment_contributors', 'draft_checked_documents', 'draft_evidence') THEN
         EXECUTE format('DELETE FROM app.%I WHERE tenant_id = $1', t) USING tenant;
       END IF;
       counts := counts || jsonb_build_object(t, n);
@@ -2711,11 +2677,11 @@ CREATE TABLE app.brand_assets (
     restricted boolean DEFAULT false NOT NULL,
     content_type text NOT NULL,
     sha256 text NOT NULL,
-    content bytea NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT brand_assets_check CHECK ((sha256 = encode(sha256(content), 'hex'::text))),
-    CONSTRAINT brand_assets_content_check CHECK ((octet_length(content) <= 2097152)),
-    CONSTRAINT brand_assets_content_type_check CHECK ((content_type = ANY (ARRAY['image/png'::text, 'image/jpeg'::text, 'image/webp'::text])))
+    byte_size bigint NOT NULL,
+    CONSTRAINT brand_assets_byte_size_check CHECK (((byte_size >= 1) AND (byte_size <= 2097152))),
+    CONSTRAINT brand_assets_content_type_check CHECK ((content_type = ANY (ARRAY['image/png'::text, 'image/jpeg'::text, 'image/webp'::text]))),
+    CONSTRAINT brand_assets_sha256_check CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text))
 );
 
 
@@ -2978,19 +2944,6 @@ CREATE TABLE app.elections (
 
 
 ALTER TABLE app.elections OWNER TO aiontheballot_owner;
-
---
--- Name: file_blobs; Type: TABLE; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE TABLE app.file_blobs (
-    file_id uuid NOT NULL,
-    tenant_id uuid NOT NULL,
-    content bytea NOT NULL
-);
-
-
-ALTER TABLE app.file_blobs OWNER TO aiontheballot_owner;
 
 --
 -- Name: files; Type: TABLE; Schema: app; Owner: aiontheballot_owner
@@ -3872,14 +3825,6 @@ ALTER TABLE ONLY app.elections
 
 ALTER TABLE ONLY app.elections
     ADD CONSTRAINT elections_tenant_id_slug_key UNIQUE (tenant_id, slug);
-
-
---
--- Name: file_blobs file_blobs_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
---
-
-ALTER TABLE ONLY app.file_blobs
-    ADD CONSTRAINT file_blobs_pkey PRIMARY KEY (file_id);
 
 
 --
@@ -4910,13 +4855,6 @@ CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.elect
 
 
 --
--- Name: file_blobs bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.file_blobs FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
-
-
---
 -- Name: files bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5239,13 +5177,6 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.elections FOR EACH ROW 
 
 
 --
--- Name: file_blobs forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.file_blobs FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
-
-
---
 -- Name: files forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5421,13 +5352,6 @@ CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.audit_log FOR EACH STATEME
 
 
 --
--- Name: file_blobs forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE TRIGGER forbid_truncate BEFORE TRUNCATE ON app.file_blobs FOR EACH STATEMENT EXECUTE FUNCTION private.forbid_mutation();
-
-
---
 -- Name: files forbid_truncate; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5505,13 +5429,6 @@ CREATE TRIGGER forbid_update BEFORE UPDATE ON app.assessment_contributors FOR EA
 
 
 --
--- Name: file_blobs forbid_update; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE TRIGGER forbid_update BEFORE UPDATE ON app.file_blobs FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
-
-
---
 -- Name: files forbid_update; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5537,13 +5454,6 @@ CREATE TRIGGER job_scope BEFORE UPDATE ON app.source_documents FOR EACH ROW EXEC
 --
 
 CREATE TRIGGER logo_is_public_asset BEFORE INSERT OR UPDATE OF logo_file_id ON app.parties FOR EACH ROW EXECUTE FUNCTION private.party_logo_is_public_asset();
-
-
---
--- Name: file_blobs matches_file; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE TRIGGER matches_file BEFORE INSERT OR DELETE ON app.file_blobs FOR EACH ROW EXECUTE FUNCTION private.blob_matches_file();
 
 
 --
@@ -6116,14 +6026,6 @@ ALTER TABLE ONLY app.draft_evidence
 
 ALTER TABLE ONLY app.elections
     ADD CONSTRAINT elections_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
-
-
---
--- Name: file_blobs file_blobs_tenant_id_file_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
---
-
-ALTER TABLE ONLY app.file_blobs
-    ADD CONSTRAINT file_blobs_tenant_id_file_id_fkey FOREIGN KEY (tenant_id, file_id) REFERENCES app.files(tenant_id, id) ON DELETE CASCADE;
 
 
 --
@@ -6790,13 +6692,6 @@ CREATE POLICY editor_insert ON app.elections FOR INSERT TO aiontheballot_admin W
 
 
 --
--- Name: file_blobs editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE POLICY editor_insert ON app.file_blobs FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
-
-
---
 -- Name: files editor_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -6864,12 +6759,6 @@ CREATE POLICY editor_update ON app.source_documents FOR UPDATE TO aiontheballot_
 --
 
 ALTER TABLE app.elections ENABLE ROW LEVEL SECURITY;
-
---
--- Name: file_blobs; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
---
-
-ALTER TABLE app.file_blobs ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: files; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
@@ -6999,13 +6888,6 @@ CREATE POLICY member_read ON app.draft_evidence FOR SELECT TO aiontheballot_admi
 --
 
 CREATE POLICY member_read ON app.elections FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
-
-
---
--- Name: file_blobs member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE POLICY member_read ON app.file_blobs FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -7461,15 +7343,6 @@ CREATE POLICY public_read ON app.elections FOR SELECT TO aiontheballot_web USING
 
 
 --
--- Name: file_blobs public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE POLICY public_read ON app.file_blobs FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
-   FROM app.files f
-  WHERE ((f.id = file_blobs.file_id) AND (f.bucket = 'public_assets'::app.file_bucket)))));
-
-
---
 -- Name: files public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -7735,16 +7608,6 @@ CREATE POLICY worker_extract ON app.source_texts FOR INSERT TO aiontheballot_wor
 
 
 --
--- Name: file_blobs worker_fetch; Type: POLICY; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE POLICY worker_fetch ON app.file_blobs FOR INSERT TO aiontheballot_worker WITH CHECK ((EXISTS ( SELECT 1
-   FROM (app.files f
-     JOIN app.job_requests r ON ((r.tenant_id = f.tenant_id)))
-  WHERE ((f.id = file_blobs.file_id) AND (f.created_at = now()) AND (r.finished_at IS NULL) AND (r.kind = 'fetch_source'::app.job_kind)))));
-
-
---
 -- Name: files worker_fetch; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -7775,15 +7638,6 @@ CREATE POLICY worker_read ON app.criteria FOR SELECT TO aiontheballot_worker USI
    FROM (app.job_requests r
      JOIN app.source_documents s ON ((s.id = r.source_document_id)))
   WHERE ((r.finished_at IS NULL) AND (r.kind = 'llm_run'::app.job_kind) AND (s.election_id = criteria.election_id)))));
-
-
---
--- Name: file_blobs worker_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE POLICY worker_read ON app.file_blobs FOR SELECT TO aiontheballot_worker USING ((EXISTS ( SELECT 1
-   FROM app.files f
-  WHERE (f.id = file_blobs.file_id))));
 
 
 --
@@ -8132,13 +7986,6 @@ REVOKE ALL ON FUNCTION private.assessment_transition() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.audit() FROM PUBLIC;
-
-
---
--- Name: FUNCTION blob_matches_file(); Type: ACL; Schema: private; Owner: aiontheballot_owner
---
-
-REVOKE ALL ON FUNCTION private.blob_matches_file() FROM PUBLIC;
 
 
 --
@@ -8641,10 +8488,10 @@ GRANT INSERT(sha256) ON TABLE app.brand_assets TO aiontheballot_admin;
 
 
 --
--- Name: COLUMN brand_assets.content; Type: ACL; Schema: app; Owner: aiontheballot_owner
+-- Name: COLUMN brand_assets.byte_size; Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
-GRANT INSERT(content) ON TABLE app.brand_assets TO aiontheballot_admin;
+GRANT INSERT(byte_size) ON TABLE app.brand_assets TO aiontheballot_admin;
 
 
 --
@@ -9162,39 +9009,6 @@ GRANT UPDATE(frozen_until) ON TABLE app.elections TO aiontheballot_admin;
 --
 
 GRANT SELECT(created_at) ON TABLE app.elections TO aiontheballot_web;
-
-
---
--- Name: TABLE file_blobs; Type: ACL; Schema: app; Owner: aiontheballot_owner
---
-
-GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_admin;
-GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_web;
-GRANT SELECT ON TABLE app.file_blobs TO aiontheballot_worker;
-
-
---
--- Name: COLUMN file_blobs.file_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
---
-
-GRANT INSERT(file_id) ON TABLE app.file_blobs TO aiontheballot_admin;
-GRANT INSERT(file_id) ON TABLE app.file_blobs TO aiontheballot_worker;
-
-
---
--- Name: COLUMN file_blobs.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
---
-
-GRANT INSERT(tenant_id) ON TABLE app.file_blobs TO aiontheballot_admin;
-GRANT INSERT(tenant_id) ON TABLE app.file_blobs TO aiontheballot_worker;
-
-
---
--- Name: COLUMN file_blobs.content; Type: ACL; Schema: app; Owner: aiontheballot_owner
---
-
-GRANT INSERT(content) ON TABLE app.file_blobs TO aiontheballot_admin;
-GRANT INSERT(content) ON TABLE app.file_blobs TO aiontheballot_worker;
 
 
 --

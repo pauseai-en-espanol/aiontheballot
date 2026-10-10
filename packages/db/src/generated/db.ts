@@ -140,7 +140,7 @@ export interface AppBrandAssetGrants {
 }
 
 export interface AppBrandAssets {
-  content: Buffer;
+  byte_size: Int8;
   content_type: string;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
@@ -273,12 +273,6 @@ export interface AppElections {
   territory_code: string | null;
   type: AppElectionType;
   went_live_at: Timestamp | null;
-}
-
-export interface AppFileBlobs {
-  content: Buffer;
-  file_id: string;
-  tenant_id: string;
 }
 
 export interface AppFiles {
@@ -655,7 +649,6 @@ export interface DB {
   'app.draft_checked_documents': AppDraftCheckedDocuments;
   'app.draft_evidence': AppDraftEvidence;
   'app.elections': AppElections;
-  'app.file_blobs': AppFileBlobs;
   'app.files': AppFiles;
   'app.hostname_tombstones': AppHostnameTombstones;
   'app.hostname_verifications': AppHostnameVerifications;

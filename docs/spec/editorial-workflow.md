@@ -312,8 +312,9 @@ _As an editor, I store each party document we cite, so quotes are checked agains
    per tenant, so a second upload reuses the first file. [DB: checks, unique hash; API]
 3. Before an upload, the screen says that the uploader counts as a contributor of every cell that cites the file,
    so they can't publish those cells while four-eyes is on. [UI; DB: publish trigger, step 4]
-4. The database checks the bytes against their hash, and sets the source's hash and the time its copy was stored;
-   neither comes from the client. [DB: `blob_matches_file`, `source_document_rules`]
+4. The file store computes the bytes' hash as it stores them, in the tenant's `sources` bucket, and checks it again
+   whenever they are read (ADR-0004). The database sets the source's hash, from its file's row, and the time its copy
+   was stored; neither comes from the client. [API: file store; DB: `source_document_rules`]
 
 ### S3. Extract the text
 

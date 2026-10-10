@@ -162,7 +162,8 @@ Backups are not part of M1: they come from the cluster's backup plan (D2) and mu
 - production switches from `main` to the `production` branch (ADR-0001);
 - D6 is decided;
 - off-node backups work (D2): phases 0 and 1 of the gitops backup plan are done, and a nightly dump of the
-  `aiontheballot` database has been restored into a scratch database.
+  `aiontheballot` database has been restored into a scratch database, with the file volume's copy from after it
+  (ADR-0004).
 
 **Gate:** a preview go/no-go. That is also where the cut list is applied if we're behind.
 
@@ -486,8 +487,62 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 - **R60. Uploads made by SQL before M2 record the nil UUID as their author:** no accounts exist yet, and
   `files.created_by` is required. It reads as "the database owner, by SQL"; real users get uuidv7 ids, so it can't
   collide. It also lands in the audit log's actor, where earlier owner scripts left none; a future foreign key from
-  `created_by` to users would have to allow it. `~/upload-spain-logos.sql` uploads PauseAI España's logos from the
-  brand kit, rendered to PNG (uploads can't be SVG, which can carry script).
+  `created_by` to users would have to allow it. `~/upload-spain-logos/upload.sh` uploads PauseAI España's logos
+  from the brand kit, rendered to PNG (uploads can't be SVG, which can carry script): bytes through `put-file`,
+  then rows.
+- **R61. File bytes live on a persistent volume, not in Postgres** (Dani's call; migration `files_on_volume`,
+  [ADR-0004](adr/0004-file-bytes-on-a-volume.md), ADR-0001 amended). `app.file_blobs` and the brand assets' inline
+  bytes are gone; the rows, and every rule about them, stay in the database. A `local-path` volume (kept on uninstall,
+  never pruned) is mounted by the API at `/data`; the store writes each file under its tenant, bucket and SHA-256,
+  before its row. The API reads bytes only for a row RLS shows, from that row's own folder. Until the admin uploads
+  (M2), `put-file` puts bytes on the volume from stdin. To do: the gitops backup plan must include the volume, and a
+  sweep must remove bytes no row names.
+
+**File storage (fixes after the adversarial review of R61):**
+
+- **R62. Bytes are found by tenant, bucket and hash** (`{tenant_id}/{bucket}/sha256/…`, and `platform/sha256/…` for
+  brand assets; Dani's direction). The API takes the folder from the row it read, never from the request. Before, the
+  store found bytes by hash alone, so a member of one tenant could record another tenant's private hash (the public can
+  read `source_documents.sha256`) and have the brand route serve those bytes. `put-file` takes the folder as
+  arguments: `<tenant-id> <public_assets|sources>`, or `platform`.
+- **R63. The store checks the hash on every read, and repairs what it would otherwise trust:** a copy already on the
+  volume is reused only if its size and hash are right, and replaced otherwise; a write is flushed (`fsync`) before
+  its rename and the folder after it. Temporary files older than a day are deleted when the API starts. At startup the
+  API also writes a probe file and logs whether the store is writable; a failure is logged and reported, and never
+  stops the API: routing and the home data don't need the volume, only brand images do.
+- **R64. The migration refuses to run while any bytes are in the database** (`RAISE`, naming the counts), rather than
+  my proving that production has none: I can't run SQL there. It locks both tables before counting. It drops
+  `file_blobs` and `brand_assets.content` in the same release as the code that stops reading them, which
+  CONTRIBUTING's expand/contract rule normally forbids. The guard makes it safe: the old pods' brand-image query names
+  what is dropped and would fail, but it runs only for an image the home data names, and with no files and no brand
+  assets there is none; their home-data query reads only columns that stay. With rows, the way through is to save
+  their bytes, delete the rows, deploy, and put them back with `put-file`. A seeded local database must be recreated
+  (CONTRIBUTING).
+- **R65. `purge-tenant-files` deletes a purged tenant's folder** (the file half of `purge_tenant`, which SQL can't
+  do), only on proof piped from the owner's query: a `purged <tenant-id>` line, printed only for a tenant `purge_log`
+  records and that no longer exists. A mistyped id, or an inactive tenant that still exists, gets no line and loses
+  nothing (an earlier draft checked only that the public couldn't see the tenant, which an inactive one passes). It
+  only reports what it would delete unless given `--delete`.
+- **R66. The volume is `local-path` of type `local`, set explicitly** (`storageClass: local-path`, PVC annotation
+  `volumeType: local`): Velero's file-system backup copies `local` volumes but not `hostPath` ones, and the type can't
+  change once the volume exists. The class already defaults to `local` in this cluster (`defaultVolumeType`). The
+  provisioner creates the folder `root:2000`, mode 0770; uid 1000 writes through `fsGroup: 1000`, which the kubelet
+  applies to `local` volumes (Headscale's and Owncast's uid-1000 pods write to theirs this way), now with
+  `fsGroupChangePolicy: OnRootMismatch`. The class reclaims with `Retain`, so deleting the claim by hand keeps the
+  folder. `local-path` neither enforces nor expands the 5 GiB it asks for.
+- **R67. Backups: each volume copy is taken after the database dump it goes with;** the sweep keeps unnamed bytes for
+  at least as long as the oldest database dump that could be restored. With the gitops plan's numbers (weekly Velero
+  backups kept 90 days, each holding the last 14 nightly dumps) that is 104 days; I propose 120.
+- **R68. ADR-0004 records the move.** CLAUDE.md asks for an ADR when the security model changes, and "a stored file is
+  what its hash says" left the database for the store. ADR-0002's must-fail item for it now names the store's unit
+  tests and the API's database tests.
+- **R69. The API has database tests** (`apps/api`, `pnpm test:db`): its data functions run against `aiontheballot_test`
+  as the runtime roles, each in a rolled-back transaction, after `@aiontheballot/db`'s tests have rebuilt it (a turbo
+  dependency, since those drop and recreate the schemas). They run the cross-tenant attack of R62.
+- **R70. Seeds write their bytes on every run,** so a deleted `.data/files` comes back with `pnpm db:seed`.
+  `FILES_ROOT` is in `.env.example` commented out: only an absolute path works for the API, the seeds and the tests,
+  which run from different folders.
+
 - **R55. The coming-soon cards carry no methodology link** (BRIEF invariant 4): there is no methodology page yet.
   Cards for published views will. Without a logo, the operator line is in words (R59).
 - **R56. The hero is sized by the viewport's height too,** so on a 1080p screen "Cómo lo haremos" starts above the

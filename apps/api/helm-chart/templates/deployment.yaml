@@ -32,6 +32,10 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.service.port | quote }}
+            {{- if .Values.persistence.enabled }}
+            - name: FILES_ROOT
+              value: {{ printf "%s/files" .Values.persistence.mountPath | quote }}
+            {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -63,6 +67,15 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.persistence.enabled }}
+            - name: files
+              mountPath: {{ .Values.persistence.mountPath }}
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if .Values.persistence.enabled }}
+        - name: files
+          persistentVolumeClaim:
+            claimName: {{ include "aiontheballot-api.fullname" . }}-files
+        {{- end }}

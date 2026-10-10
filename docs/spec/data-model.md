@@ -163,13 +163,13 @@ create table app.hostname_verifications (              -- private
   last_result      text
 );
 
-create table app.brand_assets (                        -- platform-global; content stored inline
+create table app.brand_assets (                        -- platform-global; bytes on the file volume (platform)
   id            uuid primary key default uuidv7(),
   name          text not null,
   restricted    boolean not null default false,        -- e.g. a PauseAI mark
-  content_type  text not null check (content_type in ('image/png', 'image/jpeg', 'image/webp')),
-  sha256        text not null,
-  content       bytea not null check (octet_length(content) <= 2097152),  -- 2 MB; no SVG (it can carry script)
+  content_type  text not null check (content_type in ('image/png', 'image/jpeg', 'image/webp')),  -- no SVG (script)
+  sha256        text not null check (sha256 ~ '^[0-9a-f]{64}$'),
+  byte_size     bigint not null check (byte_size between 1 and 2097152),  -- 2 MB
   created_at    timestamptz not null default now()
 );
 
@@ -434,13 +434,6 @@ create table app.files (
   check (bucket <> 'public_assets' or content_type in ('image/png', 'image/jpeg', 'image/webp'))
 );
 
-create table app.file_blobs (                          -- immutable; a trigger checks sha256(content) and the size
-  file_id    uuid primary key,
-  tenant_id  uuid not null,
-  content    bytea not null,
-  foreign key (tenant_id, file_id) references app.files (tenant_id, id)
-);
-
 -- A party's document (or a party-neutral one, party_id null). The stored copy is set once: by the fetch job from
 -- the URL (file_origin 'fetched'), or by an upload (file_origin 'uploaded', whose uploader then counts as a
 -- contributor of every cell citing it). After that only extraction_status (one way) and archive_url (once) change,
@@ -488,9 +481,13 @@ create table app.source_texts (
 );
 ```
 
-**Stored files.** A trigger checks that a blob matches its file's SHA-256 and size; the writer must be able to see the
-file. Neither a file nor its bytes is ever updated. A file is deleted only while nothing references it, and its blob
-goes with it (`on delete cascade`); deleting the bytes of a file that still exists is refused, even for the owner.
+**Stored files.** A file's row is here; its bytes are on the file volume under the row's tenant, bucket and SHA-256
+(ADR-0004), written before the row by a store that computes the hash: the store's rule, not the database's, keeps a
+row from naming missing or different bytes. The API reads bytes only for a row RLS shows, from that row's own tenant
+and bucket, and the store checks the hash again on every read. A file is never updated, and is deleted only while
+nothing references it; bytes no row names are swept from the volume after a grace period (identical bytes are stored
+once per tenant and bucket). A purge deletes the tenant's bytes with `purge-tenant-files`, given proof from
+`purge_log` that the tenant is gone.
 
 **Citable sources.** Evidence or a checked-document record may cite a source only once it has a stored copy and
 its extraction is `done` (or `not_applicable`, for kinds without text). The source's `party_id` must be null or the
@@ -1096,7 +1093,7 @@ purge moves it to `hostname_tombstones`.
 | `assessment_revisions`, `revision_evidence`, `revision_checked_documents`    | Same; the full revision history is public                                          |
 | `structural_changes`                                                         | Same                                                                               |
 | `source_documents`                                                           | Cited by a public revision; public columns only (below)                            |
-| `files` and `file_blobs`                                                     | `public_assets` images a public row shows (a party logo, a brand selection)        |
+| `files` (their bytes are on the file volume)                                 | `public_assets` images a public row shows (a party logo, a brand selection)        |
 | `current_revisions`, `corrections_log`                                       | Through the rules above (`security_invoker`)                                       |
 
 Column-level grants restrict `aiontheballot_web` further: on `source_documents` it reads only `id`, `election_id`,
@@ -1149,8 +1146,8 @@ Members also read the unrestricted brand-asset catalogue, to choose their tenant
 | Verbatim match                                                                                                 | Trigger computes `match_status` across units; the caller's value is ignored; re-run at publish                             | `draft_evidence`, publish trigger                                                                     |
 | Attestation is by a named second person                                                                        | Trigger: a stored file in `sources`, `attested_by = current_user_id()`, not the quote's author (when four-eyes applies)    | `draft_evidence`                                                                                      |
 | The matched text can't be edited                                                                               | `source_texts` written only by an open extraction job, never updated or deleted; sources' copies set once                  | `source_texts`, `source_documents`                                                                    |
-| Stored files are what their hash says, and stay so                                                             | Trigger checks `sha256(content)` and size; no `UPDATE`; `DELETE` only while unreferenced                                   | `files`, `file_blobs`                                                                                 |
-| Public files are vetted images                                                                                 | Content-type check; RLS: referenced by a public row                                                                        | `files`, `file_blobs`                                                                                 |
+| Stored files are what their hash says, and stay so                                                             | The store computes the hash and checks every read (ADR-0004); no `UPDATE`; `DELETE` only while unreferenced                | `files`, the file store                                                                               |
+| Public files are vetted images                                                                                 | Content-type check; RLS: referenced by a public row                                                                        | `files`                                                                                               |
 | Only admissible source kinds                                                                                   | Trigger checks the methodology's kinds (for ratings and for "not mentioned")                                               | `draft_evidence`, `draft_checked_documents`, publish trigger                                          |
 | The evidence requirement                                                                                       | Publish trigger                                                                                                            | `assessment_revisions`                                                                                |
 | Legal state transitions                                                                                        | Trigger                                                                                                                    | `assessments`, `elections`, `change_requests`, `reports`, `source_documents`                          |
@@ -1190,12 +1187,12 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
   request to be open, so finishing it (`finished_at`, once) ends what it authorizes at once. A trigger limits what each
   kind may change on the source. By kind:
 
-  | Kind             | Reads                                             | Writes                                                   |
-  | ---------------- | ------------------------------------------------- | -------------------------------------------------------- |
-  | `fetch_source`   | The source's URL                                  | A `sources` file and blob, then the source's copy (once) |
-  | `extract_source` | The source's file                                 | `source_texts`, then `extraction_status`                 |
-  | `archive_source` | The source's URL                                  | `archive_url` (once)                                     |
-  | `llm_run`        | Source texts, the election's criteria and parties | `llm_runs`, `llm_suggestions`                            |
+  | Kind             | Reads                                             | Writes                                                     |
+  | ---------------- | ------------------------------------------------- | ---------------------------------------------------------- |
+  | `fetch_source`   | The source's URL                                  | A `sources` file (bytes, then row), then the source's copy |
+  | `extract_source` | The source's file                                 | `source_texts`, then `extraction_status`                   |
+  | `archive_source` | The source's URL                                  | `archive_url` (once)                                       |
+  | `llm_run`        | Source texts, the election's criteria and parties | `llm_runs`, `llm_suggestions`                              |
 
 - Fetching runs only in the worker, never in the API (hostile HTML and PDFs, threat A8).
 - Separately, the worker runs `private.anonymize_expired_reports()` daily (§3.8). It needs no job request.

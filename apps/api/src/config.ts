@@ -11,6 +11,11 @@ export interface ApiConfig {
    * unavailable (503) rather than failing the whole API.
    */
   webDatabaseUrl: string | undefined;
+  /**
+   * Where stored files' bytes live (ADR-0001: a persistent volume, under their SHA-256). Undefined leaves the routes
+   * that serve them unavailable (503).
+   */
+  filesRoot: string | undefined;
 }
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'];
@@ -31,5 +36,6 @@ export const loadConfig = (env: NodeJS.ProcessEnv): ApiConfig => {
     logLevel,
     sentryDsn: readDsn(env),
     webDatabaseUrl: env.WEB_DATABASE_URL || undefined,
+    filesRoot: env.FILES_ROOT || undefined,
   };
 };

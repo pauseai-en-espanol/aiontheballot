@@ -36,30 +36,23 @@ const versions = async (client: pg.Client): Promise<Record<string, number>> =>
     ).rows.map((r) => [r.tenant_id, Number(r.version)]),
   );
 
-describe('app.brand_assets checks', () => {
-  const insert = (sha: string, type = `'image/png'`, content = `'\\x89504e47'::bytea`): string =>
-    `INSERT INTO app.brand_assets (name, content_type, sha256, content) VALUES ('Logo', ${type}, ${sha}, ${content})`;
+describe('app.brand_assets checks (the bytes live on the volume, under their hash)', () => {
+  const insert = (
+    sha = `encode(sha256('logo'), 'hex')`,
+    type = `'image/png'`,
+    size = '4',
+  ): string =>
+    `INSERT INTO app.brand_assets (name, content_type, sha256, byte_size) VALUES ('Logo', ${type}, ${sha}, ${size})`;
 
-  it('accepts an image whose hash matches its content', async () => {
-    expect(
-      await asPlatform((c) => errorCode(c, insert(`encode(sha256('\\x89504e47'::bytea), 'hex')`))),
-    ).toBeNull();
+  it.each(['1', '4', '2097152'])('accepts an image of %s bytes under its hash', async (size) => {
+    expect(await asPlatform((c) => errorCode(c, insert(undefined, undefined, size)))).toBeNull();
   });
 
   it.each([
-    ['a hash of other content', insert(`encode(sha256('\\x00'::bytea), 'hex')`)],
-    [
-      'a type other than PNG, JPEG or WebP',
-      insert(`encode(sha256('\\x89504e47'::bytea), 'hex')`, `'image/svg+xml'`),
-    ],
-    [
-      'more than 2 MB',
-      insert(
-        `encode(sha256(decode(repeat('00', 2097153), 'hex')), 'hex')`,
-        `'image/png'`,
-        `decode(repeat('00', 2097153), 'hex')`,
-      ),
-    ],
+    ['a malformed hash', insert(`'../../x'`)],
+    ['a type other than PNG, JPEG or WebP', insert(undefined, `'image/svg+xml'`)],
+    ['more than 2 MB', insert(undefined, undefined, '2097153')],
+    ['no bytes', insert(undefined, undefined, '0')],
   ])('rejects %s', async (_name, sql) => {
     expect(await asPlatform((c) => errorCode(c, sql))).toBe(CHECK_VIOLATION);
   });
@@ -151,25 +144,6 @@ describe('shared rows and the public cache key', () => {
       return [first, await versions(client)];
     });
     expect(after[TENANT_B]).toBe((before[TENANT_B] ?? 0) + 1);
-  });
-});
-
-describe('brand assets in the audit log', () => {
-  it('never copy the image bytes, only the hash', async () => {
-    const diffs = await asPlatform(async (client) => {
-      await client.query(
-        `INSERT INTO app.brand_assets (name, content_type, sha256, content)
-         VALUES ('Logo auditado', 'image/png', encode(sha256('\\x01'::bytea), 'hex'), '\\x01'::bytea)`,
-      );
-      return (
-        await client.query<{ diff: { new: Record<string, unknown> } }>(
-          `SELECT diff FROM app.audit_log WHERE table_name = 'brand_assets' AND diff -> 'new' ->> 'name' = 'Logo auditado'`,
-        )
-      ).rows;
-    });
-    expect(diffs).toHaveLength(1);
-    expect(diffs[0]?.diff.new).not.toHaveProperty('content');
-    expect(diffs[0]?.diff.new).toHaveProperty('sha256');
   });
 });
 

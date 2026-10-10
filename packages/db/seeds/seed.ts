@@ -10,6 +10,9 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
+// A .ts path: Node runs this script as TypeScript, and doesn't map .js to .ts.
+import { createFileStore, type FileStore } from '../src/file-store.ts';
+
 const id = (block: number, n: number): string =>
   `0190f8c4-5eed-7000-8000-${block.toString().padStart(6, '0')}${n.toString().padStart(6, '0')}`;
 
@@ -104,6 +107,9 @@ const LOGO = {
   file: id(5, 3),
   png: 'iVBORw0KGgoAAAANSUhEUgAAAPAAAABACAYAAAAkn/rnAAAA60lEQVR4nO3ToQ2AQBAFUSjh+i/ySgAcjgQSxMB7Zt1+NesCZAkYwgQMYQKGMAFDmIAhTMAQJmAIW8cY23Fvm3Nexv/WX+AkYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAh7HMBP92FIgFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGGfCxj+RMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5hYIEzAECZgCBMwhAkYwgQMYQKGMAFD2A4/mJNwL4ieyQAAAABJRU5ErkJggg==',
 } as const;
+const LOGO_BYTES = Buffer.from(LOGO.png, 'base64');
+/** Party A's programme: a stand-in for a PDF, enough for its stored copy and hash. */
+const PROGRAMME = Buffer.from('programa de ejemplo');
 const PAGES = [
   'El Partido Ejemplo A propone una moratoria ficticia sobre los sistemas de prueba más avanzados.',
   'También pide crear una agencia de supervisión de ejemplo, con un presupuesto inventado.',
@@ -111,9 +117,16 @@ const PAGES = [
 
 /**
  * Seeds the database, inside the caller's transaction, connected as the owner. Returns 'already seeded' (and writes
- * nothing) if the seed tenants exist, and throws if any other tenant does.
+ * no rows) if the seed tenants exist, and throws if any other tenant does.
  */
-export const seed = async (client: pg.Client): Promise<'seeded' | 'already seeded'> => {
+export const seed = async (
+  client: pg.Client,
+  /**
+   * Where the seeds' file bytes go (ADR-0004: on the volume, under their tenant, bucket and hash); none, and only rows
+   * are written. They are written even if the database is already seeded, so a lost folder comes back.
+   */
+  store?: FileStore,
+): Promise<'seeded' | 'already seeded'> => {
   {
     const { rows } = await client.query<{ slug: string }>('SELECT slug FROM app.tenants');
     const ours = new Set(Object.values(SEED_TENANTS).map((t) => t.slug));
@@ -122,6 +135,11 @@ export const seed = async (client: pg.Client): Promise<'seeded' | 'already seede
       throw new Error(
         `Refusing to seed: the database holds other tenants (${strangers.map((r) => r.slug).join(', ')})`,
       );
+    }
+    // Bytes first, rows second: a row never names bytes the store lacks.
+    if (store) {
+      await store.put({ tenantId: SEED_TENANTS.A.id, bucket: 'sources' }, PROGRAMME);
+      await store.put({ tenantId: SEED_TENANTS.A.id, bucket: 'public_assets' }, LOGO_BYTES);
     }
     if (rows.length > 0) {
       return 'already seeded';
@@ -247,15 +265,10 @@ export const seed = async (client: pg.Client): Promise<'seeded' | 'already seede
 
     // Party A's programme: uploaded by the editor, with its extracted pages.
     await as(SEED_USERS.editorA);
-    const content = Buffer.from('programa de ejemplo');
     await client.query(
       `INSERT INTO app.files (id, tenant_id, bucket, content_type, byte_size, sha256, original_filename)
        VALUES ($1, $2, 'sources', 'application/pdf', $3, encode(sha256($4), 'hex'), 'programa-de-ejemplo.pdf')`,
-      [FILE, A.id, content.length, content],
-    );
-    await client.query(
-      'INSERT INTO app.file_blobs (file_id, tenant_id, content) VALUES ($1, $2, $3)',
-      [FILE, A.id, content],
+      [FILE, A.id, PROGRAMME.length, PROGRAMME],
     );
     await client.query(
       `INSERT INTO app.source_documents (id, tenant_id, election_id, party_id, kind, title, url, is_programme)
@@ -296,15 +309,10 @@ export const seed = async (client: pg.Client): Promise<'seeded' | 'already seede
     );
     // A's operator logo, uploaded by its country admin and shown on the orange and on the white surfaces.
     await as(SEED_USERS.countryAdminA);
-    const logo = Buffer.from(LOGO.png, 'base64');
     await client.query(
       `INSERT INTO app.files (id, tenant_id, bucket, content_type, byte_size, sha256)
        VALUES ($1, $2, 'public_assets', 'image/png', $3, encode(sha256($4), 'hex'))`,
-      [LOGO.file, A.id, logo.byteLength, logo],
-    );
-    await client.query(
-      'INSERT INTO app.file_blobs (file_id, tenant_id, content) VALUES ($1, $2, $3)',
-      [LOGO.file, A.id, logo],
+      [LOGO.file, A.id, LOGO_BYTES.byteLength, LOGO_BYTES],
     );
     for (const slot of ['operator_logo_on_accent', 'operator_logo_on_canvas']) {
       await client.query(
@@ -343,7 +351,10 @@ const main = async (): Promise<void> => {
   await client.connect();
   try {
     await client.query('BEGIN');
-    const result = await seed(client);
+    // The API reads the same folder locally and in the e2e stack (FILES_ROOT, default .data/files).
+    const root =
+      process.env.FILES_ROOT || fileURLToPath(new URL('../../../.data/files', import.meta.url));
+    const result = await seed(client, createFileStore(root));
     await client.query('COMMIT');
     console.log(`Seeds: ${result}.`);
   } catch (error) {

@@ -10,6 +10,7 @@ describe('loadConfig', () => {
       logLevel: 'info',
       sentryDsn: undefined,
       webDatabaseUrl: undefined,
+      filesRoot: undefined,
     });
   });
 
@@ -20,6 +21,7 @@ describe('loadConfig', () => {
         PORT: '4000',
         LOG_LEVEL: 'debug',
         WEB_DATABASE_URL: 'postgres://aiontheballot_web@db.example.test/aiontheballot',
+        FILES_ROOT: '/data/files',
       }),
     ).toEqual({
       host: '127.0.0.1',
@@ -27,6 +29,7 @@ describe('loadConfig', () => {
       logLevel: 'debug',
       sentryDsn: undefined,
       webDatabaseUrl: 'postgres://aiontheballot_web@db.example.test/aiontheballot',
+      filesRoot: '/data/files',
     });
   });
 
