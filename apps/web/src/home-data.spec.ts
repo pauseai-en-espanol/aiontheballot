@@ -7,7 +7,12 @@ import { createHomeLoader } from './home-data';
 const API = 'http://api.example.test:3001';
 
 const home = (name: string): PublicHome => ({
-  tenant: { displayName: { es: name }, defaultLocale: 'es', methodologyKind: 'demands' },
+  tenant: {
+    displayName: { es: name },
+    defaultLocale: 'es',
+    countryCode: 'XA',
+    methodologyKind: 'demands',
+  },
   operator: {
     displayName: { es: 'Organización de ejemplo' },
     url: null,
@@ -31,6 +36,26 @@ describe('the home data loader', () => {
     expect(String(fetch.mock.calls[0]?.at(0))).toBe(`${API}/public/tenants/ejemplo-a/home`);
     now = 1_000;
     await load('ejemplo-a');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('refetches on request, but at most once per interval', async () => {
+    let now = 0;
+    const fetch = vi.fn(async () => respond(home('Ejemplo')));
+    const load = createHomeLoader({
+      apiUrl: API,
+      maxAgeMs: 60_000,
+      freshAfterMs: 5_000,
+      fetch,
+      now: () => now,
+    });
+    await load('ejemplo-a');
+    now = 1_000;
+    await load('ejemplo-a', { fresh: true });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    now = 5_000;
+    await load('ejemplo-a', { fresh: true });
+    await load('ejemplo-a', { fresh: true });
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 

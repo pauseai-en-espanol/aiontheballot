@@ -73,7 +73,7 @@ const Ballot = () => (
     viewBox="0 0 440 190"
     className={css({
       float: 'right',
-      width: 'clamp(112px, 34vw, 440px)',
+      width: 'clamp(112px, min(34vw, 40vh), 440px)',
       height: 'auto',
       marginInlineStart: 'clamp(12px, 3vw, 40px)',
     })}
@@ -108,12 +108,22 @@ const Ballot = () => (
 );
 
 // The name is a poster headline: as big as its longest word allows. A word never breaks (mid-word breaks look
-// broken this big); at these sizes the longest word fits the narrowest page.
+// broken this big); at these sizes the longest word fits the narrowest page. The height caps it too, so on a laptop
+// or a 1080p screen the rest of the page starts above the fold, and a rem term makes it grow with zoom (WCAG 1.4.4).
 const NAME_SIZES = [
-  { maxWord: 6, className: css({ fontSize: 'clamp(56px, 18vw, 232px)' }) },
-  { maxWord: 9, className: css({ fontSize: 'clamp(44px, 13vw, 168px)' }) },
-  { maxWord: 12, className: css({ fontSize: 'clamp(36px, 10vw, 128px)' }) },
-  { maxWord: Infinity, className: css({ fontSize: 'clamp(28px, 6vw, 80px)' }) },
+  {
+    maxWord: 6,
+    className: css({ fontSize: 'clamp(56px, calc(1.5rem + min(16vw, 15vh)), 232px)' }),
+  },
+  {
+    maxWord: 9,
+    className: css({ fontSize: 'clamp(44px, calc(1.25rem + min(11.5vw, 11.5vh)), 168px)' }),
+  },
+  { maxWord: 12, className: css({ fontSize: 'clamp(36px, calc(1rem + min(9vw, 9vh)), 128px)' }) },
+  {
+    maxWord: Infinity,
+    className: css({ fontSize: 'clamp(28px, calc(0.75rem + min(5vw, 6vh)), 80px)' }),
+  },
 ] as const;
 
 const nameSize = (name: string): string => {
@@ -181,7 +191,7 @@ export const ComingSoon = ({ home, locale }: ComingSoonProps) => {
       </header>
 
       <main className={css({ flex: '1' })}>
-        <section className={cx(wrap, css({ paddingBlock: '24px 88px' }))}>
+        <section className={cx(wrap, css({ paddingBlock: '24px clamp(48px, 7vh, 88px)' }))}>
           <h1
             className={cx(
               display,
@@ -295,7 +305,11 @@ export const ComingSoon = ({ home, locale }: ComingSoonProps) => {
 
         <section
           aria-labelledby="how"
-          className={css({ bg: 'bg.inverse', color: 'fg.inverse', paddingBlock: '88px' })}
+          className={css({
+            bg: 'bg.inverse',
+            color: 'fg.inverse',
+            paddingBlock: 'clamp(56px, 8vh, 88px)',
+          })}
         >
           <div className={cx(wrap, css({ display: 'flex', flexDirection: 'column', gap: '48px' }))}>
             <h2

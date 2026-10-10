@@ -138,7 +138,7 @@ Backups are not part of M1: they come from the cluster's backup plan (D2) and mu
   - _aviso legal_ (legal notice), privacy policy;
   - contact and report-an-error form.
 - **Platform invariants:** the "An initiative of {operator}" line and the methodology link in the shared layout.
-- **Share images** in four sizes.
+- **Share images** in four sizes, and link previews for every view (see Social sharing).
 - **SEO:** canonical URLs, sitemaps and `hreflang` groundwork.
 - **Security and traffic:** CSP and security headers; the Envoy rate-limit policy.
 - **Analytics:** Plausible.
@@ -219,7 +219,8 @@ is done and M2 is on track.
 ## If launch is at risk, cut in this order
 
 1. **M4 entirely.** Entering evidence by hand is the launch path anyway.
-2. **Share-image breadth.** Launch with 1200×630 and 1080×1080 for the overview and parties only.
+2. **Share-image breadth.** Launch with 1200×630 and 1080×1080 for the overview and parties only. Link previews
+   themselves are never cut.
 3. **The per-criterion page.**
 4. **The report-an-error web form.** Temporarily replace it with a published email address, and log submissions
    by hand. The right of reply itself stays.
@@ -233,6 +234,7 @@ is done and M2 is on track.
 - The evidence requirement, the four-eyes mechanism (on by default; see P14) and verbatim match.
 - History and the corrections log.
 - The operator line and the methodology link.
+- Link previews (Open Graph and Twitter tags with a share image) on every public view.
 - The legal pages.
 - Ratings shown by icon plus text plus colour.
 - CSP and security headers.
@@ -256,6 +258,40 @@ as the LLM pipeline:
 - Handle corrections within a stated turnaround time.
 - Apply the reflection-day behaviour agreed under Q8.
 - Archive the election after the results.
+
+## Social sharing: a core requirement
+
+The site spreads through people sharing it, before launch to build expectation and during the campaign to carry the
+ratings. Every public page must give a good preview on every app (WhatsApp, X, Facebook, Telegram, LinkedIn,
+Bluesky, Mastodon), and must give it fast: crawlers time out, and a slow or missing preview is a lost share.
+
+**Shipped with the coming-soon page:**
+
+- Open Graph and Twitter tags, the canonical address and `hreflang`, all from the routing table (never the Host
+  header). `og:locale` is the language and the tenant's country.
+- A share image in the A style in the four sizes (ADR-0003 §8), rendered by `packages/og` (satori, then resvg) with
+  the fonts embedded. The link preview is about 50 KB; WhatsApp drops anything over about 300 KB.
+- Content-hash URLs, `/og/{template}.{size}.{hash}.png`, cached for a year as `immutable`, with an ETag and 304s. A
+  stale or made-up hash redirects to the current image (307) and never triggers a render.
+- Pre-generation: rendering a page starts rendering its link preview, so it is ready when the crawler asks; each
+  server pre-renders every tenant's link previews once it starts. Rendered images stay in a per-process cache.
+
+**Every view, once the public site arrives (M3 and the campaign):**
+
+- The overview, each party, each criterion, each cell, the methodology and the corrections log get their own title,
+  description, canonical address and share image: a party's card shows its ratings, a cell's its rating and source,
+  with "Actualizado" (P9) on party and cell cards. Alt text describes the rating in words.
+- A download dialog offers the four sizes, since Instagram and stories have no link previews.
+- On publish, the API's revalidation call (M2) names the views that changed, and every web replica pre-renders
+  their link previews before anyone shares them. The content hash changes with the content, so a re-shared link
+  gets the new picture.
+- **Budgets:** a warm page under 300 ms of server time; a warm image under 100 ms and a cold one under a second;
+  every image under 300 KB; no cookies and no client JavaScript needed for the tags.
+- **Caching beyond the servers:** the image URLs are immutable, so a CDN in front of `/og/` would be safe. Cloudflare
+  is DNS-only today; turning its proxy on is a gitops decision for when traffic needs it.
+- **Tests:** e2e checks each view's tags and its image's size and dimensions; the template test checks the canonical
+  address on every card. Before launch: Facebook's Sharing Debugger, LinkedIn's Post Inspector, and a real WhatsApp
+  and Telegram send.
 
 ## Decisions to review (taken by Claude while Dani was away)
 
@@ -412,6 +448,31 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   the row). The platform collects no email addresses, so there is no form, no personal data and no consent to
   manage. For Spain, `~/update-spain-operator.sql` sets the website, contact address and newsletter from pauseai.es
   (a dry run unless piped with `COMMIT`), once this is deployed.
+
+**Social sharing (Dani's priority; R51 is the `announced-elections` branch's):**
+
+- **R52. satori 0.35.1:** the newest release past the workspace's three-day rule (`minimumReleaseAge`); satori
+  released 24 times in 30 days. `@resvg/resvg-js` 2.6.2 ships the musl binary the Alpine image needs (checked in a
+  locally built image: first fetch 24 ms, then 5 ms).
+- **R53. The fonts are embedded in `packages/og` as base64** (`pnpm --filter @aiontheballot/og fonts` regenerates
+  them from `packages/og/fonts/`, where their licences are; a test keeps them equal). Next bundles workspace packages
+  and resolves file assets differently in pages and in route handlers, so reading font files failed in one or the
+  other.
+- **R54. A stale image hash redirects with 307 and a minute's cache,** not 301: the current image changes with the
+  content. Only the current hash renders, so requests can't make the server render arbitrary pictures. Before
+  redirecting, the route refetches the tenant's data (at most once per tenant every 5 seconds), so servers whose
+  copies differ in age can't bounce a crawler between two hashes.
+- **R57. The hash covers everything drawn:** the card's texts, the size, the palette and the embedded fonts, plus
+  `TEMPLATE_VERSION`. A test pins the SVG each version draws, so a template change or a satori upgrade that draws
+  differently fails until the version is bumped: a picture never changes under a cached URL.
+- **R58. Metadata is never streamed** (`htmlLimitedBots: /.*/`): Next 16 otherwise puts it in the body for crawlers
+  it doesn't recognise, such as Mastodon's and Bluesky's, which read only the head. `og:locale` is set only for the
+  tenant's own language (`es_ES`), with no `og:locale:alternate`: the locales are separate pages, as `hreflang`
+  says. The renderer loads only when an image renders, so a failure there could never break a page.
+- **R55. The coming-soon cards carry no methodology link** (BRIEF invariant 4): there is no methodology page yet.
+  Cards for published views will. The operator is text until logos come from brand assets.
+- **R56. The hero is sized by the viewport's height too,** so on a 1080p screen "Cómo lo haremos" starts above the
+  fold (Dani's feedback).
 
 ## Open decisions for Dani
 

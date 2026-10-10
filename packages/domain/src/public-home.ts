@@ -6,7 +6,13 @@ import type { MethodologyKind } from './methodology.js';
  * Read as aiontheballot_web, so it holds only what RLS makes public.
  */
 export interface PublicHome {
-  tenant: { displayName: Localized; defaultLocale: string; methodologyKind: MethodologyKind };
+  tenant: {
+    displayName: Localized;
+    defaultLocale: string;
+    /** ISO 3166-1, for og:locale (`es_ES`). */
+    countryCode: string;
+    methodologyKind: MethodologyKind;
+  };
   /** Every active tenant has an operator (a deferred check in the database). */
   operator: {
     displayName: Localized;

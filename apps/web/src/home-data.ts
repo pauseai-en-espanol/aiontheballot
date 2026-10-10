@@ -12,6 +12,8 @@ export interface HomeLoaderOptions {
   apiUrl: string | undefined;
   /** How long a tenant's data is used before it is fetched again. */
   maxAgeMs?: number;
+  /** The youngest copy a `fresh` load refetches: it bounds API calls to one per tenant per interval, whatever comes. */
+  freshAfterMs?: number;
   fetch?: typeof fetch;
   now?: () => number;
 }
@@ -29,9 +31,10 @@ interface Entry {
 export const createHomeLoader = ({
   apiUrl,
   maxAgeMs = 60_000,
+  freshAfterMs = 5_000,
   fetch: fetchImpl = fetch,
   now = Date.now,
-}: HomeLoaderOptions): ((slug: string) => Promise<HomeResult>) => {
+}: HomeLoaderOptions): ((slug: string, options?: { fresh?: boolean }) => Promise<HomeResult>) => {
   const entries = new Map<string, Entry>();
   const refreshing = new Map<string, Promise<void>>();
 
@@ -58,9 +61,11 @@ export const createHomeLoader = ({
     }
   };
 
-  return async (slug) => {
+  // `fresh` refetches unless the copy is only seconds old: for a caller that must not act on data older than another's.
+  return async (slug, { fresh = false } = {}) => {
     const entry = entries.get(slug);
-    if (!entry || now() - entry.loadedAt >= maxAgeMs) {
+    const age = entry ? now() - entry.loadedAt : Infinity;
+    if (age >= maxAgeMs || (fresh && age >= freshAfterMs)) {
       let pending = refreshing.get(slug);
       if (!pending) {
         pending = refresh(slug).finally(() => refreshing.delete(slug));

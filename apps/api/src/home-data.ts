@@ -23,7 +23,7 @@ export const createHomeSource =
   async (slug) => {
     const tenant = await db
       .selectFrom('app.tenants')
-      .select(['id', 'display_name', 'default_locale', 'methodology_kind'])
+      .select(['id', 'display_name', 'default_locale', 'country_code', 'methodology_kind'])
       .where('slug', '=', slug)
       .executeTakeFirst();
     if (!tenant) {
@@ -58,6 +58,7 @@ export const createHomeSource =
       tenant: {
         displayName: localized(tenant.display_name, 'tenants.display_name'),
         defaultLocale: tenant.default_locale,
+        countryCode: tenant.country_code,
         methodologyKind: tenant.methodology_kind,
       },
       operator: {
