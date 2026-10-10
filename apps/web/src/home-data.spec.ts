@@ -8,7 +8,12 @@ const API = 'http://api.example.test:3001';
 
 const home = (name: string): PublicHome => ({
   tenant: { displayName: { es: name }, defaultLocale: 'es', methodologyKind: 'demands' },
-  operator: { displayName: { es: 'Organización de ejemplo' }, url: null, contactEmail: null },
+  operator: {
+    displayName: { es: 'Organización de ejemplo' },
+    url: null,
+    contactEmail: null,
+    newsletterUrl: null,
+  },
   election: null,
 });
 

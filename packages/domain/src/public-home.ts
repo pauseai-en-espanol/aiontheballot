@@ -8,7 +8,13 @@ import type { MethodologyKind } from './methodology.js';
 export interface PublicHome {
   tenant: { displayName: Localized; defaultLocale: string; methodologyKind: MethodologyKind };
   /** Every active tenant has an operator (a deferred check in the database). */
-  operator: { displayName: Localized; url: string | null; contactEmail: string | null };
+  operator: {
+    displayName: Localized;
+    url: string | null;
+    contactEmail: string | null;
+    /** Where people sign up to hear when the site is published: the operator's own list, never ours. */
+    newsletterUrl: string | null;
+  };
   /** The next election the public may see: the soonest one not archived whose date hasn't passed, if any. */
   election: { name: Localized; date: string | null } | null;
 }

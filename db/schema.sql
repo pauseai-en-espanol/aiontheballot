@@ -3168,7 +3168,9 @@ CREATE TABLE app.organizations (
     logo_asset_id uuid,
     is_pauseai_chapter boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    newsletter_url text,
     CONSTRAINT organizations_contact_email_check CHECK (((contact_email = lower(contact_email)) AND (contact_email ~ '^[^@[:space:]]+@[^@[:space:]]+$'::text))),
+    CONSTRAINT organizations_newsletter_url_check CHECK ((newsletter_url ~ '^https://'::text)),
     CONSTRAINT organizations_privacy_email_check CHECK (((privacy_email = lower(privacy_email)) AND (privacy_email ~ '^[^@[:space:]]+@[^@[:space:]]+$'::text))),
     CONSTRAINT organizations_url_check CHECK ((url ~ '^https://'::text))
 );
@@ -9643,6 +9645,13 @@ GRANT INSERT(logo_asset_id),UPDATE(logo_asset_id) ON TABLE app.organizations TO 
 --
 
 GRANT INSERT(is_pauseai_chapter),UPDATE(is_pauseai_chapter) ON TABLE app.organizations TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN organizations.newsletter_url; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(newsletter_url),UPDATE(newsletter_url) ON TABLE app.organizations TO aiontheballot_admin;
 
 
 --

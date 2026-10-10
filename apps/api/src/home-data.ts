@@ -33,7 +33,7 @@ export const createHomeSource =
       db
         .selectFrom('app.tenant_organizations as link')
         .innerJoin('app.organizations as o', 'o.id', 'link.organization_id')
-        .select(['o.display_name', 'o.url', 'o.contact_email'])
+        .select(['o.display_name', 'o.url', 'o.contact_email', 'o.newsletter_url'])
         .where('link.tenant_id', '=', tenant.id)
         .where('link.role', '=', 'operator')
         .executeTakeFirstOrThrow(),
@@ -64,6 +64,7 @@ export const createHomeSource =
         displayName: localized(operator.display_name, 'organizations.display_name'),
         url: operator.url,
         contactEmail: operator.contact_email,
+        newsletterUrl: operator.newsletter_url,
       },
       election: election
         ? { name: localized(election.name, 'elections.name'), date: election.date }

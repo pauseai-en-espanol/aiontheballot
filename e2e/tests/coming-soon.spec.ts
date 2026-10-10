@@ -38,6 +38,14 @@ test.describe('the coming-soon home (fictional seeds)', () => {
     ).toBeVisible();
     // The seed's live election has no date yet: its name alone.
     await expect(page.getByText('Elecciones generales de ejemplo', { exact: true })).toBeVisible();
+    // The operator's own newsletter: the platform never collects an address.
+    await expect(page.getByRole('link', { name: es.notify })).toHaveAttribute(
+      'href',
+      'https://boletin.organizacion-ejemplo-a.example/',
+    );
+    await expect(
+      page.getByText('Te avisaremos por el boletín de Organización de ejemplo A.'),
+    ).toBeVisible();
     await expect(
       page.getByRole('link', { name: 'Conoce Organización de ejemplo A' }),
     ).toHaveAttribute('href', 'https://organizacion-ejemplo-a.example/');
@@ -52,7 +60,7 @@ test.describe('the coming-soon home (fictional seeds)', () => {
     ]);
   });
 
-  test('leaves out what the operator has not given: no website link, no contact, no election', async ({
+  test('leaves out what the operator has not given: no links, no contact, no election', async ({
     page,
   }) => {
     await page.goto(TENANT_B_EN);

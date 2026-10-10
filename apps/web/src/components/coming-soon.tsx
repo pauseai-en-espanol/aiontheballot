@@ -23,22 +23,34 @@ const focusRing = css({
   _focusVisible: { outline: '3px solid', outlineColor: 'currentColor', outlineOffset: '3px' },
 });
 
-const button = cx(
+const buttonBase = cx(
   display,
   css({
     display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
+    width: { base: '100%', sm: 'auto' },
     minHeight: '52px',
     paddingInline: '24px',
-    fontSize: '22px',
+    fontSize: { base: '20px', sm: '22px' },
     letterSpacing: '0.02em',
+    textAlign: 'center',
     textDecoration: 'none',
-    bg: 'bg.inverse',
-    color: 'fg.inverse',
-    _hover: { color: 'fg.accentOnInverse' },
-    // Ink on the orange page, not the button's own white, which the orange would wash out.
+    border: '3px solid',
+    borderColor: 'border.default',
+    // Ink on the orange page, not the solid button's own white, which the orange would wash out.
     _focusVisible: { outline: '3px solid', outlineColor: 'border.default', outlineOffset: '3px' },
   }),
+);
+
+const button = cx(
+  buttonBase,
+  css({ bg: 'bg.inverse', color: 'fg.inverse', _hover: { color: 'fg.accentOnInverse' } }),
+);
+
+const buttonOutline = cx(
+  buttonBase,
+  css({ color: 'fg.onAccent', _hover: { bg: 'bg.inverse', color: 'fg.inverse' } }),
 );
 
 /** The pause sign: two bars, as in PauseAI's mark. Decorative. */
@@ -50,71 +62,64 @@ const PauseBars = () => (
   </span>
 );
 
-// No inline styles: the cached public site's CSP has no nonces (ADR-0003).
-const BALLOT_ROWS = [
-  { checked: true, line: css({ flex: '1', height: '6px', bg: 'fg.default' }) },
-  { checked: false, line: css({ flex: '1', height: '6px', bg: 'fg.default', opacity: '0.35' }) },
-  { checked: false, line: css({ width: '55%', height: '6px', bg: 'fg.default', opacity: '0.35' }) },
-];
-
-/** A ballot going into the slot of a ballot box. Decorative, and only where there is room beside the name. */
+/**
+ * A ballot going into the slot of a ballot box, floated beside the start of the name. Decorative. An SVG, so it
+ * scales down to a phone; no inline styles, since the cached public site's CSP has no nonces (ADR-0003).
+ */
 const Ballot = () => (
-  <span
+  <svg
     aria-hidden="true"
+    focusable="false"
+    viewBox="0 0 440 190"
     className={css({
-      display: { base: 'none', md: 'block' },
       float: 'right',
-      position: 'relative',
-      width: 'clamp(200px, 32vw, 440px)',
-      height: 'clamp(120px, 14vw, 190px)',
-      marginInlineStart: '40px',
+      width: 'clamp(112px, 34vw, 440px)',
+      height: 'auto',
+      marginInlineStart: 'clamp(12px, 3vw, 40px)',
     })}
   >
-    <span
-      className={css({
-        position: 'absolute',
-        insetInline: '18%',
-        top: '0',
-        bottom: '30px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '14px',
-        paddingBlock: '22px',
-        paddingInline: '24px',
-        bg: 'bg.canvas',
-      })}
-    >
-      {BALLOT_ROWS.map(({ checked, line }, row) => (
-        <span key={row} className={css({ display: 'flex', alignItems: 'center', gap: '12px' })}>
-          <span
-            className={css({
-              display: 'grid',
-              placeItems: 'center',
-              flex: 'none',
-              width: '20px',
-              height: '20px',
-              border: '3px solid',
-              borderColor: 'border.default',
-            })}
-          >
-            {checked && <span className={css({ width: '8px', height: '8px', bg: 'fg.default' })} />}
-          </span>
-          <span className={line} />
-        </span>
-      ))}
-    </span>
-    <span
-      className={css({
-        position: 'absolute',
-        insetInline: '0',
-        bottom: '0',
-        height: '44px',
-        borderRadius: '22px',
-        bg: 'bg.inverse',
-      })}
-    />
-  </span>
+    <rect x="79" y="0" width="282" height="160" className={css({ fill: 'bg.canvas' })} />
+    {[22, 56, 90].map((y, row) => (
+      <g key={y}>
+        <rect
+          x="104.5"
+          y={y + 1.5}
+          width="17"
+          height="17"
+          strokeWidth="3"
+          className={css({ fill: 'none', stroke: 'border.default' })}
+        />
+        {row === 0 && (
+          <rect x="110" y={y + 6} width="8" height="8" className={css({ fill: 'fg.default' })} />
+        )}
+        <rect
+          x="135"
+          y={y + 7}
+          width={row === 2 ? 110 : 202}
+          height="6"
+          className={
+            row === 0 ? css({ fill: 'fg.default' }) : css({ fill: 'fg.default', opacity: '0.35' })
+          }
+        />
+      </g>
+    ))}
+    <rect x="0" y="146" width="440" height="44" rx="22" className={css({ fill: 'bg.inverse' })} />
+  </svg>
 );
+
+// The name is a poster headline: as big as its longest word allows. A word never breaks (mid-word breaks look
+// broken this big); at these sizes the longest word fits the narrowest page.
+const NAME_SIZES = [
+  { maxWord: 6, className: css({ fontSize: 'clamp(56px, 18vw, 232px)' }) },
+  { maxWord: 9, className: css({ fontSize: 'clamp(44px, 13vw, 168px)' }) },
+  { maxWord: 12, className: css({ fontSize: 'clamp(36px, 10vw, 128px)' }) },
+  { maxWord: Infinity, className: css({ fontSize: 'clamp(28px, 6vw, 80px)' }) },
+] as const;
+
+const nameSize = (name: string): string => {
+  const longest = Math.max(0, ...name.split(/\s+/).map((word) => word.length));
+  return (NAME_SIZES.find((size) => longest <= size.maxWord) ?? NAME_SIZES[3]).className;
+};
 
 const PROMISES = ['quotes', 'history', 'corrections'] as const;
 
@@ -126,8 +131,10 @@ export const ComingSoon = ({ home, locale }: ComingSoonProps) => {
   const t = getTranslator(locale);
   const local = (value: PublicHome['tenant']['displayName']) =>
     pickLocalized(value, locale, home.tenant.defaultLocale) ?? '';
+  const name = local(home.tenant.displayName);
   const operator = local(home.operator.displayName);
   const operatorUrl = home.operator.url;
+  const { newsletterUrl } = home.operator;
   const { election } = home;
   const electionName = election ? local(election.name) : '';
 
@@ -178,20 +185,18 @@ export const ComingSoon = ({ home, locale }: ComingSoonProps) => {
           <h1
             className={cx(
               display,
+              nameSize(name),
               css({
-                fontSize: 'clamp(56px, 18vw, 232px)',
                 lineHeight: '0.84',
                 letterSpacing: '-0.005em',
                 // Balanced wrapping (the preflight's default for headings) ignores the ballot's float in Chrome
                 // and runs the name off the page.
                 textWrap: 'wrap',
-                // A word too long for the line breaks rather than overflow; no hyphens, which look broken this big.
-                overflowWrap: 'break-word',
               }),
             )}
           >
             <Ballot />
-            {local(home.tenant.displayName)}
+            {name}
           </h1>
 
           <div
@@ -229,7 +234,7 @@ export const ComingSoon = ({ home, locale }: ComingSoonProps) => {
               </p>
             </div>
 
-            {(election !== null || operatorUrl !== null) && (
+            {(election !== null || operatorUrl !== null || newsletterUrl !== null) && (
               <div
                 className={css({
                   display: 'flex',
@@ -259,10 +264,29 @@ export const ComingSoon = ({ home, locale }: ComingSoonProps) => {
                       : electionName}
                   </p>
                 )}
-                {operatorUrl && (
-                  <a className={button} href={operatorUrl}>
-                    {t('home.learnMore', { operator })}
-                  </a>
+                {(newsletterUrl ?? operatorUrl) && (
+                  <div
+                    className={css({
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '12px',
+                      width: { base: '100%', sm: 'auto' },
+                    })}
+                  >
+                    {newsletterUrl && (
+                      <a className={button} href={newsletterUrl}>
+                        {t('home.notify')}
+                      </a>
+                    )}
+                    {operatorUrl && (
+                      <a className={newsletterUrl ? buttonOutline : button} href={operatorUrl}>
+                        {t('home.learnMore', { operator })}
+                      </a>
+                    )}
+                  </div>
+                )}
+                {newsletterUrl && (
+                  <p className={css({ fontSize: '15px' })}>{t('home.notifyNote', { operator })}</p>
                 )}
               </div>
             )}

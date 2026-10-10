@@ -26,6 +26,8 @@
       "descriptive": "We will review what the parties propose on advanced AI. Every rating comes with its sources."
     },
     "election": "{name} · {date, date, long}",
+    "notify": "Tell me when it's out",
+    "notifyNote": "We'll let you know through {operator}'s newsletter.",
     "learnMore": "About {operator}",
     "how": {
       "title": "How we will do it",

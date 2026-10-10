@@ -47,7 +47,12 @@ describe('api', () => {
   describe("a tenant's home data", () => {
     const data: PublicHome = {
       tenant: { displayName: { es: 'Ejemplo' }, defaultLocale: 'es', methodologyKind: 'demands' },
-      operator: { displayName: { es: 'Organización de ejemplo' }, url: null, contactEmail: null },
+      operator: {
+        displayName: { es: 'Organización de ejemplo' },
+        url: null,
+        contactEmail: null,
+        newsletterUrl: null,
+      },
       election: { name: { es: 'Elecciones de ejemplo' }, date: '2030-01-15' },
     };
     const withHome = () =>

@@ -405,8 +405,13 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   the site (an e2e test checks). Roboto Slab bold waits for the scorecard, since every face is preloaded.
 - **R48. The page title is the tenant's name plus "Próximamente",** not `PLATFORM_NAME`, which the admin app still
   uses. The content carries `lang`; `<html lang>` stays `es` until M3 renders it per locale.
-- **R49. Seeds:** `ejemplo-a`'s operator now has a website and a contact address, on the reserved `.example` TLD;
-  `ejemplo-b`'s has neither, so the e2e tests cover both.
+- **R49. Seeds:** `ejemplo-a`'s operator now has a website, a contact address and a newsletter, on the reserved
+  `.example` TLD; `ejemplo-b`'s has none, so the e2e tests cover both.
+- **R50. "Avísame cuando se publique" links to the operator's own newsletter** (migration
+  `organization_newsletter`: `organizations.newsletter_url`, https only, written by platform admins like the rest of
+  the row). The platform collects no email addresses, so there is no form, no personal data and no consent to
+  manage. For Spain, `~/update-spain-operator.sql` sets the website, contact address and newsletter from pauseai.es
+  (a dry run unless piped with `COMMIT`), once this is deployed.
 
 ## Open decisions for Dani
 

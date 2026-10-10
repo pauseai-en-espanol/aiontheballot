@@ -409,6 +409,7 @@ export interface AppOrganizations {
   is_pauseai_chapter: Generated<boolean>;
   legal_name: string;
   logo_asset_id: string | null;
+  newsletter_url: string | null;
   privacy_email: string | null;
   registry_entry: string | null;
   tax_id: string | null;

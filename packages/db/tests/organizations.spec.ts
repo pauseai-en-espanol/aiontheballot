@@ -68,6 +68,7 @@ describe('app.organizations checks', () => {
     ['an uppercase contact email', `contact_email = 'Contacto@example.org'`],
     ['an uppercase privacy email', `privacy_email = 'Privacidad@example.org'`],
     ['a URL that is not https', `url = 'http://example.org'`],
+    ['a newsletter URL that is not https', `newsletter_url = 'http://example.org'`],
     ['an untranslated display name', `display_name = '{}'`],
   ])('rejects %s', async (_name, set) => {
     expect(

@@ -26,6 +26,8 @@
       "descriptive": "Analizaremos lo que proponen los partidos sobre la IA avanzada. Cada valoración, con sus fuentes."
     },
     "election": "{name} · {date, date, long}",
+    "notify": "Avísame cuando se publique",
+    "notifyNote": "Te avisaremos por el boletín de {operator}.",
     "learnMore": "Conoce {operator}",
     "how": {
       "title": "Cómo lo haremos",
