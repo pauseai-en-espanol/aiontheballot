@@ -1,5 +1,20 @@
 # @aiontheballot/api
 
+## 0.6.0
+
+### Minor Changes
+
+- 1f4eabe: Tenants' own logos (migration `tenant_brand_uploads`): a brand selection can name one of the tenant's uploaded
+  images, public while an active tenant selects it. The API serves the home data's brand images by hash; the web app
+  shows the operator's logo in the coming-soon page's header and footer, at `/brand/{sha256}.{ext}` cached as immutable,
+  and draws it on the share cards.
+
+### Patch Changes
+
+- Updated dependencies [1f4eabe]
+  - @aiontheballot/db@0.7.0
+  - @aiontheballot/domain@0.5.0
+
 ## 0.5.0
 
 ### Minor Changes

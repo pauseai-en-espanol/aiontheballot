@@ -1,6 +1,6 @@
 {
   "name": "@aiontheballot/og",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Share-image templates and their renderer (satori, then resvg): ADR-0003 \u00a78",
   "type": "module",
