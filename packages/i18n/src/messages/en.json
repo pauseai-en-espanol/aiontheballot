@@ -52,6 +52,11 @@
     "contact": "Contact"
   },
   "errors": {
-    "unexpected": "Something went wrong. Please try again later."
+    "unexpected": "Something went wrong. Please try again later.",
+    "forbidden": "You aren't allowed to do that.",
+    "stale": "This has changed since you opened it, or can't be done right now. Reload and try again.",
+    "incomplete": "Something this needs is missing.",
+    "taken": "That is already in use.",
+    "invalid": "That value isn't valid."
   }
 }

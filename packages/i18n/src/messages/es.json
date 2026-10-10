@@ -52,6 +52,11 @@
     "contact": "Contacto"
   },
   "errors": {
-    "unexpected": "Algo ha fallado. Vuelve a intentarlo más tarde."
+    "unexpected": "Algo ha fallado. Vuelve a intentarlo más tarde.",
+    "forbidden": "No tienes permiso para hacer esto.",
+    "stale": "Esto ha cambiado desde que lo abriste, o ahora no se puede hacer. Recarga y vuelve a intentarlo.",
+    "incomplete": "Falta algo necesario.",
+    "taken": "Eso ya está en uso.",
+    "invalid": "Ese valor no es válido."
   }
 }

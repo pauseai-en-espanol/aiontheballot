@@ -621,6 +621,11 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   few dozen searches of the text), rather than the longest common substring of quote and source, which would cost
   the quote's length times the programme's on every keystroke. It shows the editor where the difference begins. The
   API route that serves it waits for sign-in (O2).
+- **R78. Database refusals become HTTP answers by SQLSTATE alone** (editorial workflow §2.3): 42501 → 403, 23001
+  → 409 ("reload"), 23514 → 422, 23505 → 409, invalid values → 400, each with a message key in `packages/i18n` (English
+  and Spanish), plus the constraint's name for unique and check violations so the admin can point at the field.
+  Anything else is a 500 to report. The database's own message and detail are never passed on: they can quote what
+  was written. Mapping each trigger's message to its own key, as §2.3 asks, comes with the routes that raise them.
 
 ## Open decisions for Dani
 
