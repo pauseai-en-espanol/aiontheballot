@@ -1,5 +1,12 @@
 # @aiontheballot/api
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [d530322]
+  - @aiontheballot/db@0.6.0
+
 ## 0.4.0
 
 ### Minor Changes
