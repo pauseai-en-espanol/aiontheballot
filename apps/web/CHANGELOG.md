@@ -1,5 +1,20 @@
 # @aiontheballot/web
 
+## 0.8.0
+
+### Minor Changes
+
+- 7f83fd8: Site icons: the platform's default (the coming-soon ballot, marked with the AI sparkle, on an orange tile), or a
+  tenant's own square PNG from its new `site_icon` logo slot (a whole PNG, 512 to 1,024 px). Pages name the icons by
+  content hash at `/brand/icon/{size}.{hash}.png`, cached as immutable, with `/favicon.ico` and a web manifest. The
+  seeds give `ejemplo-a` a fictional icon.
+
+### Patch Changes
+
+- Updated dependencies [7f83fd8]
+  - @aiontheballot/og@0.3.0
+  - @aiontheballot/domain@0.6.0
+
 ## 0.7.1
 
 ### Patch Changes
