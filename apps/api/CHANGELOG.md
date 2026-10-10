@@ -1,5 +1,12 @@
 # @aiontheballot/api
 
+## 0.7.2
+
+### Patch Changes
+
+- Updated dependencies [bc2fe41]
+  - @aiontheballot/db@0.9.0
+
 ## 0.7.1
 
 ### Patch Changes

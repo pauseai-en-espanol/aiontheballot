@@ -1,5 +1,13 @@
 # @aiontheballot/e2e
 
+## 0.8.0
+
+### Minor Changes
+
+- bc2fe41: A country admin may announce a draft election (migration `announced_elections`), so a tenant's coming-soon page names
+  it and gives its date before it goes live. The public sees the announced election's own row and nothing under it.
+  ADR-0002's public-visibility rule is amended accordingly (PLAN R51).
+
 ## 0.7.0
 
 ### Minor Changes
