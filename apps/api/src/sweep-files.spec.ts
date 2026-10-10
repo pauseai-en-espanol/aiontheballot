@@ -1,9 +1,9 @@
 import { createFileStore, type FileSpace } from '@aiontheballot/db/file-store';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -29,8 +29,8 @@ const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 const ago = (days: number) => new Date(Date.now() - days * DAY);
 
 /** The owner's list, as the query prints it, taken now. */
-const list = (lines: string[]) =>
-  [...lines, `end ${lines.length} ${new Date().toISOString()}`].join('\n');
+const list = (lines: string[], auditSequence = 100) =>
+  [...lines, `end ${lines.length} ${new Date().toISOString()} ${auditSequence} true`].join('\n');
 const NAMED = `${TENANT} sources ${sha('nombrado')}`;
 const ORPHAN = `${TENANT}/sources/${sha('huerfano')}`;
 
@@ -164,10 +164,10 @@ describe('sweep-files', () => {
       list([NAMED, `platform ${sha('ausente')}`]),
       'not on this volume',
     ],
-    ['a stale list', `${NAMED}\nend 1 ${ago(2).toISOString()}`, 'take a fresh one'],
+    ['a stale list', `${NAMED}\nend 1 ${ago(2).toISOString()} 100 true`, 'take a fresh one'],
     [
       'a list from the future',
-      `${NAMED}\nend 1 ${new Date(Date.now() + DAY).toISOString()}`,
+      `${NAMED}\nend 1 ${new Date(Date.now() + DAY).toISOString()} 100 true`,
       'in the future',
     ],
   ])('refuses %s, deleting and recording nothing', async (_name, input, message) => {
@@ -177,6 +177,58 @@ describe('sweep-files', () => {
     expect([code, stderr]).toEqual([1, expect.stringContaining(message)]);
     expect(await exists(sha('huerfano'))).toBe(true);
     expect(await readFile(join(root, 'sweep-ledger.json'), 'utf8')).toBe(before);
+  });
+
+  it('starts every clock again, and deletes nothing, after the database was restored', async () => {
+    await writeFile(
+      join(root, 'sweep-ledger.json'),
+      JSON.stringify({
+        version: 1,
+        unnamedSince: { [ORPHAN]: ago(200).toISOString() },
+        auditSequence: 500,
+      }),
+    );
+    // The audit log's sequence went back from 500 to 100: a dump was restored, and with it the log's past.
+    const refused = await run(['--delete'], list([NAMED], 100), env);
+    expect([refused.code, refused.stderr]).toEqual([1, expect.stringContaining('restored')]);
+    expect(await exists(sha('huerfano'))).toBe(true);
+    const recorded = await run([], list([NAMED], 100), env);
+    expect(JSON.parse(recorded.stdout)).toMatchObject({ restored: true, unnamedExpired: 0 });
+    const after = JSON.parse(await readFile(join(root, 'sweep-ledger.json'), 'utf8')) as {
+      unnamedSince: Record<string, string>;
+      auditSequence: number;
+    };
+    expect(after.auditSequence).toBe(100);
+    expect(Date.now() - Date.parse(after.unnamedSince[ORPHAN] ?? '')).toBeLessThan(60_000);
+    expect(JSON.parse((await run(['--delete'], list([NAMED], 120), env)).stdout)).toMatchObject({
+      restored: false,
+      deleted: 0,
+    });
+  });
+
+  it('first puts back what a sweep stopped halfway left aside', async () => {
+    const huerfano = join(
+      root,
+      TENANT,
+      'sources',
+      'sha256',
+      sha('huerfano').slice(0, 2),
+      sha('huerfano').slice(2, 4),
+      sha('huerfano'),
+    );
+    const aside = huerfano.replace(root, join(root, 'retired'));
+    await mkdir(dirname(aside), { recursive: true });
+    await rename(huerfano, aside);
+    const { code, stdout } = await run([], list([NAMED]), env);
+    expect(code).toBe(0);
+    expect(JSON.parse(stdout)).toMatchObject({ recovered: { restored: 1, removed: 0 }, stored: 2 });
+    expect(await exists(sha('huerfano'))).toBe(true);
+  });
+
+  it('refuses a list taken with row security on', async () => {
+    const input = `${NAMED}\nend 1 ${new Date().toISOString()} 100 false`;
+    const { code, stderr } = await run([], input, env);
+    expect([code, stderr]).toEqual([1, expect.stringContaining('row security on')]);
   });
 
   it('refuses a grace period shorter than the oldest restorable dump', async () => {

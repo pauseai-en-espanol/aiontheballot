@@ -41,14 +41,19 @@ export interface FileStore {
   list: () => Promise<{ stored: StoredFile[]; unexpected: string[] }>;
   /**
    * Deletes one file's bytes for the sweep (ADR-0004 §5), unless they were stored or reused at or after `inUseSince`.
-   * The file is moved aside first and checked again, so a `put` that reuses it at the same moment either finds it gone
-   * and writes it again, or touches it and gets it put back.
+   * The file is moved aside first (to `retired/`, under the same space and hash) and checked there, so a `put` that
+   * reuses it at the same moment either finds it gone and writes it again, or touches it and gets it put back.
    */
   retire: (
     space: FileSpace,
     sha256: string,
     inUseSince: Date,
   ) => Promise<'deleted' | 'kept' | 'gone'>;
+  /**
+   * Puts back whatever a sweep stopped halfway left in `retired/` (its place is empty), or deletes it (its place has
+   * the same bytes again): run before each sweep.
+   */
+  recoverRetired: () => Promise<{ restored: number; removed: number }>;
   /** The sweep's ledger, kept on the volume beside the bytes it describes. */
   readLedger: () => Promise<string | undefined>;
   writeLedger: (text: string) => Promise<void>;
@@ -61,8 +66,11 @@ export interface StoredFile {
   sha256: string;
 }
 
+const TMP = 'tmp';
 const LEDGER = 'sweep-ledger.json';
 const LOCK = 'sweep.lock';
+/** Where the sweep moves a file before it decides, laid out like the root: never in `tmp/`, which startup clears. */
+const RETIRED = 'retired';
 const PREFIX = /^[0-9a-f]{2}$/;
 
 const sha256Of = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -184,8 +192,32 @@ const listSpace = async (
   }
 };
 
+/** Whether a path exists, without following a link or reading it. */
+const exists = async (path: string): Promise<boolean> => {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+};
+
+/** Moves a file set aside back to its place, unless the same bytes were written there again meanwhile. */
+const putBack = async (target: string, aside: string): Promise<'restored' | 'removed'> => {
+  if (await exists(target)) {
+    await rm(aside, { force: true });
+    return 'removed';
+  }
+  await mkdir(dirname(target), { recursive: true });
+  await rename(aside, target);
+  return 'restored';
+};
+
 export const createFileStore = (root: string): FileStore => {
-  const temporaryDirectory = join(root, 'tmp');
+  const temporaryDirectory = join(root, TMP);
 
   /** Written aside, synced, then renamed into place: a reader never sees half a file. */
   const writeAtomically = async (target: string, bytes: Uint8Array): Promise<void> => {
@@ -268,7 +300,7 @@ export const createFileStore = (root: string): FileStore => {
       const unexpected: string[] = [];
       for (const entry of await entriesIn(root)) {
         if (
-          (entry.name === 'tmp' && entry.isDirectory()) ||
+          ([TMP, RETIRED].includes(entry.name) && entry.isDirectory()) ||
           ([LEDGER, LOCK].includes(entry.name) && entry.isFile())
         ) {
           continue;
@@ -295,8 +327,8 @@ export const createFileStore = (root: string): FileStore => {
         throw new TypeError(`Not a SHA-256: ${sha256}`);
       }
       const target = pathOf(root, space, sha256);
-      await mkdir(temporaryDirectory, { recursive: true });
-      const aside = join(temporaryDirectory, `retired-${randomUUID()}`);
+      const aside = pathOf(join(root, RETIRED), space, sha256);
+      await mkdir(dirname(aside), { recursive: true });
       try {
         await rename(target, aside);
       } catch (error) {
@@ -308,15 +340,23 @@ export const createFileStore = (root: string): FileStore => {
       // Stored or reused since `inUseSince`, the move included (a put that read it just before touched it): it goes
       // back. A put that comes after the move finds it gone and writes it again.
       if ((await lstat(aside)).mtime >= inUseSince) {
-        if (await readIfPresent(target)) {
-          await rm(aside, { force: true });
-        } else {
-          await rename(aside, target);
-        }
+        await putBack(target, aside);
         return 'kept';
       }
       await rm(aside, { force: true });
       return 'deleted';
+    },
+    recoverRetired: async () => {
+      const { stored } = await createFileStore(join(root, RETIRED)).list();
+      let restored = 0;
+      for (const { space, sha256 } of stored) {
+        const outcome = await putBack(
+          pathOf(root, space, sha256),
+          pathOf(join(root, RETIRED), space, sha256),
+        );
+        restored += outcome === 'restored' ? 1 : 0;
+      }
+      return { restored, removed: stored.length - restored };
     },
     readLedger: async () => {
       try {

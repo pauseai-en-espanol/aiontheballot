@@ -5,16 +5,19 @@ import { FILE_BUCKETS, type FileSpace, isTenantId } from './file-store.js';
  * them for a grace period at least as long as the oldest database backup that could be restored, so a restored dump
  * never names bytes that are gone. Two records say since when a file has gone unnamed, and the later one counts:
  *
- * - the audit log, which keeps every deleted file row (its tenant, bucket and hash) for good: the last time a row
- *   naming a file was deleted;
+ * - the audit log, which keeps the old values of every deleted file row and every brand asset whose hash changed: the
+ *   last time a row stopped naming a file. A purge removes its tenant's audit rows, but also its bytes; a database
+ *   restore rewinds the log, which the sweep notices by the log's sequence going down, and then starts every clock
+ *   again;
  * - a ledger on the volume, of when the sweep first saw each file unnamed, for bytes no row ever named (an upload
  *   whose transaction failed). A file's own dates say when it was written, not when its row went away.
  */
 
 /**
- * The owner's query (run as `postgres`, with row security off, so it errors rather than shows less): every file row
- * and brand asset, the last deletion of each key a deleted row named (from the audit log, which keeps them for good),
- * and the line count and snapshot time, all from one snapshot.
+ * The owner's query, run as `postgres` with row security off: every file row and brand asset; the last time a row
+ * stopped naming each key (a deleted file row, a deleted brand asset, or one whose hash changed), from the audit log;
+ * then the line count, the snapshot time, the audit log's sequence (it only goes down when the database is restored)
+ * and whether the query saw every row (row security off, or a role that bypasses it). All from one snapshot.
  */
 export const SWEEP_LIST_SQL = `COPY (
   WITH named AS (
@@ -29,13 +32,18 @@ export const SWEEP_LIST_SQL = `COPY (
            || (a.diff -> 'old' ->> 'sha256') || ' '
            || to_char(max(a.at) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
       FROM app.audit_log a
-     WHERE a.action = 'delete' AND a.table_name IN ('files', 'brand_assets')
+     WHERE a.table_name IN ('files', 'brand_assets')
+       AND (a.action = 'delete' OR (a.table_name = 'brand_assets' AND a.action = 'update' AND a.diff -> 'old' ? 'sha256'))
      GROUP BY a.table_name, a.diff -> 'old' ->> 'tenant_id', a.diff -> 'old' ->> 'bucket', a.diff -> 'old' ->> 'sha256'
   )
   SELECT line FROM (
     SELECT 0 AS k, line FROM named
     UNION ALL
-    SELECT 1, 'end ' || (SELECT count(*) FROM named) || ' ' || to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+    SELECT 1, 'end ' || (SELECT count(*) FROM named)
+           || ' ' || to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+           || ' ' || coalesce(pg_sequence_last_value('app.audit_log_id_seq'), 0)
+           || ' ' || (current_setting('row_security') = 'off'
+                      OR (SELECT r.rolsuper OR r.rolbypassrls FROM pg_roles r WHERE r.rolname = current_user))
   ) l ORDER BY k
 ) TO STDOUT`;
 
@@ -82,17 +90,20 @@ const keyOf = (words: readonly string[], line: string): string => {
 export interface SweepInput {
   /** The keys rows name now. */
   named: Set<string>;
-  /** For each key a deleted row named, the last time one was deleted. */
+  /** For each key a row stopped naming, the last time one did. */
   deletedAt: Map<string, Date>;
   /** When the database's snapshot was taken. */
   snapshot: Date;
+  /** The audit log's sequence then: lower than a previous run's means the database was restored since. */
+  auditSequence: number;
 }
 
 /**
- * The output of SWEEP_LIST_SQL: one line per file row or brand asset (`{tenant_id}
- * {bucket} {sha256}`, `platform {sha256}`), one per key a deleted row named (`deleted {key words} {instant}`), then
- * `end {count of lines before it} {snapshot instant}`. Anything else, a missing or wrong count, or anything after it,
- * is refused: a list cut short would make named bytes look unnamed.
+ * The output of SWEEP_LIST_SQL: one line per file row or brand asset (`{tenant_id} {bucket} {sha256}`,
+ * `platform {sha256}`), one per key a row stopped naming (`deleted {key words} {instant}`), then
+ * `end {count of lines before it} {snapshot instant} {audit sequence} {saw every row}`. Anything else, a missing or
+ * wrong count, anything after it, or a list that may have left rows out, is refused: a list cut short would make named
+ * bytes look unnamed.
  */
 export const parseSweepInput = (text: string): SweepInput => {
   const lines = text
@@ -100,10 +111,15 @@ export const parseSweepInput = (text: string): SweepInput => {
     .map((line) => line.trim())
     .filter((line) => line !== '');
   const last = lines.pop() ?? '';
-  const [, total, at] = /^end (\d+) (\S+)$/.exec(last) ?? [];
+  const [, total, at, sequence, sawAll] = /^end (\d+) (\S+) (\d+) (true|false)$/.exec(last) ?? [];
   if (total === undefined) {
     throw new Error(
-      'The list of named files has no "end <count> <snapshot>" line: it may be cut short',
+      'The list of named files has no "end <count> <snapshot> …" line: it may be cut short',
+    );
+  }
+  if (sawAll !== 'true') {
+    throw new Error(
+      'The list was taken with row security on, by a role it applies to: it may leave rows out',
     );
   }
   if (Number(total) !== lines.length) {
@@ -113,6 +129,7 @@ export const parseSweepInput = (text: string): SweepInput => {
     named: new Set(),
     deletedAt: new Map(),
     snapshot: parseInstant(at, 'the snapshot'),
+    auditSequence: Number(sequence),
   };
   for (const line of lines) {
     const words = line.split(' ');
@@ -129,15 +146,19 @@ export const parseSweepInput = (text: string): SweepInput => {
   return input;
 };
 
-/** When the sweep first saw each stored key unnamed. */
+/** When the sweep first saw each stored key unnamed, and the highest audit sequence it has seen. */
 export interface SweepLedger {
   version: 1;
   unnamedSince: Record<string, string>;
+  auditSequence?: number;
 }
 
 export const EMPTY_LEDGER: SweepLedger = { version: 1, unnamedSince: {} };
 
-/** The ledger as written, refused if it isn't one this version wrote or holds a date after `now`. */
+/**
+ * The ledger as written, refused if it isn't one this version wrote or holds a date well after `now` (an hour's
+ * leeway for a database clock a little ahead of this one).
+ */
 export const parseLedger = (text: string | undefined, now: Date): SweepLedger => {
   if (text === undefined) {
     return EMPTY_LEDGER;
@@ -146,13 +167,14 @@ export const parseLedger = (text: string | undefined, now: Date): SweepLedger =>
   if (
     ledger.version !== 1 ||
     typeof ledger.unnamedSince !== 'object' ||
-    ledger.unnamedSince === null
+    ledger.unnamedSince === null ||
+    (ledger.auditSequence !== undefined && !Number.isSafeInteger(ledger.auditSequence))
   ) {
     throw new Error('The sweep ledger is not one this version wrote');
   }
   for (const [key, since] of Object.entries(ledger.unnamedSince)) {
-    // A date ahead of the clock means one of the two is wrong: nothing is decided on either.
-    if (parseInstant(since, key) > now) {
+    // A date well ahead of the clock means one of the two is wrong: nothing is decided on either.
+    if (parseInstant(since, key).getTime() > now.getTime() + 60 * 60 * 1000) {
       throw new Error(`The sweep ledger dates ${key} in the future (${since}): check the clock`);
     }
   }

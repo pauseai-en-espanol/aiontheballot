@@ -5,6 +5,7 @@ import {
   mkdtemp,
   readdir,
   readFile,
+  rename,
   rm,
   stat,
   symlink,
@@ -229,6 +230,27 @@ describe('the file store', () => {
     expect(await store.get(ASSETS_A, sha256)).toEqual(bytes);
     expect(await readdir(join(root, 'tmp'))).toEqual([]);
     await expect(store.retire(SOURCES_A, '../x', later)).rejects.toThrow(TypeError);
+  });
+
+  it('recovers what a sweep stopped halfway left aside, outside the temporary folder startup clears', async () => {
+    const store = createFileStore(root);
+    const other = new TextEncoder().encode('otro logo de ejemplo');
+    const otherSha = createHash('sha256').update(other).digest('hex');
+    await store.put(SOURCES_A, bytes);
+    await store.put(ASSETS_B, other);
+    const aside = (space: string[], sha: string) =>
+      join(root, 'retired', ...space, 'sha256', sha.slice(0, 2), sha.slice(2, 4), sha);
+    // One moved aside and never put back; one moved aside whose place got the same bytes again.
+    await mkdir(join(aside([TENANT_A, 'sources'], sha256), '..'), { recursive: true });
+    await rename(pathIn(TENANT_A, 'sources'), aside([TENANT_A, 'sources'], sha256));
+    await mkdir(join(aside([TENANT_B, 'public_assets'], otherSha), '..'), { recursive: true });
+    await writeFile(aside([TENANT_B, 'public_assets'], otherSha), other);
+    expect(await store.removeStaleTemporaryFiles(0)).toBe(0);
+    expect((await store.list()).unexpected).toEqual([]);
+    expect(await store.recoverRetired()).toEqual({ restored: 1, removed: 1 });
+    expect(await store.get(SOURCES_A, sha256)).toEqual(bytes);
+    expect(await store.get(ASSETS_B, otherSha)).toEqual(other);
+    expect((await createFileStore(join(root, 'retired')).list()).stored).toEqual([]);
   });
 
   it('keeps one sweep at a time', async () => {

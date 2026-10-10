@@ -8,7 +8,8 @@ import {
 /**
  * Puts the bytes read from standard input on the file store (FILES_ROOT), in a tenant's bucket or the platform's
  * space, and prints their SHA-256 and size: how files reach the volume before the admin can upload them (M2). Their
- * rows are written separately, by SQL, after this, naming the same tenant and bucket (ADR-0004). Run it in an API pod:
+ * rows are written separately, by SQL, after this, naming the same tenant and bucket (ADR-0004), and the same day: the
+ * sweep keeps bytes stored or reused within a day of its list. Run it in an API pod:
  *
  *   kubectl exec -i deploy/aiontheballot-api -- node dist/put-file.js <tenant-id> public_assets < logo.png
  *   kubectl exec -i deploy/aiontheballot-api -- node dist/put-file.js platform < brand-asset.png

@@ -593,15 +593,17 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 **Orphan-bytes sweep (ADR-0004 §5):**
 
 - **R75. `sweep-files` deletes bytes no row names, once no row has named them for 120 days** (never less than 111:
-  R67's 104 plus a week for backups that expire late). Since when is the later of the last deletion of a row naming
-  them, which the owner's list takes from the append-only audit log, and when the sweep first saw them unnamed (a
-  ledger on the volume, for bytes no row ever named), so bytes named again and dropped again wait their full time
-  again. It runs by hand, like `put-file`: the owner pipes the list from Postgres (as `postgres`, row security off),
-  since no runtime role can read every tenant's files. It refuses a list cut short, a list naming nothing while files
-  are stored, and one naming files the volume lacks; it deletes more than half the stored files only with
-  `--allow-many`; it never deletes a file stored or reused within a day of the list's snapshot (`put` marks reused
-  bytes, and the sweep re-checks a file after moving it aside); one runs at a time. Without `--delete` it only
-  records and reports. Scheduling it needs a new grant: D7.
+  R67's 104 plus a week for backups that expire late). Since when is the later of the last time a row stopped naming
+  them (a deleted file row, or a brand asset given other bytes), which the owner's list takes from the audit log, and
+  when the sweep first saw them unnamed (a ledger on the volume, for bytes no row ever named), so bytes named again
+  and dropped again wait their full time again. A database restore rewinds the audit log; the list carries its
+  sequence, and when that goes down every clock starts again and nothing is deleted that run. It runs by hand, like
+  `put-file`: the owner pipes the list from Postgres (as `postgres`, row security off, which the list proves), since
+  no runtime role can read every tenant's files. It refuses a list cut short, stale or from the future, a list naming
+  nothing while files are stored, and one naming files the volume lacks; it deletes more than half the stored files
+  only with `--allow-many`; it never deletes a file stored or reused within a day of the list's snapshot (`put` marks
+  reused bytes, and the sweep moves a file to `retired/` and checks it there, putting back what a halted sweep left);
+  one runs at a time. Without `--delete` it only records and reports. Scheduling it needs a new grant: D7.
 
 **Reserved election slugs:**
 
@@ -639,11 +641,11 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 
 D1–D5 are decided (see [Answered](#answered)). D7 and D8 came with the file volume (ADR-0004).
 
-| #   | Decision                                                      | Recommendation                                                                                                                                                                                                                                                                                                                                                                        |
-| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D6  | Where pre-production checks run, now that there is no staging | Rehearse each migration against the latest backup restored into a throwaway database (it doubles as the restore test). Run the M5 load test and the Cloudflare-contingency test against production before launch, at a quiet hour. Decide before the preview.                                                                                                                         |
-| D7  | Run the orphan-bytes sweep on a schedule                      | It runs by hand now, with the owner piping the list of files (R75). A schedule needs a runtime role that can read every tenant's file keys: recommended, a `SECURITY DEFINER` function returning only keys and deletion times, executable by `aiontheballot_worker` (an ADR-0002 change), run monthly by the worker once it exists. Until then, by hand a few times a year is enough. |
-| D8  | Whether the worker mounts the file volume                     | It parses hostile documents (A8) and its RLS limits it to one job's file. Recommended: the worker reads only the job's file, handed over by the API or through a read-only mount checked against the job's row; never the whole volume read-write. Decide before the extraction worker (M2).                                                                                          |
+| #   | Decision                                                      | Recommendation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D6  | Where pre-production checks run, now that there is no staging | Rehearse each migration against the latest backup restored into a throwaway database (it doubles as the restore test). Run the M5 load test and the Cloudflare-contingency test against production before launch, at a quiet hour. Decide before the preview.                                                                                                                                                                                                                                          |
+| D7  | Run the orphan-bytes sweep on a schedule                      | It runs by hand now, the owner piping the list of files (R75). A schedule needs something that can read every tenant's file keys and delete bytes on the volume: recommended, a CronJob from the API's image with its own login role, allowed only to execute a `SECURITY DEFINER` function that returns the keys and deletion times (an ADR-0002 change), mounting the volume as the API does. Not the worker, which parses hostile documents (D8). Until then, by hand a few times a year is enough. |
+| D8  | Whether the worker mounts the file volume                     | It parses hostile documents (A8) and its RLS limits it to one job's file. Recommended: the worker reads only the job's file, handed over by the API or through a read-only mount checked against the job's row; never the whole volume read-write. Decide before the extraction worker (M2).                                                                                                                                                                                                           |
 
 ## Questions for the chapter
 

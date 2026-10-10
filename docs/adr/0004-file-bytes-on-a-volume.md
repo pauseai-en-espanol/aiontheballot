@@ -105,19 +105,23 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   week for backups that expire late) that is 111 days; the sweep refuses less, and defaults to 120. If the plan keeps
   backups longer, the minimum (`MIN_GRACE_DAYS`) must grow with it.
 - **How the sweep knows since when.** A file's dates say when it was written, not when its row went away. The audit
-  log keeps every deleted file row (tenant, bucket, hash) for good, so the owner's list gives the last time a row
-  naming each file was deleted; a ledger on the volume adds when the sweep first saw a file unnamed, for bytes no row
-  ever named (an upload whose transaction failed). The later of the two counts, so a file named again and dropped
-  again waits its full time again.
+  log keeps the old values of every deleted file row and of every brand asset whose hash changed, so the owner's list
+  gives the last time a row stopped naming each file; a ledger on the volume adds when the sweep first saw a file
+  unnamed, for bytes no row ever named (an upload whose transaction failed). The later of the two counts, so a file
+  named again and dropped again waits its full time again. A purge removes its tenant's audit rows, and its bytes
+  with them. A database restore rewinds the log: the list carries the log's sequence, and when it goes down the sweep
+  starts every clock again and deletes nothing that run.
 - **How it runs.** No runtime role can list every tenant's files, so the owner pipes the list from Postgres, as
   `postgres` with row security off, into `sweep-files` in an API pod (`--print-query` prints the query). The command
   refuses a list that doesn't end with its own count, a list that names nothing while files are stored, and one that
   names files the volume lacks (another database, or a wrong volume); it deletes more than half the stored files only
   with `--allow-many`; one sweep runs at a time (a lock file). Without `--delete` it records and reports. A file stored
   or reused within a day of the list's snapshot is never deleted: `put` marks reused bytes as just written, and the
-  sweep moves a file aside and checks it again before deleting it, so an upload of the same bytes at that moment gets
-  them back. Running it on a schedule needs a role that can read that list: a new grant, so an ADR-0002 decision (PLAN,
-  D7).
+  sweep moves a file aside (to `retired/`, which the API's temporary cleanup never touches) and checks it there before
+  deleting it, so an upload of the same bytes at that moment gets them back; a sweep stopped halfway is put right by
+  the next. The list also says whether it saw every row; one taken with row security on is refused. Rows written by
+  hand after `put-file` should follow within the day. Running it on a schedule needs a role that can read that list:
+  a new grant, so an ADR-0002 decision (PLAN, D7).
 
 ### 6. The volume
 
@@ -142,7 +146,8 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   in a dump names bytes already on the volume when the dump was taken; a copy taken after the dump contains them,
   because the sweep deletes nothing a row named less than the grace period ago (§5) and purges are deliberate.
 - **Restoring:** a dump and the volume copy taken after it restore together. Restoring only the database from an
-  older dump onto the live volume works too, within the grace period. The preview's restore check covers both.
+  older dump onto the live volume works too, within the grace period; the next sweep sees the audit log went back
+  and starts its clocks again (§5). The preview's restore check covers both.
 - A purge deletes a tenant's bytes at once; copies in older backups expire with them, as for the database.
 
 ### 8. Locally and in tests

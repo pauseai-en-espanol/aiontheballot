@@ -70,6 +70,8 @@ try {
   if (now.getTime() - input.snapshot.getTime() > DAY_MS) {
     throw new Error(`The list is from ${input.snapshot.toISOString()}: take a fresh one`);
   }
+  // A sweep stopped halfway may have left files set aside: back to their places first.
+  const recovered = await store.recoverRetired();
   const { stored, unexpected } = await store.list();
   const keys = stored.map(({ space, sha256 }) => fileKey(space, sha256));
   // A list from another database, or a store on the wrong volume: decide nothing, not even when the clocks start.
@@ -78,10 +80,26 @@ try {
       `The list names no file, but ${keys.length} are stored: is it from this database?`,
     );
   }
-  const plan = planSweep(keys, input, parseLedger(await store.readLedger(), now), now, graceDays);
+  const previous = parseLedger(await store.readLedger(), now);
+  // The audit log's sequence went down: the database was restored, and its log forgot the deletions since. Every
+  // clock starts again, and nothing goes this time.
+  const restored =
+    previous.auditSequence !== undefined && input.auditSequence < previous.auditSequence;
+  const plan = planSweep(
+    keys,
+    input,
+    restored ? { version: 1, unnamedSince: {} } : previous,
+    now,
+    graceDays,
+  );
   if (plan.missing.length > 0) {
     throw new Error(
       `${plan.missing.length} named files are not on this volume (${plan.missing.slice(0, 3).join(', ')}…): is the list from this database, and the volume this one?`,
+    );
+  }
+  if (remove && restored) {
+    throw new Error(
+      'The database was restored since the last sweep (its audit log went back): run again without --delete, and wait',
     );
   }
   if (remove && !allowMany && plan.expired.length > keys.length / 2) {
@@ -109,7 +127,8 @@ try {
   const unnamedSince = Object.fromEntries(
     Object.entries(plan.ledger.unnamedSince).filter(([key]) => !settled.has(key)),
   );
-  await store.writeLedger(`${JSON.stringify({ version: 1, unnamedSince }, null, 2)}\n`);
+  const ledger = { version: 1, unnamedSince, auditSequence: input.auditSequence };
+  await store.writeLedger(`${JSON.stringify(ledger, null, 2)}\n`);
   console.log(
     JSON.stringify(
       {
@@ -118,6 +137,8 @@ try {
         unnamedWaiting: plan.waiting.length,
         unnamedExpired: plan.expired.length,
         ...outcomes,
+        recovered,
+        restored,
         graceDays,
         unexpected,
       },
