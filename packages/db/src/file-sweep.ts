@@ -6,9 +6,10 @@ import { FILE_BUCKETS, type FileSpace, isTenantId } from './file-store.js';
  * never names bytes that are gone. Two records say since when a file has gone unnamed, and the later one counts:
  *
  * - the audit log, which keeps the old values of every deleted file row and every brand asset whose hash changed: the
- *   last time a row stopped naming a file. A purge removes its tenant's audit rows, but also its bytes; a database
- *   restore rewinds the log, which the sweep notices by the log's sequence going down, and then starts every clock
- *   again;
+ *   last time a row stopped naming a file. A purge removes its tenant's audit rows, but also its bytes. A database
+ *   restore rewinds the log, forgetting rows named and dropped since the dump: the sweep notices by the database's
+ *   identity changing (a logical restore recreates the tables, a physical one starts a new timeline) or the log's
+ *   sequence going down, and then starts every clock again;
  * - a ledger on the volume, of when the sweep first saw each file unnamed, for bytes no row ever named (an upload
  *   whose transaction failed). A file's own dates say when it was written, not when its row went away.
  */
@@ -16,8 +17,9 @@ import { FILE_BUCKETS, type FileSpace, isTenantId } from './file-store.js';
 /**
  * The owner's query, run as `postgres` with row security off: every file row and brand asset; the last time a row
  * stopped naming each key (a deleted file row, a deleted brand asset, or one whose hash changed), from the audit log;
- * then the line count, the snapshot time, the audit log's sequence (it only goes down when the database is restored)
- * and whether the query saw every row (row security off, or a role that bypasses it). All from one snapshot.
+ * then the line count, the snapshot time, the audit log's sequence, the database's identity (cluster, timeline,
+ * database and audit table: a restore changes one of them) and whether the query saw every row (row security off, or
+ * a role that bypasses it). All from one snapshot.
  */
 export const SWEEP_LIST_SQL = `COPY (
   WITH named AS (
@@ -42,6 +44,10 @@ export const SWEEP_LIST_SQL = `COPY (
     SELECT 1, 'end ' || (SELECT count(*) FROM named)
            || ' ' || to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
            || ' ' || coalesce(pg_sequence_last_value('app.audit_log_id_seq'), 0)
+           || ' ' || (SELECT system_identifier FROM pg_control_system())
+           || '-' || (SELECT timeline_id FROM pg_control_checkpoint())
+           || '-' || (SELECT oid FROM pg_database WHERE datname = current_database())
+           || '-' || 'app.audit_log'::regclass::oid
            || ' ' || (current_setting('row_security') = 'off'
                       OR (SELECT r.rolsuper OR r.rolbypassrls FROM pg_roles r WHERE r.rolname = current_user))
   ) l ORDER BY k
@@ -96,14 +102,16 @@ export interface SweepInput {
   snapshot: Date;
   /** The audit log's sequence then: lower than a previous run's means the database was restored since. */
   auditSequence: number;
+  /** The database's identity then: different from a previous run's means it was restored (or replaced) since. */
+  incarnation: string;
 }
 
 /**
  * The output of SWEEP_LIST_SQL: one line per file row or brand asset (`{tenant_id} {bucket} {sha256}`,
  * `platform {sha256}`), one per key a row stopped naming (`deleted {key words} {instant}`), then
- * `end {count of lines before it} {snapshot instant} {audit sequence} {saw every row}`. Anything else, a missing or
- * wrong count, anything after it, or a list that may have left rows out, is refused: a list cut short would make named
- * bytes look unnamed.
+ * `end {count of lines before it} {snapshot instant} {audit sequence} {incarnation} {saw every row}`. Anything else,
+ * a missing or wrong count, anything after it, or a list that may have left rows out, is refused: a list cut short
+ * would make named bytes look unnamed.
  */
 export const parseSweepInput = (text: string): SweepInput => {
   const lines = text
@@ -111,7 +119,8 @@ export const parseSweepInput = (text: string): SweepInput => {
     .map((line) => line.trim())
     .filter((line) => line !== '');
   const last = lines.pop() ?? '';
-  const [, total, at, sequence, sawAll] = /^end (\d+) (\S+) (\d+) (true|false)$/.exec(last) ?? [];
+  const [, total, at, sequence, incarnation, sawAll] =
+    /^end (\d+) (\S+) (\d+) (\d+-\d+-\d+-\d+) (true|false)$/.exec(last) ?? [];
   if (total === undefined) {
     throw new Error(
       'The list of named files has no "end <count> <snapshot> …" line: it may be cut short',
@@ -130,6 +139,7 @@ export const parseSweepInput = (text: string): SweepInput => {
     deletedAt: new Map(),
     snapshot: parseInstant(at, 'the snapshot'),
     auditSequence: Number(sequence),
+    incarnation: incarnation ?? '',
   };
   for (const line of lines) {
     const words = line.split(' ');
@@ -146,11 +156,12 @@ export const parseSweepInput = (text: string): SweepInput => {
   return input;
 };
 
-/** When the sweep first saw each stored key unnamed, and the highest audit sequence it has seen. */
+/** When the sweep first saw each stored key unnamed, and the database it saw then. */
 export interface SweepLedger {
   version: 1;
   unnamedSince: Record<string, string>;
   auditSequence?: number;
+  incarnation?: string;
 }
 
 export const EMPTY_LEDGER: SweepLedger = { version: 1, unnamedSince: {} };
@@ -168,7 +179,8 @@ export const parseLedger = (text: string | undefined, now: Date): SweepLedger =>
     ledger.version !== 1 ||
     typeof ledger.unnamedSince !== 'object' ||
     ledger.unnamedSince === null ||
-    (ledger.auditSequence !== undefined && !Number.isSafeInteger(ledger.auditSequence))
+    (ledger.auditSequence !== undefined && !Number.isSafeInteger(ledger.auditSequence)) ||
+    (ledger.incarnation !== undefined && typeof ledger.incarnation !== 'string')
   ) {
     throw new Error('The sweep ledger is not one this version wrote');
   }
@@ -233,3 +245,14 @@ export const planSweep = (
     ledger: { version: 1, unnamedSince },
   };
 };
+
+/**
+ * Whether the database was restored (or replaced) since the ledger was written: its identity changed, or its audit
+ * log's sequence went back. Then the log has forgotten what happened after the dump, and no clock can be trusted.
+ */
+export const wasRestored = (
+  previous: SweepLedger,
+  input: Pick<SweepInput, 'auditSequence' | 'incarnation'>,
+): boolean =>
+  (previous.incarnation !== undefined && previous.incarnation !== input.incarnation) ||
+  (previous.auditSequence !== undefined && input.auditSequence < previous.auditSequence);

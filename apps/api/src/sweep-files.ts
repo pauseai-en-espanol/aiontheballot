@@ -6,6 +6,7 @@ import {
   parseSweepInput,
   planSweep,
   SWEEP_LIST_SQL,
+  wasRestored,
 } from '@aiontheballot/db/file-sweep';
 import { stat } from 'node:fs/promises';
 
@@ -22,7 +23,8 @@ import { stat } from 'node:fs/promises';
  * named for longer than the grace period (120 days by default, never less than 111), and never a file stored or reused
  * within a day of the list's snapshot. It refuses a list cut short, a list that names nothing while files are stored,
  * and a list naming files the volume lacks (another database, or a wrong volume), and it deletes more than half the
- * stored files only with --allow-many. One sweep runs at a time.
+ * stored files only with --allow-many. One sweep runs at a time. After a database restore (its identity changed, or its
+ * audit log went back), every clock starts again and the run deletes nothing, --delete or not.
  */
 const USAGE =
   "usage: sweep-files.js --print-query | <the query's output> | sweep-files.js [--delete] [--grace-days N] [--allow-many]";
@@ -81,10 +83,10 @@ try {
     );
   }
   const previous = parseLedger(await store.readLedger(), now);
-  // The audit log's sequence went down: the database was restored, and its log forgot the deletions since. Every
-  // clock starts again, and nothing goes this time.
-  const restored =
-    previous.auditSequence !== undefined && input.auditSequence < previous.auditSequence;
+  // Restored since the last run: the log forgot what happened after the dump. Every clock starts again, the new
+  // ledger is kept, and nothing goes this time.
+  const restored = wasRestored(previous, input);
+  const deleting = remove && !restored;
   const plan = planSweep(
     keys,
     input,
@@ -97,12 +99,7 @@ try {
       `${plan.missing.length} named files are not on this volume (${plan.missing.slice(0, 3).join(', ')}…): is the list from this database, and the volume this one?`,
     );
   }
-  if (remove && restored) {
-    throw new Error(
-      'The database was restored since the last sweep (its audit log went back): run again without --delete, and wait',
-    );
-  }
-  if (remove && !allowMany && plan.expired.length > keys.length / 2) {
+  if (deleting && !allowMany && plan.expired.length > keys.length / 2) {
     throw new Error(
       `${plan.expired.length} of ${keys.length} stored files would go: pass --allow-many if that is right`,
     );
@@ -110,7 +107,7 @@ try {
   const expired = new Set(plan.expired);
   const outcomes = { deleted: 0, inUse: 0, gone: 0 };
   const settled = new Set<string>();
-  if (remove) {
+  if (deleting) {
     // Bytes stored or reused near the snapshot may belong to a row it didn't see yet.
     const inUseSince = new Date(input.snapshot.getTime() - DAY_MS);
     for (const { space, sha256 } of stored) {
@@ -127,7 +124,12 @@ try {
   const unnamedSince = Object.fromEntries(
     Object.entries(plan.ledger.unnamedSince).filter(([key]) => !settled.has(key)),
   );
-  const ledger = { version: 1, unnamedSince, auditSequence: input.auditSequence };
+  const ledger = {
+    version: 1,
+    unnamedSince,
+    auditSequence: input.auditSequence,
+    incarnation: input.incarnation,
+  };
   await store.writeLedger(`${JSON.stringify(ledger, null, 2)}\n`);
   console.log(
     JSON.stringify(
@@ -146,7 +148,11 @@ try {
       2,
     ),
   );
-  if (!remove && plan.expired.length > 0) {
+  if (restored) {
+    console.log(
+      'The database was restored since the last sweep: every clock started again, and nothing was deleted.',
+    );
+  } else if (!remove && plan.expired.length > 0) {
     console.log(`Pass --delete to delete the ${plan.expired.length} expired files.`);
   }
 } catch (error) {

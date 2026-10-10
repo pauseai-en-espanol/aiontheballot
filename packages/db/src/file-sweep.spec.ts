@@ -8,6 +8,7 @@ import {
   parseLedger,
   parseSweepInput,
   planSweep,
+  wasRestored,
 } from './file-sweep.js';
 
 const TENANT = '0190f8c4-5eed-7000-8000-00000000000a';
@@ -28,7 +29,7 @@ describe("the owner's list", () => {
         `deleted ${TENANT} sources ${B} 2029-06-01T10:00:00Z`,
         `deleted ${TENANT} sources ${B} 2029-07-01T10:00:00.5Z`,
         `deleted platform ${A} 2029-05-01T10:00:00Z`,
-        'end 6 2030-01-01T00:00:00Z 42 true',
+        'end 6 2030-01-01T00:00:00Z 42 7-1-5-9 true',
       ].join('\r\n'),
     );
     expect([...input.named].sort()).toEqual(
@@ -43,16 +44,17 @@ describe("the owner's list", () => {
     );
     expect(input.snapshot).toEqual(new Date('2030-01-01T00:00:00Z'));
     expect(input.auditSequence).toBe(42);
+    expect(input.incarnation).toBe('7-1-5-9');
   });
 
   it('is refused unless it saw every row (row security off, or a role that bypasses it)', () => {
-    expect(() => parseSweepInput(`platform ${A}\nend 1 2030-01-01T00:00:00Z 42 false`)).toThrow(
-      'row security on',
-    );
+    expect(() =>
+      parseSweepInput(`platform ${A}\nend 1 2030-01-01T00:00:00Z 42 7-1-5-9 false`),
+    ).toThrow('row security on');
   });
 
   it('takes an empty database, said so', () => {
-    expect(parseSweepInput('end 0 2030-01-01T00:00:00Z 42 true').named.size).toBe(0);
+    expect(parseSweepInput('end 0 2030-01-01T00:00:00Z 42 7-1-5-9 true').named.size).toBe(0);
   });
 
   it.each([
@@ -61,50 +63,52 @@ describe("the owner's list", () => {
     ['without a snapshot', `${TENANT} sources ${A}\nend 1`, 'cut short'],
     [
       'with fewer lines than it says',
-      `${TENANT} sources ${A}\nend 2 2030-01-01T00:00:00Z 42 true`,
+      `${TENANT} sources ${A}\nend 2 2030-01-01T00:00:00Z 42 7-1-5-9 true`,
       'says 2',
     ],
     [
       'with more lines than it says',
-      `${TENANT} sources ${A}\nplatform ${B}\nend 1 2030-01-01T00:00:00Z 42 true`,
+      `${TENANT} sources ${A}\nplatform ${B}\nend 1 2030-01-01T00:00:00Z 42 7-1-5-9 true`,
       'says 1',
     ],
     [
       'with lines after its end',
-      `end 0 2030-01-01T00:00:00Z 42 true\n${TENANT} sources ${A}`,
+      `end 0 2030-01-01T00:00:00Z 42 7-1-5-9 true\n${TENANT} sources ${A}`,
       'cut short',
     ],
     [
       'with an unknown bucket',
-      `${TENANT} logos ${A}\nend 1 2030-01-01T00:00:00Z 42 true`,
+      `${TENANT} logos ${A}\nend 1 2030-01-01T00:00:00Z 42 7-1-5-9 true`,
       'Not a named file',
     ],
     [
       'with a tenant that is not an id',
-      `../x sources ${A}\nend 1 2030-01-01T00:00:00Z 42 true`,
+      `../x sources ${A}\nend 1 2030-01-01T00:00:00Z 42 7-1-5-9 true`,
       'Not a named file',
     ],
     [
       'with a malformed hash',
-      `platform ${A.toUpperCase()}\nend 1 2030-01-01T00:00:00Z 42 true`,
+      `platform ${A.toUpperCase()}\nend 1 2030-01-01T00:00:00Z 42 7-1-5-9 true`,
       'Not a named file',
     ],
     [
       'with psql decorations that keep the count',
-      ` ?column? \nplatform ${A}\nend 2 2030-01-01T00:00:00Z 42 true`,
+      ` ?column? \nplatform ${A}\nend 2 2030-01-01T00:00:00Z 42 7-1-5-9 true`,
       'Not a named file',
     ],
     [
       'with a deletion without its date',
-      `deleted platform ${A}\nend 1 2030-01-01T00:00:00Z 42 true`,
+      `deleted platform ${A}\nend 1 2030-01-01T00:00:00Z 42 7-1-5-9 true`,
       'Not an instant',
     ],
     [
       'with a date that is not UTC',
-      `deleted platform ${A} 2029-01-01\nend 1 2030-01-01T00:00:00Z 42 true`,
+      `deleted platform ${A} 2029-01-01\nend 1 2030-01-01T00:00:00Z 42 7-1-5-9 true`,
       'Not an instant',
     ],
-    ['with a snapshot that is not an instant', 'end 0 ayer 42 true', 'Not an instant'],
+    ['with a snapshot that is not an instant', 'end 0 ayer 42 7-1-5-9 true', 'Not an instant'],
+    ['without the database it came from', 'end 0 2030-01-01T00:00:00Z 42 true', 'cut short'],
+    ['with half its identity', 'end 0 2030-01-01T00:00:00Z 42 7-1 true', 'cut short'],
   ])('is refused %s', (_name, text, message) => {
     expect(() => parseSweepInput(text)).toThrow(message);
   });
@@ -184,11 +188,49 @@ describe('the sweep ledger', () => {
     ['a year for a date', { version: 1, unnamedSince: { k: '2001' } }, 'Not an instant'],
     ['a date in the future', { version: 1, unnamedSince: { k: '2031-01-01T00:00:00Z' } }, 'future'],
     [
+      'an identity that is not text',
+      { version: 1, unnamedSince: {}, incarnation: 7 },
+      'not one this version wrote',
+    ],
+    [
       'an audit sequence that is not a number',
       { version: 1, unnamedSince: {}, auditSequence: '500' },
       'not one this version wrote',
     ],
   ])('refuses %s', (_name, ledger, message) => {
     expect(() => parseLedger(JSON.stringify(ledger), NOW)).toThrow(message);
+  });
+});
+
+describe('a database restore', () => {
+  const ledger = {
+    version: 1 as const,
+    unnamedSince: {},
+    auditSequence: 500,
+    incarnation: '7-1-5-9',
+  };
+
+  it.each([
+    ['the same database, its log grown', { auditSequence: 600, incarnation: '7-1-5-9' }, false],
+    [
+      'the same database, nothing written since',
+      { auditSequence: 500, incarnation: '7-1-5-9' },
+      false,
+    ],
+    [
+      'its tables recreated (a logical restore)',
+      { auditSequence: 900, incarnation: '7-1-5-10' },
+      true,
+    ],
+    ['another database', { auditSequence: 900, incarnation: '7-1-6-9' }, true],
+    ['a new timeline (a physical restore)', { auditSequence: 900, incarnation: '7-2-5-9' }, true],
+    ['another cluster', { auditSequence: 900, incarnation: '8-1-5-9' }, true],
+    ['its log gone back', { auditSequence: 499, incarnation: '7-1-5-9' }, true],
+  ])('tells whether it was restored: %s', (_name, input, restored) => {
+    expect(wasRestored(ledger, input)).toBe(restored);
+  });
+
+  it('is never seen by a first run, which has no ledger to compare with', () => {
+    expect(wasRestored(EMPTY_LEDGER, { auditSequence: 1, incarnation: '8-1-5-9' })).toBe(false);
   });
 });

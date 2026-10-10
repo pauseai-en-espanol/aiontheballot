@@ -592,18 +592,21 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
 
 **Orphan-bytes sweep (ADR-0004 §5):**
 
-- **R75. `sweep-files` deletes bytes no row names, once no row has named them for 120 days** (never less than 111:
-  R67's 104 plus a week for backups that expire late). Since when is the later of the last time a row stopped naming
-  them (a deleted file row, or a brand asset given other bytes), which the owner's list takes from the audit log, and
-  when the sweep first saw them unnamed (a ledger on the volume, for bytes no row ever named), so bytes named again
-  and dropped again wait their full time again. A database restore rewinds the audit log; the list carries its
-  sequence, and when that goes down every clock starts again and nothing is deleted that run. It runs by hand, like
-  `put-file`: the owner pipes the list from Postgres (as `postgres`, row security off, which the list proves), since
-  no runtime role can read every tenant's files. It refuses a list cut short, stale or from the future, a list naming
-  nothing while files are stored, and one naming files the volume lacks; it deletes more than half the stored files
-  only with `--allow-many`; it never deletes a file stored or reused within a day of the list's snapshot (`put` marks
-  reused bytes, and the sweep moves a file to `retired/` and checks it there, putting back what a halted sweep left);
-  one runs at a time. Without `--delete` it only records and reports. Scheduling it needs a new grant: D7.
+- **R75. `sweep-files` deletes bytes no row names, once no row has named them for 120 days** (never less than 111: R67's
+  104 plus a week for backups that expire late). Since when is the later of the last time a row stopped naming them (a
+  deleted file row, or a brand asset given other bytes), which the owner's list takes from the audit log, and when the
+  sweep first saw them unnamed (a ledger on the volume, for bytes no row ever named), so bytes named again and dropped
+  again wait their full time again. A database restore rewinds the audit log; the list carries the database's identity
+  (cluster, timeline, database and audit table OIDs) and the log's sequence, and when the identity changes or the
+  sequence goes down every clock starts again and nothing is deleted that run, `--delete` or not (the restore procedure
+  deletes the ledger too, for a restore that changed neither). It runs by hand, like `put-file`: the owner pipes the
+  list from Postgres (as `postgres`, row security off, which the list proves), since no runtime role can read every
+  tenant's files. It refuses a list cut short, stale or from the future, a list naming nothing while files are stored,
+  and one naming files the volume lacks; it deletes more than half the stored files only with `--allow-many`; it never
+  deletes a file stored or reused within a day of the list's snapshot (`put` marks reused bytes, and the sweep moves a
+  file to `retired/` and checks it there, putting back what a halted sweep left without ever replacing a fresh copy, and
+  touching nothing through a link); one runs at a time, and a purge never runs during one and also clears what a sweep
+  set aside of its tenant. Without `--delete` it only records and reports. Scheduling it needs a new grant: D7.
 
 **Reserved election slugs:**
 

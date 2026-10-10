@@ -32,10 +32,15 @@ describe("the sweep's list of named files", () => {
         [BRAND_ASSETS.unused.id],
       );
       const listed = await client.query<{ line: string }>(LIST);
+      const { rows: identity } = await client.query<{ database: string; audit: string }>(
+        `SELECT (SELECT oid FROM pg_database WHERE datname = current_database())::text AS database,
+                'app.audit_log'::regclass::oid::text AS audit`,
+      );
       const { rows } = await client.query<{ files: string; assets: string }>(
         'SELECT (SELECT count(*) FROM app.files) AS files, (SELECT count(*) FROM app.brand_assets) AS assets',
       );
       return {
+        identity: identity[0]!,
         oldAsset: before[0]!.sha256,
         text: listed.rows.map((row) => row.line).join('\n'),
         rows: Number(rows[0]!.files) + Number(rows[0]!.assets),
@@ -66,6 +71,13 @@ describe("the sweep's list of named files", () => {
     }
     expect(Math.abs(input.snapshot.getTime() - Date.now())).toBeLessThan(60_000);
     expect(input.auditSequence).toBeGreaterThan(0);
+    // The cluster, its timeline, the database and the audit table: what a restore changes.
+    const [cluster, timeline, database, audit] = input.incarnation.split('-');
+    expect([cluster, timeline]).toEqual([
+      expect.stringMatching(/^\d+$/),
+      expect.stringMatching(/^\d+$/),
+    ]);
+    expect([database, audit]).toEqual([result.identity.database, result.identity.audit]);
   });
 
   it('says so when it may have left rows out: row security on, for a role it can apply to', async () => {

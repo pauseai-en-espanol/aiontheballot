@@ -1,7 +1,20 @@
 import type { Dirent } from 'node:fs';
 
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, open, readdir, readFile, rename, rm, stat, utimes } from 'node:fs/promises';
+import {
+  link,
+  lstat,
+  mkdir,
+  open,
+  readdir,
+  readFile,
+  realpath,
+  rename,
+  rm,
+  stat,
+  unlink,
+  utimes,
+} from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -205,15 +218,33 @@ const exists = async (path: string): Promise<boolean> => {
   }
 };
 
-/** Moves a file set aside back to its place, unless the same bytes were written there again meanwhile. */
+/**
+ * Moves a file set aside back to its place, unless the same bytes are there again (a `put` wrote them meanwhile).
+ * `link` never replaces a file, so a fresh copy is never overwritten by the older one, whatever the timing.
+ */
 const putBack = async (target: string, aside: string): Promise<'restored' | 'removed'> => {
-  if (await exists(target)) {
-    await rm(aside, { force: true });
-    return 'removed';
-  }
   await mkdir(dirname(target), { recursive: true });
-  await rename(aside, target);
-  return 'restored';
+  let restored = true;
+  try {
+    await link(aside, target);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+      throw error;
+    }
+    restored = false;
+  }
+  await unlink(aside);
+  return restored ? 'restored' : 'removed';
+};
+
+/**
+ * Refuses a folder reached through a link anywhere below the root: a sweep that set files aside through one could
+ * delete the very files it set aside (`retired` linked to the root, say).
+ */
+const assertNoLinks = async (root: string, folder: string): Promise<void> => {
+  if ((await realpath(folder)) !== join(await realpath(root), relative(root, folder))) {
+    throw new Error(`${folder} is reached through a link: the sweep touches nothing there`);
+  }
 };
 
 export const createFileStore = (root: string): FileStore => {
@@ -232,6 +263,26 @@ export const createFileStore = (root: string): FileStore => {
     } finally {
       await rm(temporary, { force: true });
     }
+  };
+
+  /** One sweep (or purge) at a time: a lock file created exclusively, removed by the function it returns. */
+  const lockSweep = async (): Promise<() => Promise<void>> => {
+    const path = join(root, LOCK);
+    try {
+      await writeSynced(
+        path,
+        new TextEncoder().encode(`${process.pid} ${new Date().toISOString()}\n`),
+      );
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new Error(
+          `Another sweep holds ${path}. If none is running (one stopped halfway), delete that file and run again.`,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
+    return () => rm(path, { force: true });
   };
 
   return {
@@ -271,7 +322,14 @@ export const createFileStore = (root: string): FileStore => {
       if (!isTenantId(tenantId)) {
         throw new TypeError(`Not a tenant id: ${tenantId}`);
       }
-      await rm(join(root, tenantId), { recursive: true, force: true });
+      // Never while a sweep runs, which could put back a file it set aside; and what one left aside goes too.
+      const release = await lockSweep();
+      try {
+        await rm(join(root, tenantId), { recursive: true, force: true });
+        await rm(join(root, RETIRED, tenantId), { recursive: true, force: true });
+      } finally {
+        await release();
+      }
     },
     removeStaleTemporaryFiles: async (maxAgeMs) => {
       let names: string[];
@@ -329,6 +387,7 @@ export const createFileStore = (root: string): FileStore => {
       const target = pathOf(root, space, sha256);
       const aside = pathOf(join(root, RETIRED), space, sha256);
       await mkdir(dirname(aside), { recursive: true });
+      await assertNoLinks(root, dirname(aside));
       try {
         await rename(target, aside);
       } catch (error) {
@@ -343,17 +402,20 @@ export const createFileStore = (root: string): FileStore => {
         await putBack(target, aside);
         return 'kept';
       }
-      await rm(aside, { force: true });
+      await unlink(aside);
       return 'deleted';
     },
     recoverRetired: async () => {
-      const { stored } = await createFileStore(join(root, RETIRED)).list();
+      const retired = join(root, RETIRED);
+      if (!(await exists(retired))) {
+        return { restored: 0, removed: 0 };
+      }
+      await assertNoLinks(root, retired);
+      // Links further down are listed as unexpected, and left alone.
+      const { stored } = await createFileStore(retired).list();
       let restored = 0;
       for (const { space, sha256 } of stored) {
-        const outcome = await putBack(
-          pathOf(root, space, sha256),
-          pathOf(join(root, RETIRED), space, sha256),
-        );
+        const outcome = await putBack(pathOf(root, space, sha256), pathOf(retired, space, sha256));
         restored += outcome === 'restored' ? 1 : 0;
       }
       return { restored, removed: stored.length - restored };
@@ -371,24 +433,7 @@ export const createFileStore = (root: string): FileStore => {
     writeLedger: async (text) => {
       await writeAtomically(join(root, LEDGER), new TextEncoder().encode(text));
     },
-    lockSweep: async () => {
-      const path = join(root, LOCK);
-      try {
-        await writeSynced(
-          path,
-          new TextEncoder().encode(`${process.pid} ${new Date().toISOString()}\n`),
-        );
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-          throw new Error(
-            `Another sweep holds ${path}. If none is running (one stopped halfway), delete that file and run again.`,
-            { cause: error },
-          );
-        }
-        throw error;
-      }
-      return () => rm(path, { force: true });
-    },
+    lockSweep,
     probe: async () => {
       await mkdir(temporaryDirectory, { recursive: true });
       const path = join(temporaryDirectory, `probe-${randomUUID()}`);

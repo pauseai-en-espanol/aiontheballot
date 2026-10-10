@@ -29,8 +29,12 @@ const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 const ago = (days: number) => new Date(Date.now() - days * DAY);
 
 /** The owner's list, as the query prints it, taken now. */
-const list = (lines: string[], auditSequence = 100) =>
-  [...lines, `end ${lines.length} ${new Date().toISOString()} ${auditSequence} true`].join('\n');
+const DATABASE = '7-1-5-9';
+const list = (lines: string[], auditSequence = 100, incarnation = DATABASE) =>
+  [
+    ...lines,
+    `end ${lines.length} ${new Date().toISOString()} ${auditSequence} ${incarnation} true`,
+  ].join('\n');
 const NAMED = `${TENANT} sources ${sha('nombrado')}`;
 const ORPHAN = `${TENANT}/sources/${sha('huerfano')}`;
 
@@ -164,10 +168,14 @@ describe('sweep-files', () => {
       list([NAMED, `platform ${sha('ausente')}`]),
       'not on this volume',
     ],
-    ['a stale list', `${NAMED}\nend 1 ${ago(2).toISOString()} 100 true`, 'take a fresh one'],
+    [
+      'a stale list',
+      `${NAMED}\nend 1 ${ago(2).toISOString()} 100 7-1-5-9 true`,
+      'take a fresh one',
+    ],
     [
       'a list from the future',
-      `${NAMED}\nend 1 ${new Date(Date.now() + DAY).toISOString()} 100 true`,
+      `${NAMED}\nend 1 ${new Date(Date.now() + DAY).toISOString()} 100 7-1-5-9 true`,
       'in the future',
     ],
   ])('refuses %s, deleting and recording nothing', async (_name, input, message) => {
@@ -179,32 +187,43 @@ describe('sweep-files', () => {
     expect(await readFile(join(root, 'sweep-ledger.json'), 'utf8')).toBe(before);
   });
 
-  it('starts every clock again, and deletes nothing, after the database was restored', async () => {
-    await writeFile(
-      join(root, 'sweep-ledger.json'),
-      JSON.stringify({
-        version: 1,
-        unnamedSince: { [ORPHAN]: ago(200).toISOString() },
-        auditSequence: 500,
-      }),
-    );
-    // The audit log's sequence went back from 500 to 100: a dump was restored, and with it the log's past.
-    const refused = await run(['--delete'], list([NAMED], 100), env);
-    expect([refused.code, refused.stderr]).toEqual([1, expect.stringContaining('restored')]);
-    expect(await exists(sha('huerfano'))).toBe(true);
-    const recorded = await run([], list([NAMED], 100), env);
-    expect(JSON.parse(recorded.stdout)).toMatchObject({ restored: true, unnamedExpired: 0 });
-    const after = JSON.parse(await readFile(join(root, 'sweep-ledger.json'), 'utf8')) as {
-      unnamedSince: Record<string, string>;
-      auditSequence: number;
-    };
-    expect(after.auditSequence).toBe(100);
-    expect(Date.now() - Date.parse(after.unnamedSince[ORPHAN] ?? '')).toBeLessThan(60_000);
-    expect(JSON.parse((await run(['--delete'], list([NAMED], 120), env)).stdout)).toMatchObject({
-      restored: false,
-      deleted: 0,
-    });
-  });
+  it.each([
+    ['its identity changed (a logical restore recreates the tables)', 500, '7-1-5-10'],
+    ['its identity changed (a physical restore starts a new timeline)', 600, '7-2-5-9'],
+    ['its audit log went back', 100, DATABASE],
+  ])(
+    'starts every clock again, and deletes nothing even with --delete, after a restore: %s',
+    async (_name, auditSequence, incarnation) => {
+      await writeFile(
+        join(root, 'sweep-ledger.json'),
+        JSON.stringify({
+          version: 1,
+          unnamedSince: { [ORPHAN]: ago(200).toISOString() },
+          auditSequence: 500,
+          incarnation: DATABASE,
+        }),
+      );
+      const restored = await run(['--delete'], list([NAMED], auditSequence, incarnation), env);
+      expect(restored.code).toBe(0);
+      expect(JSON.parse(restored.stdout.split('\n}')[0] + '\n}')).toMatchObject({
+        restored: true,
+        unnamedExpired: 0,
+        deleted: 0,
+      });
+      expect(restored.stdout).toContain('every clock started again');
+      expect(await exists(sha('huerfano'))).toBe(true);
+      // The reset is kept: the next run measures from now, and knows this database.
+      const after = JSON.parse(await readFile(join(root, 'sweep-ledger.json'), 'utf8')) as {
+        unnamedSince: Record<string, string>;
+        auditSequence: number;
+        incarnation: string;
+      };
+      expect([after.auditSequence, after.incarnation]).toEqual([auditSequence, incarnation]);
+      expect(Date.now() - Date.parse(after.unnamedSince[ORPHAN] ?? '')).toBeLessThan(60_000);
+      const next = await run(['--delete'], list([NAMED], auditSequence + 1, incarnation), env);
+      expect(JSON.parse(next.stdout)).toMatchObject({ restored: false, deleted: 0 });
+    },
+  );
 
   it('first puts back what a sweep stopped halfway left aside', async () => {
     const huerfano = join(
@@ -226,7 +245,7 @@ describe('sweep-files', () => {
   });
 
   it('refuses a list taken with row security on', async () => {
-    const input = `${NAMED}\nend 1 ${new Date().toISOString()} 100 false`;
+    const input = `${NAMED}\nend 1 ${new Date().toISOString()} 100 7-1-5-9 false`;
     const { code, stderr } = await run([], input, env);
     expect([code, stderr]).toEqual([1, expect.stringContaining('row security on')]);
   });

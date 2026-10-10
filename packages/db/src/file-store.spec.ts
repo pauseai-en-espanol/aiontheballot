@@ -107,13 +107,34 @@ describe('the file store', () => {
     await store.put(ASSETS_A, bytes);
     await store.put(ASSETS_B, bytes);
     await store.put('platform', bytes);
+    // What a sweep stopped halfway set aside goes too, so no later sweep can put it back.
+    const aside = join(root, 'retired', TENANT_A, 'sources', 'sha256', 'ab', 'cd');
+    await mkdir(aside, { recursive: true });
+    await writeFile(join(aside, 'a'.repeat(64)), bytes);
+    await mkdir(join(root, 'retired', TENANT_B), { recursive: true });
     await store.removeTenant(TENANT_A);
+    expect(await readdir(join(root, 'retired'))).toEqual([TENANT_B]);
     expect(await store.get(SOURCES_A, sha256)).toBeUndefined();
     expect(await store.get(ASSETS_A, sha256)).toBeUndefined();
     expect(await store.get(ASSETS_B, sha256)).toEqual(bytes);
     expect(await store.get('platform', sha256)).toEqual(bytes);
     await expect(store.removeTenant('..')).rejects.toThrow(TypeError);
     await expect(store.removeTenant('platform')).rejects.toThrow(TypeError);
+  });
+
+  it("never deletes a tenant's bytes while a sweep runs", async () => {
+    const store = createFileStore(root);
+    await store.put(SOURCES_A, bytes);
+    const release = await store.lockSweep();
+    await expect(store.removeTenant(TENANT_A)).rejects.toThrow('Another sweep');
+    expect(await store.get(SOURCES_A, sha256)).toEqual(bytes);
+    await release();
+    await store.removeTenant(TENANT_A);
+    expect(await store.get(SOURCES_A, sha256)).toBeUndefined();
+    // The purge let go of the lock.
+    await (
+      await store.lockSweep()
+    )();
   });
 
   it('deletes only temporary files old enough to be leftovers', async () => {
@@ -251,6 +272,23 @@ describe('the file store', () => {
     expect(await store.get(SOURCES_A, sha256)).toEqual(bytes);
     expect(await store.get(ASSETS_B, otherSha)).toEqual(other);
     expect((await createFileStore(join(root, 'retired')).list()).stored).toEqual([]);
+  });
+
+  it('touches nothing through a link where it sets files aside', async () => {
+    const store = createFileStore(root);
+    await store.put(SOURCES_A, bytes);
+    // `retired` linked to the root would make each file its own copy set aside, deleted by the sweep.
+    await symlink(root, join(root, 'retired'));
+    const later = new Date(Date.now() + 60_000);
+    await expect(store.retire(SOURCES_A, sha256, later)).rejects.toThrow('through a link');
+    await expect(store.recoverRetired()).rejects.toThrow('through a link');
+    expect(await store.get(SOURCES_A, sha256)).toEqual(bytes);
+    await rm(join(root, 'retired'));
+    // Further down, too.
+    await mkdir(join(root, 'retired'));
+    await symlink(join(root, TENANT_A), join(root, 'retired', TENANT_A));
+    await expect(store.retire(SOURCES_A, sha256, later)).rejects.toThrow('through a link');
+    expect(await store.get(SOURCES_A, sha256)).toEqual(bytes);
   });
 
   it('keeps one sweep at a time', async () => {

@@ -97,8 +97,9 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
 - **Purge.** `private.purge_tenant()` deletes the tenant's rows; then `purge-tenant-files`, run in an API pod as
   `node dist/purge-tenant-files.js <tenant-id> --delete`, deletes the tenant's folder. It acts only on proof read from
   standard input: the owner's query prints `purged <tenant-id>` only for a tenant that `purge_log` records and that no
-  longer exists, so a mistyped id, or an inactive tenant that still exists, deletes nothing. Without `--delete` it
-  only says what it would delete.
+  longer exists, so a mistyped id, or an inactive tenant that still exists, deletes nothing. Without `--delete` it only
+  says what it would delete. It never runs during a sweep (it takes the sweep's lock), and it also deletes whatever of
+  the tenant a halted sweep left set aside.
 - **Sweep.** Bytes that no row names are deleted only after no row has named them for a **grace period at least as
   long as the oldest database backup that could be restored**, so restoring an older dump never finds its bytes gone.
   With the backup plan's numbers (weekly Velero backups kept 90 days, each holding the last 14 nightly dumps, plus a
@@ -109,8 +110,12 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   gives the last time a row stopped naming each file; a ledger on the volume adds when the sweep first saw a file
   unnamed, for bytes no row ever named (an upload whose transaction failed). The later of the two counts, so a file
   named again and dropped again waits its full time again. A purge removes its tenant's audit rows, and its bytes
-  with them. A database restore rewinds the log: the list carries the log's sequence, and when it goes down the sweep
-  starts every clock again and deletes nothing that run.
+  with them. A database restore rewinds the log, forgetting rows named and dropped after the dump, so no clock can be
+  trusted after one. The list carries the database's identity (the cluster, its timeline, the database's and the
+  audit table's OIDs: a logical restore recreates the tables, a physical one starts a new timeline) and the log's
+  sequence; when the identity changes or the sequence goes down, the sweep starts every clock again, keeps that, and
+  deletes nothing that run, `--delete` or not. A restore that changed neither would go unseen, so the restore
+  procedure also deletes the ledger (`sweep-ledger.json`), which has the same effect.
 - **How it runs.** No runtime role can list every tenant's files, so the owner pipes the list from Postgres, as
   `postgres` with row security off, into `sweep-files` in an API pod (`--print-query` prints the query). The command
   refuses a list that doesn't end with its own count, a list that names nothing while files are stored, and one that
@@ -118,10 +123,12 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   with `--allow-many`; one sweep runs at a time (a lock file). Without `--delete` it records and reports. A file stored
   or reused within a day of the list's snapshot is never deleted: `put` marks reused bytes as just written, and the
   sweep moves a file aside (to `retired/`, which the API's temporary cleanup never touches) and checks it there before
-  deleting it, so an upload of the same bytes at that moment gets them back; a sweep stopped halfway is put right by
-  the next. The list also says whether it saw every row; one taken with row security on is refused. Rows written by
-  hand after `put-file` should follow within the day. Running it on a schedule needs a role that can read that list:
-  a new grant, so an ADR-0002 decision (PLAN, D7).
+  deleting it, so an upload of the same bytes at that moment gets them back; putting a file back never replaces a fresh
+  copy (`link`, not `rename`), and nothing is moved through a link. A sweep stopped halfway leaves its lock, which
+  someone must delete by hand once sure no sweep runs; until the next sweep puts them back, the files it had set aside
+  are missing (named ones answer 404), so that is done promptly. The list also says whether it saw every row; one taken
+  with row security on is refused. Rows written by hand after `put-file` should follow within the day. Running it on a
+  schedule needs a role that can read that list: a new grant, so an ADR-0002 decision (PLAN, D7).
 
 ### 6. The volume
 
@@ -146,8 +153,8 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   in a dump names bytes already on the volume when the dump was taken; a copy taken after the dump contains them,
   because the sweep deletes nothing a row named less than the grace period ago (§5) and purges are deliberate.
 - **Restoring:** a dump and the volume copy taken after it restore together. Restoring only the database from an
-  older dump onto the live volume works too, within the grace period; the next sweep sees the audit log went back
-  and starts its clocks again (§5). The preview's restore check covers both.
+  older dump onto the live volume works too, within the grace period; after any restore the sweep's ledger is
+  deleted too, and the next sweep would also see the database changed (§5). The preview's restore check covers both.
 - A purge deletes a tenant's bytes at once; copies in older backups expire with them, as for the database.
 
 ### 8. Locally and in tests
