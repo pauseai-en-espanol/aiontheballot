@@ -19,7 +19,10 @@ the checklists.
    migrated and seeded (`pnpm db:up && pnpm db:migrate && pnpm db:seed`), and `WEB_DATABASE_URL` in `.env`.
 
 3. Add a changeset for any change that affects a package (`pnpm release:note`). Use `pnpm release:empty` for docs or
-   CI-only changes. The pre-push hook checks for one.
+   CI-only changes. The pre-push hook checks for one, and it and CI check that every deployable whose code changed is
+   released: a migration needs `@aiontheballot/migrations` in the changeset, or its image isn't rebuilt. A change to
+   the UI preset needs web and admin too (they take it as a devDependency), and one to root files (the lockfile,
+   `turbo.json`) needs every deployable.
 4. Keep PRs focused on one topic, and include what you ran and what it showed.
 
 ## Content rules

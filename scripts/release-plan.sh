@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Lists the deployables CD must release: each umbrella-chart dependency whose package version is ahead of the image
 # tag in the umbrella values.yaml. Tags are "<version>.<short sha>", so only the version part is compared. Changesets
-# bumps an app whenever one of its workspace dependencies is bumped, so a version change covers both.
+# bumps an app when one of its workspace dependencies is bumped, but not a devDependency (web and admin take the UI
+# preset as one): scripts/check-deployables-released.sh makes the changesets name every deployable that changed.
 #
 # Comparing against the chart, rather than diffing the last commit, makes CD idempotent: a failed or skipped run is
 # picked up by the next one. Output: "<chart key> <package name> <version>" per deployable. Requires yq.
