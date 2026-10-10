@@ -26,35 +26,54 @@ export interface DatabaseRefusal {
   report: boolean;
 }
 
-const KINDS: Readonly<Record<string, Omit<DatabaseRefusal, 'constraint' | 'report'>>> = {
+interface Kind extends Pick<DatabaseRefusal, 'status' | 'error'> {
+  /** Still a fault to report, though it has an answer for the user. */
+  report?: true;
+  /** Only when raised by this function (`routine`); from anywhere else, a fault. */
+  only?: string;
+}
+
+const KINDS: Readonly<Record<string, Kind>> = {
   // A missing role, aal1, four-eyes, RLS's WITH CHECK. A missing grant is a fault instead (below).
   '42501': { status: 403, error: 'forbidden' },
   // The wrong state, a stale version, the election's status, the freeze window: reload and try again.
   '23001': { status: 409, error: 'stale' },
-  // Another transaction got there first (a serialization failure, a deadlock): the same answer.
+  // Another transaction got there first (a serialization failure, a deadlock): the same answer. A deadlock also
+  // means two writes take their locks in different orders, a bug to fix.
   '40001': { status: 409, error: 'stale' },
-  '40P01': { status: 409, error: 'stale' },
+  '40P01': { status: 409, error: 'stale', report: true },
   // What the content lacks: evidence, a default-locale text, a checked document.
   '23514': { status: 422, error: 'incomplete' },
   // A slug or an invitation already taken.
   '23505': { status: 409, error: 'taken' },
   // Something it names is gone, or something still names what it removes.
   '23503': { status: 409, error: 'linked' },
-  // A limit the database keeps, such as the reports a site takes in a day.
-  '54000': { status: 429, error: 'limit' },
+  // A limit a trigger keeps, such as the reports a site takes in a day. Postgres's own limits (an index entry too
+  // large, say) raise it too, from elsewhere: those are faults.
+  '54000': { status: 429, error: 'limit', only: 'exec_stmt_raise' },
   // A value the database can't take as given: a bad id, a malformed date.
   '22023': { status: 400, error: 'invalid' },
   '22P02': { status: 400, error: 'invalid' },
   '22007': { status: 400, error: 'invalid' },
   '22008': { status: 400, error: 'invalid' },
+  // Text Postgres can't hold: a NUL character.
+  '22021': { status: 400, error: 'invalid' },
 };
 
 /**
- * Where Postgres refuses a privilege the role lacks (`permission denied for table …`): the API asked for something its
- * grants never allow, a bug to report, not a user's refusal to explain. RLS (`ExecWithCheckOptions`) and the triggers
+ * Where Postgres refuses a privilege the role lacks (`permission denied for table …`, a column, a type, a sequence),
+ * or a query RLS would filter while row security is off: the API asked for something its grants or settings never
+ * allow, a bug to report, not a user's refusal to explain. RLS (`ExecWithCheckOptions`) and the triggers
  * (`exec_stmt_raise`) raise the same SQLSTATE from elsewhere.
  */
-const GRANT_CHECKS = new Set(['aclcheck_error', 'aclcheck_error_col']);
+const GRANT_CHECKS = new Set([
+  'aclcheck_error',
+  'aclcheck_error_col',
+  'aclcheck_error_type',
+  'nextval_internal',
+  'do_setval',
+  'check_enable_rls',
+]);
 
 /** The kinds whose constraint names the field at fault. */
 const NAMED: ReadonlySet<DatabaseRefusal['error']> = new Set(['taken', 'incomplete', 'linked']);
@@ -69,12 +88,17 @@ export const databaseRefusal = (error: unknown): DatabaseRefusal => {
     constraint?: unknown;
   };
   const kind = typeof code === 'string' ? KINDS[code] : undefined;
-  if (!kind || (typeof routine === 'string' && GRANT_CHECKS.has(routine))) {
+  if (
+    !kind ||
+    (kind.only !== undefined && routine !== kind.only) ||
+    (typeof routine === 'string' && GRANT_CHECKS.has(routine))
+  ) {
     return { status: 500, error: 'unexpected', report: true };
   }
   return {
-    ...kind,
+    status: kind.status,
+    error: kind.error,
     ...(typeof constraint === 'string' && NAMED.has(kind.error) ? { constraint } : {}),
-    report: false,
+    report: kind.report ?? false,
   };
 };

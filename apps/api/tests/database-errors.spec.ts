@@ -51,7 +51,8 @@ describe('a database refusal, as Postgres raises it', () => {
         sql`UPDATE app.elections SET slug = 'brand' WHERE slug = ${DRAFT_A.slug}`,
       );
       const malformed = await refusalOf(trx, sql`SELECT ${'no-es-un-id'}::uuid`);
-      return { reserved, malformed };
+      const nul = await refusalOf(trx, sql`SELECT ${'una cita\u0000 de ejemplo'}::text`);
+      return { reserved, malformed, nul };
     });
     expect(answers.reserved).toEqual({
       status: 422,
@@ -60,6 +61,25 @@ describe('a database refusal, as Postgres raises it', () => {
       report: false,
     });
     expect(answers.malformed).toEqual({ status: 400, error: 'invalid', report: false });
+    expect(answers.nul).toEqual({ status: 400, error: 'invalid', report: false });
+  });
+
+  it("reports a limit of Postgres's own, such as an index entry too large, as a fault", async () => {
+    const error = await inRolledBackTransaction(async (trx) => {
+      await actAs(trx, 'aiontheballot_admin', USERS.countryAdminA);
+      // A slug long and varied enough that its unique index can't hold it, even compressed.
+      const slug = Array.from({ length: 1500 }, (_, i) =>
+        ((i * 7919) % 1296).toString(36).padStart(2, '0'),
+      ).join('-');
+      return sql`UPDATE app.elections SET slug = ${slug} WHERE slug = ${DRAFT_A.slug}`
+        .execute(trx)
+        .then(
+          () => undefined,
+          (caught: unknown) => caught,
+        );
+    });
+    expect(error).toMatchObject({ code: '54000' });
+    expect(databaseRefusal(error)).toEqual({ status: 500, error: 'unexpected', report: true });
   });
 
   it('names the foreign key a row broke', async () => {

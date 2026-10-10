@@ -12,15 +12,14 @@ describe('a database refusal', () => {
     ['42501', 403, 'forbidden'],
     ['23001', 409, 'stale'],
     ['40001', 409, 'stale'],
-    ['40P01', 409, 'stale'],
     ['23514', 422, 'incomplete'],
     ['23505', 409, 'taken'],
     ['23503', 409, 'linked'],
-    ['54000', 429, 'limit'],
     ['22023', 400, 'invalid'],
     ['22P02', 400, 'invalid'],
     ['22007', 400, 'invalid'],
     ['22008', 400, 'invalid'],
+    ['22021', 400, 'invalid'],
   ])('answers %s with %i and the key %s', (code, status, error) => {
     expect(databaseRefusal(pgError(code))).toMatchObject({ status, error, report: false });
   });
@@ -34,13 +33,44 @@ describe('a database refusal', () => {
       status: 403,
       report: false,
     });
-    for (const routine of ['aclcheck_error', 'aclcheck_error_col']) {
+    for (const routine of [
+      'aclcheck_error',
+      'aclcheck_error_col',
+      'aclcheck_error_type',
+      'nextval_internal',
+      'do_setval',
+      'check_enable_rls',
+    ]) {
       expect(databaseRefusal(pgError('42501', { routine }))).toEqual({
         status: 500,
         error: 'unexpected',
         report: true,
       });
     }
+  });
+
+  it("answers a trigger's limit as one, but Postgres's own limits as faults to report", () => {
+    expect(databaseRefusal(pgError('54000', { routine: 'exec_stmt_raise' }))).toEqual({
+      status: 429,
+      error: 'limit',
+      report: false,
+    });
+    // An index entry too large: a slug far too long, say.
+    for (const extra of [{ routine: 'index_form_tuple_context' }, {}]) {
+      expect(databaseRefusal(pgError('54000', extra))).toEqual({
+        status: 500,
+        error: 'unexpected',
+        report: true,
+      });
+    }
+  });
+
+  it('answers a deadlock as stale, and reports it: two writes take their locks in different orders', () => {
+    expect(databaseRefusal(pgError('40P01'))).toEqual({
+      status: 409,
+      error: 'stale',
+      report: true,
+    });
   });
 
   it('names the constraint of a unique, foreign key or check violation, so the admin can point at the field', () => {

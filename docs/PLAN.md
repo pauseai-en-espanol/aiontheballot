@@ -640,10 +640,14 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   each with a message key in `packages/i18n` (English and Spanish), plus the constraint's name for unique, foreign key
   and check violations so the admin can point at the field. A 42501 from a missing grant (Postgres's `aclcheck_error`,
   not RLS or a trigger) is the API's bug: a 500 to report, like anything else unlisted. The database's own message and
-  detail are never passed on: they can quote what was written. Two gaps for the routes that raise them: mapping each
-  trigger's message to its own key, as §2.3 asks; and triggers raise `check_violation` without a constraint name
-  (`USING CONSTRAINT`), while a table's CHECK on a value (a reserved slug) also answers "incomplete", so the admin
-  words those by constraint.
+  detail are never passed on: they can quote what was written. 54000 is a limit only when a trigger raised it (the
+  reports a site takes in a day); Postgres's own (an index entry too large, from a slug far too long) is a fault, and
+  so is any missing grant on a column, type or sequence, or a query RLS would filter with row security off. A deadlock
+  answers "reload" but is reported: two writes take locks in different orders. `app.slug` has no length limit yet: a
+  forward migration should give it one (with the admin's forms) before M2's editors create slugs. Two gaps for the
+  routes that raise them: mapping each trigger's message to its own key, as §2.3 asks; and triggers raise
+  `check_violation` without a constraint name (`USING CONSTRAINT`), while a table's CHECK on a value (a reserved
+  slug) also answers "incomplete", so the admin words those by constraint.
 - **R79. The cell grid (C1.1) is an API data function, `cellGrid`, read in the actor's transaction** (its type asks
   for one), so RLS decides who sees which election, and the tenant in the path picks it (two tenants may share an
   election slug). A cell is _published with a newer draft_ when it is a draft and has a revision; _withdrawn_ shows
