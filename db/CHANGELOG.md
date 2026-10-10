@@ -1,5 +1,13 @@
 # @aiontheballot/migrations
 
+## 0.7.0
+
+### Minor Changes
+
+- 5d9b0e2: Ship migration `organization_newsletter` (`organizations.newsletter_url`), which the coming-soon release needs: its
+  changeset bumped the API and web but not this package, so the migration image wasn't rebuilt and production's API
+  asked for a column that didn't exist yet.
+
 ## 0.6.0
 
 ### Minor Changes
