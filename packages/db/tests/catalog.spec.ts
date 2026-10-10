@@ -19,6 +19,24 @@ describe('catalog: runtime roles', () => {
     expect(roles.filter((r) => r.risky)).toEqual([]);
   });
 
+  it('are every login role of the database but its owner, so none escapes these checks', async () => {
+    const logins = await rows<{ rolname: string }>(
+      `SELECT rolname FROM pg_roles
+        WHERE rolcanlogin AND rolname LIKE 'aiontheballot\\_%' AND rolname <> 'aiontheballot_owner'
+        ORDER BY rolname`,
+    );
+    expect(logins.map((r) => r.rolname)).toEqual([...RUNTIME_ROLES].sort());
+  });
+
+  it('are members of no role, so none can SET ROLE to one that reaches more (the owner, say)', async () => {
+    const memberships = await rows<{ grant: string }>(
+      `SELECT m.member::regrole::text || ' in ' || m.roleid::regrole::text AS grant
+         FROM pg_auth_members m WHERE m.member::regrole::text = ANY($1)`,
+      [RUNTIME_ROLES],
+    );
+    expect(memberships).toEqual([]);
+  });
+
   it('own no schema, relation or function', async () => {
     const owned = await rows<{ kind: string; name: string }>(
       `SELECT 'schema' AS kind, nspname AS name FROM pg_namespace WHERE nspowner::regrole::text = ANY($1)
@@ -82,6 +100,34 @@ describe('catalog: closed by default', () => {
     ).toEqual([...SECURITY_DEFINER_ALLOWLIST].sort());
   });
 
+  it('keeps aiontheballot_auth out of app and private: no table, column, sequence or function', async () => {
+    // Better Auth's role reaches only its own tables in the auth schema (ADR-0002 §2).
+    const reachable = await rows<{ grant: string }>(
+      `SELECT n.nspname || '.' || c.relname || ' ' || p.privilege AS grant
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER',
+                                 'MAINTAIN']) AS p(privilege)
+        WHERE n.nspname IN ('app', 'private') AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+          AND (has_table_privilege('aiontheballot_auth', c.oid, p.privilege)
+               OR (p.privilege IN ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES')
+                   AND has_any_column_privilege('aiontheballot_auth', c.oid, p.privilege)))
+       UNION ALL
+       SELECT n.nspname || '.' || c.relname || ' ' || p.privilege
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         CROSS JOIN unnest(ARRAY['USAGE', 'SELECT', 'UPDATE']) AS p(privilege)
+        WHERE n.nspname IN ('app', 'private') AND c.relkind = 'S'
+          AND CASE WHEN c.relkind = 'S' THEN has_sequence_privilege('aiontheballot_auth', c.oid, p.privilege) END
+       UNION ALL
+       SELECT n.nspname || '.' || p.proname || ' EXECUTE'
+         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname IN ('app', 'private') AND has_function_privilege('aiontheballot_auth', p.oid, 'EXECUTE')
+       UNION ALL
+       SELECT nspname || ' ' || p.privilege FROM pg_namespace CROSS JOIN unnest(ARRAY['USAGE', 'CREATE']) AS p(privilege)
+        WHERE nspname IN ('app', 'private') AND has_schema_privilege('aiontheballot_auth', oid, p.privilege)`,
+    );
+    expect(reachable).toEqual([]);
+  });
+
   it('gives aiontheballot_web no way to write any table', async () => {
     const writable = await rows<{ grant: string }>(
       `SELECT c.relname || ' ' || p.privilege AS grant
@@ -95,12 +141,12 @@ describe('catalog: closed by default', () => {
     expect(writable).toEqual([]);
   });
 
-  it('never grants TRUNCATE (which skips RLS), REFERENCES or TRIGGER to a runtime role', async () => {
+  it('never grants TRUNCATE (which skips RLS), REFERENCES, TRIGGER or MAINTAIN to a runtime role', async () => {
     const risky = await rows<{ grant: string }>(
       `SELECT r.role || ' ' || c.relname || ' ' || p.privilege AS grant
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
          CROSS JOIN unnest($1::text[]) AS r(role)
-         CROSS JOIN unnest(ARRAY['TRUNCATE', 'REFERENCES', 'TRIGGER']) AS p(privilege)
+         CROSS JOIN unnest(ARRAY['TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']) AS p(privilege)
         WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p', 'v')
           AND (has_table_privilege(r.role, c.oid, p.privilege)
                OR (p.privilege = 'REFERENCES' AND has_any_column_privilege(r.role, c.oid, p.privilege)))`,

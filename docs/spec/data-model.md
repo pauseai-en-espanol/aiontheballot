@@ -1204,7 +1204,8 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
 1. ~~**Worker database role.**~~ **Decided:** `aiontheballot_worker`, scoped to one job request at a time (§8).
 2. **Better Auth tables.** They should sit in the `auth` schema with uuid ids (its `generateId` configured), if its
    Postgres adapter supports a non-default schema cleanly. The spike will confirm. Otherwise the fallback is
-   prefixed tables in a schema `aiontheballot_web` can't read.
+   prefixed tables in another schema of their own (never `app` or `public`). Either way only `aiontheballot_auth`
+   reaches them (ADR-0002 §2; spec O2, decided).
 3. **The descriptive scale** (PLAN P6): define `red` versus `not_mentioned`.
 4. **Admissible sources** (PLAN Q9): both methodology lists default to `{pdf, web_page}` until the chapter decides.
 5. **Party names localized?** They're assumed to be `jsonb`, because some coalitions use different names in

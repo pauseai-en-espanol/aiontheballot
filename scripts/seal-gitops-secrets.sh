@@ -5,8 +5,9 @@
 #
 # Usage: scripts/seal-gitops-secrets.sh <path-to-gitops>
 # Asks for the Harbor secret of robot$aiontheballot-pull (input hidden). Refuses to overwrite: to rotate, delete the
-# files first. The four passwords are always regenerated together, and the postgresql provisioning hook re-applies them
-# to the roles on its next sync.
+# files first. The five passwords are always regenerated together, and the postgresql provisioning hook re-applies them
+# to the roles on its next sync. (scripts/seal-auth-role-secret.sh added the fifth, Better Auth's, to an existing
+# checkout once.)
 set -euo pipefail
 
 GITOPS="${1:?usage: $0 <path-to-gitops>}"
@@ -20,7 +21,7 @@ DB_HOST="postgresql.postgresql.svc.cluster.local:5432"
 
 files=("$PG_DIR/aiontheballot-db-credentials.yaml" "$APP_DIR/aiontheballot-harbor-pull.yaml"
   "$APP_DIR/aiontheballot-owner-db.yaml" "$APP_DIR/aiontheballot-web-db.yaml" "$APP_DIR/aiontheballot-admin-db.yaml"
-  "$APP_DIR/aiontheballot-worker-db.yaml")
+  "$APP_DIR/aiontheballot-worker-db.yaml" "$APP_DIR/aiontheballot-auth-db.yaml")
 for f in "${files[@]}"; do
   if [ -e "$f" ]; then
     echo "Refusing to overwrite $f" >&2
@@ -64,6 +65,7 @@ owner_pw="$(openssl rand -hex 32)"
 web_pw="$(openssl rand -hex 32)"
 admin_pw="$(openssl rand -hex 32)"
 worker_pw="$(openssl rand -hex 32)"
+auth_pw="$(openssl rand -hex 32)"
 url() { printf 'postgres://%s:%s@%s/aiontheballot?sslmode=disable' "$1" "$2" "$DB_HOST"; }
 
 seal "$PG_DIR/aiontheballot-db-credentials.yaml" \
@@ -74,7 +76,8 @@ seal "$PG_DIR/aiontheballot-db-credentials.yaml" \
   --from-file=AIONTHEBALLOT_OWNER_PASSWORD=<(printf %s "$owner_pw") \
   --from-file=AIONTHEBALLOT_WEB_PASSWORD=<(printf %s "$web_pw") \
   --from-file=AIONTHEBALLOT_ADMIN_PASSWORD=<(printf %s "$admin_pw") \
-  --from-file=AIONTHEBALLOT_WORKER_PASSWORD=<(printf %s "$worker_pw")
+  --from-file=AIONTHEBALLOT_WORKER_PASSWORD=<(printf %s "$worker_pw") \
+  --from-file=AIONTHEBALLOT_AUTH_PASSWORD=<(printf %s "$auth_pw")
 
 seal "$APP_DIR/aiontheballot-harbor-pull.yaml" \
   "# Pull secret for harbor.danilupion.com/aiontheballot ($HARBOR_ROBOT, pull only), on the default SA." -2 \
@@ -100,5 +103,9 @@ seal "$APP_DIR/aiontheballot-worker-db.yaml" \
   "# DATABASE_URL for aiontheballot_worker (background worker): $(url aiontheballot_worker '<WORKER_PASSWORD>')" -2 \
   generic aiontheballot-worker-db -n aiontheballot --from-file=DATABASE_URL=<(url aiontheballot_worker "$worker_pw")
 
-unset HARBOR_SECRET owner_pw web_pw admin_pw worker_pw
+seal "$APP_DIR/aiontheballot-auth-db.yaml" \
+  "# DATABASE_URL for aiontheballot_auth (Better Auth, in the API): $(url aiontheballot_auth '<AUTH_PASSWORD>')" -2 \
+  generic aiontheballot-auth-db -n aiontheballot --from-file=DATABASE_URL=<(url aiontheballot_auth "$auth_pw")
+
+unset HARBOR_SECRET owner_pw web_pw admin_pw worker_pw auth_pw
 echo "Done. Review with: git -C \"$GITOPS\" status"

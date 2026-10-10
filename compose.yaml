@@ -1,5 +1,5 @@
 # Local development and test database, mirroring production on danilupion-com:
-# the same Postgres image as the halyard `postgresql` chart, and the same roles (an owner plus three
+# the same Postgres image as the halyard `postgresql` chart, and the same roles (an owner plus four
 # non-owner runtime roles, as the chart's `extraRoles` create them). See ADR-0001 and ADR-0002 §2.
 #
 #   pnpm db:up        # start Postgres on :5432 (override with AIONTHEBALLOT_PG_PORT)
@@ -18,6 +18,7 @@ services:
       AIONTHEBALLOT_WEB_PASSWORD: ${AIONTHEBALLOT_WEB_PASSWORD:-dev-only-web}
       AIONTHEBALLOT_ADMIN_PASSWORD: ${AIONTHEBALLOT_ADMIN_PASSWORD:-dev-only-admin}
       AIONTHEBALLOT_WORKER_PASSWORD: ${AIONTHEBALLOT_WORKER_PASSWORD:-dev-only-worker}
+      AIONTHEBALLOT_AUTH_PASSWORD: ${AIONTHEBALLOT_AUTH_PASSWORD:-dev-only-auth}
     ports:
       - '${AIONTHEBALLOT_PG_PORT:-5432}:5432'
     volumes:

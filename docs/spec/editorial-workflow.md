@@ -662,10 +662,8 @@ Taken while drafting; each can be changed before M2 starts.
 - **O1. Archive service.** Which service takes the snapshots? Default: the Internet Archive's Save Page Now (free,
   public, sometimes slow or refused). Alternatives: archive.today, or no external snapshot (our stored copy and its
   hash only).
-- **O2. Better Auth's database role.** Better Auth needs to read and write its own tables. Options: run it as
-  `aiontheballot_admin` with grants on `auth.*`, or a fourth role that owns nothing and can reach only `auth.*`
-  (also a gitops change). Either is an ADR-0002 update. Recommendation: the fourth role, so the admin role never
-  sees password hashes or TOTP secrets.
+- ~~**O2. Better Auth's database role.**~~ **Decided:** a fourth role, `aiontheballot_auth`, that owns nothing and
+  can reach only `auth.*`, so the admin role never sees password hashes or TOTP secrets (ADR-0002 §2).
 - **O3. Should going live require at least one party and one criterion in the database?** A live election with
   none would be an empty public page. Recommendation: yes, as a small migration adding to `election_rules`.
 - **O4. Team size.** With one or two people, four-eyes blocks publishing whenever one is away (PLAN P14). Who will

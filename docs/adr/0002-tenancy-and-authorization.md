@@ -41,9 +41,21 @@ The UI repeats some checks, but only for user experience.
 | `aiontheballot_admin`  | API admin routes and the worker | Runtime role                                                                                            |
 | `aiontheballot_web`    | API public routes (read-only)   | Runtime role                                                                                            |
 | `aiontheballot_worker` | Background worker               | Runtime role; only job tables, scoped to the one open `job_requests` row it runs (`app.job_request_id`) |
+| `aiontheballot_auth`   | Better Auth, inside the API     | Runtime role; only Better Auth's tables in the `auth` schema, nothing in `app` or `private`             |
 
 All runtime roles are `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB` and own nothing. A catalog
 meta-test fails if this ever changes.
+
+**Credentials stay with their own role** (editorial workflow spec, O2, decided by Dani). Better Auth's tables hold
+accounts, password hashes, TOTP secrets and sessions. They live in the `auth` schema (or, should Better Auth's
+adapter need it, another schema of their own: never `app` or `public`), owned by `aiontheballot_owner`, and only
+`aiontheballot_auth` is granted on them, so no query run as `aiontheballot_admin`, `aiontheballot_web` or
+`aiontheballot_worker` can reach a credential. They hold no tenant data (one account can belong to several tenants),
+so grants keep them apart rather than RLS. The API keeps two pools: Better Auth's, which establishes who the user
+is, and the admin role's, which runs everything they do through `withActor` (§3). What the app needs from `auth`, the
+verified email an invitation checks, comes through `private.accept_invitation` (§10, already on the allowlist).
+Catalog meta-tests keep `aiontheballot_auth` out of `app` and `private`, and no runtime role is a member of another
+role.
 
 ### 3. Actor context per transaction
 

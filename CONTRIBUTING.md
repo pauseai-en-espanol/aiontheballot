@@ -30,7 +30,17 @@ the checklists.
    pnpm db:up && pnpm db:migrate && pnpm db:seed
    ```
 
-   The test database (`aiontheballot_test`) needs nothing: `pnpm test:db` rebuilds it on every run.
+   The test database (`aiontheballot_test`) needs nothing: `pnpm test:db` rebuilds it on every run. The roles,
+   though, are created only with a new volume (`db/local/init.sh`). When a new runtime role is added there, start
+   again as above, or add it to the running database, as for `aiontheballot_auth`:
+
+   ```sh
+   docker exec -i aiontheballot-postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U postgres' <<'SQL'
+   CREATE ROLE aiontheballot_auth WITH LOGIN PASSWORD 'dev-only-auth'
+     NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+   GRANT CONNECT ON DATABASE aiontheballot, aiontheballot_test TO aiontheballot_auth;
+   SQL
+   ```
 
 3. Add a changeset for any change that affects a package (`pnpm release:note`). Use `pnpm release:empty` for docs or
    CI-only changes. The pre-push hook checks for one, and it and CI check that every deployable whose code changed is
@@ -73,7 +83,7 @@ and the [data model spec](docs/spec/data-model.md)):
      only what memberships give it), plus the `private.bump_public_version()` trigger, so the public cache follows;
    - membership policies through the `private` helpers, which already require `aal2`.
 5. **Explicit grants** for each runtime role (`aiontheballot_web`, `aiontheballot_admin`, `aiontheballot_worker`),
-   and nothing to `PUBLIC`.
+   and nothing to `PUBLIC`. `aiontheballot_auth` gets nothing outside the `auth` schema (ADR-0002 §2).
 6. **If it holds published history:** `UPDATE`/`DELETE`/`TRUNCATE` triggers using `private.forbid_mutation()`,
    which honours `app.purge` only for the table owner.
 7. **Personal data?** Define its retention, and comment each such column `personal data`: the audit trigger never

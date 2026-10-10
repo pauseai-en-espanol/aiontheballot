@@ -170,10 +170,10 @@ fix them rather than copy them.
 - Reachable only inside the cluster: ClusterIP, no NodePort.
 - The shared `postgresql` instance, with an `aiontheballot` database. The apps never connect as the role that owns the
   tables: an owner bypasses RLS and can disable policies and triggers.
-- The runtime roles `aiontheballot_web`, `aiontheballot_admin` and `aiontheballot_worker` come from the halyard
-  `postgresql` chart's `databases[].extraRoles` (chart 1.1.0): login roles that own nothing and are forced to
-  `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`. Our migrations, run as the owner, grant them
-  table privileges.
+- The runtime roles `aiontheballot_web`, `aiontheballot_admin`, `aiontheballot_worker` and `aiontheballot_auth` (Better
+  Auth's, ADR-0002 §2) come from the halyard `postgresql` chart's `databases[].extraRoles` (chart 1.1.0): login roles
+  that own nothing and are forced to `NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`. Our migrations,
+  run as the owner, grant them table privileges.
 - Role names belong to the whole Postgres server, and the migrations grant to these fixed names. A second
   environment on the same server would have to share the roles and their passwords (halyard also rejects a role
   listed under two databases), so it would need its own Postgres instance.

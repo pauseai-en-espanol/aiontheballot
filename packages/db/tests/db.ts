@@ -34,4 +34,5 @@ export const RUNTIME_ROLES = [
   'aiontheballot_web',
   'aiontheballot_admin',
   'aiontheballot_worker',
+  'aiontheballot_auth',
 ] as const;
