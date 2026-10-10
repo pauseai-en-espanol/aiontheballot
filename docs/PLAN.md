@@ -628,11 +628,15 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   a match. That part is given normalised; the editor will need it mapped back onto the quote as typed. The API route
   that serves it, which should keep each source's normalised pages rather than redo them per keystroke, waits for
   sign-in (editorial workflow spec §18, O2). The two normalisers still differ on rare characters: D9.
-- **R78. Database refusals become HTTP answers by SQLSTATE alone** (editorial workflow §2.3): 42501 → 403, 23001
-  → 409 ("reload"), 23514 → 422, 23505 → 409, invalid values → 400, each with a message key in `packages/i18n` (English
-  and Spanish), plus the constraint's name for unique and check violations so the admin can point at the field.
-  Anything else is a 500 to report. The database's own message and detail are never passed on: they can quote what
-  was written. Mapping each trigger's message to its own key, as §2.3 asks, comes with the routes that raise them.
+- **R78. Database refusals become HTTP answers by SQLSTATE** (editorial workflow §2.3): 42501 → 403, 23001, 40001
+  and 40P01 → 409 ("reload"), 23514 → 422, 23505 → 409, 23503 → 409 ("linked"), 54000 → 429, invalid values → 400,
+  each with a message key in `packages/i18n` (English and Spanish), plus the constraint's name for unique, foreign key
+  and check violations so the admin can point at the field. A 42501 from a missing grant (Postgres's `aclcheck_error`,
+  not RLS or a trigger) is the API's bug: a 500 to report, like anything else unlisted. The database's own message and
+  detail are never passed on: they can quote what was written. Two gaps for the routes that raise them: mapping each
+  trigger's message to its own key, as §2.3 asks; and triggers raise `check_violation` without a constraint name
+  (`USING CONSTRAINT`), while a table's CHECK on a value (a reserved slug) also answers "incomplete", so the admin
+  words those by constraint.
 - **R79. The cell grid (C1.1) is an API data function, `cellGrid`, read in the actor's transaction** (its type asks
   for one), so RLS decides who sees which election, and the tenant in the path picks it (two tenants may share an
   election slug). A cell is _published with a newer draft_ when it is a draft and has a revision; _withdrawn_ shows

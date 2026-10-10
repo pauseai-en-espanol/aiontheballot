@@ -57,6 +57,8 @@
     "stale": "This has changed since you opened it, or can't be done right now. Reload and try again.",
     "incomplete": "Something this needs is missing.",
     "taken": "That is already in use.",
-    "invalid": "That value isn't valid."
+    "linked": "Something this refers to has gone, or something still refers to it.",
+    "invalid": "That value isn't valid.",
+    "limit": "That limit has been reached. Try again later."
   }
 }

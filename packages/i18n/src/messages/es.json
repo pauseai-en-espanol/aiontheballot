@@ -57,6 +57,8 @@
     "stale": "Esto ha cambiado desde que lo abriste, o ahora no se puede hacer. Recarga y vuelve a intentarlo.",
     "incomplete": "Falta algo necesario.",
     "taken": "Eso ya está en uso.",
-    "invalid": "Ese valor no es válido."
+    "linked": "Algo a lo que esto se refiere ya no existe, o algo todavía se refiere a esto.",
+    "invalid": "Ese valor no es válido.",
+    "limit": "Se ha alcanzado el límite. Vuelve a intentarlo más tarde."
   }
 }
