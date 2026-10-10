@@ -15,6 +15,8 @@ A multi-tenant platform that publishes sourced comparisons of political parties'
   cookies.
 - **Tenant isolation lives in Postgres (ADR-0002).** Every new table needs `tenant_id`, RLS, composite FKs, the
   immutability trigger, explicit grants and an entry in `packages/db/tests/rls/matrix.ts` (checklist in CONTRIBUTING.md).
+  The one exception is Better Auth's tables in `auth`: no tenant data, granted to `aiontheballot_auth` only
+  (ADR-0002 §2).
 - **Database roles:** runtime roles never own anything, every admin query goes through `withActor`, and
   `aiontheballot_web` never gets write grants. A new `SECURITY DEFINER` function or grant requires an ADR-0002 update.
 - **Data rules are database triggers:** evidence, four-eyes review, verbatim match, immutability. UI checks are

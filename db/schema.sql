@@ -29,6 +29,22 @@ CREATE SCHEMA app;
 ALTER SCHEMA app OWNER TO aiontheballot_owner;
 
 --
+-- Name: auth; Type: SCHEMA; Schema: -; Owner: aiontheballot_owner
+--
+
+CREATE SCHEMA auth;
+
+
+ALTER SCHEMA auth OWNER TO aiontheballot_owner;
+
+--
+-- Name: SCHEMA auth; Type: COMMENT; Schema: -; Owner: aiontheballot_owner
+--
+
+COMMENT ON SCHEMA auth IS 'Better Auth''s tables: only aiontheballot_auth reaches them (ADR-0002 §2)';
+
+
+--
 -- Name: private; Type: SCHEMA; Schema: -; Owner: aiontheballot_owner
 --
 
@@ -3603,6 +3619,154 @@ END)
 ALTER TABLE app.tenants OWNER TO aiontheballot_owner;
 
 --
+-- Name: accounts; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TABLE auth.accounts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    account_id text NOT NULL,
+    provider_id text NOT NULL,
+    user_id uuid NOT NULL,
+    access_token text,
+    refresh_token text,
+    id_token text,
+    access_token_expires_at timestamp with time zone,
+    refresh_token_expires_at timestamp with time zone,
+    scope text,
+    password text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone NOT NULL
+);
+
+
+ALTER TABLE auth.accounts OWNER TO aiontheballot_owner;
+
+--
+-- Name: rate_limits; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TABLE auth.rate_limits (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    key text NOT NULL,
+    count integer NOT NULL,
+    last_request bigint NOT NULL
+);
+
+
+ALTER TABLE auth.rate_limits OWNER TO aiontheballot_owner;
+
+--
+-- Name: COLUMN rate_limits.key; Type: COMMENT; Schema: auth; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN auth.rate_limits.key IS 'personal data';
+
+
+--
+-- Name: sessions; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TABLE auth.sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    token text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
+    ip_address text,
+    user_agent text,
+    user_id uuid NOT NULL
+);
+
+
+ALTER TABLE auth.sessions OWNER TO aiontheballot_owner;
+
+--
+-- Name: COLUMN sessions.ip_address; Type: COMMENT; Schema: auth; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN auth.sessions.ip_address IS 'personal data';
+
+
+--
+-- Name: COLUMN sessions.user_agent; Type: COMMENT; Schema: auth; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN auth.sessions.user_agent IS 'personal data';
+
+
+--
+-- Name: two_factors; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TABLE auth.two_factors (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    secret text NOT NULL,
+    backup_codes text NOT NULL,
+    user_id uuid NOT NULL,
+    verified boolean,
+    failed_verification_count integer,
+    locked_until timestamp with time zone
+);
+
+
+ALTER TABLE auth.two_factors OWNER TO aiontheballot_owner;
+
+--
+-- Name: users; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TABLE auth.users (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    email text NOT NULL,
+    email_verified boolean NOT NULL,
+    image text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    two_factor_enabled boolean
+);
+
+
+ALTER TABLE auth.users OWNER TO aiontheballot_owner;
+
+--
+-- Name: COLUMN users.name; Type: COMMENT; Schema: auth; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN auth.users.name IS 'personal data';
+
+
+--
+-- Name: COLUMN users.email; Type: COMMENT; Schema: auth; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN auth.users.email IS 'personal data';
+
+
+--
+-- Name: COLUMN users.image; Type: COMMENT; Schema: auth; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN auth.users.image IS 'personal data';
+
+
+--
+-- Name: verifications; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TABLE auth.verifications (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    identifier text NOT NULL,
+    value text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+ALTER TABLE auth.verifications OWNER TO aiontheballot_owner;
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: aiontheballot_owner
 --
 
@@ -4262,6 +4426,78 @@ ALTER TABLE ONLY app.tenants
 
 
 --
+-- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.accounts
+    ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: rate_limits rate_limits_key_key; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.rate_limits
+    ADD CONSTRAINT rate_limits_key_key UNIQUE (key);
+
+
+--
+-- Name: rate_limits rate_limits_pkey; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.rate_limits
+    ADD CONSTRAINT rate_limits_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.sessions
+    ADD CONSTRAINT sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sessions sessions_token_key; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.sessions
+    ADD CONSTRAINT sessions_token_key UNIQUE (token);
+
+
+--
+-- Name: two_factors two_factors_pkey; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.two_factors
+    ADD CONSTRAINT two_factors_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: verifications verifications_pkey; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.verifications
+    ADD CONSTRAINT verifications_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: aiontheballot_owner
 --
 
@@ -4547,6 +4783,41 @@ CREATE UNIQUE INDEX tenant_organizations_one_operator_idx ON app.tenant_organiza
 --
 
 CREATE INDEX tenant_organizations_organization_id_idx ON app.tenant_organizations USING btree (organization_id);
+
+
+--
+-- Name: accounts_user_id_idx; Type: INDEX; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE INDEX accounts_user_id_idx ON auth.accounts USING btree (user_id);
+
+
+--
+-- Name: sessions_user_id_idx; Type: INDEX; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE INDEX sessions_user_id_idx ON auth.sessions USING btree (user_id);
+
+
+--
+-- Name: two_factors_secret_idx; Type: INDEX; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE INDEX two_factors_secret_idx ON auth.two_factors USING btree (secret);
+
+
+--
+-- Name: two_factors_user_id_idx; Type: INDEX; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE INDEX two_factors_user_id_idx ON auth.two_factors USING btree (user_id);
+
+
+--
+-- Name: verifications_identifier_idx; Type: INDEX; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE INDEX verifications_identifier_idx ON auth.verifications USING btree (identifier);
 
 
 --
@@ -6375,6 +6646,30 @@ ALTER TABLE ONLY app.tenant_organizations
 
 
 --
+-- Name: accounts accounts_user_id_fkey; Type: FK CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.accounts
+    ADD CONSTRAINT accounts_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sessions sessions_user_id_fkey; Type: FK CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.sessions
+    ADD CONSTRAINT sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: two_factors two_factors_user_id_fkey; Type: FK CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.two_factors
+    ADD CONSTRAINT two_factors_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: structural_changes approval_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -7754,6 +8049,13 @@ CREATE POLICY worker_update ON app.source_documents FOR UPDATE TO aiontheballot_
 GRANT USAGE ON SCHEMA app TO aiontheballot_web;
 GRANT USAGE ON SCHEMA app TO aiontheballot_admin;
 GRANT USAGE ON SCHEMA app TO aiontheballot_worker;
+
+
+--
+-- Name: SCHEMA auth; Type: ACL; Schema: -; Owner: aiontheballot_owner
+--
+
+GRANT USAGE ON SCHEMA auth TO aiontheballot_auth;
 
 
 --
@@ -10280,6 +10582,48 @@ GRANT INSERT(llm_monthly_cap_usd),UPDATE(llm_monthly_cap_usd) ON TABLE app.tenan
 --
 
 GRANT SELECT(created_at) ON TABLE app.tenants TO aiontheballot_web;
+
+
+--
+-- Name: TABLE accounts; Type: ACL; Schema: auth; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.accounts TO aiontheballot_auth;
+
+
+--
+-- Name: TABLE rate_limits; Type: ACL; Schema: auth; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.rate_limits TO aiontheballot_auth;
+
+
+--
+-- Name: TABLE sessions; Type: ACL; Schema: auth; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.sessions TO aiontheballot_auth;
+
+
+--
+-- Name: TABLE two_factors; Type: ACL; Schema: auth; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.two_factors TO aiontheballot_auth;
+
+
+--
+-- Name: TABLE users; Type: ACL; Schema: auth; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.users TO aiontheballot_auth;
+
+
+--
+-- Name: TABLE verifications; Type: ACL; Schema: auth; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.verifications TO aiontheballot_auth;
 
 
 --

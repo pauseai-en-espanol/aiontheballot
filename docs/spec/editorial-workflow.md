@@ -605,7 +605,8 @@ _As a member, I triage what the public reports, and link the corrections it lead
 
 1. This spec reviewed.
 2. The extraction spike against real programme PDFs from the chapter, kept outside the repository (ADR-0003 §9).
-3. Better Auth's tables in the `auth` schema with uuid ids, or the fallback (data model, open item 2), and O2.
+3. ~~Better Auth's tables in the `auth` schema with uuid ids, or the fallback (data model, open item 2), and O2.~~
+   Done: migration `auth_schema`, and O2 decided (PLAN R81).
 4. A migration for `criteria.short_title` (W22).
 
 ## 17. Decisions to review

@@ -51,6 +51,18 @@ describe('catalog: runtime roles', () => {
 });
 
 describe('catalog: closed by default', () => {
+  it('lets no runtime role create in public or make temporary tables, which could shadow a name', async () => {
+    const allowed = await rows<{ grant: string }>(
+      `SELECT r.role || ' public CREATE' AS grant FROM unnest($1::text[]) AS r(role)
+        WHERE has_schema_privilege(r.role, 'public', 'CREATE')
+       UNION ALL
+       SELECT r.role || ' TEMP' FROM unnest($1::text[]) AS r(role)
+        WHERE has_database_privilege(r.role, current_database(), 'TEMP')`,
+      [RUNTIME_ROLES],
+    );
+    expect(allowed).toEqual([]);
+  });
+
   it('does not let PUBLIC connect to the database', async () => {
     const [row] = await rows<{ allowed: boolean }>(
       `SELECT has_database_privilege('public', current_database(), 'CONNECT') AS allowed`,
@@ -58,11 +70,11 @@ describe('catalog: closed by default', () => {
     expect(row?.allowed).toBe(false);
   });
 
-  it('does not let PUBLIC execute any function in app or private', async () => {
+  it('does not let PUBLIC execute any function in app, private or auth', async () => {
     const open = await rows<{ fn: string }>(
       `SELECT n.nspname || '.' || p.proname AS fn
          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname IN ('app', 'private')
+        WHERE n.nspname IN ('app', 'private', 'auth')
           AND (p.proacl IS NULL
                OR EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE'))`,
     );
@@ -77,7 +89,7 @@ describe('catalog: closed by default', () => {
          JOIN pg_namespace n ON n.oid = p.pronamespace
          CROSS JOIN LATERAL aclexplode(p.proacl) a
          JOIN pg_roles r ON r.oid = a.grantee
-        WHERE n.nspname IN ('app', 'private') AND a.privilege_type = 'EXECUTE' AND r.rolname = ANY($1)
+        WHERE n.nspname IN ('app', 'private', 'auth') AND a.privilege_type = 'EXECUTE' AND r.rolname = ANY($1)
         ORDER BY 1`,
       [RUNTIME_ROLES],
     );
@@ -89,7 +101,7 @@ describe('catalog: closed by default', () => {
       `SELECT n.nspname || '.' || p.proname AS fn, p.prosecdef AS definer,
               coalesce(EXISTS (SELECT 1 FROM unnest(p.proconfig) c WHERE c LIKE 'search_path=%'), false) AS pinned
          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname IN ('app', 'private')`,
+        WHERE n.nspname IN ('app', 'private', 'auth')`,
     );
     expect(functions.filter((f) => !f.pinned).map((f) => f.fn)).toEqual([]);
     expect(
@@ -128,12 +140,75 @@ describe('catalog: closed by default', () => {
     expect(reachable).toEqual([]);
   });
 
+  it("keeps every other runtime role, and PUBLIC, out of auth: Better Auth's credentials (ADR-0002 §2)", async () => {
+    const others = ['public', ...RUNTIME_ROLES.filter((role) => role !== 'aiontheballot_auth')];
+    const reachable = await rows<{ grant: string }>(
+      `SELECT r.role || ' ' || n.nspname || '.' || c.relname || ' ' || p.privilege AS grant
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         CROSS JOIN unnest($1::text[]) AS r(role)
+         CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER',
+                                 'MAINTAIN']) AS p(privilege)
+        WHERE n.nspname = 'auth' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+          AND (has_table_privilege(r.role, c.oid, p.privilege)
+               OR (p.privilege IN ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES')
+                   AND has_any_column_privilege(r.role, c.oid, p.privilege)))
+       UNION ALL
+       SELECT r.role || ' ' || n.nspname || '.' || c.relname || ' ' || p.privilege
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         CROSS JOIN unnest($1::text[]) AS r(role)
+         CROSS JOIN unnest(ARRAY['USAGE', 'SELECT', 'UPDATE']) AS p(privilege)
+        WHERE n.nspname = 'auth' AND c.relkind = 'S'
+          AND CASE WHEN c.relkind = 'S' THEN has_sequence_privilege(r.role, c.oid, p.privilege) END
+       UNION ALL
+       SELECT r.role || ' ' || n.nspname || '.' || f.proname || ' EXECUTE'
+         FROM pg_proc f JOIN pg_namespace n ON n.oid = f.pronamespace
+         CROSS JOIN unnest($1::text[]) AS r(role)
+        WHERE n.nspname = 'auth' AND has_function_privilege(r.role, f.oid, 'EXECUTE')
+       UNION ALL
+       SELECT r.role || ' auth ' || p.privilege
+         FROM unnest($1::text[]) AS r(role)
+         CROSS JOIN unnest(ARRAY['USAGE', 'CREATE']) AS p(privilege)
+        WHERE has_schema_privilege(r.role, 'auth', p.privilege)`,
+      [others],
+    );
+    expect(reachable).toEqual([]);
+  });
+
+  it('gives aiontheballot_auth exactly what Better Auth does with its tables, and no default grants anywhere', async () => {
+    const granted = await rows<{ grant: string }>(
+      `SELECT c.relname || ' ' || string_agg(p.privilege, ',' ORDER BY p.privilege) AS grant
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER',
+                                 'MAINTAIN']) AS p(privilege)
+        WHERE n.nspname = 'auth' AND c.relkind IN ('r', 'p')
+          AND has_table_privilege('aiontheballot_auth', c.oid, p.privilege)
+        GROUP BY c.relname ORDER BY 1`,
+    );
+    expect(granted.map((g) => g.grant)).toEqual(
+      ['accounts', 'rate_limits', 'sessions', 'two_factors', 'users', 'verifications'].map(
+        (table) => `${table} DELETE,INSERT,SELECT,UPDATE`,
+      ),
+    );
+    const [schema] = await rows<{ create: boolean }>(
+      `SELECT has_schema_privilege('aiontheballot_auth', 'auth', 'CREATE') AS create`,
+    );
+    expect(schema?.create).toBe(false);
+    // A default privilege for anyone but the owner would hand them every future table or function.
+    expect(
+      await rows(
+        `SELECT d.defaclrole::regrole::text AS creator, d.defaclobjtype AS kind, x.grantee::regrole::text AS grantee
+           FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) x
+          WHERE x.grantee <> d.defaclrole`,
+      ),
+    ).toEqual([]);
+  });
+
   it('gives aiontheballot_web no way to write any table', async () => {
     const writable = await rows<{ grant: string }>(
       `SELECT c.relname || ' ' || p.privilege AS grant
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
          CROSS JOIN unnest(ARRAY['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) AS p(privilege)
-        WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p', 'v')
+        WHERE n.nspname IN ('app', 'auth') AND c.relkind IN ('r', 'p', 'v')
           AND (has_table_privilege('aiontheballot_web', c.oid, p.privilege)
                OR (p.privilege IN ('INSERT', 'UPDATE')
                    AND has_any_column_privilege('aiontheballot_web', c.oid, p.privilege)))`,
@@ -147,7 +222,7 @@ describe('catalog: closed by default', () => {
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
          CROSS JOIN unnest($1::text[]) AS r(role)
          CROSS JOIN unnest(ARRAY['TRUNCATE', 'REFERENCES', 'TRIGGER', 'MAINTAIN']) AS p(privilege)
-        WHERE n.nspname = 'app' AND c.relkind IN ('r', 'p', 'v')
+        WHERE n.nspname IN ('app', 'auth') AND c.relkind IN ('r', 'p', 'v')
           AND (has_table_privilege(r.role, c.oid, p.privilege)
                OR (p.privilege = 'REFERENCES' AND has_any_column_privilege(r.role, c.oid, p.privilege)))`,
       [RUNTIME_ROLES],
@@ -160,7 +235,7 @@ describe('catalog: closed by default', () => {
       `SELECT DISTINCT c.relname
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
          LEFT JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0
-        WHERE n.nspname IN ('app', 'private')
+        WHERE n.nspname IN ('app', 'private', 'auth')
           AND (EXISTS (SELECT 1 FROM aclexplode(c.relacl) x WHERE x.grantee = 0)
                OR EXISTS (SELECT 1 FROM aclexplode(a.attacl) x WHERE x.grantee = 0))`,
     );
@@ -409,6 +484,16 @@ const IMMUTABLE = [
 ];
 
 /** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
+/** Better Auth's, in `auth` (migration auth_schema): it has no audit trigger, but the marks still say what is. */
+const AUTH_PERSONAL_DATA: readonly string[] = [
+  'auth.rate_limits.key',
+  'auth.sessions.ip_address',
+  'auth.sessions.user_agent',
+  'auth.users.email',
+  'auth.users.image',
+  'auth.users.name',
+];
+
 const PERSONAL_DATA: readonly string[] = [
   'files.original_filename',
   'invitations.email',
@@ -464,15 +549,15 @@ describe('catalog: audit', () => {
 
   it('marks exactly the personal-data columns of the spec', async () => {
     const marked = await rows<{ col: string }>(
-      `SELECT c.relname || '.' || a.attname AS col
+      `SELECT CASE n.nspname WHEN 'app' THEN '' ELSE n.nspname || '.' END || c.relname || '.' || a.attname AS col
          FROM pg_attribute a
          JOIN pg_class c ON c.oid = a.attrelid
          JOIN pg_namespace n ON n.oid = c.relnamespace
          JOIN pg_description d ON d.objoid = c.oid AND d.objsubid = a.attnum
-        WHERE n.nspname = 'app' AND d.description = 'personal data'
+        WHERE n.nspname IN ('app', 'auth') AND d.description = 'personal data'
         ORDER BY 1`,
     );
-    expect(marked.map((m) => m.col)).toEqual([...PERSONAL_DATA].sort());
+    expect(marked.map((m) => m.col)).toEqual([...PERSONAL_DATA, ...AUTH_PERSONAL_DATA].sort());
   });
 
   it('protects every immutable table with UPDATE, DELETE and TRUNCATE triggers', async () => {

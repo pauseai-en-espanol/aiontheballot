@@ -105,7 +105,8 @@ Backups are not part of M1: they come from the cluster's backup plan (D2) and mu
 **Ships:**
 
 - **Access:** sign-in by invitation plus TOTP; a tenant switcher. `private.accept_invitation(token)` comes with
-  Better Auth's tables, since it checks the invited email against the user's verified email.
+  Better Auth's tables, since it checks the invited email against the user's verified email. A daily job deletes
+  expired sessions Better Auth never meets again (personal data, R81).
 - **The first account:** sign-in is invitation-only, so the first platform admin needs a way in without one (a
   command only the owner can run). Making them a platform admin is then a row in `app.platform_admins`, added
   as the owner, since the app has no write path to it.
@@ -673,6 +674,21 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   tarballs (the reverted ones may be stale). A subchart's new version still needs `helm dependency update` for
   `Chart.lock`. Should the application ever get a `manifest-generate-paths` annotation, it must include the subcharts'
   folders, or their changes would go unseen.
+
+**Sign-in (M2, O2 decided):**
+
+- **R81. Better Auth's tables are its own, generated for our options and named like ours** (migration `auth_schema`, in
+  the `auth` schema only `aiontheballot_auth` reaches). `apps/api/src/auth/schema.ts` maps Better Auth's models to
+  plural snake_case tables (`users`, `sessions`, `accounts`, `verifications`, `two_factors`, `rate_limits`), and an API
+  database test runs Better Auth's own migration in a rolled-back scratch schema and compares the two catalogs (columns,
+  types, defaults, keys with their delete actions, indexes), so options and tables can't drift; it also signs in, enrols
+  TOTP and trips the rate limiter as `aiontheballot_auth`. Ids are Better Auth's uuids (`gen_random_uuid()`), not the
+  `uuidv7()` of `app` tables: nothing sorts them. The rate limiter counts in the database, so both API replicas share
+  it. Name, email, image, a session's address and browser, and the limiter's keys (addresses) are commented
+  `personal data`; Better Auth deletes an expired session when it meets it, expired tokens on any lookup and old limiter
+  rows itself; a daily job for expired sessions it never meets again comes with sign-in (M2). The connections
+  (`createAuthPool`) set `search_path=auth`, so Better Auth's unqualified names find its tables (the role can't create
+  in `public`, so a changed path fails closed), and read `bigint` as a number, which the limiter's arithmetic needs.
 
 ## Open decisions for Dani
 
