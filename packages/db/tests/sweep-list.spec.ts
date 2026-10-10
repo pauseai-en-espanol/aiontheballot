@@ -32,8 +32,13 @@ describe("the sweep's list of named files", () => {
         [BRAND_ASSETS.unused.id],
       );
       const listed = await client.query<{ line: string }>(LIST);
-      const { rows: identity } = await client.query<{ database: string; audit: string }>(
-        `SELECT (SELECT oid FROM pg_database WHERE datname = current_database())::text AS database,
+      const { rows: identity } = await client.query<{
+        cluster: string;
+        database: string;
+        audit: string;
+      }>(
+        `SELECT (SELECT to_hex(system_identifier) FROM pg_control_system()) AS cluster,
+                (SELECT oid FROM pg_database WHERE datname = current_database())::text AS database,
                 'app.audit_log'::regclass::oid::text AS audit`,
       );
       const { rows } = await client.query<{ files: string; assets: string }>(
@@ -73,10 +78,9 @@ describe("the sweep's list of named files", () => {
     expect(input.auditSequence).toBeGreaterThan(0);
     // The cluster, its timeline, the database and the audit table: what a restore changes.
     const [cluster, timeline, database, audit] = input.incarnation.split('-');
-    expect([cluster, timeline]).toEqual([
-      expect.stringMatching(/^\d+$/),
-      expect.stringMatching(/^\d+$/),
-    ]);
+    // The cluster's id in hex, so one made after 2038 (a negative id) still reads as one word.
+    expect(cluster).toBe(result.identity.cluster);
+    expect(timeline).toMatch(/^\d+$/);
     expect([database, audit]).toEqual([result.identity.database, result.identity.audit]);
   });
 

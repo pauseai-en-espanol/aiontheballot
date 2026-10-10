@@ -1,6 +1,6 @@
 import { createFileStore } from '@aiontheballot/db/file-store';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +55,28 @@ describe('purge-tenant-files', () => {
     expect(code).toBe(0);
     expect(stdout).toContain('Deleted 2 files');
     expect(await folders()).toEqual([OTHER, 'platform', 'tmp'].sort());
+  });
+
+  it('counts and deletes what a halted sweep set aside of the tenant too', async () => {
+    const aside = join(root, 'retired', PURGED, 'sources', 'sha256', 'ab', 'cd');
+    await mkdir(aside, { recursive: true });
+    await writeFile(join(aside, 'a'.repeat(64)), 'archivo apartado de ejemplo');
+    const { code, stdout } = await run([PURGED, '--delete'], `purged ${PURGED}\n`, env);
+    expect(code).toBe(0);
+    expect(stdout).toContain('Deleted 3 files');
+    expect(await readdir(join(root, 'retired'))).toEqual([]);
+  });
+
+  it('refuses plainly while a sweep runs, and deletes nothing', async () => {
+    const release = await createFileStore(root).lockSweep();
+    const { code, stdout, stderr } = await run([PURGED, '--delete'], `purged ${PURGED}\n`, env);
+    await release();
+    expect(code).toBe(1);
+    expect(stdout).toBe('');
+    expect(stderr.trim()).toMatch(
+      /^A sweep or a purge holds .*sweep\.lock\. Only if none is running/,
+    );
+    expect(await folders()).toContain(PURGED);
   });
 
   it("reads the proof from psql's aligned output too", async () => {

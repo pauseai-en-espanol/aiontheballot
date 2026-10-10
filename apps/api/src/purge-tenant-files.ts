@@ -38,23 +38,28 @@ if (!proof.split('\n').some((line) => line.trim() === `purged ${tenantId}`)) {
   );
 }
 
-const folder = join(root, tenantId);
 let files = 0;
 let bytes = 0;
-try {
-  for (const entry of await readdir(folder, { recursive: true, withFileTypes: true })) {
-    if (entry.isFile()) {
-      files += 1;
-      bytes += (await stat(join(entry.parentPath, entry.name))).size;
+// The tenant's folder, and whatever of it a halted sweep set aside.
+for (const folder of [join(root, tenantId), join(root, 'retired', tenantId)]) {
+  try {
+    for (const entry of await readdir(folder, { recursive: true, withFileTypes: true })) {
+      if (entry.isFile()) {
+        files += 1;
+        bytes += (await stat(join(entry.parentPath, entry.name))).size;
+      }
     }
-  }
-} catch (error) {
-  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-    throw error;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
   }
 }
 if (remove) {
-  await createFileStore(root).removeTenant(tenantId);
+  // Refused while a sweep runs: said plainly, without a stack.
+  await createFileStore(root)
+    .removeTenant(tenantId)
+    .catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
   console.log(`Deleted ${files} files (${bytes} bytes) of tenant ${tenantId}`);
 } else {
   console.log(

@@ -112,10 +112,12 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   named again and dropped again waits its full time again. A purge removes its tenant's audit rows, and its bytes
   with them. A database restore rewinds the log, forgetting rows named and dropped after the dump, so no clock can be
   trusted after one. The list carries the database's identity (the cluster, its timeline, the database's and the
-  audit table's OIDs: a logical restore recreates the tables, a physical one starts a new timeline) and the log's
-  sequence; when the identity changes or the sequence goes down, the sweep starts every clock again, keeps that, and
-  deletes nothing that run, `--delete` or not. A restore that changed neither would go unseen, so the restore
-  procedure also deletes the ledger (`sweep-ledger.json`), which has the same effect.
+  audit table's OIDs: a logical restore recreates the tables, a physical one with archive recovery starts a new
+  timeline) and the log's sequence; when the identity changes or the sequence goes down, the sweep starts every clock
+  again, keeps that, and deletes nothing that run, `--delete` or not. A restore of the data folder by crash recovery
+  (a volume snapshot) keeps the identity, and new writes soon hide the sequence, so it would go unseen: **the restore
+  runbook must delete the ledger** (`sweep-ledger.json` on the volume), which starts every clock again just the same
+  (PLAN M5).
 - **How it runs.** No runtime role can list every tenant's files, so the owner pipes the list from Postgres, as
   `postgres` with row security off, into `sweep-files` in an API pod (`--print-query` prints the query). The command
   refuses a list that doesn't end with its own count, a list that names nothing while files are stored, and one that
@@ -139,6 +141,8 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   the kubelet applies to `local` volumes (other uid-1000 pods on the cluster, such as Headscale's, write to theirs
   this way); `fsGroupChangePolicy: OnRootMismatch` sets it once rather than walking every file at each start. At
   startup the API writes, flushes and deletes a probe file and logs whether the store is writable.
+- The sweep puts files back with hard links (§5), which the node's ext4 or xfs supports; a volume without them
+  (CIFS, some FUSE mounts) would need that changed first.
 - **Size:** `local-path` neither enforces nor expands the size the claim asks for. The volume can grow until the
   node's disk is full, so disk usage is what to watch.
 - The claim is kept when the release is uninstalled and is never pruned or deleted by Argo CD, and the cluster's
@@ -153,8 +157,8 @@ bytes, and commits only once they are on the disk. A failed commit leaves bytes 
   in a dump names bytes already on the volume when the dump was taken; a copy taken after the dump contains them,
   because the sweep deletes nothing a row named less than the grace period ago (§5) and purges are deliberate.
 - **Restoring:** a dump and the volume copy taken after it restore together. Restoring only the database from an
-  older dump onto the live volume works too, within the grace period; after any restore the sweep's ledger is
-  deleted too, and the next sweep would also see the database changed (§5). The preview's restore check covers both.
+  older dump onto the live volume works too, within the grace period; after any restore the sweep's ledger must be
+  deleted too (§5). The preview's restore check covers both.
 - A purge deletes a tenant's bytes at once; copies in older backups expire with them, as for the database.
 
 ### 8. Locally and in tests

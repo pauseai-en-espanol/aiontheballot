@@ -276,7 +276,7 @@ export const createFileStore = (root: string): FileStore => {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
         throw new Error(
-          `Another sweep holds ${path}. If none is running (one stopped halfway), delete that file and run again.`,
+          `A sweep or a purge holds ${path}. Only if none is running (one stopped halfway), delete that file and run again.`,
           { cause: error },
         );
       }

@@ -176,8 +176,9 @@ Backups are not part of M1: they come from the cluster's backup plan (D2) and mu
 - **Load test** (where: D6): requests per second for HTML and for images, and how much of the uplink they use.
 - **Cloudflare-proxy contingency:** tested once (where: D6).
 - **Accessibility:** a manual pass.
-- **Backups:** a full **restore drill**.
-- **Runbooks:** incidents, corrections, reflection-day freeze, moving to other hosting, domain renewal.
+- **Backups:** a full **restore drill**, the file volume included.
+- **Runbooks:** incidents, corrections, reflection-day freeze, moving to other hosting, domain renewal, and restoring
+  the database, whose steps include deleting the sweep's ledger (`sweep-ledger.json`, ADR-0004 §5).
 - **Monitoring:** off-node uptime monitors on every hostname.
 
 **Demo:** the launch checklist is signed off at the launch go/no-go, followed by a code freeze in which only
@@ -597,16 +598,18 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   deleted file row, or a brand asset given other bytes), which the owner's list takes from the audit log, and when the
   sweep first saw them unnamed (a ledger on the volume, for bytes no row ever named), so bytes named again and dropped
   again wait their full time again. A database restore rewinds the audit log; the list carries the database's identity
-  (cluster, timeline, database and audit table OIDs) and the log's sequence, and when the identity changes or the
-  sequence goes down every clock starts again and nothing is deleted that run, `--delete` or not (the restore procedure
-  deletes the ledger too, for a restore that changed neither). It runs by hand, like `put-file`: the owner pipes the
-  list from Postgres (as `postgres`, row security off, which the list proves), since no runtime role can read every
-  tenant's files. It refuses a list cut short, stale or from the future, a list naming nothing while files are stored,
-  and one naming files the volume lacks; it deletes more than half the stored files only with `--allow-many`; it never
-  deletes a file stored or reused within a day of the list's snapshot (`put` marks reused bytes, and the sweep moves a
-  file to `retired/` and checks it there, putting back what a halted sweep left without ever replacing a fresh copy, and
-  touching nothing through a link); one runs at a time, and a purge never runs during one and also clears what a sweep
-  set aside of its tenant. Without `--delete` it only records and reports. Scheduling it needs a new grant: D7.
+  (cluster, timeline, database and audit table OIDs: a logical restore or archive recovery changes it) and the log's
+  sequence, and when the identity changes or the sequence goes down every clock starts again and nothing is deleted that
+  run, `--delete` or not (a restore by crash recovery, such as a volume snapshot, changes neither, so the restore
+  runbook must delete the ledger, which starts every clock again just the same). It runs by hand, like `put-file`: the
+  owner pipes the list from Postgres (as `postgres`, row security off, which the list proves), since no runtime role can
+  read every tenant's files. It refuses a list cut short, stale or from the future, a list naming nothing while files
+  are stored, and one naming files the volume lacks; it deletes more than half the stored files only with
+  `--allow-many`; it never deletes a file stored or reused within a day of the list's snapshot (`put` marks reused
+  bytes, and the sweep moves a file to `retired/` and checks it there, putting back what a halted sweep left without
+  ever replacing a fresh copy, and touching nothing through a link); one runs at a time, and a purge never runs during
+  one and also clears what a sweep set aside of its tenant. Without `--delete` it only records and reports. Scheduling
+  it needs a new grant: D7.
 
 **Reserved election slugs:**
 

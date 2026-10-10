@@ -126,7 +126,7 @@ describe('the file store', () => {
     const store = createFileStore(root);
     await store.put(SOURCES_A, bytes);
     const release = await store.lockSweep();
-    await expect(store.removeTenant(TENANT_A)).rejects.toThrow('Another sweep');
+    await expect(store.removeTenant(TENANT_A)).rejects.toThrow('A sweep or a purge holds');
     expect(await store.get(SOURCES_A, sha256)).toEqual(bytes);
     await release();
     await store.removeTenant(TENANT_A);
@@ -294,7 +294,7 @@ describe('the file store', () => {
   it('keeps one sweep at a time', async () => {
     const store = createFileStore(root);
     const release = await store.lockSweep();
-    await expect(store.lockSweep()).rejects.toThrow('Another sweep');
+    await expect(store.lockSweep()).rejects.toThrow('A sweep or a purge holds');
     await release();
     const again = await store.lockSweep();
     await again();

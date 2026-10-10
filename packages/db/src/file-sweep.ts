@@ -8,8 +8,10 @@ import { FILE_BUCKETS, type FileSpace, isTenantId } from './file-store.js';
  * - the audit log, which keeps the old values of every deleted file row and every brand asset whose hash changed: the
  *   last time a row stopped naming a file. A purge removes its tenant's audit rows, but also its bytes. A database
  *   restore rewinds the log, forgetting rows named and dropped since the dump: the sweep notices by the database's
- *   identity changing (a logical restore recreates the tables, a physical one starts a new timeline) or the log's
- *   sequence going down, and then starts every clock again;
+ *   identity changing (a logical restore recreates the tables; a physical one with archive recovery starts a new
+ *   timeline) or the log's sequence going down, and then starts every clock again. A restore of the data folder by
+ *   crash recovery (a volume snapshot) keeps the identity, and new writes soon hide the sequence: the restore
+ *   runbook deletes the ledger, which starts every clock again too;
  * - a ledger on the volume, of when the sweep first saw each file unnamed, for bytes no row ever named (an upload
  *   whose transaction failed). A file's own dates say when it was written, not when its row went away.
  */
@@ -44,7 +46,7 @@ export const SWEEP_LIST_SQL = `COPY (
     SELECT 1, 'end ' || (SELECT count(*) FROM named)
            || ' ' || to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
            || ' ' || coalesce(pg_sequence_last_value('app.audit_log_id_seq'), 0)
-           || ' ' || (SELECT system_identifier FROM pg_control_system())
+           || ' ' || (SELECT to_hex(system_identifier) FROM pg_control_system())
            || '-' || (SELECT timeline_id FROM pg_control_checkpoint())
            || '-' || (SELECT oid FROM pg_database WHERE datname = current_database())
            || '-' || 'app.audit_log'::regclass::oid
@@ -120,7 +122,7 @@ export const parseSweepInput = (text: string): SweepInput => {
     .filter((line) => line !== '');
   const last = lines.pop() ?? '';
   const [, total, at, sequence, incarnation, sawAll] =
-    /^end (\d+) (\S+) (\d+) (\d+-\d+-\d+-\d+) (true|false)$/.exec(last) ?? [];
+    /^end (\d+) (\S+) (\d+) ([0-9a-f]+-\d+-\d+-\d+) (true|false)$/.exec(last) ?? [];
   if (total === undefined) {
     throw new Error(
       'The list of named files has no "end <count> <snapshot> …" line: it may be cut short',

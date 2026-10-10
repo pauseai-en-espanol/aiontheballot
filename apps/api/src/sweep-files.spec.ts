@@ -261,7 +261,7 @@ describe('sweep-files', () => {
   it('runs one at a time', async () => {
     const release = await store().lockSweep();
     const { code, stderr } = await run([], list([NAMED]), env);
-    expect([code, stderr]).toEqual([1, expect.stringContaining('Another sweep')]);
+    expect([code, stderr]).toEqual([1, expect.stringContaining('A sweep or a purge holds')]);
     await release();
     expect((await run([], list([NAMED]), env)).code).toBe(0);
   });
