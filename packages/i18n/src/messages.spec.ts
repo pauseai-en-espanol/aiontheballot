@@ -31,6 +31,17 @@ describe('messages', () => {
     ).toContain('2030');
   });
 
+  it('keeps share descriptions short enough for link previews on phones', () => {
+    // About 125 characters show. Operators' names run to about 20 (PauseAI España is 14).
+    const operator = 'Organización de ej20';
+    for (const locale of LOCALES) {
+      const t = getTranslator(locale);
+      for (const kind of ['demands', 'descriptive'] as const) {
+        expect(t(`home.shareDescription.${kind}`, { operator }).length).toBeLessThanOrEqual(125);
+      }
+    }
+  });
+
   it('recognises supported locales', () => {
     expect(isLocale('es')).toBe(true);
     expect(isLocale('ca')).toBe(false);

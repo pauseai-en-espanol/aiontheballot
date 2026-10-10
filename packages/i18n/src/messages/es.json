@@ -26,6 +26,10 @@
       "demands": "Compararemos lo que proponen los partidos sobre la IA avanzada con las demandas de {operator}. Cada valoración, con sus fuentes.",
       "descriptive": "Analizaremos lo que proponen los partidos sobre la IA avanzada. Cada valoración, con sus fuentes."
     },
+    "shareDescription": {
+      "demands": "Compararemos lo que proponen los partidos sobre la IA avanzada con las demandas de {operator}, con sus fuentes.",
+      "descriptive": "Analizaremos lo que proponen los partidos sobre la IA avanzada, con sus fuentes."
+    },
     "election": "{name} · {date, date, long}",
     "notify": "Avísame cuando se publique",
     "notifyNote": "Te avisaremos por el boletín de {operator}.",

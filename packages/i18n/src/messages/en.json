@@ -26,6 +26,10 @@
       "demands": "We will compare what the parties propose on advanced AI with {operator}'s demands. Every rating comes with its sources.",
       "descriptive": "We will review what the parties propose on advanced AI. Every rating comes with its sources."
     },
+    "shareDescription": {
+      "demands": "We will compare what the parties propose on advanced AI with {operator}'s demands, with sources.",
+      "descriptive": "We will review what the parties propose on advanced AI, with sources."
+    },
     "election": "{name} · {date, date, long}",
     "notify": "Tell me when it's out",
     "notifyNote": "We'll let you know through {operator}'s newsletter.",

@@ -47,9 +47,10 @@ export const generateMetadata = async (props: TenantPageProps): Promise<Metadata
     pickLocalized(value, locale, home.tenant.defaultLocale) ?? '';
   const name = local(home.tenant.displayName);
   const title = `${name} · ${t('home.comingSoon')}`;
-  const description = t(`home.description.${home.tenant.methodologyKind}`, {
-    operator: local(home.operator.displayName),
-  });
+  const operator = local(home.operator.displayName);
+  const description = t(`home.description.${home.tenant.methodologyKind}`, { operator });
+  // Shorter for link previews, which cut around 125 characters on phones; search results take the full sentence.
+  const shareDescription = t(`home.shareDescription.${home.tenant.methodologyKind}`, { operator });
   const url = pageUrl(base, locale, tenant.defaultLocale);
   const card = homeCardContent(home, locale, base);
   const hash = homeCardHash(card, LINK_PREVIEW);
@@ -75,7 +76,7 @@ export const generateMetadata = async (props: TenantPageProps): Promise<Metadata
       url,
       siteName: name,
       title,
-      description,
+      description: shareDescription,
       // Only for the tenant's own language (es_ES): `en_ES` is no Facebook locale, and og:locale:alternate means the
       // same URL in another language, while ours are separate pages (hreflang says so).
       // (Nor while an older API, mid-rollout, leaves the country out.)
@@ -84,7 +85,7 @@ export const generateMetadata = async (props: TenantPageProps): Promise<Metadata
         : {}),
       images: [image],
     },
-    twitter: { card: 'summary_large_image', title, description, images: [image] },
+    twitter: { card: 'summary_large_image', title, description: shareDescription, images: [image] },
   };
 };
 
