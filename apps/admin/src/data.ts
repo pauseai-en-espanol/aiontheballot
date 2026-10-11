@@ -126,3 +126,48 @@ export const getDocuments = cache(
     return body === undefined ? undefined : expect(body, ['documents', 'canEdit'], 'the texts');
   },
 );
+
+/** A site an organization runs (`operator`) or endorses (editorial workflow P2). */
+export interface OrganizationLink {
+  slug: string;
+  name: Localized;
+  role: 'operator' | 'endorser';
+}
+
+export interface OrganizationSummary {
+  id: string;
+  displayName: Localized;
+  legalName: string;
+  isPauseaiChapter: boolean;
+  tenants: OrganizationLink[];
+}
+
+export interface Organization extends OrganizationSummary {
+  taxId: string | null;
+  address: string | null;
+  registryEntry: string | null;
+  contactEmail: string | null;
+  privacyEmail: string | null;
+  url: string | null;
+  newsletterUrl: string | null;
+}
+
+/** Every organization, for platform admins (anyone else gets undefined: a 404), and the languages names may be in. */
+export const getOrganizations = cache(
+  async (): Promise<{ organizations: OrganizationSummary[]; languages: string[] } | undefined> => {
+    const body = await readApi('/api/organizations');
+    return body === undefined
+      ? undefined
+      : expect(body, ['organizations', 'languages'], 'the organizations');
+  },
+);
+
+/** One organization, for platform admins, and the languages its name may be in. */
+export const getOrganization = cache(
+  async (id: string): Promise<{ organization: Organization; languages: string[] } | undefined> => {
+    const body = await readApi(`/api/organizations/${encodeURIComponent(id)}`);
+    return body === undefined
+      ? undefined
+      : expect(body, ['organization', 'languages'], 'an organization');
+  },
+);

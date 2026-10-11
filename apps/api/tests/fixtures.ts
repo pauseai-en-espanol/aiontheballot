@@ -53,5 +53,8 @@ export const ELECTIONS_A = {
 /** A's operator, which its demands methodologies name. */
 export const OPERATOR_A = fixture(3, 1);
 
+/** An organization no tenant links to: only platform admins see it. */
+export const UNLINKED_ORGANIZATION = fixture(3, 4);
+
 /** A fictional brand asset every tenant may select. */
 export const SHARED_BRAND_ASSET = fixture(4, 1);

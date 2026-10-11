@@ -30,3 +30,19 @@ export const siteName = (
   locale: string,
 ): InLanguage =>
   inLanguage(tenant.name, locale, tenant.defaultLocale) ?? { text: tenant.slug, lang: locale };
+
+/** An organization's name as `inLanguage` picks it (it has no default language of its own), else its legal name. */
+export const organizationName = (
+  organization: { displayName: Localized; legalName: string },
+  locale: string,
+): InLanguage =>
+  inLanguage(organization.displayName, locale, locale) ?? {
+    text: organization.legalName,
+    lang: locale,
+  };
+
+/** A site's name as an organization's page shows it: in the admin's language where it has it, else its slug. */
+export const linkedSiteName = (
+  site: { slug: string; name: Localized },
+  locale: string,
+): InLanguage => inLanguage(site.name, locale, locale) ?? { text: site.slug, lang: locale };

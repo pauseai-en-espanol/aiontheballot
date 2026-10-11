@@ -175,6 +175,8 @@ rest stays a runbook (W6).
    `tenant_organizations`]
 4. A change updates every page that shows the organization, the legal notice included. [DB: `bump_public_version`]
 
+_Built: the fields of P2.1 but the logo, on `/platform/organizations` (PLAN R112)._
+
 ### P3. Brand assets
 
 1. Platform admins upload PNG, JPEG or WebP images up to 2 MB. SVG is refused, since it can carry script. [DB: check]

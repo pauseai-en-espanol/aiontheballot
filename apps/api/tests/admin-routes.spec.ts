@@ -9,7 +9,13 @@ import type { ProfileSource } from '../src/admin/profiles.js';
 import { createProfileSource } from '../src/admin/profiles.js';
 import { adminDataRoutes } from '../src/admin/routes.js';
 import { createAccount, deleteAccount } from './auth-fixtures.js';
-import { TENANT_A, USERS } from './fixtures.js';
+import {
+  OPERATOR_A,
+  SHARED_BRAND_ASSET,
+  TENANT_A,
+  UNLINKED_ORGANIZATION,
+  USERS,
+} from './fixtures.js';
 import './db.js';
 
 const env = (name: string): string => {
@@ -72,7 +78,7 @@ const build = (options: { withAdmin?: boolean } = {}): FastifyInstance => {
 const app = build();
 
 const send = (
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
   url: string,
   as: string | undefined,
   { body, origin = ORIGIN }: { body?: unknown; origin?: string | null } = {},
@@ -477,6 +483,208 @@ describe('settings and policy texts (editorial workflow §5, P1)', () => {
                  WHERE tenant_id = ${TENANT_A} AND (id = ANY(${created}) OR id NOT IN (${PUBLISHED_A}, ${DRAFT_A}))`.execute(
         owner,
       );
+    }
+  });
+});
+
+describe('organizations (editorial workflow P2)', () => {
+  const BODY = {
+    displayName: { es: 'Organización de ejemplo' },
+    legalName: '  Organización de Ejemplo  ',
+    taxId: '',
+    address: null,
+    registryEntry: '   ',
+    contactEmail: ' Contacto@Ejemplo.ORG ',
+    privacyEmail: null,
+    url: 'https://ejemplo.org',
+    newsletterUrl: null,
+    // A's operator is a PauseAI chapter, and A uses a restricted brand asset, which needs one (P3).
+    isPauseaiChapter: true,
+  };
+
+  const organization = async (id: string) =>
+    (
+      await sql<Record<string, unknown>>`
+        SELECT display_name, legal_name, tax_id, address, registry_entry, contact_email, privacy_email, url,
+               newsletter_url, is_pauseai_chapter
+          FROM app.organizations WHERE id = ${id}`.execute(owner)
+    ).rows[0];
+
+  it("are for platform admins only: anyone else gets a 404, as for a page they can't open", async () => {
+    const listed = await send('GET', '/api/organizations', USERS.platformAdmin);
+    expect(listed.statusCode).toBe(200);
+    const body = listed.json<{ organizations: { id: string }[]; languages: string[] }>();
+    expect(body.organizations.map(({ id }) => id)).toContain(UNLINKED_ORGANIZATION);
+    expect(body.languages).toContain('es');
+    for (const user of [USERS.countryAdminA, USERS.editorA, USERS.noMembership]) {
+      expect((await send('GET', '/api/organizations', user)).statusCode).toBe(404);
+      expect((await send('GET', `/api/organizations/${OPERATOR_A}`, user)).statusCode).toBe(404);
+      expect(
+        (await send('PUT', `/api/organizations/${OPERATOR_A}`, user, { body: BODY })).statusCode,
+      ).toBe(404);
+      expect((await send('POST', '/api/organizations', user, { body: BODY })).statusCode).toBe(404);
+    }
+    const one = await send('GET', `/api/organizations/${OPERATOR_A}`, USERS.platformAdmin);
+    expect(one.statusCode).toBe(200);
+    expect(one.json()).toMatchObject({
+      organization: { id: OPERATOR_A, tenants: [{ slug: 'test-a', role: 'operator' }] },
+      languages: ['es'],
+    });
+    expect(
+      (
+        await send(
+          'GET',
+          '/api/organizations/0190f8c4-0000-7000-8000-000000000399',
+          USERS.platformAdmin,
+        )
+      ).statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await send(
+          'PUT',
+          '/api/organizations/0190f8c4-0000-7000-8000-000000000399',
+          USERS.platformAdmin,
+          {
+            body: BODY,
+          },
+        )
+      ).statusCode,
+    ).toBe(404);
+  });
+
+  it('change every field at once, trimmed, blank as unset, emails in lowercase', async () => {
+    const before = await organization(OPERATOR_A);
+    try {
+      const url = `/api/organizations/${OPERATOR_A}`;
+      expect((await send('PUT', url, USERS.platformAdmin, { body: BODY })).statusCode).toBe(204);
+      expect(await organization(OPERATOR_A)).toEqual({
+        display_name: { es: 'Organización de ejemplo' },
+        legal_name: 'Organización de Ejemplo',
+        tax_id: null,
+        address: null,
+        registry_entry: null,
+        contact_email: 'contacto@ejemplo.org',
+        privacy_email: null,
+        url: 'https://ejemplo.org',
+        newsletter_url: null,
+        is_pauseai_chapter: true,
+      });
+      expect(
+        (
+          await send('PUT', url, USERS.platformAdmin, {
+            body: BODY,
+            origin: 'https://otro.example',
+          })
+        ).statusCode,
+      ).toBe(403);
+    } finally {
+      await owner
+        .updateTable('app.organizations')
+        .set({
+          display_name: JSON.stringify(before?.display_name),
+          legal_name: before?.legal_name as string,
+          tax_id: before?.tax_id as string | null,
+          address: before?.address as string | null,
+          registry_entry: before?.registry_entry as string | null,
+          contact_email: before?.contact_email as string | null,
+          privacy_email: before?.privacy_email as string | null,
+          url: before?.url as string | null,
+          newsletter_url: before?.newsletter_url as string | null,
+          is_pauseai_chapter: before?.is_pauseai_chapter as boolean,
+        })
+        .where('id', '=', OPERATOR_A)
+        .execute();
+    }
+  });
+
+  it("refuse what the database or the form's shape refuses, and change nothing", async () => {
+    const before = await organization(OPERATOR_A);
+    const url = `/api/organizations/${OPERATOR_A}`;
+    const put = (body: unknown) => send('PUT', url, USERS.platformAdmin, { body });
+    for (const [body, status, constraint] of [
+      [{ ...BODY, url: 'http://ejemplo.org' }, 422, 'organizations_url_check'],
+      [{ ...BODY, newsletterUrl: 'ejemplo.org' }, 422, 'organizations_newsletter_url_check'],
+      [{ ...BODY, contactEmail: 'no es un correo' }, 422, 'organizations_contact_email_check'],
+      [{ ...BODY, privacyEmail: 'privacidad@' }, 422, 'organizations_privacy_email_check'],
+      [{ ...BODY, legalName: '   ' }, 422, undefined],
+      [{ ...BODY, displayName: { es: '  ' } }, 422, undefined],
+      [{ ...BODY, displayName: { xx: 'Otra' } }, 400, undefined],
+      // A tenant of its uses a restricted brand asset, which only a PauseAI chapter's tenants may.
+      [{ ...BODY, isPauseaiChapter: false }, 422, undefined],
+      [(({ taxId: _, ...rest }) => rest)(BODY), 400, undefined],
+    ] as const) {
+      const answer = await put(body);
+      expect(answer.statusCode, JSON.stringify(body)).toBe(status);
+      if (constraint !== undefined) {
+        expect(answer.json()).toMatchObject({ error: 'incomplete', constraint });
+      }
+    }
+    expect(await organization(OPERATOR_A)).toEqual(before);
+  });
+
+  it("keep what the form doesn't show: the logo, and a language no site has but the name does", async () => {
+    const {
+      id: _,
+      created_at: __,
+      ...before
+    } = await owner
+      .selectFrom('app.organizations')
+      .selectAll()
+      .where('id', '=', OPERATOR_A)
+      .executeTakeFirstOrThrow();
+    try {
+      await owner
+        .updateTable('app.organizations')
+        .set({
+          display_name: JSON.stringify({ fr: "Organisation d'exemple" }),
+          logo_asset_id: SHARED_BRAND_ASSET,
+        })
+        .where('id', '=', OPERATOR_A)
+        .execute();
+      const url = `/api/organizations/${OPERATOR_A}`;
+      const shown = await send('GET', url, USERS.platformAdmin);
+      expect(shown.json<{ languages: string[] }>().languages).toEqual(['es', 'fr']);
+      const body = {
+        ...BODY,
+        displayName: { fr: "Organisation d'exemple", es: 'Organización de ejemplo' },
+      };
+      expect((await send('PUT', url, USERS.platformAdmin, { body })).statusCode).toBe(204);
+      expect(await organization(OPERATOR_A)).toMatchObject({
+        display_name: { fr: "Organisation d'exemple", es: 'Organización de ejemplo' },
+      });
+      expect(
+        (
+          await sql<{ logo: string | null }>`
+            SELECT logo_asset_id AS logo FROM app.organizations WHERE id = ${OPERATOR_A}`.execute(
+            owner,
+          )
+        ).rows[0]?.logo,
+      ).toBe(SHARED_BRAND_ASSET);
+      // A new one may only be named in the sites' languages.
+      expect(
+        (await send('POST', '/api/organizations', USERS.platformAdmin, { body })).statusCode,
+      ).toBe(400);
+    } finally {
+      await owner
+        .updateTable('app.organizations')
+        .set({ ...before, display_name: JSON.stringify(before.display_name) })
+        .where('id', '=', OPERATOR_A)
+        .execute();
+    }
+  });
+
+  it('create one, as a platform admin', async () => {
+    const created = await send('POST', '/api/organizations', USERS.platformAdmin, { body: BODY });
+    expect(created.statusCode).toBe(201);
+    const { id } = created.json<{ id: string }>();
+    try {
+      expect(await organization(id)).toMatchObject({
+        legal_name: 'Organización de Ejemplo',
+        contact_email: 'contacto@ejemplo.org',
+      });
+    } finally {
+      await owner.deleteFrom('app.organizations').where('id', '=', id).execute();
     }
   });
 });

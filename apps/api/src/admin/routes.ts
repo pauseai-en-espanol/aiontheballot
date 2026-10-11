@@ -39,6 +39,14 @@ import {
   updateReviewer,
 } from './methodology.js';
 import {
+  createOrganization,
+  getOrganization,
+  listOrganizations,
+  type OrganizationFields,
+  platformLanguages,
+  updateOrganization,
+} from './organizations.js';
+import {
   type ChangeResult,
   createDocument,
   deleteDocument,
@@ -117,6 +125,46 @@ const MEMBER_ROLE_PARAMS = {
   properties: { tenant: SLUG, userId: UUID, role: ROLE },
   required: ['tenant', 'userId', 'role'],
 } as const;
+
+const ORGANIZATION_PARAMS = {
+  type: 'object',
+  properties: { id: UUID },
+  required: ['id'],
+} as const;
+
+/** Optional text: null or blank leaves it unset. */
+const OPTIONAL_TEXT = (maxLength: number) => ({ type: ['string', 'null'], maxLength }) as const;
+const ORGANIZATION_BODY = {
+  type: 'object',
+  properties: {
+    displayName: localizedSchema(200),
+    legalName: { type: 'string', maxLength: 300 },
+    taxId: OPTIONAL_TEXT(50),
+    address: OPTIONAL_TEXT(500),
+    registryEntry: OPTIONAL_TEXT(300),
+    contactEmail: OPTIONAL_TEXT(254),
+    privacyEmail: OPTIONAL_TEXT(254),
+    url: OPTIONAL_TEXT(2048),
+    newsletterUrl: OPTIONAL_TEXT(2048),
+    isPauseaiChapter: { type: 'boolean' },
+  },
+  required: [
+    'displayName',
+    'legalName',
+    'taxId',
+    'address',
+    'registryEntry',
+    'contactEmail',
+    'privacyEmail',
+    'url',
+    'newsletterUrl',
+    'isPauseaiChapter',
+  ],
+  additionalProperties: false,
+} as const;
+type OrganizationBody = Omit<OrganizationFields, 'displayName'> & {
+  displayName: Record<string, string>;
+};
 
 type TenantRole = (typeof TENANT_ROLES)[number];
 
@@ -359,6 +407,52 @@ const publishable = (body: Localized, access: Access, publish: boolean): Localiz
     throw new Refusal(422, 'needsDefaultLanguage');
   }
   return body;
+};
+
+/** Text as the column takes it: trimmed, and null when blank. */
+const optionalText = (value: string | null): string | null => {
+  const trimmed = value?.trim() ?? '';
+  return trimmed === '' ? null : trimmed;
+};
+
+/**
+ * An organization's fields as the database takes them (P2.2): emails in lowercase, which their checks require; the
+ * checks themselves (an email's shape, `https://` links) stay the database's. The name may be in any site's language.
+ */
+const organizationFields = (
+  body: OrganizationBody,
+  languages: readonly string[],
+): OrganizationFields => {
+  const displayName = localizedInput(body.displayName, languages);
+  if (displayName === 'invalid') {
+    throw new Refusal(400, 'invalid');
+  }
+  const legalName = optionalText(body.legalName);
+  if (displayName === 'empty' || legalName === null) {
+    throw new Refusal(422, 'incomplete');
+  }
+  return {
+    displayName,
+    legalName,
+    taxId: optionalText(body.taxId),
+    address: optionalText(body.address),
+    registryEntry: optionalText(body.registryEntry),
+    contactEmail: optionalText(body.contactEmail)?.toLowerCase() ?? null,
+    privacyEmail: optionalText(body.privacyEmail)?.toLowerCase() ?? null,
+    url: optionalText(body.url),
+    newsletterUrl: optionalText(body.newsletterUrl),
+    isPauseaiChapter: body.isPauseaiChapter,
+  };
+};
+
+/**
+ * The platform screens are for platform admins (editorial workflow §13.15, W6): anyone else gets a 404, as for a page
+ * they can't open. Writes are RLS's to refuse all the same.
+ */
+const platformOnly = async (trx: Transaction<DB>, actor: Actor): Promise<void> => {
+  if (!(await isPlatformAdmin(trx, actor.userId))) {
+    throw new Refusal(404, 'notFound');
+  }
 };
 
 /** The tenant and election the path names, or a 404 for either if RLS hides it (editorial workflow §2.1). */
@@ -706,6 +800,87 @@ export const adminDataRoutes =
           await withActor(db, actor, async (trx) => {
             const { tenantId } = await tenantFor(trx, actor, request.params.tenant);
             refuseUnless(await deleteDocument(trx, tenantId, request.params.id));
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Every organization, with the sites each runs or endorses (P2), and the languages a name may be written in.
+    scope.get('/organizations', async (request, reply) =>
+      signedIn(request, reply, (db, actor) =>
+        withActor(db, actor, async (trx) => {
+          await platformOnly(trx, actor);
+          return {
+            organizations: await listOrganizations(trx),
+            languages: await platformLanguages(trx),
+          };
+        }),
+      ),
+    );
+
+    // A new organization (P2.1).
+    scope.post<{ Body: OrganizationBody }>(
+      '/organizations',
+      { schema: { body: ORGANIZATION_BODY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          const id = await withActor(db, actor, async (trx) => {
+            await platformOnly(trx, actor);
+            return createOrganization(
+              trx,
+              organizationFields(request.body, await platformLanguages(trx)),
+            );
+          });
+          return reply.code(201).send({ id });
+        }),
+    );
+
+    // One organization, and the languages its name may be in: every site's, and any it already has.
+    scope.get<{ Params: { id: string } }>(
+      '/organizations/:id',
+      { schema: { params: ORGANIZATION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            await platformOnly(trx, actor);
+            const organization = await getOrganization(trx, request.params.id);
+            if (!organization) {
+              throw new Refusal(404, 'notFound');
+            }
+            const languages = [
+              ...new Set([
+                ...(await platformLanguages(trx)),
+                ...Object.keys(organization.displayName),
+              ]),
+            ].sort();
+            return { organization, languages };
+          }),
+        ),
+    );
+
+    // Changes an organization (P2.1): every field at once, as the form shows them.
+    scope.put<{ Params: { id: string }; Body: OrganizationBody }>(
+      '/organizations/:id',
+      { schema: { params: ORGANIZATION_PARAMS, body: ORGANIZATION_BODY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            await platformOnly(trx, actor);
+            const current = await getOrganization(trx, request.params.id);
+            if (!current) {
+              throw new Refusal(404, 'notFound');
+            }
+            const languages = [
+              ...(await platformLanguages(trx)),
+              ...Object.keys(current.displayName),
+            ];
+            refuseUnless(
+              await updateOrganization(
+                trx,
+                request.params.id,
+                organizationFields(request.body, languages),
+              ),
+            );
           });
           return reply.code(204).send();
         }),

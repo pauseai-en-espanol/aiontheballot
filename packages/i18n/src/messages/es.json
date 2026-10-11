@@ -494,6 +494,59 @@
       "endBeforeStart": "El final debe ser posterior al comienzo.",
       "slugMismatch": "Ese no es el identificador de la elección. Escríbelo exactamente."
     },
-    "language": "Idioma"
+    "language": "Idioma",
+    "platform": {
+      "title": "Plataforma",
+      "intro": "Lo que comparten todos los sitios, para quien administra la plataforma.",
+      "nav": "Secciones de la plataforma"
+    },
+    "organizations": {
+      "title": "Organizaciones",
+      "intro": "Las organizaciones que gestionan o respaldan un sitio. Lo que escribas aquí es público: aparece en los sitios a los que sirve cada una, incluido el aviso legal.",
+      "caption": "Organizaciones y los sitios a los que sirve cada una",
+      "name": "Nombre",
+      "legalName": "Nombre legal",
+      "sites": "Sitios",
+      "noSites": "Ninguno todavía",
+      "roles": {
+        "operator": "gestiona",
+        "endorser": "respalda"
+      },
+      "pauseai": "Grupo de PauseAI",
+      "none": "Todavía no hay organizaciones.",
+      "new": "Nueva organización",
+      "newIntro": "Una organización puede servir a varios sitios. Vincularla a un sitio se hace aparte.",
+      "details": "Datos",
+      "form": {
+        "displayName": "Nombre",
+        "displayNameHint": "Como lo ve el público, en los idiomas de los sitios a los que sirve. Al menos uno.",
+        "legalName": "Nombre legal",
+        "legalNameHint": "Tal como está inscrita. Aparece en el aviso legal.",
+        "taxId": "Identificación fiscal (NIF)",
+        "address": "Domicilio social",
+        "registryEntry": "Inscripción registral",
+        "registryEntryHint": "El registro en que está inscrita y su número en él.",
+        "contactEmail": "Correo de contacto",
+        "contactEmailHint": "Aparece en sus sitios como la dirección a la que escribir.",
+        "privacyEmail": "Correo de privacidad",
+        "privacyEmailHint": "La dirección para preguntas sobre datos personales.",
+        "url": "Sitio web",
+        "newsletterUrl": "Página de alta en el boletín",
+        "linkHint": "Una dirección completa que empiece por https://.",
+        "optional": "opcional",
+        "pauseai": "Un grupo de PauseAI",
+        "pauseaiHint": "Sus sitios solo pueden usar los recursos de marca restringidos de PauseAI mientras lo sea, así que no puede dejar de serlo mientras los usen.",
+        "create": "Crear organización",
+        "save": "Guardar organización",
+        "saved": "Organización guardada."
+      },
+      "constraints": {
+        "email": "Escribe una dirección de correo, como nombre@example.org.",
+        "link": "Escribe una dirección completa que empiece por https://.",
+        "legalName": "Escribe el nombre legal de la organización.",
+        "displayName": "Escribe su nombre en al menos un idioma.",
+        "pauseai": "Un sitio al que sirve esta organización usa recursos de marca restringidos de PauseAI, así que tiene que seguir siendo un grupo de PauseAI."
+      }
+    }
   }
 }

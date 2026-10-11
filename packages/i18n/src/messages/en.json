@@ -494,6 +494,59 @@
       "endBeforeStart": "The end must be after the start.",
       "slugMismatch": "That isn't the election's slug. Type it exactly."
     },
-    "language": "Language"
+    "language": "Language",
+    "platform": {
+      "title": "Platform",
+      "intro": "What every site shares, for platform admins.",
+      "nav": "Platform sections"
+    },
+    "organizations": {
+      "title": "Organizations",
+      "intro": "The organizations that run or endorse a site. What you write here is public: it appears on the sites each one serves, the legal notice included.",
+      "caption": "Organizations and the sites each serves",
+      "name": "Name",
+      "legalName": "Legal name",
+      "sites": "Sites",
+      "noSites": "None yet",
+      "roles": {
+        "operator": "operator",
+        "endorser": "endorser"
+      },
+      "pauseai": "PauseAI chapter",
+      "none": "There are no organizations yet.",
+      "new": "New organization",
+      "newIntro": "An organization can serve several sites. Linking it to a site is done separately.",
+      "details": "Details",
+      "form": {
+        "displayName": "Name",
+        "displayNameHint": "As the public sees it, in the languages of the sites it serves. At least one.",
+        "legalName": "Legal name",
+        "legalNameHint": "As registered. The legal notice gives it.",
+        "taxId": "Tax ID",
+        "address": "Registered address",
+        "registryEntry": "Registry entry",
+        "registryEntryHint": "The register it is entered in, and its number there.",
+        "contactEmail": "Contact email",
+        "contactEmailHint": "Shown on its sites as the address to write to.",
+        "privacyEmail": "Privacy email",
+        "privacyEmailHint": "The address for questions about personal data.",
+        "url": "Website",
+        "newsletterUrl": "Newsletter sign-up page",
+        "linkHint": "A full address starting with https://.",
+        "optional": "optional",
+        "pauseai": "A PauseAI chapter",
+        "pauseaiHint": "Its sites may use PauseAI's restricted brand assets only while it is one, so it can't stop being one while they do.",
+        "create": "Create organization",
+        "save": "Save organization",
+        "saved": "Organization saved."
+      },
+      "constraints": {
+        "email": "Enter an email address, such as name@example.org.",
+        "link": "Enter a full address starting with https://.",
+        "legalName": "Enter the organization's legal name.",
+        "displayName": "Enter its name in at least one language.",
+        "pauseai": "A site this organization serves uses PauseAI's restricted brand assets, so it has to stay a PauseAI chapter."
+      }
+    }
   }
 }

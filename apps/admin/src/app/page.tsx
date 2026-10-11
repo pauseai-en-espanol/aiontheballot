@@ -18,7 +18,7 @@ export const generateMetadata = async (): Promise<Metadata> => ({
 
 /**
  * Where signing in ends (editorial workflow A6.1): a member of one site goes straight to its dashboard; a member of
- * several, or a platform admin, chooses from the sites they may open.
+ * several, or a platform admin, chooses from the sites they may open. Platform admins also find the platform's screens.
  */
 const Home = async () => {
   const { user } = await requireStage('signed-in');
@@ -47,6 +47,18 @@ const Home = async () => {
           ))}
         </ul>
       )}
+      {platformAdmin ? (
+        <>
+          <h2 className={styles.h2}>{t('admin.platform.title')}</h2>
+          <ul className={styles.list}>
+            <li>
+              <Link className={styles.link} href="/platform/organizations">
+                {t('admin.organizations.title')}
+              </Link>
+            </li>
+          </ul>
+        </>
+      ) : null}
       <SignOutButton label={t('auth.home.signOut')} />
     </main>
   );

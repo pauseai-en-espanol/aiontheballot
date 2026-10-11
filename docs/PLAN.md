@@ -977,6 +977,21 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   site with fictional data among them. Planned for platform admins after the organizations screens; the hostname
   stays a gitops change. Not scheduled yet.
 
+**M2 platform screens:**
+
+- **R112. Organizations, on the platform's own screens** (P2, §13.15): `/platform` and `/platform/organizations`
+  (the list with the sites each serves, a new one, and each one's page), linked from the site list for platform admins
+  only. Anyone else gets a 404 from the layout and from the API, as for a page they can't open; writes stay RLS's to
+  refuse. A form writes every field at once (`PUT`): trimmed, blank as unset, emails in lowercase (their checks
+  require it); the database checks the emails' shape and the `https://` links, and the form points at the field a
+  constraint names. A refusal without one is the API's (a blank legal name or name) or, when the box was unticked, the
+  trigger that keeps restricted brand assets to PauseAI chapters, so the form points at that field and says why. A new
+  organization opens on its own page, which says it was saved: the page's announcer can now carry a message across the
+  navigation the write starts (`announce(…, { afterNavigation: true })`), since the form's own status line goes with the
+  old page. The name may be in any
+  site's language and any it already has, none required on its own. Not yet: the logo (uploads), linking endorsers to
+  a site (P2.3), and deleting an organization.
+
 ## Open decisions for Dani
 
 D1–D5 and D11 are decided (see [Answered](#answered)). D7 and D8 came with the file volume (ADR-0004), D9 with the
