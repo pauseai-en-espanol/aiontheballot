@@ -119,9 +119,11 @@ test.describe("a site's members (editorial workflow A7)", () => {
 
       await removeReviewer.click();
       await dialog.getByRole('button', { name: en.admin.members.confirm }).click();
-      // The button is gone with the role: focus lands on the line that says what happened.
-      await expect(page.getByRole('status')).toBeFocused();
-      await expect(page.getByRole('status')).toHaveText(
+      // The button is gone with the role: focus lands on the line that says what happened. It is the members table's
+      // own, the first on the page: the invitations form below has its own status line.
+      const status = page.getByRole('status').first();
+      await expect(status).toBeFocused();
+      await expect(status).toHaveText(
         fill(en.admin.members.removed, {
           role: en.admin.roles.reviewer.toLowerCase(),
           name: 'Persona Y',
@@ -139,7 +141,7 @@ test.describe("a site's members (editorial workflow A7)", () => {
       const addLabel = fill(en.admin.members.addLabel, { name: 'Persona Y' });
       await page.getByLabel(addLabel).selectOption({ label: en.admin.roles.reviewer });
       await row(page, 'Persona Y').getByRole('button', { name: en.admin.members.add }).click();
-      await expect(page.getByRole('status')).toHaveText(
+      await expect(status).toHaveText(
         fill(en.admin.members.added, {
           role: en.admin.roles.reviewer.toLowerCase(),
           name: 'Persona Y',

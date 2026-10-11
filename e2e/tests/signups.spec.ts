@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import pg from 'pg';
 
 import { expectAccessible } from '../axe.js';
+import { get, send } from '../fetch-by-host.js';
 import { mailFor } from '../mail.js';
 import { PLATFORM_HOST, PORTS, TENANT_URL } from '../servers.js';
 
@@ -72,7 +73,6 @@ test.describe('the signup list (PLAN R119)', () => {
 
   test('confirms only when the person presses the button, then unsubscribes with one click', async ({
     page,
-    request,
   }) => {
     const email = `suscripcion-${crypto.randomUUID()}@example.org`;
     await page.goto(TENANT_URL);
@@ -107,11 +107,11 @@ test.describe('the signup list (PLAN R119)', () => {
     expect(await signupOf(email)).toEqual({ confirmed: true, future: true });
 
     // A mail client's one-click unsubscribe (RFC 8058): a post from no page at all.
-    const response = await request.post(local(oneClick), {
+    const response = await send('POST', local(oneClick), {
       form: { 'List-Unsubscribe': 'One-Click' },
       headers: { 'sec-fetch-site': 'cross-site' },
     });
-    expect(response.status()).toBe(200);
+    expect(response.status).toBe(200);
     expect(await signupOf(email)).toBeUndefined();
 
     // The email's own link now says there's nothing to delete.
@@ -145,15 +145,12 @@ test.describe('the signup list (PLAN R119)', () => {
     expect(await mailFor(email)).toHaveLength(1);
   });
 
-  test("refuses another site's form: signing up takes a post from the site's own pages", async ({
-    request,
-  }) => {
-    const response = await request.post(`${TENANT_URL}/avisos`, {
+  test("refuses another site's form: signing up takes a post from the site's own pages", async () => {
+    const response = await send('POST', `${TENANT_URL}/avisos`, {
       form: { email: `ajena-${crypto.randomUUID()}@example.org` },
       headers: { 'sec-fetch-site': 'cross-site' },
-      maxRedirects: 0,
     });
-    expect(response.status()).toBe(403);
+    expect(response.status).toBe(403);
   });
 });
 
@@ -176,16 +173,14 @@ test.describe("the site's always-on pages", () => {
     await expectAccessible(page);
   });
 
-  test("a policy text that isn't published, and the app's own English words, are no page", async ({
-    request,
-  }) => {
+  test("a policy text that isn't published, and the app's own English words, are no page", async () => {
     for (const path of ['/quienes-somos', '/privacy', '/legal-notice', '/avisos/confirm']) {
-      expect((await request.get(`${TENANT_URL}${path}`)).status(), path).toBe(404);
+      expect((await get(`${TENANT_URL}${path}`)).status, path).toBe(404);
     }
-    expect((await request.get(`${TENANT_B}/privacidad`)).status()).toBe(404);
+    expect((await get(`${TENANT_B}/privacidad`)).status).toBe(404);
   });
 
-  test("an election's pages wait until the site opens", async ({ request }) => {
-    expect((await request.get(`${TENANT_URL}/generales-de-ejemplo`)).status()).toBe(404);
+  test("an election's pages wait until the site opens", async () => {
+    expect((await get(`${TENANT_URL}/generales-de-ejemplo`)).status).toBe(404);
   });
 });

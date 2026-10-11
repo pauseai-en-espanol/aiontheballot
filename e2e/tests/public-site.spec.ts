@@ -2,6 +2,7 @@ import { messages } from '@aiontheballot/i18n/messages';
 import { expect, type Page, test } from '@playwright/test';
 
 import { expectAccessible } from '../axe.js';
+import { get } from '../fetch-by-host.js';
 import { PREVIEW_URL, TENANT_URL } from '../servers.js';
 
 const es = messages.es;
@@ -38,13 +39,12 @@ const cspViolations = (page: Page): string[] => {
 test.describe('the public site, on the preview host (public-site spec)', () => {
   test("leads from the home to the current election's scorecard, never to be indexed", async ({
     page,
-    request,
   }) => {
-    const home = await request.get(SITE, { maxRedirects: 0 });
-    expect(home.status()).toBe(307);
-    expect(home.headers().location).toBe('/ejemplo-a/generales-de-ejemplo');
-    const scorecard = await request.get(ELECTION);
-    expect(scorecard.headers()['x-robots-tag']).toBe('noindex, nofollow');
+    const home = await get(SITE);
+    expect(home.status).toBe(307);
+    expect(home.headers.location).toBe('/ejemplo-a/generales-de-ejemplo');
+    const scorecard = await get(ELECTION);
+    expect(scorecard.headers['x-robots-tag']).toBe('noindex, nofollow');
     await page.goto(ELECTION);
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
       'content',
@@ -186,9 +186,7 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     expect(violations).toEqual([]);
   });
 
-  test('answers 404 for an unknown party, criterion or election, and for English words on a Spanish site', async ({
-    request,
-  }) => {
+  test('answers 404 for an unknown party, criterion or election, and for English words on a Spanish site', async () => {
     for (const path of [
       '/generales-de-ejemplo/partidos/no-existe',
       '/generales-de-ejemplo/criterios/no-existe',
@@ -196,15 +194,15 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
       '/generales-de-ejemplo/parties/partido-ejemplo-a',
       '/generales-de-ejemplo/methodology',
     ]) {
-      expect((await request.get(`${SITE}${path}`)).status(), path).toBe(404);
+      expect((await get(`${SITE}${path}`)).status, path).toBe(404);
     }
   });
 });
 
 test.describe('security headers and search engines (public-site spec §7, §8)', () => {
-  test('send the CSP and its companions on pages, images and routes alike', async ({ request }) => {
+  test('send the CSP and its companions on pages, images and routes alike', async () => {
     for (const path of ['/', '/aviso-legal', '/favicon.ico', '/sitemap.xml']) {
-      const headers = (await request.get(`${TENANT_URL}${path}`)).headers();
+      const { headers } = await get(`${TENANT_URL}${path}`);
       expect(headers['content-security-policy'], path).toContain("frame-ancestors 'none'");
       expect(headers['content-security-policy'], path).toContain("default-src 'self'");
       // Only `pnpm dev` allows eval: never the production build these tests run against.
@@ -215,29 +213,24 @@ test.describe('security headers and search engines (public-site spec §7, §8)',
     }
   });
 
-  test('list only what a coming-soon site serves, and every election page once it shows them', async ({
-    request,
-  }) => {
-    const comingSoon = await (await request.get(`${TENANT_URL}/sitemap.xml`)).text();
+  test('list only what a coming-soon site serves, and every election page once it shows them', async () => {
+    const text = async (url: string) => (await get(url)).body.toString('utf8');
+    const comingSoon = await text(`${TENANT_URL}/sitemap.xml`);
     expect(comingSoon).toContain(`<loc>${CANONICAL}</loc>`);
     expect(comingSoon).toContain(`<loc>${CANONICAL}/aviso-legal</loc>`);
     expect(comingSoon).toContain(`<loc>${CANONICAL}/privacidad</loc>`);
     expect(comingSoon).not.toContain('generales-de-ejemplo');
-    const preview = await (await request.get(`${SITE}/sitemap.xml`)).text();
+    const preview = await text(`${SITE}/sitemap.xml`);
     for (const path of ELECTION_PAGES) {
       expect(preview).toContain(`<loc>${CANONICAL}${path}</loc>`);
     }
     // There, the home is a redirect to the election: no page of its own.
     expect(preview).not.toContain(`<loc>${CANONICAL}</loc>`);
-    expect(await (await request.get(`${TENANT_URL}/robots.txt`)).text()).toBe(
+    expect(await text(`${TENANT_URL}/robots.txt`)).toBe(
       `User-agent: *\nAllow: /\nSitemap: ${CANONICAL}/sitemap.xml\n`,
     );
     // Crawlers read the preview host's at its root.
-    expect(await (await request.get(`${PREVIEW_URL}/robots.txt`)).text()).toBe(
-      'User-agent: *\nDisallow: /\n',
-    );
-    expect(await (await request.get(`${SITE}/robots.txt`)).text()).toBe(
-      'User-agent: *\nDisallow: /\n',
-    );
+    expect(await text(`${PREVIEW_URL}/robots.txt`)).toBe('User-agent: *\nDisallow: /\n');
+    expect(await text(`${SITE}/robots.txt`)).toBe('User-agent: *\nDisallow: /\n');
   });
 });
