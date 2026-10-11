@@ -60,17 +60,56 @@ export const deleteAccounts = async (ids: string[]) => {
 };
 
 /** Runs SQL as the database owner, as the owner runs what a command prints; returns the rows it changed. */
-export const asOwner = async (sql: string): Promise<number> => {
+export const asOwner = async (sql: string, values: unknown[] = []): Promise<number> => {
   const owner = pool('DATABASE_URL');
   try {
-    return (await owner.query(sql)).rowCount ?? 0;
+    return (await owner.query(sql, values)).rowCount ?? 0;
   } finally {
     await owner.end();
   }
 };
 
-/** A role in a seeded tenant, added as the database owner adds one, stamped as the member's own. */
-export const addMembership = async (userId: string, tenantSlug: string) => {
+/**
+ * A tenant of the test's own, so what it changes (members, settings, elections) touches nothing another test reads:
+ * fictional, inactive (it needs no operator then), in Spanish and English, its name in both unless `english` is
+ * false. Remove it with `purgeTenant`.
+ */
+export const createTenant = async ({ english = true }: { english?: boolean } = {}) => {
+  const owner = pool('DATABASE_URL');
+  try {
+    const slug = `e2e-${crypto.randomUUID().slice(0, 8)}`;
+    const name = {
+      es: `Sitio de prueba ${slug}`,
+      ...(english ? { en: `Test site ${slug}` } : {}),
+    };
+    const { rows } = await owner.query<{ id: string }>(
+      `INSERT INTO app.tenants (slug, country_code, default_locale, enabled_locales, display_name,
+                                methodology_kind, report_retention_days)
+       VALUES ($1, 'XE', 'es', '{es,en}', $2, 'demands', 365) RETURNING id`,
+      [slug, name],
+    );
+    return { id: rows[0]?.id ?? '', slug, name };
+  } finally {
+    await owner.end();
+  }
+};
+
+/** Removes a test's tenant and everything in it, as the owner removes a tenant (ADR-0002 §14). */
+export const purgeTenant = async (id: string) => {
+  const owner = pool('DATABASE_URL');
+  try {
+    await owner.query('SELECT private.purge_tenant($1)', [id]);
+  } finally {
+    await owner.end();
+  }
+};
+
+/** A role in a tenant, added as the database owner adds one, stamped as the member's own. */
+export const addMembership = async (
+  userId: string,
+  tenantSlug: string,
+  role: 'country_admin' | 'editor' | 'reviewer' = 'editor',
+) => {
   const owner = pool('DATABASE_URL');
   const client = await owner.connect();
   try {
@@ -78,8 +117,8 @@ export const addMembership = async (userId: string, tenantSlug: string) => {
     await client.query(`SELECT set_config('app.user_id', $1, true)`, [userId]);
     await client.query(
       `INSERT INTO app.memberships (user_id, tenant_id, role)
-       SELECT $1, id, 'editor' FROM app.tenants WHERE slug = $2`,
-      [userId, tenantSlug],
+       SELECT $1, id, $3 FROM app.tenants WHERE slug = $2`,
+      [userId, tenantSlug, role],
     );
     await client.query('COMMIT');
   } finally {

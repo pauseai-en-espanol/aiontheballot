@@ -12,8 +12,15 @@ export const USERS = {
   reviewerA: user(3),
   countryAdminA: user(4),
   platformAdmin: user(5),
+  /** Editor in A, reviewer in B. */
+  editorAReviewerB: user(6),
   countryAdminB: user(8),
+  /** No membership: the matrix's insert cases give it one. */
+  newcomer: user(10),
 } as const;
+
+/** Tenant A (`test-a`): its members are the editor, the reviewer, the country admin and editorAReviewerB. */
+export const TENANT_A = '0190f8c4-0000-7000-8000-00000000000a';
 
 /** Tenant A's live election (two parties, two criteria) and its three cells, and its draft election (no cells). */
 export const LIVE_A = {

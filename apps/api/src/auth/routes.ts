@@ -1,9 +1,9 @@
 import type { Database } from '@aiontheballot/db/client';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 
-import { withActor } from '@aiontheballot/db/actor';
+import type { ProfileSource } from '../admin/profiles.js';
 
-import { listTenants } from '../admin/tenants.js';
+import { adminDataRoutes } from '../admin/routes.js';
 import { type Auth, AUTH_BASE_PATH, TWO_FACTOR_COOKIE, VISITOR_ADDRESS_HEADER } from './auth.js';
 import { actorOf, type FoundSession, stageOf } from './session.js';
 import { visitorAddress } from './visitor.js';
@@ -85,6 +85,8 @@ export interface AdminRoutesOptions {
   auth?: { auth: Auth; adminOrigin: string };
   /** The aiontheballot_admin role's pool; without it the signed-in data routes answer 503. */
   admin?: Database;
+  /** Members' names and emails, read as Better Auth's role; without it the members route answers 503. */
+  profiles?: ProfileSource;
 }
 
 /**
@@ -93,7 +95,7 @@ export interface AdminRoutesOptions {
  * mistake on a public host still reaches nothing. The admin's server-side calls name the admin host too.
  */
 export const adminRoutes =
-  ({ auth: signIn, admin }: AdminRoutesOptions) =>
+  ({ auth: signIn, admin, profiles }: AdminRoutesOptions) =>
   async (scope: FastifyInstance): Promise<void> => {
     if (!signIn) {
       scope.all('/*', async (_request, reply) =>
@@ -171,25 +173,13 @@ export const adminRoutes =
       return { stage, user: { id, name, email } };
     });
 
-    const signedIn = async (
-      request: FastifyRequest,
-      reply: FastifyReply,
-      run: (db: Database, actor: NonNullable<ReturnType<typeof actorOf>>) => Promise<unknown>,
-    ) => {
-      if (!admin) {
-        return reply.code(503).send({ error: 'Admin data is not configured' });
-      }
-      const actor = actorOf(await findSession(request));
-      if (!actor) {
-        return reply.code(401).send({ error: 'Sign in with your second factor first' });
-      }
-      return run(admin, actor);
-    };
-
-    // The tenants the user may open (A6).
-    scope.get('/tenants', async (request, reply) =>
-      signedIn(request, reply, async (db, actor) => ({
-        tenants: await withActor(db, actor, listTenants),
-      })),
+    // Everything a signed-in user reads and writes (admin/routes.ts), always as an aal2 actor.
+    await scope.register(
+      adminDataRoutes({
+        admin,
+        profiles,
+        adminOrigin,
+        actorFor: async (request) => actorOf(await findSession(request)),
+      }),
     );
   };

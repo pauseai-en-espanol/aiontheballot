@@ -1,5 +1,4 @@
 import { messages } from '@aiontheballot/i18n/messages';
-import { AxeBuilder } from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -12,21 +11,12 @@ import {
   PASSWORD,
   visitorAddress,
 } from '../accounts.js';
+import { expectAccessible } from '../axe.js';
 import { ADMIN_URL, AUTH, PLATFORM_NAME, TENANT_URL } from '../servers.js';
 import { totpCode } from '../totp.js';
 
 const en = messages.en.auth;
 const es = messages.es.auth;
-
-/** WCAG 2.2 AA, as far as axe can tell (editorial workflow §2.6). */
-const expectAccessible = async (page: Page) => {
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
-    .analyze();
-  expect(
-    violations.map((v) => `${v.id}: ${v.nodes.map((n) => String(n.target)).join(', ')}`),
-  ).toEqual([]);
-};
 
 // Each test is its own visitor at the gateway, so tests running together don't share the sign-in rate limit.
 test.beforeEach(async ({ page }) => {
@@ -55,7 +45,7 @@ const signIn = async (page: Page, email: string, password = PASSWORD) => {
 };
 
 /** Enrols TOTP through the pages, checking each step, and returns what they showed. */
-const enrol = async (page: Page) => {
+const enrol = async (page: Page, landing = `${ADMIN_URL}/`) => {
   await expect(page).toHaveURL(`${ADMIN_URL}/two-factor/enrol`);
   await page.getByLabel(en.enrol.password, { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: en.enrol.begin }).click();
@@ -68,7 +58,7 @@ const enrol = async (page: Page) => {
   await expect(codes).toHaveCount(10);
   const backupCodes = await codes.allTextContents();
   await page.getByRole('button', { name: en.enrol.done }).click();
-  await expect(page).toHaveURL(`${ADMIN_URL}/`);
+  await expect(page).toHaveURL(landing);
   return { key, backupCodes };
 };
 
@@ -261,15 +251,15 @@ test.describe('admin sign-in (editorial workflow A4)', () => {
     await expect(formAlert(page)).toHaveText(`⚠ ${en.errors.invalidCode}`);
   });
 
-  test('lists the tenants a member may open, once signed in with the second factor', async ({
+  test('takes a member of one site to its dashboard, once signed in with the second factor', async ({
     page,
   }) => {
     const { id, email } = await createAccount();
     await addMembership(id, 'ejemplo-a');
     await signIn(page, email);
-    await enrol(page);
+    await enrol(page, `${ADMIN_URL}/t/ejemplo-a`);
     // In the admin's language where the tenant has one (the seeds name ejemplo-a in English too).
-    await expect(page.getByRole('listitem')).toHaveText(['Example tenant A']);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Example tenant A');
   });
 
   // The gateway's half of ADR-0002 T8: a public host routes nothing to the API's /api, so sign-in isn't there at all

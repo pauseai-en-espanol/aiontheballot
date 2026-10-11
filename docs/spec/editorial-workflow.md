@@ -134,6 +134,7 @@ _As a member, I sign in with a password and a second factor._
    a tenant list. [API; DB: RLS on `tenants`]
 2. Platform admins see every tenant; everyone else sees only their own, and nothing of other tenants, not even
    published content (PLAN, Answered: admin visibility). [DB: RLS]
+3. _Built (PLAN R98):_ every tenant screen has a shell with a site switcher; a tenant the user can't open is a 404.
 
 ### A7. Manage members
 
@@ -148,6 +149,8 @@ _As a country admin, I see who has access and remove access that is no longer ne
    [API]
 5. A platform admin who adds a membership, including to themselves, is audited, and the tenant's country admins see
    it in the audit view (PLAN P11). [DB: audit trigger]
+6. _Built (PLAN R94–R97):_ names and emails come from Better Auth's tables for the memberships RLS shows; the last
+   country admin is refused under a lock on the tenant's row.
 
 ## 4. Platform administration
 

@@ -1,33 +1,49 @@
 import type { Metadata } from 'next';
 
 import { getTranslator } from '@aiontheballot/i18n/messages';
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import { SignOutButton } from '@/auth/SignOutButton';
-import * as styles from '@/auth/styles';
+import { getTenants } from '@/data';
 import { getLocale } from '@/locale';
+import { siteName } from '@/localized';
 import { requireStage } from '@/session';
-import { listTenants, tenantName } from '@/tenants';
+import { Lang } from '@/ui/Lang';
+import * as styles from '@/ui/styles';
 
 export const generateMetadata = async (): Promise<Metadata> => ({
   title: getTranslator(await getLocale())('auth.home.title'),
 });
 
-// Signed in with a second factor: the tenants this user may open (editorial workflow A6).
+/**
+ * Where signing in ends (editorial workflow A6.1): a member of one site goes straight to its dashboard; a member of
+ * several, or a platform admin, chooses from the sites they may open.
+ */
 const Home = async () => {
   const { user } = await requireStage('signed-in');
+  const { tenants, platformAdmin } = await getTenants();
+  const [only] = tenants;
+  if (only && tenants.length === 1 && !platformAdmin) {
+    redirect(`/t/${only.slug}`);
+  }
   const locale = await getLocale();
   const t = getTranslator(locale);
-  const tenants = await listTenants();
   return (
-    <main className={styles.page}>
-      <h1 className={styles.heading}>{t('auth.home.title')}</h1>
+    <main className={styles.narrow}>
+      <h1 className={styles.h1}>{t('auth.home.title')}</h1>
       <p className={styles.text}>{t('auth.home.signedInAs', { name: user?.name ?? '' })}</p>
+      {platformAdmin ? <p className={styles.text}>{t('admin.sites.platformAdmin')}</p> : null}
       {tenants.length === 0 ? (
         <p className={styles.text}>{t('auth.home.noTenants')}</p>
       ) : (
         <ul className={styles.list}>
           {tenants.map((tenant) => (
-            <li key={tenant.slug}>{tenantName(tenant, locale)}</li>
+            <li key={tenant.slug}>
+              <Link className={styles.link} href={`/t/${tenant.slug}`}>
+                <Lang value={siteName(tenant, locale)} page={locale} />
+              </Link>
+            </li>
           ))}
         </ul>
       )}

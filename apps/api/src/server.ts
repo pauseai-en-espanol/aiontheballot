@@ -3,6 +3,7 @@ import { createDatabase } from '@aiontheballot/db/client';
 import { createFileStore } from '@aiontheballot/db/file-store';
 import { captureException } from '@sentry/node';
 
+import { createProfileSource } from './admin/profiles.js';
 import { buildApp } from './app.js';
 import { createAuth } from './auth/auth.js';
 import { loadConfig } from './config.js';
@@ -48,6 +49,7 @@ const app = buildApp({
           }
         : undefined,
     admin,
+    profiles: authPool ? createProfileSource(authPool) : undefined,
   },
 });
 

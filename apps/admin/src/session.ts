@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 
 import { getFromApi } from './api';
 
@@ -64,10 +65,11 @@ export const sessionFrom = (status: number, body: unknown): Session => {
   throw new Error(`The API answered ${status} for the session`);
 };
 
-export const getSession = async (): Promise<Session> => {
+/** Asked of the API once per request, however many layouts and pages need it. */
+export const getSession = cache(async (): Promise<Session> => {
   const { status, body } = await getFromApi('/api/session', await forwardedRequest());
   return sessionFrom(status, body);
-};
+});
 
 /**
  * Lets a page render only at the stages it serves, and sends any other request to its stage's page (editorial

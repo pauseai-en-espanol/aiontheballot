@@ -400,7 +400,7 @@ describe('the database sees aal2 only after TOTP (ADR-0002 §9)', () => {
     await enrol(who, email);
     const empty = await who.send('GET', '/api/tenants');
     expect(empty.statusCode).toBe(200);
-    expect(empty.json()).toEqual({ tenants: [] });
+    expect(empty.json()).toEqual({ tenants: [], platformAdmin: false });
 
     const { rows } = await superuser.query<{ id: string; slug: string }>(
       `SELECT id, slug FROM app.tenants WHERE active ORDER BY slug LIMIT 1`,

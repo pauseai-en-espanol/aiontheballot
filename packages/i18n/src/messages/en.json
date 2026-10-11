@@ -58,7 +58,11 @@
     "taken": "That is already in use.",
     "linked": "Something this refers to has gone, or something still refers to it.",
     "invalid": "That value isn't valid.",
-    "limit": "That limit has been reached. Try again later."
+    "limit": "That limit has been reached. Try again later.",
+    "notFound": "That isn't there any more. Reload the page.",
+    "lastCountryAdmin": "This is the site's only country admin. Give someone else that role first.",
+    "notMember": "Only members of the site can be given a role directly. Anyone else needs an invitation.",
+    "signedOut": "Your session has ended. Sign in again."
   },
   "auth": {
     "otherAccount": "Sign in with another account",
@@ -131,6 +135,62 @@
       "passwordTooLong": "Use at most 128 characters.",
       "passwordsDiffer": "The two passwords are not the same.",
       "unexpected": "Something went wrong. Please try again later."
+    }
+  },
+  "admin": {
+    "skipToContent": "Skip to content",
+    "roles": {
+      "country_admin": "Country admin",
+      "editor": "Editor",
+      "reviewer": "Reviewer"
+    },
+    "shell": {
+      "nav": "Site sections",
+      "dashboard": "Dashboard",
+      "members": "Members",
+      "switchSite": "Switch site",
+      "allSites": "All sites",
+      "current": "current"
+    },
+    "sites": {
+      "platformAdmin": "As a platform admin, you see every site."
+    },
+    "dashboard": {
+      "yourRoles": "Your roles here: {roles}.",
+      "platformAdmin": "You are a platform admin: you may do here what every role may.",
+      "noRoles": "You hold no role here.",
+      "notPublic": "This site isn't public yet: nothing of it shows on the public site until a platform admin turns it on.",
+      "sections": "What you can open",
+      "membersIntro": "Who has access to this site, and with which roles.",
+      "queuesLater": "Your work queues (drafts, reviews, reports) will show here once cells can be edited."
+    },
+    "members": {
+      "title": "Members",
+      "intro": "Everyone with access to this site and the roles they hold. A role that is removed stops working on the member's next request.",
+      "manageIntro": "To give someone new access, they need an invitation. Invitations aren't available yet.",
+      "tableLabel": "Members of {site}",
+      "name": "Name",
+      "email": "Email",
+      "roles": "Roles",
+      "unknownAccount": "Deleted account",
+      "you": "you",
+      "remove": "Remove",
+      "removeLabel": "Remove the {role} role from {name}",
+      "onlyCountryAdmin": "The site's only country admin: give the role to someone else before removing it.",
+      "confirmTitle": "Remove a role",
+      "confirmBody": "Remove the {role} role from {name}? They lose what it allows on their next request.",
+      "confirmSelf": "Remove your own {role} role? You lose what it allows straight away.",
+      "confirm": "Remove role",
+      "cancel": "Cancel",
+      "removed": "The {role} role was removed from {name}.",
+      "addLabel": "Another role for {name}",
+      "add": "Add role",
+      "added": "{name} now also has the {role} role."
+    },
+    "notFound": {
+      "title": "Page not found",
+      "body": "This page doesn't exist, or you don't have access to it.",
+      "home": "Go to your sites"
     }
   }
 }

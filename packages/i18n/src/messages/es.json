@@ -58,7 +58,11 @@
     "taken": "Eso ya está en uso.",
     "linked": "Algo a lo que esto se refiere ya no existe, o algo todavía se refiere a esto.",
     "invalid": "Ese valor no es válido.",
-    "limit": "Se ha alcanzado el límite. Vuelve a intentarlo más tarde."
+    "limit": "Se ha alcanzado el límite. Vuelve a intentarlo más tarde.",
+    "notFound": "Eso ya no existe. Recarga la página.",
+    "lastCountryAdmin": "Es la única persona con el rol de coordinación del sitio. Antes, da ese rol a otra persona.",
+    "notMember": "Solo se puede dar un rol directamente a quien ya es miembro del sitio. Cualquier otra persona necesita una invitación.",
+    "signedOut": "Tu sesión ha terminado. Vuelve a iniciar sesión."
   },
   "auth": {
     "otherAccount": "Iniciar sesión con otra cuenta",
@@ -131,6 +135,62 @@
       "passwordTooLong": "Usa como mucho 128 caracteres.",
       "passwordsDiffer": "Las dos contraseñas no coinciden.",
       "unexpected": "Algo ha ido mal. Inténtalo de nuevo más tarde."
+    }
+  },
+  "admin": {
+    "skipToContent": "Saltar al contenido",
+    "roles": {
+      "country_admin": "Coordinación",
+      "editor": "Edición",
+      "reviewer": "Revisión"
+    },
+    "shell": {
+      "nav": "Secciones del sitio",
+      "dashboard": "Panel",
+      "members": "Miembros",
+      "switchSite": "Cambiar de sitio",
+      "allSites": "Todos los sitios",
+      "current": "actual"
+    },
+    "sites": {
+      "platformAdmin": "Como administras la plataforma, ves todos los sitios."
+    },
+    "dashboard": {
+      "yourRoles": "Tus roles aquí: {roles}.",
+      "platformAdmin": "Administras la plataforma: aquí puedes hacer lo que puede hacer cualquier rol.",
+      "noRoles": "No tienes ningún rol aquí.",
+      "notPublic": "Este sitio aún no es público: no se ve nada de él en el sitio público hasta que quien administra la plataforma lo active.",
+      "sections": "Lo que puedes abrir",
+      "membersIntro": "Quién tiene acceso a este sitio y con qué roles.",
+      "queuesLater": "Aquí verás tus tareas pendientes (borradores, revisiones, avisos) cuando se puedan editar las celdas."
+    },
+    "members": {
+      "title": "Miembros",
+      "intro": "Todas las personas con acceso a este sitio y sus roles. Un rol que se quita deja de funcionar en la siguiente petición de esa persona.",
+      "manageIntro": "Para dar acceso a alguien nuevo hace falta una invitación. Las invitaciones aún no están disponibles.",
+      "tableLabel": "Miembros de {site}",
+      "name": "Nombre",
+      "email": "Correo electrónico",
+      "roles": "Roles",
+      "unknownAccount": "Cuenta eliminada",
+      "you": "tú",
+      "remove": "Quitar",
+      "removeLabel": "Quitar el rol de {role} a {name}",
+      "onlyCountryAdmin": "Es la única persona con el rol de coordinación: da ese rol a otra persona antes de quitarlo.",
+      "confirmTitle": "Quitar un rol",
+      "confirmBody": "¿Quitar el rol de {role} a {name}? Perderá lo que permite en su siguiente petición.",
+      "confirmSelf": "¿Quitarte tu rol de {role}? Perderás lo que permite de inmediato.",
+      "confirm": "Quitar rol",
+      "cancel": "Cancelar",
+      "removed": "Se ha quitado el rol de {role} a {name}.",
+      "addLabel": "Otro rol para {name}",
+      "add": "Añadir rol",
+      "added": "{name} tiene ahora también el rol de {role}."
+    },
+    "notFound": {
+      "title": "Página no encontrada",
+      "body": "Esta página no existe o no tienes acceso a ella.",
+      "home": "Ir a tus sitios"
     }
   }
 }
