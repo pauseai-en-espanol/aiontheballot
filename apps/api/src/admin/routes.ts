@@ -58,14 +58,7 @@ import {
   updateSettings,
 } from './settings.js';
 import { signupCounts } from './signups.js';
-import {
-  addHostname,
-  createSite,
-  getSite,
-  listSites,
-  setSiteActive,
-  type SiteFields,
-} from './sites.js';
+import { createSite, getSite, listSites, setSiteActive, type SiteFields } from './sites.js';
 import {
   createCriterion,
   createParty,
@@ -103,7 +96,7 @@ export type ApiRefusalKey = (typeof API_REFUSAL_KEYS)[number];
 export class Refusal extends Error {
   constructor(
     readonly status: 400 | 403 | 404 | 409 | 422,
-    readonly key: ApiRefusalKey | 'forbidden' | 'invalid' | 'incomplete' | 'stale',
+    readonly key: ApiRefusalKey | 'forbidden' | 'invalid' | 'incomplete' | 'stale' | 'taken',
   ) {
     super(key);
   }
@@ -224,7 +217,8 @@ const SITE_BODY = {
     enabledLocales: { type: 'array', items: { type: 'string', maxLength: 10 }, maxItems: 20 },
     methodologyKind: { type: 'string', enum: ['demands', 'descriptive'] },
     operatorId: UUID,
-    reportRetentionDays: { type: 'integer' },
+    // The column's own bounds, so a number past Postgres's integers is a refusal, not a fault.
+    reportRetentionDays: { type: 'integer', minimum: 1, maximum: 36_500 },
   },
   required: [
     'slug',
@@ -243,12 +237,6 @@ const SITE_ACTIVE_BODY = {
   type: 'object',
   properties: { active: { type: 'boolean' } },
   required: ['active'],
-  additionalProperties: false,
-} as const;
-const HOSTNAME_BODY = {
-  type: 'object',
-  properties: { hostname: { type: 'string', maxLength: 300 }, canonical: { type: 'boolean' } },
-  required: ['hostname', 'canonical'],
   additionalProperties: false,
 } as const;
 
@@ -517,9 +505,14 @@ const siteFields = (body: SiteBody): SiteFields => {
   if (name === 'empty') {
     throw new Refusal(422, 'incomplete');
   }
+  const slug = body.slug.trim();
+  // `new` is the new-site form's own address in the admin (/platform/sites/new), which a site's page would never reach.
+  if (slug === 'new') {
+    throw new Refusal(409, 'taken');
+  }
   return {
     ...body,
-    slug: body.slug.trim(),
+    slug,
     name,
     countryCode: body.countryCode.trim().toUpperCase(),
     enabledLocales,
@@ -1015,11 +1008,13 @@ export const adminDataRoutes =
       { schema: { body: SITE_BODY } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
-          await withActor(db, actor, async (trx) => {
+          const { slug } = await withActor(db, actor, async (trx) => {
             await platformOnly(trx, actor);
-            await createSite(trx, siteFields(request.body));
+            const fields = siteFields(request.body);
+            await createSite(trx, fields);
+            return fields;
           });
-          return reply.code(201).send({ slug: request.body.slug });
+          return reply.code(201).send({ slug });
         }),
     );
 
@@ -1051,26 +1046,6 @@ export const adminDataRoutes =
             );
           });
           return reply.code(204).send();
-        }),
-    );
-
-    // Gives a site a hostname: its DNS, route and certificate are a gitops change (R129).
-    scope.post<{ Params: { site: string }; Body: { hostname: string; canonical: boolean } }>(
-      '/sites/:site/hostnames',
-      { schema: { params: SITE_PARAMS, body: HOSTNAME_BODY } },
-      async (request, reply) =>
-        signedIn(request, reply, async (db, actor) => {
-          await withActor(db, actor, async (trx) => {
-            await platformOnly(trx, actor);
-            const site = await siteFor(trx, request.params.site);
-            await addHostname(
-              trx,
-              site.id,
-              request.body.hostname.trim().toLowerCase(),
-              request.body.canonical,
-            );
-          });
-          return reply.code(201).send();
         }),
     );
 

@@ -70,6 +70,7 @@ const NewSitePage = async () => {
             slug_check: t('admin.platformSites.constraints.slug'),
             slug_length: t('admin.platformSites.constraints.slug'),
             tenants_slug_key: t('admin.platformSites.constraints.slugTaken'),
+            slug_reserved: t('admin.platformSites.constraints.slugReserved'),
             tenants_country_code_check: t('admin.platformSites.constraints.countryCode'),
             tenants_report_retention_days_check: t('admin.platformSites.constraints.retention'),
             tenants_report_retention_days_max: t('admin.platformSites.constraints.retention'),

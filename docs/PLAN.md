@@ -1172,22 +1172,26 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
 - **R129. Sites, on the platform's own screens** (R111, revisits W6; editorial workflow P4): `/platform/sites` lists
   every site, on or off, with its addresses; `/platform/sites/new` creates one (short name, name in its languages,
   country code, main and other languages from those the platform has messages for, methodology kind, operator, report
-  retention), always off, its operator linked in the same transaction; a site's page turns it on or off and gives it
-  addresses, verified on entry (the platform sets up their DNS, route and certificate in gitops, so a platform admin
-  vouches for them) and, if asked, made the main one, the old main one then redirecting to it. Everything goes
-  through the policies and triggers that already exist: platform admins alone insert tenants, their operator links
-  and hostnames; the database refuses a site on without an operator, a taken or reserved address, a malformed short
-  name or country code. No new grant, function or policy. Not here: changing a site's name, languages or operator,
-  and retiring an address, which stay runbooks; a short name that system paths shadow on the platform host
-  (`healthz`) isn't refused, since such a site is still reachable on its own address.
+  retention), always off, its operator linked in the same transaction; a site's page shows its details and addresses
+  and turns it on or off, each behind a confirmation that says what follows within a minute. Everything goes through
+  the policies and triggers that already exist: platform admins alone insert tenants and their operator links; the
+  database refuses a site on without an operator, a malformed short name or country code, a taken short name; the
+  API refuses `new` (the form's own address) and a retention past the column's bounds. No new grant, function or
+  policy. Addresses are not written here: an adversarial review showed that adding one marked verified, and making it
+  the main one at once, would redirect a live site to a host with no route yet, unrecoverably, and would replace
+  ADR-0002's TXT verification with a platform admin's word, a change to the security model. They stay a runbook (an
+  open question in the brief). Not here either: changing a site's name, languages or operator, which stay runbooks.
 - **R130. Demo content as SQL that Dani runs, never a seed** (task 5): `node packages/db/demo/print.ts sql <slug>`
-  prints one `DO` block that fills an empty, active site whose country code is user-assigned (XA–XZ, never a real
-  country) with an obviously fictional election: three "Partido Ejemplo" parties, four "Criterio de ejemplo" criteria,
-  two invented programmes as plain-text sources, four published cells (one of each rating, on the site's scale) and
-  the rest pending. It goes in through the real triggers (four-eyes, verbatim match, evidence), acting as three
-  fictional members it removes at the end; the programmes' bytes go on the volume first with put-file
-  (`print.ts file a|b`). It refuses a real country's site, an inactive one, one with elections or none at all, and
-  takes only a slug, so it can't put fictional content into iaenlasurnas.es's tenant.
+  prints one `DO` block that fills an empty, active site whose country code is user-assigned (XA–XZ, but not XK, which
+  Kosovo uses) with an obviously fictional election: three "Partido Ejemplo" parties, four "Criterio de ejemplo"
+  criteria, two invented programmes as Spanish plain-text sources, four published cells (one of each rating, on the
+  site's scale, summaries in Spanish and English) and the rest pending. It goes in through the real triggers
+  (four-eyes, verbatim match, evidence), acting as three fictional members it removes at the end; first each
+  programme's bytes go on the volume, in the site's `sources` bucket, the same day:
+  `print.ts file a | kubectl exec -i deploy/aiontheballot-api -- node dist/put-file.js <site-id> sources`, then `b`.
+  It refuses a real country's site, an inactive one, one with elections or none at all, one in a language other than
+  Spanish or English, and takes only a slug, so it can't put fictional content into iaenlasurnas.es's tenant. Its test
+  runs it as the owner role.
 
 ## Open decisions for Dani
 

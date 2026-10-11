@@ -16,13 +16,12 @@ test.afterAll(async () => {
 });
 
 test.describe('sites (PLAN R129)', () => {
-  test('are created off by a platform admin, then turned on and given their main address', async ({
+  test('are created off by a platform admin, then turned on after a confirmation', async ({
     page,
   }) => {
     // A fictional organization to run the new site: the operator of a test site of its own.
     const runner = await createTenant({ operator: true });
     const slug = `e2e-${crypto.randomUUID().slice(0, 8)}`;
-    const hostname = `${slug}.example.test`;
     try {
       const { id } = await signedInAccount(page, created);
       await asOwner('INSERT INTO app.platform_admins (user_id) VALUES ($1)', [id]);
@@ -50,32 +49,23 @@ test.describe('sites (PLAN R129)', () => {
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(`Demo site ${slug}`);
       await expect(page.locator('#page-announcer')).toHaveText(form.created);
       await expect(page.getByText(sites.active.off)).toBeVisible();
+      // Turning it on asks first, in a dialog.
       await page.getByRole('button', { name: sites.active.turnOn }).click();
-      await expect(page.getByText(sites.active.on)).toBeVisible();
-      await page.getByLabel(sites.hostname.label, { exact: true }).fill(hostname);
-      await page.getByLabel(sites.hostname.canonical).check();
-      await page.getByRole('button', { name: sites.hostname.add }).click();
-      await expect(page.getByText(`${hostname} (${sites.canonical})`)).toBeVisible();
+      const dialog = page.getByRole('alertdialog');
+      await expect(dialog).toContainText(sites.active.turnOnBody);
       await expectAccessible(page);
+      await dialog.getByRole('button', { name: sites.active.turnOn }).click();
+      await expect(page.getByText(sites.active.on)).toBeVisible();
+      // Addresses are shown, never added here: that is a runbook (ADR-0002, Hostnames).
+      await expect(page.getByText(sites.hostname.intro)).toBeVisible();
+      await expect(page.getByRole('textbox', { name: /address/i })).toHaveCount(0);
       expect(
         await asOwner(
-          `SELECT 1 FROM app.tenants t JOIN app.tenant_hostnames h ON h.tenant_id = t.id
-            WHERE t.slug = $1 AND t.active AND t.country_code = 'XD' AND t.default_locale = 'en'
-              AND h.hostname = $2 AND h.is_canonical AND h.verified_at IS NOT NULL`,
-          [slug, hostname],
+          `SELECT 1 FROM app.tenants
+            WHERE slug = $1 AND active AND country_code = 'XD' AND default_locale = 'en'`,
+          [slug],
         ),
       ).toBe(1);
-
-      // An address that is taken says so, at the field.
-      await page.getByLabel(sites.hostname.label, { exact: true }).fill(hostname);
-      await page.getByRole('button', { name: sites.hostname.add }).click();
-      await expect(page.locator('#hostname-error')).toHaveText(
-        `⚠ ${sites.constraints.hostnameTaken}`,
-      );
-      await expect(page.getByLabel(sites.hostname.label, { exact: true })).toHaveAttribute(
-        'aria-invalid',
-        'true',
-      );
     } finally {
       await asOwner(`SELECT private.purge_tenant(id) FROM app.tenants WHERE slug = $1`, [slug]);
       await purgeTenant(runner.id, runner.operatorId);

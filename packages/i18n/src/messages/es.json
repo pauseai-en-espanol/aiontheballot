@@ -582,7 +582,7 @@
     },
     "platformSites": {
       "title": "Sitios",
-      "intro": "Todos los sitios de la plataforma, activos o no. La dirección pública de un sitio necesita además su DNS, su ruta y su certificado, que son un cambio en gitops.",
+      "intro": "Todos los sitios de la plataforma, activos o no. Las direcciones de un sitio se añaden con un procedimiento: su DNS, su ruta y su certificado son un cambio en gitops, y la fila de la base de datos dice de qué sitio es cada una.",
       "caption": "Sitios y sus direcciones",
       "name": "Nombre",
       "country": "País",
@@ -598,11 +598,11 @@
       "newIntro": "Un sitio nuevo empieza inactivo: nadie fuera del admin lo ve hasta que lo actives. Su operador es la organización que lo gestiona y responde de él en el aviso legal.",
       "form": {
         "slug": "Nombre corto",
-        "slugHint": "Minúsculas, cifras y guiones, como demo. Nombra el sitio en las direcciones del admin y de la plataforma, y no cambia.",
+        "slugHint": "Minúsculas, cifras y guiones, como demo. Nombra el sitio en las direcciones del admin y de la plataforma, y no cambia. No new, que usa el admin.",
         "name": "Nombre",
-        "nameHint": "Tal como lo ve el público, en los idiomas del sitio. Al menos uno.",
+        "nameHint": "Tal como lo ve el público, en los idiomas del sitio. Al menos uno; el texto en un idioma que el sitio no tiene se descarta.",
         "countryCode": "Código de país",
-        "countryCodeHint": "Dos letras, ISO 3166-1, como ES. Un sitio de demostración lleva uno de XA a XZ, que no tiene ningún país.",
+        "countryCodeHint": "Dos letras, ISO 3166-1, como ES. Un sitio de demostración lleva un código que no tiene ningún país: uno de XA a XZ, salvo XK, que usa Kosovo.",
         "defaultLocale": "Idioma principal",
         "enabledLocales": "Otros idiomas",
         "methodologyKind": "Tipo de metodología",
@@ -619,25 +619,23 @@
       "noOperator": "Ninguno",
       "languages": "Idiomas",
       "methodologyKind": "Metodología",
-      "reportRetention": "Avisos guardados",
+      "reportRetention": "Plazo de los avisos",
       "active": {
         "title": "Sitio público",
         "on": "Activo: sus direcciones lo sirven. Muestra la página de «próximamente» hasta que OPEN_SITES, en el despliegue, lo incluya.",
         "off": "Inactivo: nadie fuera del admin lo ve.",
         "turnOn": "Activar el sitio",
+        "turnOnTitle": "¿Activar este sitio?",
+        "turnOnBody": "Sus direcciones empiezan a servirlo en menos de un minuto: su página de «próximamente», hasta que el despliegue lo abra.",
         "turnOff": "Desactivar el sitio",
+        "turnOffTitle": "¿Desactivar este sitio?",
+        "turnOffBody": "En menos de un minuto, todas las direcciones del sitio responden que ahí no hay nada, hasta que se vuelva a activar.",
         "turnedOn": "El sitio está activo.",
         "turnedOff": "El sitio está inactivo."
       },
       "hostname": {
         "title": "Direcciones",
-        "intro": "Una dirección que añadas aquí es del sitio desde ese momento, y no se puede deshacer, solo retirar. Solo sirve el sitio cuando su DNS, su ruta y su certificado están en gitops.",
-        "label": "Dirección",
-        "hint": "Un nombre de host sin https://, como demo.example.org.",
-        "canonical": "Hacerla la dirección principal",
-        "canonicalHint": "La dirección que usan los enlaces, los sitemaps y las imágenes para compartir del sitio; cualquier otra redirige a ella.",
-        "add": "Añadir dirección",
-        "added": "Dirección añadida."
+        "intro": "Añadir una dirección, o hacer principal otra, se hace con un procedimiento: la plataforma la verifica y luego le da su ruta y su certificado en gitops."
       },
       "constraints": {
         "slug": "Usa minúsculas, cifras y guiones sueltos, hasta 63 caracteres.",
@@ -645,9 +643,8 @@
         "countryCode": "Escribe dos letras, como ES.",
         "retention": "Escribe un número de días de 1 a 36500.",
         "name": "Escribe su nombre en al menos uno de sus idiomas.",
-        "hostname": "Escribe un nombre de host, como demo.example.org.",
-        "hostnameTaken": "Esta dirección está ocupada o reservada.",
-        "operator": "Un sitio activo necesita un operador."
+        "operator": "Un sitio activo necesita un operador.",
+        "slugReserved": "El admin usa este nombre corto. Elige otro."
       }
     }
   },

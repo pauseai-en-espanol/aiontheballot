@@ -765,6 +765,14 @@ describe('sites (PLAN R129)', () => {
     ['no name at all', { name: { es: '  ' } }, 422, 'incomplete'],
     ['a malformed short name', { slug: 'Sitio Malo' }, 422, 'incomplete'],
     ['a malformed country code', { countryCode: 'España' }, 422, 'incomplete'],
+    ['the short name the admin keeps for its form', { slug: 'new' }, 409, 'taken'],
+    // The schema's own refusal, before the database can overflow.
+    [
+      'a retention past what the column takes',
+      { reportRetentionDays: 2 ** 31 },
+      400,
+      'Bad Request',
+    ],
   ])('refuse %s', async (_name, change, status, error) => {
     const answer = await send('POST', '/api/sites', USERS.platformAdmin, {
       body: { ...BODY, ...change },
@@ -773,19 +781,16 @@ describe('sites (PLAN R129)', () => {
     expect(answer.json()).toMatchObject({ error });
   });
 
-  it('are created off, turned on, and given a main address by a platform admin', async () => {
-    const hostname = `rutas-${Date.now()}.example.test`;
-    const created = await send('POST', '/api/sites', USERS.platformAdmin, { body: BODY });
+  it('are created off and turned on by a platform admin, and give hostnames no route here', async () => {
+    const created = await send('POST', '/api/sites', USERS.platformAdmin, {
+      body: { ...BODY, slug: ` ${BODY.slug} ` },
+    });
     expect(created.statusCode).toBe(201);
     expect(created.json()).toEqual({ slug: BODY.slug });
     const on = await send('PUT', `/api/sites/${BODY.slug}/active`, USERS.platformAdmin, {
       body: { active: true },
     });
     expect(on.statusCode).toBe(204);
-    const added = await send('POST', `/api/sites/${BODY.slug}/hostnames`, USERS.platformAdmin, {
-      body: { hostname: ` ${hostname.toUpperCase()} `, canonical: true },
-    });
-    expect(added.statusCode).toBe(201);
     const site = await send('GET', `/api/sites/${BODY.slug}`, USERS.platformAdmin);
     expect(site.json()).toEqual({
       site: {
@@ -802,14 +807,14 @@ describe('sites (PLAN R129)', () => {
           name: expect.any(Object),
           legalName: expect.any(String),
         },
-        hostnames: [{ hostname, canonical: true, verified: true, retired: false }],
+        hostnames: [],
       },
     });
-    const taken = await send('POST', '/api/sites/test-a/hostnames', USERS.platformAdmin, {
-      body: { hostname, canonical: false },
+    // Hostnames are verified and routed by runbook (ADR-0002): the admin has no route to add one.
+    const hostname = await send('POST', `/api/sites/${BODY.slug}/hostnames`, USERS.platformAdmin, {
+      body: { hostname: 'otra.example.test', canonical: true },
     });
-    expect(taken.statusCode).toBe(409);
-    expect(taken.json()).toEqual({ error: 'taken', constraint: 'tenant_hostnames_pkey' });
+    expect(hostname.statusCode).toBe(404);
     const again = await send('POST', '/api/sites', USERS.platformAdmin, { body: BODY });
     expect(again.json()).toEqual({ error: 'taken', constraint: 'tenants_slug_key' });
   });

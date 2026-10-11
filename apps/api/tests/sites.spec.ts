@@ -4,7 +4,6 @@ import { sql, type Transaction } from 'kysely';
 import { describe, expect, it } from 'vitest';
 
 import {
-  addHostname,
   createSite,
   getSite,
   listSites,
@@ -80,44 +79,6 @@ describe('sites (PLAN R129)', () => {
       await expect(
         sql`DELETE FROM app.tenant_organizations WHERE tenant_id = ${id}`.execute(trx),
       ).rejects.toMatchObject({ code: '23514' });
-    });
-  });
-
-  it('take addresses, the main one moving to the newest when asked, the old one staying theirs', async () => {
-    await inRolledBackTransaction(async (trx) => {
-      await actAs(trx, USERS.platformAdmin);
-      const { id } = await createSite(trx, FIELDS);
-      await addHostname(trx, id, 'prueba-uno.example.test', true);
-      await addHostname(trx, id, 'prueba-alias.example.test', false);
-      await addHostname(trx, id, 'prueba-dos.example.test', true);
-      expect((await getSite(trx, FIELDS.slug))?.hostnames).toEqual([
-        { hostname: 'prueba-dos.example.test', canonical: true, verified: true, retired: false },
-        { hostname: 'prueba-alias.example.test', canonical: false, verified: true, retired: false },
-        { hostname: 'prueba-uno.example.test', canonical: false, verified: true, retired: false },
-      ]);
-    });
-  });
-
-  it("never take another site's address, nor one the platform reserves", async () => {
-    await inRolledBackTransaction(async (trx) => {
-      await sql`INSERT INTO app.platform_hostnames (hostname) VALUES ('reservada.example.test')`.execute(
-        trx,
-      );
-      await actAs(trx, USERS.platformAdmin);
-      const { id } = await createSite(trx, FIELDS);
-      await expect(addHostname(trx, id, 'test-a.example.test', false)).rejects.toMatchObject({
-        code: '23505',
-      });
-    });
-    await inRolledBackTransaction(async (trx) => {
-      await sql`INSERT INTO app.platform_hostnames (hostname) VALUES ('reservada.example.test')`.execute(
-        trx,
-      );
-      await actAs(trx, USERS.platformAdmin);
-      const { id } = await createSite(trx, FIELDS);
-      await expect(addHostname(trx, id, 'reservada.example.test', false)).rejects.toMatchObject({
-        code: '23001',
-      });
     });
   });
 

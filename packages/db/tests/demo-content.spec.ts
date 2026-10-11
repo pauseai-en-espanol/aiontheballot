@@ -22,7 +22,8 @@ const createSite = async (
   await client.query(
     `INSERT INTO app.tenants (id, slug, country_code, default_locale, enabled_locales, display_name, methodology_kind,
                               report_retention_days, active)
-     VALUES ($1, 'demo', $2, $5, '{es,en}', '{"es": "Sitio de demostración"}', $3, 365, $4)`,
+     VALUES ($1, 'demo', $2, $5, ARRAY[$5, 'es', 'en']::app.locale[], '{"es": "Sitio de demostración"}', $3, 365,
+             $4)`,
     [SITE, country, kind, active, locale],
   );
   await client.query(
@@ -35,6 +36,8 @@ describe('the demo content (PLAN R130)', () => {
   it('fills an empty demo site through the real triggers: a live election, pending cells and a few published', async () => {
     await inRolledBackTransaction(async (client) => {
       await createSite(client);
+      // As the tables' owner, as Dani runs it.
+      await client.query('SET LOCAL ROLE aiontheballot_owner');
       await client.query(demoContentSql('demo'));
       await client.query('SET LOCAL ROLE aiontheballot_web');
       const { rows } = await client.query<{
@@ -103,7 +106,9 @@ describe('the demo content (PLAN R130)', () => {
 
   it.each([
     ['a site in a real country', { country: 'ES' }],
+    ['a site in Kosovo, whose XK is no user-assigned code in practice', { country: 'XK' }],
     ['a site not yet active', { active: false }],
+    ['a site in a language the content lacks', { locale: 'fr' }],
   ])('refuses %s, changing nothing', async (_name, site) => {
     await inRolledBackTransaction(async (client) => {
       await createSite(client, site);

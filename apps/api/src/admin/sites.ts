@@ -5,8 +5,8 @@ import { sql, type Transaction } from 'kysely';
 
 /**
  * Sites (tenants), on the platform's own screens (PLAN R111, R129): created and turned on or off by platform admins,
- * who alone may (RLS: the tenants insert and update policies, the operator link, the hostnames). A site's hostname
- * still needs its DNS, route and certificate in gitops; the database row only says that it is the site's.
+ * who alone may (RLS: the tenants insert and update policies, the operator link). Their hostnames are shown, never
+ * written here: a hostname is verified and routed by runbook and gitops (ADR-0002, Hostnames).
  */
 export interface SiteFields {
   slug: string;
@@ -187,33 +187,3 @@ export const setSiteActive = async (
     .where('id', '=', tenantId)
     .returning('id')
     .executeTakeFirst()) !== undefined;
-
-/**
- * Gives a site a hostname, verified (its DNS is the platform's to set up, in gitops) and, if asked, canonical: the
- * site's one public address, which the old canonical one then redirects to. A canonical hostname moves in two steps,
- * since only one may be canonical at a time.
- */
-export const addHostname = async (
-  trx: Transaction<DB>,
-  tenantId: string,
-  hostname: string,
-  canonical: boolean,
-): Promise<void> => {
-  await trx
-    .insertInto('app.tenant_hostnames')
-    .values({ hostname, tenant_id: tenantId, is_canonical: false, verified_at: sql`now()` })
-    .execute();
-  if (canonical) {
-    await trx
-      .updateTable('app.tenant_hostnames')
-      .set({ is_canonical: false })
-      .where('tenant_id', '=', tenantId)
-      .where('is_canonical', '=', true)
-      .execute();
-    await trx
-      .updateTable('app.tenant_hostnames')
-      .set({ is_canonical: true })
-      .where('hostname', '=', hostname)
-      .execute();
-  }
-};

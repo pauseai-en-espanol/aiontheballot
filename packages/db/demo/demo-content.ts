@@ -4,11 +4,14 @@
  * triggers, as fictional members who exist only for this and are removed at the end, so the demo shows what the
  * platform does without a word of real political content.
  *
- * It fills only an active site whose country code is user-assigned (ISO 3166 XA–XZ, never a real country) and that
- * has no election yet: it can't put fictional content into a real site.
+ * It fills only an active site whose country code is user-assigned (ISO 3166 XA–XZ, never a real country, and not
+ * XK, which Kosovo uses) and that has no election yet: it can't put fictional content into a real site.
  *
- *   node packages/db/demo/print.ts file a   # programme A's bytes, for put-file (then b)
- *   node packages/db/demo/print.ts sql demo # the SQL for the site with slug `demo`, to run as the owner
+ * First each programme's bytes go on the volume, in the site's `sources` bucket, the same day as the SQL runs:
+ *
+ *   node packages/db/demo/print.ts file a | kubectl exec -i deploy/aiontheballot-api -- \
+ *     node dist/put-file.js <site-id> sources                     # then the same for b
+ *   node packages/db/demo/print.ts sql demo                       # the SQL for the site `demo`, run as the owner
  */
 
 /** The fictional programmes, stored as plain text: their bytes go on the volume, their sections are the units. */
@@ -153,9 +156,9 @@ export const demoContentSql = (slug: string): string => {
     VALUES (d_tenant, 'sources', 'text/plain', octet_length(convert_to(${literal(text)}, 'UTF8')),
             encode(sha256(convert_to(${literal(text)}, 'UTF8')), 'hex'), ${literal(`programa-de-ejemplo-${key}.txt`)})
     RETURNING id INTO d_file;
-    INSERT INTO app.source_documents (tenant_id, election_id, party_id, kind, title, url, is_programme)
+    INSERT INTO app.source_documents (tenant_id, election_id, party_id, kind, title, url, language, is_programme)
     VALUES (d_tenant, d_election, d_parties[${programme.party + 1}], 'web_page', ${literal(programme.title)},
-            ${literal(`https://example.org/programa-de-ejemplo-${key}`)}, true)
+            ${literal(`https://example.org/programa-de-ejemplo-${key}`)}, 'es', true)
     RETURNING id INTO d_created;
     d_sources[${programme.party + 1}] := d_created;
     UPDATE app.source_documents SET file_id = d_file, file_origin = 'uploaded' WHERE id = d_sources[${programme.party + 1}];
@@ -217,8 +220,8 @@ BEGIN
   IF NOT d_active THEN
     RAISE EXCEPTION 'site % is not active: an election goes live only in an active site, so turn it on first', site;
   END IF;
-  IF d_country !~ '^X[A-Z]$' THEN
-    RAISE EXCEPTION 'site % is in %, not a user-assigned country (XA-XZ): demo content goes only into a demo site',
+  IF d_country !~ '^X[A-JL-Z]$' THEN
+    RAISE EXCEPTION 'site % is in %, not a user-assigned country (XA-XZ but XK): demo content goes only into a demo site',
       site, d_country;
   END IF;
   IF d_default_locale NOT IN ('es', 'en') THEN

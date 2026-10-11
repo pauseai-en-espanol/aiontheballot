@@ -7,8 +7,7 @@ import { notFound } from 'next/navigation';
 import { getSite } from '@/data';
 import { getLocale } from '@/locale';
 import { organizationName, siteName } from '@/localized';
-import { HostnameForm } from '@/sites/HostnameForm';
-import { SiteActiveForm } from '@/sites/SiteActiveForm';
+import { ConfirmButton } from '@/ui/ConfirmButton';
 import { Lang } from '@/ui/Lang';
 import { languageName } from '@/ui/locales';
 import * as styles from '@/ui/styles';
@@ -98,16 +97,32 @@ const SitePage = async ({ params }: SiteParams) => {
         <p className={styles.text}>
           {site.active ? t('admin.platformSites.active.on') : t('admin.platformSites.active.off')}
         </p>
-        <SiteActiveForm
-          slug={site.slug}
-          active={site.active}
-          text={{
-            turnOn: t('admin.platformSites.active.turnOn'),
-            turnOff: t('admin.platformSites.active.turnOff'),
-            turnedOn: t('admin.platformSites.active.turnedOn'),
-            turnedOff: t('admin.platformSites.active.turnedOff'),
-            errors: { ...errors, incomplete: t('admin.platformSites.constraints.operator') },
-          }}
+        <ConfirmButton
+          method="PUT"
+          path={`/api/sites/${encodeURIComponent(site.slug)}/active`}
+          body={{ active: !site.active }}
+          secondary={site.active}
+          text={
+            site.active
+              ? {
+                  button: t('admin.platformSites.active.turnOff'),
+                  title: t('admin.platformSites.active.turnOffTitle'),
+                  body: t('admin.platformSites.active.turnOffBody'),
+                  confirm: t('admin.platformSites.active.turnOff'),
+                  cancel: t('admin.members.cancel'),
+                  done: t('admin.platformSites.active.turnedOff'),
+                  errors,
+                }
+              : {
+                  button: t('admin.platformSites.active.turnOn'),
+                  title: t('admin.platformSites.active.turnOnTitle'),
+                  body: t('admin.platformSites.active.turnOnBody'),
+                  confirm: t('admin.platformSites.active.turnOn'),
+                  cancel: t('admin.members.cancel'),
+                  done: t('admin.platformSites.active.turnedOn'),
+                  errors: { ...errors, incomplete: t('admin.platformSites.constraints.operator') },
+                }
+          }
         />
       </section>
       <section aria-labelledby="hostnames" className={styles.section}>
@@ -128,23 +143,6 @@ const SitePage = async ({ params }: SiteParams) => {
             ))}
           </ul>
         )}
-        <HostnameForm
-          slug={site.slug}
-          text={{
-            label: t('admin.platformSites.hostname.label'),
-            hint: t('admin.platformSites.hostname.hint'),
-            canonical: t('admin.platformSites.hostname.canonical'),
-            canonicalHint: t('admin.platformSites.hostname.canonicalHint'),
-            add: t('admin.platformSites.hostname.add'),
-            added: t('admin.platformSites.hostname.added'),
-            errors,
-            constraints: {
-              hostname_check: t('admin.platformSites.constraints.hostname'),
-              tenant_hostnames_pkey: t('admin.platformSites.constraints.hostnameTaken'),
-              reserved: t('admin.platformSites.constraints.hostnameTaken'),
-            },
-          }}
-        />
       </section>
     </>
   );

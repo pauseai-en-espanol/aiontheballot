@@ -39,7 +39,7 @@ const ERROR_ID = 'site-error';
 
 /** The constraint a field's refusal names, for its `aria-describedby`. */
 const FIELD_CONSTRAINTS = {
-  slug: ['slug_check', 'slug_length', 'tenants_slug_key'],
+  slug: ['slug_check', 'slug_length', 'tenants_slug_key', 'slug_reserved'],
   countryCode: ['tenants_country_code_check'],
   reportRetentionDays: ['tenants_report_retention_days_check', 'tenants_report_retention_days_max'],
 } as const;
@@ -94,8 +94,15 @@ export const SiteForm = ({
       () => undefined,
     );
     if (answer && !answer.ok) {
+      // Without a constraint, `incomplete` is the name (no text in the site's languages), and `taken` the one short
+      // name the admin keeps for itself.
       setConstraint(
-        answer.constraint ?? (answer.error === 'incomplete' ? 'localized_check' : undefined),
+        answer.constraint ??
+          (answer.error === 'incomplete'
+            ? 'localized_check'
+            : answer.error === 'taken'
+              ? 'slug_reserved'
+              : undefined),
       );
       return;
     }

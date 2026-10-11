@@ -186,16 +186,14 @@ _Built: the fields of P2.1 but the logo, on `/platform/organizations` (PLAN R112
 
 ### P4. Sites
 
-1. Only platform admins create a site, turn it on or off, and give it addresses. [DB: RLS on `tenants`,
-   `tenant_organizations`, `tenant_hostnames`]
+1. Only platform admins create a site and turn it on or off. [DB: RLS on `tenants`, `tenant_organizations`]
 2. A new site starts off, with its operator, in the platform's languages, the default among them. [API, DB: checks]
-3. A site is on only with an operator. [DB: `active_tenant_has_operator`]
-4. An address is verified when a platform admin adds it, since its DNS, route and certificate are a gitops change; it
-   is the site's for good, never one that is taken, reserved or retired. Made the main one, it takes over from the old,
-   which redirects to it. [DB: `tenant_hostname_rules`, the one-canonical index]
+3. A site is on only with an operator. Turning it on or off asks first, since its addresses change within a minute.
+   [DB: `active_tenant_has_operator`; UI]
+4. Its addresses are shown, not written: a hostname is verified and routed by runbook (ADR-0002, Hostnames). [UI]
 
-_Built (PLAN R129): `/platform/sites`, its new-site form and each site's page. Changing a site's name, languages or
-operator, and retiring an address, stay runbooks._
+_Built (PLAN R129): `/platform/sites`, its new-site form and each site's page. Adding addresses, changing a site's
+name, languages or operator stay runbooks._
 
 ## 5. Tenant settings
 
