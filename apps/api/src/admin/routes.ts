@@ -6,6 +6,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Transaction } from 'kysely';
 
 import { withActor } from '@aiontheballot/db/actor';
+import { type Rating, RATINGS } from '@aiontheballot/domain/methodology';
+import { matchQuote } from '@aiontheballot/domain/quote-match';
 import { isLocale } from '@aiontheballot/i18n/messages';
 import { captureException } from '@sentry/node';
 
@@ -13,6 +15,25 @@ import type { ProfileSource } from './profiles.js';
 
 import { databaseRefusal } from '../database-errors.js';
 import { type Access, accessTo, holds, isPlatformAdmin, TENANT_ROLES } from './access.js';
+import { cellGrid } from './cell-grid.js';
+import {
+  addCheckedDocument,
+  addQuote,
+  type CellChange,
+  type ChangeKind,
+  clearRecheck,
+  commentOnCell,
+  createCell,
+  deleteCell,
+  getCell,
+  moveCell,
+  publishCell,
+  rejectCell,
+  removeCheckedDocument,
+  removeQuote,
+  saveCell,
+  sourceUnits,
+} from './cells.js';
 import { goLiveChecklist } from './checklist.js';
 import {
   createElection,
@@ -193,6 +214,55 @@ const ELECTION_ID_PARAMS = {
   properties: { tenant: SLUG, election: SLUG, id: UUID },
   required: ['tenant', 'election', 'id'],
 } as const;
+const CELL_PAIR_PARAMS = {
+  type: 'object',
+  properties: { tenant: SLUG, election: SLUG, party: UUID, criterion: UUID },
+  required: ['tenant', 'election', 'party', 'criterion'],
+} as const;
+const CELL_ITEM_PARAMS = <K extends string>(item: K) =>
+  ({
+    type: 'object',
+    properties: { tenant: SLUG, election: SLUG, id: UUID, [item]: UUID },
+    required: ['tenant', 'election', 'id', item],
+  }) as const;
+/** The content version a change was made against (C14). */
+const VERSION = { type: 'integer', minimum: 0 } as const;
+const VERSION_QUERY = {
+  type: 'object',
+  properties: { version: VERSION },
+  required: ['version'],
+} as const;
+/** A cell's fields as its form sends them: the rating on any scale, which the database checks against the tenant's. */
+const CELL_BODY = {
+  type: 'object',
+  properties: {
+    version: VERSION,
+    rating: { type: ['string', 'null'], enum: [...RATINGS, null] },
+    summary: { anyOf: [localizedSchema(4000), { type: 'null' }] },
+    changeKind: { type: ['string', 'null'], enum: ['update', 'correction', 'withdrawal', null] },
+    publicNote: { anyOf: [localizedSchema(2000), { type: 'null' }] },
+  },
+  required: ['version', 'rating', 'summary', 'changeKind', 'publicNote'],
+  additionalProperties: false,
+} as const;
+interface CellBody {
+  version: number;
+  rating: Rating | null;
+  summary: Record<string, string> | null;
+  changeKind: Exclude<ChangeKind, 'initial'> | null;
+  publicNote: Record<string, string> | null;
+}
+/** A comment, or a rejection's note (C8, C9), and for a rejection the version the reviewer saw. */
+const NOTE_BODY = (withVersion: boolean) =>
+  ({
+    type: 'object',
+    properties: {
+      ...(withVersion ? { version: VERSION } : {}),
+      note: { type: 'string', maxLength: 4000 },
+    },
+    required: withVersion ? ['version', 'note'] : ['note'],
+    additionalProperties: false,
+  }) as const;
 
 /**
  * Slugs and territory codes in bodies are checked by the database, whose constraint names the field (R78); the schemas
@@ -427,6 +497,43 @@ const refuseUnless = (result: ChangeResult): void => {
   if (result === 'stale') {
     throw new Refusal(409, 'stale');
   }
+};
+
+/** Turns a cell change that didn't happen into its refusal: gone, or changed by someone else first (C14). */
+const refuseUnlessCell = (result: CellChange): void => {
+  if (result === 'not-found') {
+    throw new Refusal(404, 'notFound');
+  }
+  if (result === 'stale') {
+    throw new Refusal(409, 'stale');
+  }
+  if (result === 'forbidden') {
+    throw new Refusal(403, 'forbidden');
+  }
+};
+
+/** Optional localized text, in the tenant's languages only: null when blank, which a draft may be. */
+const optionalLocalizedInput = (
+  value: Record<string, string> | null,
+  access: Access,
+): Localized | null => {
+  if (value === null) {
+    return null;
+  }
+  const input = localizedInput(value, access.enabledLocales);
+  if (input === 'invalid') {
+    throw new Refusal(400, 'invalid');
+  }
+  return input === 'empty' ? null : input;
+};
+
+/** A note that must say something: a comment, or why a cell goes back (C8.1). */
+const requiredNote = (note: string): string => {
+  const trimmed = note.trim();
+  if (trimmed === '') {
+    throw new Refusal(422, 'incomplete');
+  }
+  return trimmed;
 };
 
 /** Localized text a column requires: in the tenant's languages only, and with text in at least one. */
@@ -1047,6 +1154,405 @@ export const adminDataRoutes =
           });
           return reply.code(204).send();
         }),
+    );
+
+    // The election's cell grid (C1.1).
+    scope.get<{ Params: { tenant: string; election: string } }>(
+      '/t/:tenant/e/:election/cells',
+      { schema: { params: ELECTION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const { access } = await electionFor(trx, actor, request.params);
+            const grid = await cellGrid(trx, request.params.tenant, request.params.election);
+            if (!grid) {
+              throw new Refusal(404, 'notFound');
+            }
+            return { ...grid, roles: access.roles, platformAdmin: access.platformAdmin };
+          }),
+        ),
+    );
+
+    // One cell, by its party and criterion, with everything its screen shows (C2–C12), and the names of the people
+    // its trail names: members RLS shows, never more.
+    scope.get<{ Params: { tenant: string; election: string; party: string; criterion: string } }>(
+      '/t/:tenant/e/:election/cells/:party/:criterion',
+      { schema: { params: CELL_PAIR_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          const { access, cell } = await withActor(db, actor, async (trx) => {
+            const found = await electionFor(trx, actor, request.params);
+            const pair = await getCell(
+              trx,
+              found.election.id,
+              request.params.party,
+              request.params.criterion,
+            );
+            if (!pair) {
+              throw new Refusal(404, 'notFound');
+            }
+            return { access: found.access, cell: pair };
+          });
+          const ids = cell.draft
+            ? [
+                ...cell.draft.events.map((e) => e.actorId),
+                ...cell.draft.contributors,
+                ...cell.draft.checkedDocuments.map((c) => c.checkedBy),
+              ]
+            : [];
+          const found = profiles ? await profiles(ids, { emails: false }) : new Map();
+          return {
+            ...cell,
+            names: Object.fromEntries(
+              [...new Set(ids)].map((id) => [id, found.get(id)?.name ?? null]),
+            ),
+            roles: access.roles,
+            platformAdmin: access.platformAdmin,
+            you: actor.userId,
+          };
+        }),
+    );
+
+    // Creates a cell as a draft (C2.1).
+    scope.post<{
+      Params: { tenant: string; election: string };
+      Body: { partyId: string; criterionId: string };
+    }>(
+      '/t/:tenant/e/:election/cells',
+      {
+        schema: {
+          params: ELECTION_PARAMS,
+          body: {
+            type: 'object',
+            properties: { partyId: UUID, criterionId: UUID },
+            required: ['partyId', 'criterionId'],
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          const id = await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            return createCell(
+              trx,
+              access.tenantId,
+              election.id,
+              request.body.partyId,
+              request.body.criterionId,
+            );
+          });
+          return reply.code(201).send({ id });
+        }),
+    );
+
+    // Saves a draft's rating, summary, change kind and public note (C2, C10, C11), at the version loaded (C14).
+    scope.put<{ Params: { tenant: string; election: string; id: string }; Body: CellBody }>(
+      '/t/:tenant/e/:election/cells/:id',
+      { schema: { params: ELECTION_ID_PARAMS, body: CELL_BODY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            refuseUnlessCell(
+              await saveCell(trx, election.id, request.params.id, request.body.version, {
+                rating: request.body.rating,
+                summary: optionalLocalizedInput(request.body.summary, access),
+                changeKind: request.body.changeKind,
+                publicNote: optionalLocalizedInput(request.body.publicNote, access),
+              }),
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Deletes a cell never published (C13).
+    scope.delete<{
+      Params: { tenant: string; election: string; id: string };
+      Querystring: { version: number };
+    }>(
+      '/t/:tenant/e/:election/cells/:id',
+      { schema: { params: ELECTION_ID_PARAMS, querystring: VERSION_QUERY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            refuseUnlessCell(
+              await deleteCell(trx, election.id, request.params.id, request.query.version),
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Adds a quote (C2.4–7): the database matches it against the source's stored text.
+    scope.post<{
+      Params: { tenant: string; election: string; id: string };
+      Body: { version: number; sourceId: string; quote: string; sectionLabel: string | null };
+    }>(
+      '/t/:tenant/e/:election/cells/:id/quotes',
+      {
+        schema: {
+          params: ELECTION_ID_PARAMS,
+          body: {
+            type: 'object',
+            properties: {
+              version: VERSION,
+              sourceId: UUID,
+              // The column's own bounds (15 to 1,000 characters) are the database's; this only bounds the size.
+              quote: { type: 'string', maxLength: 4000 },
+              sectionLabel: OPTIONAL_TEXT(200),
+            },
+            required: ['version', 'sourceId', 'quote', 'sectionLabel'],
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            refuseUnlessCell(
+              await addQuote(
+                trx,
+                access.tenantId,
+                election.id,
+                request.params.id,
+                request.body.version,
+                {
+                  sourceId: request.body.sourceId,
+                  text: request.body.quote,
+                  sectionLabel: optionalText(request.body.sectionLabel),
+                },
+              ),
+            );
+          });
+          return reply.code(201).send();
+        }),
+    );
+
+    // Removes a quote.
+    scope.delete<{
+      Params: { tenant: string; election: string; id: string; quote: string };
+      Querystring: { version: number };
+    }>(
+      '/t/:tenant/e/:election/cells/:id/quotes/:quote',
+      { schema: { params: CELL_ITEM_PARAMS('quote'), querystring: VERSION_QUERY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            refuseUnlessCell(
+              await removeQuote(
+                trx,
+                election.id,
+                request.params.id,
+                request.query.version,
+                request.params.quote,
+              ),
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Records a checked document for "No lo menciona" (C3).
+    scope.post<{
+      Params: { tenant: string; election: string; id: string };
+      Body: { version: number; sourceId: string };
+    }>(
+      '/t/:tenant/e/:election/cells/:id/checked',
+      {
+        schema: {
+          params: ELECTION_ID_PARAMS,
+          body: {
+            type: 'object',
+            properties: { version: VERSION, sourceId: UUID },
+            required: ['version', 'sourceId'],
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            refuseUnlessCell(
+              await addCheckedDocument(
+                trx,
+                access.tenantId,
+                election.id,
+                request.params.id,
+                request.body.version,
+                request.body.sourceId,
+              ),
+            );
+          });
+          return reply.code(201).send();
+        }),
+    );
+
+    // Removes a checked document.
+    scope.delete<{
+      Params: { tenant: string; election: string; id: string; source: string };
+      Querystring: { version: number };
+    }>(
+      '/t/:tenant/e/:election/cells/:id/checked/:source',
+      { schema: { params: CELL_ITEM_PARAMS('source'), querystring: VERSION_QUERY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            refuseUnlessCell(
+              await removeCheckedDocument(
+                trx,
+                election.id,
+                request.params.id,
+                request.query.version,
+                request.params.source,
+              ),
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Submits a draft (C5), recalls it (C6) or publishes the version the reviewer saw (C7).
+    for (const step of ['submit', 'recall', 'publish'] as const) {
+      scope.post<{
+        Params: { tenant: string; election: string; id: string };
+        Body: { version: number };
+      }>(
+        `/t/:tenant/e/:election/cells/:id/${step}`,
+        {
+          schema: {
+            params: ELECTION_ID_PARAMS,
+            body: {
+              type: 'object',
+              properties: { version: VERSION },
+              required: ['version'],
+              additionalProperties: false,
+            },
+          },
+        },
+        async (request, reply) =>
+          signedIn(request, reply, async (db, actor) => {
+            await withActor(db, actor, async (trx) => {
+              const { election } = await electionFor(trx, actor, request.params);
+              const { id } = request.params;
+              const { version } = request.body;
+              refuseUnlessCell(
+                step === 'publish'
+                  ? await publishCell(trx, election.id, id, version)
+                  : await moveCell(
+                      trx,
+                      election.id,
+                      id,
+                      version,
+                      step === 'submit' ? 'in_review' : 'draft',
+                    ),
+              );
+            });
+            return reply.code(204).send();
+          }),
+      );
+    }
+
+    // Sends a cell in review back with a note (C8).
+    scope.post<{
+      Params: { tenant: string; election: string; id: string };
+      Body: { version: number; note: string };
+    }>(
+      '/t/:tenant/e/:election/cells/:id/reject',
+      { schema: { params: ELECTION_ID_PARAMS, body: NOTE_BODY(true) } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            refuseUnlessCell(
+              await rejectCell(
+                trx,
+                access.tenantId,
+                election.id,
+                request.params.id,
+                request.body.version,
+                requiredNote(request.body.note),
+              ),
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Comments on a cell (C9).
+    scope.post<{
+      Params: { tenant: string; election: string; id: string };
+      Body: { note: string };
+    }>(
+      '/t/:tenant/e/:election/cells/:id/comments',
+      { schema: { params: ELECTION_ID_PARAMS, body: NOTE_BODY(false) } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            refuseUnlessCell(
+              await commentOnCell(
+                trx,
+                access.tenantId,
+                election.id,
+                request.params.id,
+                requiredNote(request.body.note),
+              ),
+            );
+          });
+          return reply.code(201).send();
+        }),
+    );
+
+    // Clears a recheck flag (C12.2).
+    scope.delete<{ Params: { tenant: string; election: string; id: string } }>(
+      '/t/:tenant/e/:election/cells/:id/recheck',
+      { schema: { params: ELECTION_ID_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            refuseUnlessCell(await clearRecheck(trx, election.id, request.params.id));
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // The live match of a quote against a source (C2.6, W13): what the database will decide on save, as the editor
+    // types. The source's units are read under RLS each time; they never change once extracted.
+    scope.post<{
+      Params: { tenant: string; election: string; id: string };
+      Body: { quote: string };
+    }>(
+      '/t/:tenant/e/:election/sources/:id/match',
+      {
+        schema: {
+          params: ELECTION_ID_PARAMS,
+          body: {
+            type: 'object',
+            properties: { quote: { type: 'string', maxLength: 4000 } },
+            required: ['quote'],
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            const units = await sourceUnits(trx, election.id, request.params.id);
+            if (!units) {
+              throw new Refusal(404, 'notFound');
+            }
+            return matchQuote(request.body.quote, units);
+          }),
+        ),
     );
 
     // The tenant's elections (§6).

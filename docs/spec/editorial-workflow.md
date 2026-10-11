@@ -511,6 +511,8 @@ _As a reviewer, I check someone else's draft against its sources and publish it.
 1. Each save of a quote or field is its own change. If someone else changed the cell since it was loaded, the screen
    says so and offers to reload before saving. [API: `content_version`; UI]
 
+_Built (PLAN R131): C1.1, C2, C3, C5–C14 on `…/cells` and each cell's page. Not yet: C1.2's queues, C4 and C10.4._
+
 ## 9. Programme status
 
 ### PS1. Set the programme status

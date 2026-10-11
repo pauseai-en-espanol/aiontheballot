@@ -18,6 +18,7 @@
     "docker:push": "docker push \"${DOCKER_REGISTRY:+${DOCKER_REGISTRY}/}aiontheballot/admin:${npm_package_version}${DOCKER_TAG_SUFFIX:+.${DOCKER_TAG_SUFFIX}}\""
   },
   "dependencies": {
+    "@aiontheballot/domain": "workspace:*",
     "@aiontheballot/i18n": "workspace:*",
     "@aiontheballot/observability": "workspace:*",
     "@ark-ui/react": "5.39.3",

@@ -1192,6 +1192,21 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   It refuses a real country's site, an inactive one, one with elections or none at all, one in a language other than
   Spanish or English, and takes only a slug, so it can't put fictional content into iaenlasurnas.es's tenant. Its test
   runs it as the owner role.
+- **R131. The cell editor and the review workflow, as built** (editorial workflow C1–C3, C5–C14; task 6): the
+  election's grid (`…/cells`), each cell with its state, published rating and flags in words; a cell's page with its
+  draft (rating on the methodology's scale, summary per language, and after the first publish a kind of change and a
+  public note), its quotes with where each matches, the documents checked for "not mentioned", the workflow open to
+  the user (start, submit, recall, approve and publish behind a confirmation, send back with a note, delete while never
+  published), its recheck flag, its comments and trail with names, and every published revision. Every change names
+  the content version the editor loaded; the API locks the cell, compares, and answers 409 `stale` if someone changed
+  it first, and the screen offers a full reload (C14). The live match (W13) answers as the editor pauses typing (400
+  ms), through `POST …/sources/{id}/match`, which reads the source's units under RLS each time rather than keeping
+  them in memory (R77's suggestion, left for when programmes are long). The database decides every step, as before;
+  the API adds only the version check, a non-empty note, and the languages a text may be in. A cell RLS won't let the
+  actor delete (a published one) is a 403, never a silent success. Publish is offered only to reviewers, country
+  admins and platform admins, and replaced by the reason when four-eyes forbids the user's own work. Not built: C4
+  (attested quotes, which need uploads, with sources, task 8), C10.4 (linking a right-of-reply report, which has no
+  screen yet), and the dashboard queues of C1.2. The e2e test leaves the seeded cells as it found them.
 
 ## Open decisions for Dani
 

@@ -10,6 +10,7 @@ import { createProfileSource } from '../src/admin/profiles.js';
 import { adminDataRoutes } from '../src/admin/routes.js';
 import { createAccount, deleteAccount } from './auth-fixtures.js';
 import {
+  LIVE_A,
   OPERATOR_A,
   SHARED_BRAND_ASSET,
   TENANT_A,
@@ -817,5 +818,60 @@ describe('sites (PLAN R129)', () => {
     expect(hostname.statusCode).toBe(404);
     const again = await send('POST', '/api/sites', USERS.platformAdmin, { body: BODY });
     expect(again.json()).toEqual({ error: 'taken', constraint: 'tenants_slug_key' });
+  });
+});
+
+describe('cells (editorial workflow §8)', () => {
+  const grid = '/api/t/test-a/e/generales-de-ejemplo/cells';
+  const SOURCE_A = '0190f8c4-0000-7000-8000-000000000651';
+
+  it("serve the election's grid and each cell to its members, and a 404 to anyone else", async () => {
+    const shown = await send('GET', grid, USERS.editorA);
+    expect(shown.statusCode).toBe(200);
+    const body = shown.json<{
+      cells: { partyId: string; criterionId: string; assessmentId: string | null }[];
+    }>();
+    const cell = body.cells.find((c) => c.assessmentId === LIVE_A.cells.draft);
+    expect(cell).toBeDefined();
+    const one = await send('GET', `${grid}/${cell?.partyId}/${cell?.criterionId}`, USERS.reviewerA);
+    expect(one.statusCode).toBe(200);
+    expect(one.json()).toMatchObject({ draft: { id: LIVE_A.cells.draft }, you: USERS.reviewerA });
+    for (const user of [USERS.countryAdminB, USERS.noMembership]) {
+      expect((await send('GET', grid, user)).statusCode).toBe(404);
+      expect(
+        (await send('GET', `${grid}/${cell?.partyId}/${cell?.criterionId}`, user)).statusCode,
+      ).toBe(404);
+    }
+  });
+
+  it("refuse a change made against an older version, which someone else's change made stale (C14)", async () => {
+    const answer = await send('PUT', `${grid}/${LIVE_A.cells.draft}`, USERS.editorA, {
+      body: { version: 9999, rating: null, summary: null, changeKind: null, publicNote: null },
+    });
+    expect(answer.statusCode).toBe(409);
+    expect(answer.json()).toEqual({ error: 'stale' });
+  });
+
+  it('match a quote as the editor types, without saving anything (C2.6)', async () => {
+    const url = `/api/t/test-a/e/generales-de-ejemplo/sources/${SOURCE_A}/match`;
+    const matched = await send('POST', url, USERS.editorA, {
+      body: { quote: 'propone una moratoria de ejemplo sobre los sistemas de prueba' },
+    });
+    expect(matched.json()).toEqual({
+      kind: 'matched',
+      span: { fromUnit: 1, toUnit: 1, location: 'p. 1' },
+    });
+    const short = await send('POST', url, USERS.editorA, { body: { quote: 'corta' } });
+    expect(short.json()).toMatchObject({ kind: 'too-short', counted: 'stored' });
+    expect(
+      (await send('POST', url, USERS.countryAdminB, { body: { quote: 'x' } })).statusCode,
+    ).toBe(404);
+  });
+
+  it('refuse a rejection without a note, before the database is asked', async () => {
+    const answer = await send('POST', `${grid}/${LIVE_A.cells.inReview}/reject`, USERS.reviewerA, {
+      body: { version: 0, note: '   ' },
+    });
+    expect(answer.statusCode).toBe(422);
   });
 });
