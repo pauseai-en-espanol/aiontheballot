@@ -668,8 +668,8 @@ importers:
         specifier: 2.6.2
         version: 2.6.2
       satori:
-        specifier: 0.38.2
-        version: 0.38.2
+        specifier: 0.41.0
+        version: 0.41.0
     devDependencies:
       '@slango.configs/lint-staged':
         specifier: 2.0.8
@@ -4635,8 +4635,8 @@ packages:
     resolution: {integrity: sha512-b3rppTKm9T+PsVCBEOUR46GWI7fdOs00VKZ1+9c1EWDaDMvjQc6tUwuFyIprgGgTcWoVHSKrU8H31ZHA2e0RHA==}
     engines: {node: '>=10'}
 
-  satori@0.38.2:
-    resolution: {integrity: sha512-aTQnYV+X4q5q2Pbrxvw2IwSN/DV+YwGm1Rr2+zT2tHP9kMHhvHKqbGZXSygawnHZVM67fPvQBxHXN5TCJbF/3A==}
+  satori@0.41.0:
+    resolution: {integrity: sha512-RXagfUbczs7RX8jMzViI4GlLDPUCkQXkSGFADG9/OOMziMrw7yOdxGz8IWYi1BhaXwE7Aboh0yx/41KK4HUjNw==}
     engines: {node: '>=16'}
 
   saxes@6.0.0:
@@ -9075,7 +9075,7 @@ snapshots:
 
   safe-stable-stringify@2.5.0: {}
 
-  satori@0.38.2:
+  satori@0.41.0:
     dependencies:
       '@shuding/opentype.js': 1.4.0-beta.0
       css-background-parser: 0.1.0
