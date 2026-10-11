@@ -46,7 +46,7 @@ const FIELD_CONSTRAINTS = {
 
 /**
  * A new site (PLAN R129): its short name, name, country, languages, methodology kind, operator and how long reports are
- * kept. It is created off; its own page turns it on and gives it addresses. The database checks every field and
+ * kept. It is created off; its own page turns it on and shows its addresses. The database checks every field and
  * decides who may (platform admins only).
  */
 export const SiteForm = ({

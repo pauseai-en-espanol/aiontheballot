@@ -599,7 +599,7 @@
       "newIntro": "Un sitio nuevo empieza inactivo: nadie fuera del admin lo ve hasta que lo actives. Su operador es la organización que lo gestiona y responde de él en el aviso legal.",
       "form": {
         "slug": "Nombre corto",
-        "slugHint": "Minúsculas, cifras y guiones, como demo. Nombra el sitio en las direcciones del admin y de la plataforma, y no cambia. No new, que usa el admin.",
+        "slugHint": "Minúsculas, cifras y guiones, como demo. Nombra el sitio en las direcciones del admin y de la plataforma, y no cambia. No «new», que usa el admin.",
         "name": "Nombre",
         "nameHint": "Tal como lo ve el público, en los idiomas del sitio. Al menos uno; el texto en un idioma que el sitio no tiene se descarta.",
         "countryCode": "Código de país",
@@ -627,7 +627,7 @@
         "off": "Inactivo: nadie fuera del admin lo ve.",
         "turnOn": "Activar el sitio",
         "turnOnTitle": "¿Activar este sitio?",
-        "turnOnBody": "Sus direcciones empiezan a servirlo en menos de un minuto: su página de «próximamente», hasta que el despliegue lo abra.",
+        "turnOnBody": "Sus direcciones empiezan a servirlo en menos de un minuto: su página de «próximamente», salvo que OPEN_SITES, en el despliegue, ya lo abra.",
         "turnOff": "Desactivar el sitio",
         "turnOffTitle": "¿Desactivar este sitio?",
         "turnOffBody": "En menos de un minuto, todas las direcciones del sitio responden que ahí no hay nada, hasta que se vuelva a activar.",

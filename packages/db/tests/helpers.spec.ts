@@ -25,6 +25,11 @@ describe('private.normalize_for_match', () => {
     'tabulador\tvertical\u000Bpágina\f',
     'ab\u0345-\ncd',
     'inteli-\u0085gencia',
+    // Spaces that are White_Space only to Unicode's rules (JS's \s misses U+0085), around a broken word.
+    'inteli-\u0085\n\u0085gencia',
+    // Every quote and dash the normaliser folds.
+    '\u2018a\u2019 \u201Ab\u201B \u2032 \u201Cc\u201D \u201Ed\u201F \u2033 \u00ABe\u00BB',
+    'f\u2010g\u2011h\u2012i\u2013j\u2014k\u2015l\u2212m',
   ];
 
   it.each(fixtures)('matches the TypeScript port for %j', async (input) => {

@@ -983,9 +983,14 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   a check confirms no stored match would change. To build before the cell editor's UI.
   _Built:_ migration `quote_normaliser_unicode` and `normalizeForMatch` (`\p{Alphabetic}`, `\p{White_Space}`: JS's
   `\s` took U+FEFF and missed U+0085). The migration first normalises every stored source text and quote both ways and
-  stops if any would change, since a generated column keeps what it stored; a guard test proves it stops. The parity
-  test adds U+FEFF, U+0085, U+00A0, U+2028, U+3000, U+200B, U+180E, tabs and form feeds, and a letter that is
-  Alphabetic but no `\p{L}` (U+0345) before a broken word.
+  stops if any would change, since a generated column keeps what it stored (texts and quotes are locked meanwhile, so
+  none written during the migration escapes it); guard tests prove it stops for a text and for a quote. The parity
+  test adds U+FEFF, U+0085 (alone and around a broken word), U+2028, U+200B, U+180E, tabs and form feeds, every folded
+  quote and dash, and a letter that is Alphabetic but no `\p{L}` (U+0345) before a broken word. If the check ever
+  stops a deploy, the way on is to recompute the column, which Postgres 17 and later do with
+  `ALTER TABLE app.source_texts ALTER COLUMN normalized SET EXPRESSION AS (private.normalize_for_match(body))`, and to
+  check again the match of the quotes from the texts it changed. Known drift: Node 26 has Unicode 17 and Postgres 18
+  Unicode 16, so for the characters Unicode 17 added the live match can disagree with the database, which decides.
 - **R114. Invitations for people without an account use one narrow lookup** (D10). `private.pending_invitation(token)`,
   a `SECURITY DEFINER` function executable by `aiontheballot_admin` only, with an empty `search_path`, returns the email
   and role of a pending, unexpired invitation whose `token_hash` is the token's SHA-256, and nothing otherwise. The API
@@ -1180,7 +1185,9 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   policy. Addresses are not written here: an adversarial review showed that adding one marked verified, and making it
   the main one at once, would redirect a live site to a host with no route yet, unrecoverably, and would replace
   ADR-0002's TXT verification with a platform admin's word, a change to the security model. They stay a runbook (an
-  open question in the brief). Not here either: changing a site's name, languages or operator, which stay runbooks.
+  open question for Dani). Only the missing route keeps the admin from it: `aiontheballot_admin` still holds the
+  grants and policy to write a verified, main hostname for a platform admin, which revoking would change ADR-0002 (the
+  same open question). Not here either: changing a site's name, languages or operator, which stay runbooks.
 - **R130. Demo content as SQL that Dani runs, never a seed** (task 5): `node packages/db/demo/print.ts sql <slug>`
   prints one `DO` block that fills an empty, active site whose country code is user-assigned (XA–XZ, but not XK, which
   Kosovo uses) with an obviously fictional election: three "Partido Ejemplo" parties, four "Criterio de ejemplo"

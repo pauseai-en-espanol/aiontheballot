@@ -599,7 +599,7 @@
       "newIntro": "A new site starts off: nobody outside the admin sees it until you turn it on. Its operator is the organization that runs it and answers for it in the legal notice.",
       "form": {
         "slug": "Short name",
-        "slugHint": "Lowercase letters, digits and hyphens, such as demo. It names the site in the admin's and the platform's addresses, and doesn't change. Not new, which the admin keeps.",
+        "slugHint": "Lowercase letters, digits and hyphens, such as demo. It names the site in the admin's and the platform's addresses, and doesn't change. Not “new”, which the admin keeps.",
         "name": "Name",
         "nameHint": "As the public sees it, in the site's languages. At least one; text in a language the site doesn't have is left out.",
         "countryCode": "Country code",
@@ -627,7 +627,7 @@
         "off": "Off: nobody outside the admin sees it.",
         "turnOn": "Turn the site on",
         "turnOnTitle": "Turn this site on?",
-        "turnOnBody": "Its addresses start serving it within a minute: its coming-soon page, until the deployment opens it.",
+        "turnOnBody": "Its addresses start serving it within a minute: its coming-soon page, unless the deployment's OPEN_SITES already opens it.",
         "turnOff": "Turn the site off",
         "turnOffTitle": "Turn this site off?",
         "turnOffBody": "Within a minute, every address of the site answers that there is nothing there, until it is turned on again.",

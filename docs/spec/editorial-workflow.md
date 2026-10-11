@@ -614,7 +614,7 @@ _As a member, I triage what the public reports, and link the corrections it lead
 
 - LLM suggestions (M4) and the MCP server (later). Evidence written in M2 is `manual`.
 - Hostnames' DNS verification, changing a tenant's operator, core criteria and platform admins in the admin:
-  runbooks for the pilot (W6). Creating tenants and giving them hostnames came later (P4, PLAN R129).
+  runbooks for the pilot (W6). Creating tenants came later (P4, PLAN R129); hostnames stay a runbook.
 - Bulk editing and theming beyond logo and colours (PLAN, cut list 5).
 - Notification emails (W17), passkeys (ADR-0003 §2) and changing a user's email.
 

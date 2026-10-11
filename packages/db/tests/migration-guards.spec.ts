@@ -177,6 +177,35 @@ describe('quote_normaliser_unicode', () => {
       ALTER TABLE app.source_texts ENABLE TRIGGER USER`);
   }, 120_000);
 
+  it('refuses while a stored quote would normalise differently', async () => {
+    // A draft's quote with a byte-order mark, put straight in past the workflow's rules: only the stored quote matters.
+    const tables = ['parties', 'criteria', 'assessments', 'draft_evidence'];
+    await asOwner(`
+      ${tables.map((t) => `ALTER TABLE app.${t} DISABLE TRIGGER USER;`).join('\n')}
+      INSERT INTO app.parties (id, tenant_id, election_id, slug, name, short_name, display_order)
+      VALUES ('0190f8c4-5eed-7000-8000-0000000000bd', '${TENANT}', '${ELECTION}', 'partido-ejemplo-a',
+              '{"es": "Partido Ejemplo A"}', '{"es": "PEA"}', 1);
+      INSERT INTO app.criteria (id, tenant_id, election_id, slug, title, description, display_order)
+      VALUES ('0190f8c4-5eed-7000-8000-0000000000be', '${TENANT}', '${ELECTION}', 'criterio-de-ejemplo',
+              '{"es": "Criterio de ejemplo"}', '{"es": "Un criterio inventado."}', 1);
+      INSERT INTO app.assessments (id, tenant_id, election_id, party_id, criterion_id, updated_by)
+      VALUES ('0190f8c4-5eed-7000-8000-0000000000bf', '${TENANT}', '${ELECTION}',
+              '0190f8c4-5eed-7000-8000-0000000000bd', '0190f8c4-5eed-7000-8000-0000000000be',
+              '00000000-0000-0000-0000-000000000000');
+      INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote,
+                                      created_by)
+      VALUES ('${TENANT}', '${ELECTION}', '0190f8c4-5eed-7000-8000-0000000000bf', '${SOURCE}', 1,
+              U&'Una cita de ejemplo\\FEFF lo bastante larga', '00000000-0000-0000-0000-000000000000');
+      ${tables.map((t) => `ALTER TABLE app.${t} ENABLE TRIGGER USER;`).join('\n')}`);
+    expect(await migrate(dir)).toContain(
+      '1 stored source texts or quotes would normalise differently',
+    );
+    await asOwner(`
+      ${tables.map((t) => `ALTER TABLE app.${t} DISABLE TRIGGER USER;`).join('\n')}
+      DELETE FROM app.draft_evidence; DELETE FROM app.assessments; DELETE FROM app.criteria; DELETE FROM app.parties;
+      ${tables.map((t) => `ALTER TABLE app.${t} ENABLE TRIGGER USER;`).join('\n')}`);
+  }, 120_000);
+
   it('runs once every stored text normalises the same', async () => {
     await asOwner(`
       ALTER TABLE app.source_texts DISABLE TRIGGER USER;

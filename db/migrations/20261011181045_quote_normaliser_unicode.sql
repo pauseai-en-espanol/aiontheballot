@@ -26,6 +26,10 @@ CREATE FUNCTION private.normalize_for_match_r113(input text) RETURNS text
     )
   $$;
 
+-- No text or quote is written while the check runs and the function changes: one written in between would be stored
+-- under the old rules unseen. Held only for this migration's transaction.
+LOCK TABLE app.source_texts, app.draft_evidence, app.revision_evidence IN SHARE MODE;
+
 DO $check$
 DECLARE
   changed bigint;

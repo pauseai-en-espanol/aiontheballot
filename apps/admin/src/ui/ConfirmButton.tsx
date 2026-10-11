@@ -52,6 +52,7 @@ export const ConfirmButton = ({
   const [status, setStatus] = useState('');
   const busy = useRef(false);
   const statusLine = useRef<HTMLParagraphElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
   const focusStatus = useRef(false);
   const errorId = useId();
 
@@ -72,6 +73,8 @@ export const ConfirmButton = ({
     setPending(false);
     if (!answer.ok) {
       setError(answer.error ?? 'unexpected');
+      // Back to the button, which names the alert, once it is rendered: not the empty status line.
+      requestAnimationFrame(() => trigger.current?.focus());
       return;
     }
     if (then !== undefined) {
@@ -90,6 +93,7 @@ export const ConfirmButton = ({
   return (
     <div className={styles.confirm}>
       <button
+        ref={trigger}
         className={secondary ? styles.secondaryButton : styles.button}
         type="button"
         aria-label={text.label}

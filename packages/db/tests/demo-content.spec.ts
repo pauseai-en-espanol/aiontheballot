@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { demoContentSql, programmeText } from '../demo/demo-content.js';
-import { errorCode, inRolledBackTransaction } from './db.js';
+import { inRolledBackTransaction } from './db.js';
 
 const SITE = '0190f8c4-de70-7000-8000-0000000000d1';
 const OPERATOR = '0190f8c4-de70-7000-8000-0000000000d2';
@@ -32,13 +32,28 @@ const createSite = async (
   );
 };
 
+/**
+ * Runs SQL as the tables' owner, as Dani runs the demo content, then back to the superuser for the checks. In a
+ * savepoint, so a refusal leaves the test's transaction usable.
+ */
+const asOwner = async (client: pg.Client, sql: string): Promise<void> => {
+  await client.query('SAVEPOINT demo');
+  try {
+    await client.query('SET LOCAL ROLE aiontheballot_owner');
+    await client.query(sql);
+    await client.query('RESET ROLE');
+    await client.query('RELEASE SAVEPOINT demo');
+  } catch (error) {
+    await client.query('ROLLBACK TO SAVEPOINT demo');
+    throw error;
+  }
+};
+
 describe('the demo content (PLAN R130)', () => {
   it('fills an empty demo site through the real triggers: a live election, pending cells and a few published', async () => {
     await inRolledBackTransaction(async (client) => {
       await createSite(client);
-      // As the tables' owner, as Dani runs it.
-      await client.query('SET LOCAL ROLE aiontheballot_owner');
-      await client.query(demoContentSql('demo'));
+      await asOwner(client, demoContentSql('demo'));
       await client.query('SET LOCAL ROLE aiontheballot_web');
       const { rows } = await client.query<{
         status: string;
@@ -83,7 +98,7 @@ describe('the demo content (PLAN R130)', () => {
   it('fills a site whose main language is English too', async () => {
     await inRolledBackTransaction(async (client) => {
       await createSite(client, { locale: 'en' });
-      await client.query(demoContentSql('demo'));
+      await asOwner(client, demoContentSql('demo'));
       const { rows } = await client.query<{ n: number }>(
         'SELECT count(*)::int AS n FROM app.assessment_revisions WHERE tenant_id = $1',
         [SITE],
@@ -95,7 +110,7 @@ describe('the demo content (PLAN R130)', () => {
   it("rates on a descriptive site's scale", async () => {
     await inRolledBackTransaction(async (client) => {
       await createSite(client, { kind: 'descriptive' });
-      await client.query(demoContentSql('demo'));
+      await asOwner(client, demoContentSql('demo'));
       const { rows } = await client.query<{ rating: string }>(
         'SELECT rating::text FROM app.assessment_revisions WHERE tenant_id = $1 ORDER BY 1',
         [SITE],
@@ -112,7 +127,9 @@ describe('the demo content (PLAN R130)', () => {
   ])('refuses %s, changing nothing', async (_name, site) => {
     await inRolledBackTransaction(async (client) => {
       await createSite(client, site);
-      expect(await errorCode(client, demoContentSql('demo'))).toBe('P0001');
+      expect(
+        await asOwner(client, demoContentSql('demo')).catch((e: { code?: string }) => e.code),
+      ).toBe('P0001');
       const { rows } = await client.query('SELECT 1 FROM app.elections WHERE tenant_id = $1', [
         SITE,
       ]);
@@ -123,9 +140,13 @@ describe('the demo content (PLAN R130)', () => {
   it('refuses a site that already has an election, and a site that does not exist', async () => {
     await inRolledBackTransaction(async (client) => {
       await createSite(client);
-      await client.query(demoContentSql('demo'));
-      expect(await errorCode(client, demoContentSql('demo'))).toBe('P0001');
-      expect(await errorCode(client, demoContentSql('no-existe'))).toBe('P0001');
+      await asOwner(client, demoContentSql('demo'));
+      expect(
+        await asOwner(client, demoContentSql('demo')).catch((e: { code?: string }) => e.code),
+      ).toBe('P0001');
+      expect(
+        await asOwner(client, demoContentSql('no-existe')).catch((e: { code?: string }) => e.code),
+      ).toBe('P0001');
     });
   });
 
