@@ -28,8 +28,10 @@ fi
 file=".changeset/renovate-$(git rev-parse --short HEAD).md"
 {
   echo '---'
+  # Single quotes, as Prettier writes them: CI checks main's format, and this file reaches main unchecked by the PR's
+  # own run (it is amended in after the checks).
   while read -r name; do
-    echo "\"$name\": patch"
+    echo "'$name': patch"
   done <<< "$names"
   echo '---'
   echo
