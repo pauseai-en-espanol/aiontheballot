@@ -100,3 +100,29 @@ export const getMembers = cache(async (slug: string): Promise<MemberList | undef
 /** Whether the user may do what any of `roles` may in the tenant (platform admins may do all): for what to offer. */
 export const mayAct = (overview: TenantOverview, ...roles: TenantRole[]): boolean =>
   overview.platformAdmin || overview.roles.some((role) => roles.includes(role));
+
+/** The operator's texts (editorial workflow T2). */
+export const DOCUMENT_KINDS = [
+  'privacy_policy',
+  'right_of_reply_policy',
+  'about_operator',
+] as const;
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
+
+export interface DocumentVersion {
+  id: string;
+  kind: DocumentKind;
+  version: number;
+  body: Localized;
+  /** Null while a draft. */
+  publishedAt: string | null;
+  createdAt: string;
+}
+
+/** Every version of the tenant's texts, newest first in each kind, and whether the user may write them. */
+export const getDocuments = cache(
+  async (slug: string): Promise<{ documents: DocumentVersion[]; canEdit: boolean } | undefined> => {
+    const body = await read(`${tenantPath(slug)}/documents`);
+    return body === undefined ? undefined : expect(body, ['documents', 'canEdit'], 'the texts');
+  },
+);

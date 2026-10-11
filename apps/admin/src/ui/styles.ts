@@ -412,3 +412,108 @@ export const actions = css({
 });
 
 export const visuallyHidden = css({ srOnly: true });
+
+export const h3 = css({ fontSize: 'lg', fontWeight: 'bold', marginBlockEnd: '2' });
+
+export const fieldset = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2',
+  border: 'none',
+  padding: '0',
+});
+
+export const tabList = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '1',
+  borderBlockEndWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'border.subtle',
+});
+
+/** The selected tab is marked by a thick underline and bold text, besides aria-selected. */
+export const tab = css({
+  minHeight: '11',
+  paddingInline: '3',
+  bg: 'transparent',
+  color: 'fg.default',
+  cursor: 'pointer',
+  borderBlockEndWidth: '3px',
+  borderStyle: 'solid',
+  borderColor: 'transparent',
+  _focusVisible: focusRing,
+  '&[aria-selected="true"]': { fontWeight: 'bold', borderColor: 'border.default' },
+});
+
+export const tabPanel = css({
+  display: 'flex',
+  flexDirection: 'column',
+  paddingBlockStart: '2',
+  _focusVisible: focusRing,
+});
+
+export const numberInput = css({
+  width: '10rem',
+  minHeight: '11',
+  paddingInline: '3',
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'border.default',
+  borderRadius: 'md',
+  bg: 'bg.canvas',
+  color: 'fg.default',
+  fontSize: 'md',
+  _focusVisible: focusRing,
+  _invalid: { borderWidth: '2px' },
+});
+
+export const checkboxField = css({ display: 'flex', alignItems: 'center', gap: '3' });
+
+export const checkbox = css({
+  width: '6',
+  height: '6',
+  accentColor: 'fg.default',
+  _focusVisible: focusRing,
+});
+
+/** Settings shown to those who can't change them: the name, then its value in words. */
+export const facts = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1',
+  marginBlockEnd: '4',
+  maxWidth: '65ch',
+  '& dt': { fontWeight: 'bold' },
+});
+
+export const buttonRow = css({ display: 'flex', flexWrap: 'wrap', gap: '3' });
+
+export const versions = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2',
+  listStyle: 'none',
+});
+
+export const details = css({
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'border.subtle',
+  borderRadius: 'md',
+  padding: '3',
+});
+
+export const summary = css({ cursor: 'pointer', minHeight: '6', _focusVisible: focusRing });
+
+export const versionText = css({ marginBlockStart: '3' });
+
+/** Text as it was written, line breaks kept: Markdown is shown, not rendered. */
+export const prose = css({ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxWidth: '75ch' });
+
+export const prefixed = css({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '1',
+  fontFamily: 'mono',
+});

@@ -214,6 +214,8 @@ _As a country admin, I set up how my tenant looks and what it says about us._
    `members_may_change`]
 2. The screen says it applies to reports sent from then on, since each report's date is fixed when it arrives. [UI;
    DB: `submit_report`]
+3. _Built (PLAN R99, R100):_ report retention, policy texts and the second-approver setting; theme colours and logos
+   wait (R100).
 
 ## 6. Elections
 

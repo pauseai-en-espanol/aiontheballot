@@ -79,6 +79,7 @@ const TenantLayout = async ({
         sections={[
           { href: base, label: t('admin.shell.dashboard') },
           { href: `${base}/members`, label: t('admin.shell.members') },
+          { href: `${base}/settings`, label: t('admin.shell.settings') },
         ]}
       />
       <main id="main" tabIndex={-1} className={styles.main}>

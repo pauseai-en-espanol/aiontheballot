@@ -2,7 +2,7 @@ import type { DB } from '@aiontheballot/db/generated/db';
 
 import { sql, type Transaction } from 'kysely';
 
-import { TENANT_ROLES, type TenantRole } from './access.js';
+import { lockTenant, TENANT_ROLES, type TenantRole } from './access.js';
 
 /** A tenant's member: who, by account id, and every role they hold there. */
 export interface Membership {
@@ -34,21 +34,6 @@ export const listMemberships = async (
   }));
 };
 
-/**
- * Takes a lock on the tenant's row that only those who may change its memberships can take (RLS gives the update
- * policy's rows to country admins and platform admins), so two removals in one tenant run one after the other. Without
- * it, two removals at once would each still see the other's country admin and leave the tenant with none.
- * `FOR NO KEY UPDATE`, so it never blocks writes elsewhere that merely reference the tenant. Whether the lock was
- * taken also says whether the actor may manage the tenant's members at all.
- */
-const lockMemberships = async (trx: Transaction<DB>, tenantId: string): Promise<boolean> =>
-  (await trx
-    .selectFrom('app.tenants')
-    .select('id')
-    .where('id', '=', tenantId)
-    .forNoKeyUpdate()
-    .executeTakeFirst()) !== undefined;
-
 export type RemoveRoleResult = 'removed' | 'not-found' | 'forbidden' | 'last-country-admin';
 
 /**
@@ -65,7 +50,8 @@ export const removeRole = async (
   userId: string,
   role: TenantRole,
 ): Promise<RemoveRoleResult> => {
-  const manager = await lockMemberships(trx, tenantId);
+  // Two removals in one tenant run one after the other, or each would still see the other's country admin.
+  const manager = await lockTenant(trx, tenantId);
   const target = await trx
     .selectFrom('app.memberships')
     .select('user_id')

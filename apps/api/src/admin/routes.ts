@@ -1,6 +1,7 @@
 import type { Actor } from '@aiontheballot/db/actor';
 import type { Database } from '@aiontheballot/db/client';
 import type { DB } from '@aiontheballot/db/generated/db';
+import type { Localized } from '@aiontheballot/domain/localized';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Transaction } from 'kysely';
 
@@ -11,14 +12,31 @@ import type { ProfileSource } from './profiles.js';
 
 import { databaseRefusal } from '../database-errors.js';
 import { type Access, accessTo, holds, isPlatformAdmin, TENANT_ROLES } from './access.js';
+import { localizedInput, localizedSchema } from './localized-input.js';
 import { addRole, listMemberships, removeRole } from './members.js';
+import {
+  type ChangeResult,
+  createDocument,
+  deleteDocument,
+  DOCUMENT_KINDS,
+  type DocumentKind,
+  listDocuments,
+  updateDocument,
+  updateSettings,
+} from './settings.js';
 import { listTenants, tenantOverview } from './tenants.js';
 
 /**
  * What the API refuses on its own, before or after the database has its say (editorial workflow §2.3): each a key
  * under `errors` in packages/i18n, like the database's refusals (database-errors.ts).
  */
-export const API_REFUSAL_KEYS = ['notFound', 'lastCountryAdmin', 'notMember'] as const;
+export const API_REFUSAL_KEYS = [
+  'notFound',
+  'lastCountryAdmin',
+  'notMember',
+  'draftExists',
+  'needsDefaultLanguage',
+] as const;
 export type ApiRefusalKey = (typeof API_REFUSAL_KEYS)[number];
 
 /**
@@ -27,8 +45,8 @@ export type ApiRefusalKey = (typeof API_REFUSAL_KEYS)[number];
  */
 export class Refusal extends Error {
   constructor(
-    readonly status: 403 | 404 | 409 | 422,
-    readonly key: ApiRefusalKey | 'forbidden',
+    readonly status: 400 | 403 | 404 | 409 | 422,
+    readonly key: ApiRefusalKey | 'forbidden' | 'invalid' | 'incomplete' | 'stale',
   ) {
     super(key);
   }
@@ -51,6 +69,11 @@ const MEMBER_PARAMS = {
   properties: { tenant: SLUG, userId: UUID },
   required: ['tenant', 'userId'],
 } as const;
+const ID_PARAMS = {
+  type: 'object',
+  properties: { tenant: SLUG, id: UUID },
+  required: ['tenant', 'id'],
+} as const;
 const MEMBER_ROLE_PARAMS = {
   type: 'object',
   properties: { tenant: SLUG, userId: UUID, role: ROLE },
@@ -69,6 +92,45 @@ export interface AdminDataOptions {
   /** Who a request acts for: a signed-in actor at aal2, or nobody (auth/session.ts). */
   actorFor: (request: FastifyRequest) => Promise<Actor | undefined>;
 }
+
+/** A policy text's length in one language at most: long enough for a privacy policy. */
+const DOCUMENT_MAX_LENGTH = 100_000;
+
+/** Turns a write that changed nothing into its refusal (each data function says why). */
+const refuseUnless = (result: ChangeResult): void => {
+  if (result === 'not-found') {
+    throw new Refusal(404, 'notFound');
+  }
+  if (result === 'forbidden') {
+    throw new Refusal(403, 'forbidden');
+  }
+  if (result === 'stale') {
+    throw new Refusal(409, 'stale');
+  }
+};
+
+/** Localized text a column requires: in the tenant's languages only, and with text in at least one. */
+const requiredLocalized = (value: Record<string, string>, access: Access): Localized => {
+  const input = localizedInput(value, access.enabledLocales);
+  if (input === 'invalid') {
+    throw new Refusal(400, 'invalid');
+  }
+  if (input === 'empty') {
+    throw new Refusal(422, 'incomplete');
+  }
+  return input;
+};
+
+/**
+ * Text that is to be published must have the tenant's default language (the trigger's rule too, which names nothing):
+ * this says so, so the admin can point at that language (editorial workflow §2.3).
+ */
+const publishable = (body: Localized, access: Access, publish: boolean): Localized => {
+  if (publish && !Object.hasOwn(body, access.defaultLocale)) {
+    throw new Refusal(422, 'needsDefaultLanguage');
+  }
+  return body;
+};
 
 /** The tenant the path names, or a 404 for one RLS hides (editorial workflow §2.1). */
 const tenantFor = async (trx: Transaction<DB>, actor: Actor, slug: string): Promise<Access> => {
@@ -240,6 +302,167 @@ export const adminDataRoutes =
             if (result === 'last-country-admin') {
               throw new Refusal(409, 'lastCountryAdmin');
             }
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // A tenant's settings (T3, P1): the report retention, and whether live edits need a second approver.
+    scope.patch<{
+      Params: { tenant: string };
+      Body: { reportRetentionDays?: number; liveEditsNeedSecondApprover?: boolean };
+    }>(
+      '/t/:tenant/settings',
+      {
+        schema: {
+          params: TENANT_PARAMS,
+          body: {
+            type: 'object',
+            properties: {
+              // A century at most: the column takes any positive integer, and a typo shouldn't keep reports forever.
+              reportRetentionDays: { type: 'integer', minimum: 1, maximum: 36_500 },
+              liveEditsNeedSecondApprover: { type: 'boolean' },
+            },
+            additionalProperties: false,
+            minProperties: 1,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { tenantId } = await tenantFor(trx, actor, request.params.tenant);
+            const { reportRetentionDays, liveEditsNeedSecondApprover } = request.body;
+            // Fastify drops properties the schema doesn't name, so a body of only those arrives empty.
+            if (reportRetentionDays === undefined && liveEditsNeedSecondApprover === undefined) {
+              throw new Refusal(400, 'invalid');
+            }
+            refuseUnless(
+              await updateSettings(trx, tenantId, {
+                reportRetentionDays,
+                liveEditsNeedSecondApprover,
+              }),
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // The operator's texts (T2): every version, for every member.
+    scope.get<{ Params: { tenant: string } }>(
+      '/t/:tenant/documents',
+      { schema: { params: TENANT_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            return {
+              documents: await listDocuments(trx, access.tenantId),
+              canEdit: holds(access, 'country_admin'),
+            };
+          }),
+        ),
+    );
+
+    // Starts a version of a text: a draft, or published at once.
+    scope.post<{
+      Params: { tenant: string };
+      Body: { kind: DocumentKind; body: Record<string, string>; publish?: boolean };
+    }>(
+      '/t/:tenant/documents',
+      {
+        schema: {
+          params: TENANT_PARAMS,
+          body: {
+            type: 'object',
+            properties: {
+              kind: { type: 'string', enum: DOCUMENT_KINDS },
+              body: localizedSchema(DOCUMENT_MAX_LENGTH),
+              publish: { type: 'boolean' },
+            },
+            required: ['kind', 'body'],
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          const created = await withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            const result = await createDocument(
+              trx,
+              access.tenantId,
+              request.body.kind,
+              publishable(
+                requiredLocalized(request.body.body, access),
+                access,
+                request.body.publish === true,
+              ),
+              request.body.publish === true,
+            );
+            if (result === 'draft-exists') {
+              throw new Refusal(409, 'draftExists');
+            }
+            if (result === 'forbidden') {
+              throw new Refusal(403, 'forbidden');
+            }
+            return result;
+          });
+          return reply.code(201).send(created);
+        }),
+    );
+
+    // Saves a draft, and publishes it if asked.
+    scope.patch<{
+      Params: { tenant: string; id: string };
+      Body: { body: Record<string, string>; publish?: boolean };
+    }>(
+      '/t/:tenant/documents/:id',
+      {
+        schema: {
+          params: ID_PARAMS,
+          body: {
+            type: 'object',
+            properties: {
+              body: localizedSchema(DOCUMENT_MAX_LENGTH),
+              publish: { type: 'boolean' },
+            },
+            required: ['body'],
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            refuseUnless(
+              await updateDocument(
+                trx,
+                access.tenantId,
+                request.params.id,
+                publishable(
+                  requiredLocalized(request.body.body, access),
+                  access,
+                  request.body.publish === true,
+                ),
+                request.body.publish === true,
+              ),
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Deletes a draft.
+    scope.delete<{ Params: { tenant: string; id: string } }>(
+      '/t/:tenant/documents/:id',
+      { schema: { params: ID_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { tenantId } = await tenantFor(trx, actor, request.params.tenant);
+            refuseUnless(await deleteDocument(trx, tenantId, request.params.id));
           });
           return reply.code(204).send();
         }),

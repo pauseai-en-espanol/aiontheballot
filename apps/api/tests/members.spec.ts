@@ -69,7 +69,15 @@ describe("a tenant's members (editorial workflow A7.1)", () => {
       };
     });
     expect(members).toHaveLength(4);
-    expect(access).toEqual({ tenantId: TENANT_A, roles: [], platformAdmin: true });
+    expect(access).toEqual({
+      tenantId: TENANT_A,
+      defaultLocale: 'es',
+      enabledLocales: expect.arrayContaining(['es']),
+      countryCode: expect.stringMatching(/^[A-Z]{2}$/),
+      methodologyKind: 'demands',
+      roles: [],
+      platformAdmin: true,
+    });
   });
 
   it("finds no tenant for someone who isn't in it", async () => {

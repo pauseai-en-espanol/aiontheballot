@@ -75,7 +75,7 @@ export const MembersTable = ({
   const [status, setStatus] = useState('');
   // Where focus goes once a change is made: the status line, since the button pressed may be gone after the reload.
   const statusLine = useRef<HTMLParagraphElement>(null);
-  const focusStatus = useRef(false);
+  const confirmed = useRef(false);
   const countryAdmins = members.filter((m) => m.roles.includes('country_admin')).length;
   // A deleted account has no name: a short id tells several apart.
   const nameOf = (member: Member) =>
@@ -91,6 +91,10 @@ export const MembersTable = ({
       return;
     }
     const { member, role } = confirming;
+    // The dialog closes first, so what follows is announced outside it, and hands focus to the status line, since the
+    // button pressed may be gone with the role (after Cancel, it goes back to that button).
+    confirmed.current = true;
+    setConfirming(undefined);
     busy.current = true;
     setPending(true);
     setError(undefined);
@@ -98,8 +102,6 @@ export const MembersTable = ({
     const answer = await sendToApi('DELETE', `${rolesPath(member)}/${role}`);
     busy.current = false;
     setPending(false);
-    focusStatus.current = answer.ok;
-    setConfirming(undefined);
     if (!answer.ok) {
       setError(answer.error);
       return;
@@ -110,6 +112,8 @@ export const MembersTable = ({
       return;
     }
     setStatus(fill(text.removed, { role: roleIn(role), name: nameOf(member) }));
+    // The button pressed goes with the role: focus moves to the line that says what happened.
+    statusLine.current?.focus();
     router.refresh();
   };
 
@@ -192,7 +196,7 @@ export const MembersTable = ({
                                   })}
                                   onClick={() => {
                                     setError(undefined);
-                                    focusStatus.current = false;
+                                    confirmed.current = false;
                                     setConfirming({ member, role });
                                   }}
                                 >
@@ -247,8 +251,7 @@ export const MembersTable = ({
       <Dialog.Root
         role="alertdialog"
         open={confirming !== undefined}
-        // After a removal, to the status line that says so; after Cancel, back to the button.
-        finalFocusEl={() => (focusStatus.current ? statusLine.current : null)}
+        finalFocusEl={() => (confirmed.current ? statusLine.current : null)}
         onOpenChange={({ open }) => {
           if (!open) {
             setConfirming(undefined);

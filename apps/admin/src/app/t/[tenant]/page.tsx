@@ -62,6 +62,12 @@ const Dashboard = async ({ params }: Params) => {
           </Link>
           <span className={styles.muted}>{t('admin.dashboard.membersIntro')}</span>
         </li>
+        <li className={styles.card}>
+          <Link className={styles.cardLink} href={`${base}/settings`}>
+            {t('admin.shell.settings')}
+          </Link>
+          <span className={styles.muted}>{t('admin.dashboard.settingsIntro')}</span>
+        </li>
       </ul>
       <p className={styles.text}>{t('admin.dashboard.queuesLater')}</p>
     </>

@@ -62,7 +62,9 @@
     "notFound": "That isn't there any more. Reload the page.",
     "lastCountryAdmin": "This is the site's only country admin. Give someone else that role first.",
     "notMember": "Only members of the site can be given a role directly. Anyone else needs an invitation.",
-    "signedOut": "Your session has ended. Sign in again."
+    "signedOut": "Your session has ended. Sign in again.",
+    "draftExists": "There is already a draft of this text. Edit that one, or delete it first.",
+    "needsDefaultLanguage": "Publishing needs the text in the site's default language."
   },
   "auth": {
     "otherAccount": "Sign in with another account",
@@ -150,7 +152,8 @@
       "members": "Members",
       "switchSite": "Switch site",
       "allSites": "All sites",
-      "current": "current"
+      "current": "current",
+      "settings": "Settings"
     },
     "sites": {
       "platformAdmin": "As a platform admin, you see every site."
@@ -162,7 +165,8 @@
       "notPublic": "This site isn't public yet: nothing of it shows on the public site until a platform admin turns it on.",
       "sections": "What you can open",
       "membersIntro": "Who has access to this site, and with which roles.",
-      "queuesLater": "Your work queues (drafts, reviews, reports) will show here once cells can be edited."
+      "queuesLater": "Your work queues (drafts, reviews, reports) will show here once cells can be edited.",
+      "settingsIntro": "Review settings, how long reports are kept, and the policy texts."
     },
     "members": {
       "title": "Members",
@@ -191,6 +195,62 @@
       "title": "Page not found",
       "body": "This page doesn't exist, or you don't have access to it.",
       "home": "Go to your sites"
+    },
+    "localized": {
+      "needed": "needed to publish"
+    },
+    "settings": {
+      "title": "Settings",
+      "save": "Save",
+      "saved": "Saved.",
+      "on": "On",
+      "off": "Off",
+      "review": {
+        "title": "Review",
+        "liveEdits": "A second person must approve changes to a live election",
+        "liveEditsHint": "When on, whoever proposes a change to a live election (its name, date, methodology, parties or criteria) can't approve it themselves. Every approved change is public either way.",
+        "platformOnly": "Only a platform admin changes this.",
+        "save": "Save review setting"
+      },
+      "retention": {
+        "title": "Reports",
+        "label": "Days a report is kept before its personal data is removed",
+        "hint": "A change applies to reports sent from then on: each report's date is set when it arrives.",
+        "days": "{days, plural, one {# day} other {# days}}",
+        "save": "Save retention"
+      },
+      "texts": {
+        "title": "Policy texts",
+        "intro": "The texts the public site shows about the operator and its policies, written per language. A published version never changes; the next one starts as a copy of it.",
+        "kinds": {
+          "privacy_policy": "Privacy policy",
+          "right_of_reply_policy": "Right-of-reply policy",
+          "about_operator": "About the operator"
+        },
+        "published": "Version {version}, published {date, date, long}",
+        "notPublished": "Not published yet.",
+        "draft": "Draft of version {version}"
+      }
+    },
+    "texts": {
+      "newVersion": "Version {version}",
+      "copyIntro": "This starts as a copy of the published version. Saving it keeps it as a draft until it is published.",
+      "firstIntro": "Write the first version. Saving it keeps it as a draft until it is published.",
+      "body": "Text",
+      "bodyHint": "In Markdown. The public site shows it formatted.",
+      "saveDraft": "Save draft",
+      "publish": "Publish",
+      "publishTitle": "Publish this version?",
+      "publishBody": "A published version never changes: any later change starts a new version. It needs the text in the site's default language.",
+      "deleteDraft": "Delete draft",
+      "deleteTitle": "Delete this draft?",
+      "deleteBody": "The draft's text is lost. Published versions stay.",
+      "saved": "Draft saved.",
+      "published": "Version {version} published.",
+      "deleted": "Draft deleted.",
+      "readOnly": "Only country admins and platform admins write these texts.",
+      "history": "Published versions",
+      "needsLanguage": "Publishing needs the text in {language}."
     }
   }
 }

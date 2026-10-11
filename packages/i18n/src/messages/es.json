@@ -62,7 +62,9 @@
     "notFound": "Eso ya no existe. Recarga la página.",
     "lastCountryAdmin": "Es la única persona con el rol de coordinación del sitio. Antes, da ese rol a otra persona.",
     "notMember": "Solo se puede dar un rol directamente a quien ya es miembro del sitio. Cualquier otra persona necesita una invitación.",
-    "signedOut": "Tu sesión ha terminado. Vuelve a iniciar sesión."
+    "signedOut": "Tu sesión ha terminado. Vuelve a iniciar sesión.",
+    "draftExists": "Ya hay un borrador de este texto. Edita ese o bórralo antes.",
+    "needsDefaultLanguage": "Para publicar hace falta el texto en el idioma principal del sitio."
   },
   "auth": {
     "otherAccount": "Iniciar sesión con otra cuenta",
@@ -150,7 +152,8 @@
       "members": "Miembros",
       "switchSite": "Cambiar de sitio",
       "allSites": "Todos los sitios",
-      "current": "actual"
+      "current": "actual",
+      "settings": "Ajustes"
     },
     "sites": {
       "platformAdmin": "Como administras la plataforma, ves todos los sitios."
@@ -162,7 +165,8 @@
       "notPublic": "Este sitio aún no es público: no se ve nada de él en el sitio público hasta que quien administra la plataforma lo active.",
       "sections": "Lo que puedes abrir",
       "membersIntro": "Quién tiene acceso a este sitio y con qué roles.",
-      "queuesLater": "Aquí verás tus tareas pendientes (borradores, revisiones, avisos) cuando se puedan editar las celdas."
+      "queuesLater": "Aquí verás tus tareas pendientes (borradores, revisiones, avisos) cuando se puedan editar las celdas.",
+      "settingsIntro": "La revisión, el plazo de conservación de los avisos y los textos legales."
     },
     "members": {
       "title": "Miembros",
@@ -191,6 +195,62 @@
       "title": "Página no encontrada",
       "body": "Esta página no existe o no tienes acceso a ella.",
       "home": "Ir a tus sitios"
+    },
+    "localized": {
+      "needed": "necesario para publicar"
+    },
+    "settings": {
+      "title": "Ajustes",
+      "save": "Guardar",
+      "saved": "Guardado.",
+      "on": "Activado",
+      "off": "Desactivado",
+      "review": {
+        "title": "Revisión",
+        "liveEdits": "Los cambios en una elección publicada necesitan la aprobación de otra persona",
+        "liveEditsHint": "Si está activado, quien propone un cambio en una elección publicada (su nombre, su fecha, su metodología, sus partidos o sus criterios) no puede aprobarlo. Cada cambio aprobado es público en cualquier caso.",
+        "platformOnly": "Solo quien administra la plataforma puede cambiarlo.",
+        "save": "Guardar ajuste de revisión"
+      },
+      "retention": {
+        "title": "Avisos",
+        "label": "Días que se guarda un aviso antes de borrar sus datos personales",
+        "hint": "Un cambio se aplica a los avisos que lleguen a partir de entonces: la fecha de cada aviso se fija al recibirlo.",
+        "days": "{days, plural, one {# día} other {# días}}",
+        "save": "Guardar plazo"
+      },
+      "texts": {
+        "title": "Textos legales",
+        "intro": "Los textos que el sitio público muestra sobre la organización y sus políticas, escritos en cada idioma. Una versión publicada no cambia nunca; la siguiente empieza como copia de ella.",
+        "kinds": {
+          "privacy_policy": "Política de privacidad",
+          "right_of_reply_policy": "Política de derecho de réplica",
+          "about_operator": "Sobre la organización"
+        },
+        "published": "Versión {version}, publicada el {date, date, long}",
+        "notPublished": "Aún no se ha publicado.",
+        "draft": "Borrador de la versión {version}"
+      }
+    },
+    "texts": {
+      "newVersion": "Versión {version}",
+      "copyIntro": "Empieza como copia de la versión publicada. Al guardarla queda como borrador hasta que se publique.",
+      "firstIntro": "Escribe la primera versión. Al guardarla queda como borrador hasta que se publique.",
+      "body": "Texto",
+      "bodyHint": "En Markdown. El sitio público lo muestra con formato.",
+      "saveDraft": "Guardar borrador",
+      "publish": "Publicar",
+      "publishTitle": "¿Publicar esta versión?",
+      "publishBody": "Una versión publicada no cambia nunca: cualquier cambio posterior empieza una versión nueva. Necesita el texto en el idioma principal del sitio.",
+      "deleteDraft": "Eliminar borrador",
+      "deleteTitle": "¿Eliminar este borrador?",
+      "deleteBody": "Se pierde el texto del borrador. Las versiones publicadas se mantienen.",
+      "saved": "Borrador guardado.",
+      "published": "Versión {version} publicada.",
+      "deleted": "Borrador eliminado.",
+      "readOnly": "Solo quien coordina el sitio o administra la plataforma escribe estos textos.",
+      "history": "Versiones publicadas",
+      "needsLanguage": "Para publicar hace falta el texto en {language}."
     }
   }
 }

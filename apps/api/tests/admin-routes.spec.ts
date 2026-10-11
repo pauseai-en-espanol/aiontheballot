@@ -72,7 +72,7 @@ const build = (options: { withAdmin?: boolean } = {}): FastifyInstance => {
 const app = build();
 
 const send = (
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   url: string,
   as: string | undefined,
   { body, origin = ORIGIN }: { body?: unknown; origin?: string | null } = {},
@@ -351,6 +351,132 @@ describe("members' names and emails (PLAN R94)", () => {
       expect(await source([], { emails: true })).toEqual(new Map());
     } finally {
       await deleteAccount(authPool, id);
+    }
+  });
+});
+
+describe('settings and policy texts (editorial workflow §5, P1)', () => {
+  /** A's fixture texts: a published privacy policy and a newer draft of it. */
+  const PUBLISHED_A = '0190f8c4-0000-7000-8000-000000000501';
+  const DRAFT_A = '0190f8c4-0000-7000-8000-000000000502';
+
+  const settingsOfA = async () =>
+    (
+      await sql<{ days: number; second: boolean }>`
+        SELECT report_retention_days AS days, live_edits_need_second_approver AS second
+          FROM app.tenants WHERE id = ${TENANT_A}`.execute(owner)
+    ).rows[0];
+
+  it("change a tenant's settings as the database allows, and refuse what doesn't fit", async () => {
+    const before = await settingsOfA();
+    try {
+      const url = '/api/t/test-a/settings';
+      const days = await send('PATCH', url, USERS.countryAdminA, {
+        body: { reportRetentionDays: 90 },
+      });
+      expect(days.statusCode).toBe(204);
+      expect((await settingsOfA())?.days).toBe(90);
+      const second = await send('PATCH', url, USERS.countryAdminA, {
+        body: { liveEditsNeedSecondApprover: true },
+      });
+      expect(second.statusCode).toBe(403);
+      expect(second.json()).toEqual({ error: 'forbidden' });
+      expect(
+        (await send('PATCH', url, USERS.editorA, { body: { reportRetentionDays: 7 } })).statusCode,
+      ).toBe(403);
+      for (const body of [
+        {},
+        { reportRetentionDays: 0 },
+        { reportRetentionDays: 36_501 },
+        { reportRetentionDays: 1.5 },
+        { theme: {} },
+      ]) {
+        expect(
+          (await send('PATCH', url, USERS.countryAdminA, { body })).statusCode,
+          JSON.stringify(body),
+        ).toBe(400);
+      }
+      const platform = await send('PATCH', url, USERS.platformAdmin, {
+        body: { liveEditsNeedSecondApprover: true },
+      });
+      expect(platform.statusCode).toBe(204);
+      expect((await settingsOfA())?.second).toBe(true);
+    } finally {
+      // As the fixture platform admin: the tenant's trigger leaves that setting to platform admins, the owner included.
+      await owner.transaction().execute(async (trx) => {
+        await sql`SELECT set_config('app.user_id', ${USERS.platformAdmin}, true),
+                         set_config('app.aal', '2', true)`.execute(trx);
+        await sql`UPDATE app.tenants SET report_retention_days = ${before?.days ?? 365},
+                         live_edits_need_second_approver = ${before?.second ?? false}
+                   WHERE id = ${TENANT_A}`.execute(trx);
+      });
+    }
+  });
+
+  it('start, save, publish and delete versions of a text, as a country admin', async () => {
+    const created: string[] = [];
+    try {
+      const base = '/api/t/test-a/documents';
+      const list = await send('GET', base, USERS.editorA);
+      expect(list.json()).toMatchObject({ canEdit: false });
+      expect(list.json<{ documents: unknown[] }>().documents).toHaveLength(2);
+
+      // A draft of the privacy policy already exists.
+      const blocked = await send('POST', base, USERS.countryAdminA, {
+        body: { kind: 'privacy_policy', body: { es: 'Texto de ejemplo' } },
+      });
+      expect(blocked.statusCode).toBe(409);
+      expect(blocked.json()).toEqual({ error: 'draftExists' });
+
+      const draft = await send('POST', base, USERS.countryAdminA, {
+        body: { kind: 'about_operator', body: { es: 'Sobre la organización de ejemplo' } },
+      });
+      expect(draft.statusCode).toBe(201);
+      const { id } = draft.json<{ id: string }>();
+      created.push(id);
+      for (const [body, status] of [
+        // A language the tenant doesn't enable (A's is Spanish only), and nothing but blanks.
+        [{ body: { en: 'Example text' } }, 400],
+        [{ body: { es: '  ' } }, 422],
+      ] as const) {
+        expect(
+          (await send('PATCH', `${base}/${id}`, USERS.countryAdminA, { body })).statusCode,
+        ).toBe(status);
+      }
+      const published = await send('PATCH', `${base}/${id}`, USERS.countryAdminA, {
+        body: { body: { es: 'Sobre la organización de ejemplo, publicado' }, publish: true },
+      });
+      expect(published.statusCode).toBe(204);
+      const again = await send('PATCH', `${base}/${id}`, USERS.countryAdminA, {
+        body: { body: { es: 'Otro texto' } },
+      });
+      expect(again.statusCode).toBe(409);
+      expect((await send('DELETE', `${base}/${id}`, USERS.countryAdminA)).statusCode).toBe(409);
+      expect(
+        (await send('DELETE', `${base}/${crypto.randomUUID()}`, USERS.countryAdminA)).statusCode,
+      ).toBe(404);
+      // B's published text, named through A.
+      expect(
+        (await send('DELETE', `${base}/0190f8c4-0000-7000-8000-000000000503`, USERS.countryAdminA))
+          .statusCode,
+      ).toBe(404);
+      expect((await send('DELETE', `${base}/${id}`, USERS.editorA)).statusCode).toBe(409);
+
+      const second = await send('POST', base, USERS.countryAdminA, {
+        body: { kind: 'about_operator', body: { es: 'Segunda versión de ejemplo' } },
+      });
+      const secondId = second.json<{ id: string }>().id;
+      created.push(secondId);
+      expect((await send('DELETE', `${base}/${secondId}`, USERS.editorA)).statusCode).toBe(403);
+      expect((await send('DELETE', `${base}/${secondId}`, USERS.countryAdminA)).statusCode).toBe(
+        204,
+      );
+    } finally {
+      // Everything but A's two fixture texts, whatever a broken build let through.
+      await sql`DELETE FROM app.tenant_documents
+                 WHERE tenant_id = ${TENANT_A} AND (id = ANY(${created}) OR id NOT IN (${PUBLISHED_A}, ${DRAFT_A}))`.execute(
+        owner,
+      );
     }
   });
 });

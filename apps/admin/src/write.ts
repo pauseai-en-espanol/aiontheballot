@@ -16,6 +16,8 @@ export const WRITE_ERRORS = [
   'notFound',
   'lastCountryAdmin',
   'notMember',
+  'draftExists',
+  'needsDefaultLanguage',
   'signedOut',
   'unexpected',
 ] as const;

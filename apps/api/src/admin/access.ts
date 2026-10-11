@@ -1,5 +1,6 @@
 import type { DB } from '@aiontheballot/db/generated/db';
-import type { Transaction } from 'kysely';
+
+import { sql, type Transaction } from 'kysely';
 
 /** The roles a member can hold in a tenant, as `app.tenant_role` has them (ADR-0002 §8). */
 export const TENANT_ROLES = ['country_admin', 'editor', 'reviewer'] as const;
@@ -12,6 +13,12 @@ export type TenantRole = (typeof TENANT_ROLES)[number];
  */
 export interface Access {
   tenantId: string;
+  /** The tenant's languages, for localized text (editorial workflow §2.4). */
+  defaultLocale: string;
+  enabledLocales: string[];
+  /** Territories are inside it (E1.2). */
+  countryCode: string;
+  methodologyKind: 'demands' | 'descriptive';
   roles: TenantRole[];
   platformAdmin: boolean;
 }
@@ -35,7 +42,14 @@ export const accessTo = async (
 ): Promise<Access | undefined> => {
   const tenant = await trx
     .selectFrom('app.tenants')
-    .select('id')
+    .select([
+      'id',
+      'default_locale',
+      // An array of a domain, which node-postgres reads as text unless it is cast.
+      sql<string[]>`enabled_locales::text[]`.as('enabled_locales'),
+      'country_code',
+      'methodology_kind',
+    ])
     .where('slug', '=', slug)
     .executeTakeFirst();
   if (!tenant) {
@@ -49,6 +63,10 @@ export const accessTo = async (
     .execute();
   return {
     tenantId: tenant.id,
+    defaultLocale: tenant.default_locale,
+    enabledLocales: tenant.enabled_locales,
+    countryCode: tenant.country_code,
+    methodologyKind: tenant.methodology_kind,
     roles: TENANT_ROLES.filter((role) => roles.some((row) => row.role === role)),
     platformAdmin: await isPlatformAdmin(trx, userId),
   };
@@ -57,3 +75,17 @@ export const accessTo = async (
 /** Whether the actor holds one of `roles` in the tenant, or is a platform admin, who may do what any role may. */
 export const holds = (access: Access, ...roles: TenantRole[]): boolean =>
   access.platformAdmin || access.roles.some((role) => roles.includes(role));
+
+/**
+ * Locks the tenant's row for changes only its country admins and platform admins may make (RLS gives the tenants
+ * update policy's rows to them alone), so two such changes in one tenant run one after the other: removing country
+ * admins (R95), starting a draft of a text (R99). `FOR NO KEY UPDATE`, so it never blocks writes elsewhere that
+ * merely reference the tenant. Whether the lock was taken also says whether the actor is one of them.
+ */
+export const lockTenant = async (trx: Transaction<DB>, tenantId: string): Promise<boolean> =>
+  (await trx
+    .selectFrom('app.tenants')
+    .select('id')
+    .where('id', '=', tenantId)
+    .forNoKeyUpdate()
+    .executeTakeFirst()) !== undefined;
