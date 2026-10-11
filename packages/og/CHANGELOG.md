@@ -1,5 +1,11 @@
 # @aiontheballot/og
 
+## 0.3.2
+
+### Patch Changes
+
+- 464c259: satori 0.41.0, which draws the share images exactly as 0.38.2 did (their pinned SVG is unchanged).
+
 ## 0.3.1
 
 ### Patch Changes
