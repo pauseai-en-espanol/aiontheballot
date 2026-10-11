@@ -2,12 +2,10 @@ import type { Metadata } from 'next';
 
 import { pickLocalized } from '@aiontheballot/domain/localized';
 import { getTranslator } from '@aiontheballot/i18n/messages';
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-import { hostnameOf, readAnalytics } from '@/analytics';
-import { Analytics } from '@/components/analytics';
 import { ComingSoon } from '@/components/coming-soon';
+import { PageViews } from '@/components/page-views';
 import { pageMetadata } from '@/page-metadata';
 import { isSignupOutcome } from '@/signup-outcomes';
 import { FOOTER_LOGO, loadSitePage, type SitePageParams } from '@/site-page';
@@ -51,11 +49,6 @@ const TenantHome = async (props: HomeProps) => {
     redirect(href({ page: 'election', election: current.slug }));
   }
   const aviso = (await props.searchParams).aviso;
-  // Plausible, on a host the deployment gives a Plausible site (PLAN R83). Here, not in the root layout, which a 404
-  // renders in too: a missing page isn't a page view. The host picks the site and grants nothing.
-  const hostname = hostnameOf((await headers()).get('host'));
-  const counted =
-    hostname !== undefined && readAnalytics(process.env)?.sites.has(hostname) === true;
   return (
     <>
       <ComingSoon
@@ -74,7 +67,7 @@ const TenantHome = async (props: HomeProps) => {
             : undefined
         }
       />
-      {counted && <Analytics />}
+      <PageViews />
     </>
   );
 };

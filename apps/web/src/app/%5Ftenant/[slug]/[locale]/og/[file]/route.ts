@@ -5,14 +5,14 @@ import { isLocale, type Locale } from '@aiontheballot/i18n/messages';
 import { homeImage } from '@/home-image';
 import { IMMUTABLE, matchesEtag, plain } from '@/http-cache';
 import {
-  homeCardContent,
   homeCardHash,
   imagePath,
   pageUrl,
   parseImageFile,
+  requestedHomeCard,
   type ShareTemplate,
 } from '@/share';
-import { loadTenantPage, type TenantPage } from '@/tenant-data';
+import { loadTenantPage, openSites, type TenantPage } from '@/tenant-data';
 
 interface ImageContext {
   params: Promise<{ slug: string; locale: string; file: string }>;
@@ -20,11 +20,19 @@ interface ImageContext {
 
 /** The image's current content and hash, and its address, from the tenant's data. */
 const currentImage = (
+  slug: string,
   page: Extract<TenantPage, { kind: 'found' }>,
   locale: Locale,
-  requested: { template: ShareTemplate; size: ShareSize },
+  requested: { template: ShareTemplate; size: ShareSize; hash: string },
 ) => {
-  const card = homeCardContent(page.home, locale, page.base);
+  const card = requestedHomeCard(
+    page.home,
+    locale,
+    page.base,
+    openSites.has(slug),
+    requested.size,
+    requested.hash,
+  );
   const hash = homeCardHash(card, requested.size);
   const url = pageUrl(
     page.base,
@@ -47,12 +55,12 @@ export const GET = async (request: Request, { params }: ImageContext): Promise<R
     return plain(404, 'Not found');
   }
   let page = await loadTenantPage(slug);
-  let current = page.kind === 'found' ? currentImage(page, locale, requested) : undefined;
+  let current = page.kind === 'found' ? currentImage(slug, page, locale, requested) : undefined;
   if (current && current.hash !== requested.hash) {
     // The page that named this image may have newer data than this server's copy: refetch before redirecting, so
     // servers with copies of different ages can't send a crawler back and forth.
     page = await loadTenantPage(slug, { fresh: true });
-    current = page.kind === 'found' ? currentImage(page, locale, requested) : undefined;
+    current = page.kind === 'found' ? currentImage(slug, page, locale, requested) : undefined;
   }
   if (page.kind === 'missing') {
     return plain(404, 'Not found');

@@ -451,7 +451,8 @@
         "checkPublished": "Checked: published",
         "needsSource": "“Published” needs a source of the party marked as its programme. Add one in its sources first.",
         "saved": "Check recorded.",
-        "readOnly": "This election is archived: its programme statuses no longer change."
+        "readOnly": "This election is archived: its programme statuses no longer change.",
+        "retired": "This party left the election: its programme status no longer changes."
       }
     },
     "criteria": {
@@ -636,6 +637,7 @@
   "election": {
     "question": {
       "demands": "Does each party meet {owner}’s demands?",
+      "demandsUnnamed": "Does each party meet the demands the methodology sets out?",
       "descriptive": "What does each party propose on advanced AI?"
     },
     "legend": "What each rating means",
@@ -689,6 +691,7 @@
     "title": "Methodology",
     "scale": "The ratings",
     "demands": "Each rating says how far a party meets the demands of {owner}.",
+    "demandsUnnamed": "Each rating says how far a party meets the demands this methodology sets out.",
     "descriptive": "Each rating describes what a party proposes on advanced AI.",
     "pending": "Pending means not rated yet, which is not the same as “not mentioned”.",
     "reviewers": "External review",

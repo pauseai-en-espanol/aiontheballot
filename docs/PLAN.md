@@ -1114,6 +1114,55 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   the latest published version, with its number and date, in the page's language or else the default one, marked as
   such. Markdown is rendered with markdown-it 15.0.2: raw HTML escaped, images off, links only to http(s) and mailto,
   headings starting at h2. A text not published is a 404 and unlinked.
+- **R125. The public site's election pages (M3), as built** ([spec](spec/public-site.md) §5): the scorecard, with a
+  table on screens of 1,024 px and more (parties down the side, criteria across, the party column fixed and the table
+  scrolling sideways inside a focusable region) and cards on smaller ones, one per party or, through a plain link
+  (`?vista=criterios`), one per criterion; the party, criterion, cell and methodology pages. A cell is rated, pending
+  (no revision) or withdrawn (its latest revision withdrew the rating, worded "Valoración retirada", provisional),
+  never shown by colour alone: the rating visuals are fixed in `packages/ui` (a tick, a half, a cross, a slashed
+  circle, three dots in a dashed circle, each outlined in ink, its mark at 3:1 against its fill, each place on a scale
+  with its own shape and the same shape in both kinds of methodology, tests for all of it). Every scorecard, party,
+  criterion and cell page has the legend with the methodology link (BRIEF invariant 2); every page has the operator
+  line, and an e2e crawl checks both and that no page logs a CSP violation. A rating shows its date wherever it shows.
+  A party's colour is an SVG fill beside its name, never a style attribute; its short name in the table carries the
+  full one for screen readers. Content in another language than the page's says so (`lang`), and quotes and source
+  titles carry their document's language, else the site's (WCAG 3.1.2). The wording of the scorecard's question and the
+  methodology's lead follows the methodology's kind, like the legend, with a wording of its own if the demands' owner
+  isn't public. Retired parties and criteria, and their cells, aren't shown or counted. An open site's home, and the
+  preview host's, answers 307 to the current election (the soonest live, else the latest archived); otherwise it is the
+  coming-soon page. The data is a new public route, `GET /public/tenants/{slug}/elections/{election}`, read as
+  `aiontheballot_web` in one read-only snapshot (live and archived elections only; sources with their public columns
+  only), cached by the web app for 60 seconds per election, at most 200 kept. Only an election the home lists reaches
+  the API, so made-up slugs are a 404 that costs nothing; only the API's own "no public election" is a missing one, any
+  other answer a failure (the last good copy stays). Page views are counted on the election pages too (R83). Every
+  page's link preview is the home's card until per-view cards come (M3); once a site is open with a public election,
+  the card names that election instead of saying "Próximamente" (an image asked for in the other mode is rendered, not
+  redirected, so pods that disagree mid-rollout can't bounce a crawler). Not fixed: a signup form sent from a page
+  loaded just before its site opens lands on the scorecard without its outcome (the email still goes out). Quotes and
+  sources with no recorded language are marked in the site's language, the likelier one.
+- **R126. Security headers on every response** (spec §7), from `next.config.js`: a CSP that loads nothing from another
+  host, frames nothing and posts only to the site; HSTS without `includeSubDomains`; `nosniff`; a referrer policy;
+  `Permissions-Policy`; COOP; `X-Frame-Options`. ADR-0003 keeps nonces off the public site, so the CSP allows inline
+  scripts, which Next needs for each page's data: a question for Dani in the brief, since pages now render per
+  request anyway. `pnpm dev` alone adds `'unsafe-eval'`, which React's development build needs. An e2e test checks
+  the headers on a page, an icon and a route.
+- **R127. Sitemaps, robots and the page's language** (spec §8): `/sitemap.xml` at a site's root lists what it serves
+  in its mode (not the home once it redirects to an election), every language with its `hreflang` alternates, on the
+  canonical base; a site's `/robots.txt` allows everything and names it. Crawlers read robots.txt only at a host's
+  root, so the proxy answers it there for the hosts that serve sites by path: the preview host disallows everything
+  (and sends `X-Robots-Tag: noindex` and the robots meta tag), even without routing data; the platform host allows
+  everything and names the sitemap of each site whose canonical base it is. `<html lang>` now follows the page (R48's
+  follow-up), from a header the proxy sets.
+- **R128. The programme status on the admin's party page** (editorial workflow PS1, the scorecard's "Programa aún no
+  publicado (comprobado el …)"): two buttons, "Checked: still not published" and "Checked: published", each a check
+  that sets the status, even to the same one, and that the database stamps with its date (R29), in a live election
+  too, as the spec allows; an archived election's, and a retired party's, is read-only on the screen. "Published"
+  needs a source marked as the party's programme (R30): without one its button says so and sends nothing, and the
+  database would refuse it anyway. A new route, `PUT /api/t/{tenant}/e/{election}/parties/{id}/programme`, runs it in
+  the actor's transaction; RLS and the programme trigger decide (editors, country admins and platform admins, outside
+  a freeze window). The database still lets a retired party's status change, which no public page shows. The party
+  list in the admin and the public pages read the status and its date; the public sees a new check within the web
+  app's minute.
 
 ## Open decisions for Dani
 
@@ -1122,31 +1171,6 @@ R118's note).
 
 ## Questions for the chapter
 
-- **R125. The public site's election pages (M3), as built** ([spec](spec/public-site.md) §5): the scorecard, with a
-  table on screens of 1,024 px and more (parties down the side, criteria across, the party column fixed and the table
-  scrolling sideways inside a focusable region) and cards on smaller ones, one per party or, through a plain link
-  (`?vista=criterios`), one per criterion; the party, criterion, cell and methodology pages. A cell is rated, pending
-  (no revision) or withdrawn (its latest revision withdrew the rating, worded "Valoración retirada", provisional), never
-  shown by colour alone: the rating visuals are fixed in `packages/ui` (a tick, a half, a cross, a slashed circle,
-  three dots in a dashed circle, each outlined in ink, its mark at 3:1 against its fill, each place on a scale with its
-  own shape and the same shape in both kinds of methodology, tests for all of it). Every scorecard, party, criterion
-  and cell page has the legend with the methodology link (BRIEF invariant 2); every page has the operator line, and an
-  e2e crawl checks both. A party's colour is an SVG fill beside its name, never a style attribute. Retired parties and
-  criteria aren't shown. An open site's home, and the preview host's, answers 307 to the current election (the soonest
-  live, else the latest archived); otherwise it is the coming-soon page. The data is a new public route,
-  `GET /public/tenants/{slug}/elections/{election}`, read as `aiontheballot_web` (live and archived elections only;
-  sources with their public columns only), cached by the web app for 60 seconds per election, at most 200 kept, a
-  missing one remembered too. Every page's link preview is the home's card until per-view cards come (M3).
-- **R126. Security headers on every response** (spec §7), from `next.config.js`: a CSP that loads nothing from another
-  host, frames nothing and posts only to the site; HSTS without `includeSubDomains`; `nosniff`; a referrer policy;
-  `Permissions-Policy`; COOP; `X-Frame-Options`. ADR-0003 keeps nonces off the public site, so the CSP allows inline
-  scripts, which Next needs for each page's data: a question for Dani in the brief, since pages now render per
-  request anyway. An e2e test checks the headers on a page, an icon and a route, and that the scorecard logs no CSP
-  violation.
-- **R127. Sitemaps, robots and the page's language** (spec §8): `/sitemap.xml` at a site's root lists what it serves
-  in its mode, every language with its `hreflang` alternates, on the canonical base; `/robots.txt` allows everything
-  and names it, except on the preview host, which disallows everything (and sends `X-Robots-Tag: noindex` and the
-  robots meta tag). `<html lang>` now follows the page (R48's follow-up), from a header the proxy sets.
 - **Q5. Content.** Please supply the criteria list, methodology text, external reviewers, and the **rule for which
   parties are included**. The rule must be stated in the methodology. Can the party list still change after
   candidacies are proclaimed, for example through appeals?
@@ -1165,14 +1189,6 @@ R118's note).
   (PDFs and web pages are matched automatically; the rest need a second person to attest them). Restricting to
   official documents is the most defensible. Separately: which kinds can back "No lo menciona", which may be given
   before a party's programme exists? The default is the party's programme and its website.
-- **R128. The programme status on the admin's party page** (editorial workflow PS1, the scorecard's "Programa aún no
-  publicado (comprobado el …)"): two buttons, "Checked: still not published" and "Checked: published", each a check
-  that sets the status, even to the same one, and that the database stamps with its date (R29), in a live election
-  too, as the spec allows; an archived election's is read-only. "Published" needs a source marked as the party's
-  programme (R30): without one its button says so and sends nothing, and the database would refuse it anyway. A new
-  route, `PUT /api/t/{tenant}/e/{election}/parties/{id}/programme`, runs it in the actor's transaction; RLS and the
-  programme trigger decide (editors and country admins, outside a freeze window). The party list in the admin and the
-  public pages read the status and its date; the public sees a new check within the web app's minute.
 
 ## Pushback and clarifications on the brief
 

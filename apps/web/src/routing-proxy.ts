@@ -1,5 +1,6 @@
 import {
   buildRoutingTable,
+  pathHostRobots,
   resolve,
   type RoutingConfig,
   type RoutingTable,
@@ -38,6 +39,19 @@ export const createRoutingProxy =
   ) =>
   async (request: NextRequest): Promise<NextResponse> => {
     const table = await routingTable();
+    // Crawlers read robots.txt only at a host's root, where the preview and platform hosts serve no site.
+    const robots =
+      request.nextUrl.pathname === '/robots.txt'
+        ? pathHostRobots(request.headers.get('host') ?? '', table, config)
+        : undefined;
+    if (robots !== undefined) {
+      return new NextResponse(robots, {
+        headers: {
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'public, max-age=300',
+        },
+      });
+    }
     const resolution = resolve(
       {
         host: request.headers.get('host') ?? '',

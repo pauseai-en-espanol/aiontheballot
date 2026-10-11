@@ -1,5 +1,4 @@
-import type { PublicElection } from '@aiontheballot/domain/public-election';
-
+import { NO_PUBLIC_ELECTION, type PublicElection } from '@aiontheballot/domain/public-election';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createElectionLoader } from './election-data';
@@ -36,12 +35,32 @@ describe('the election loader', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it('remembers a missing election for a while too, so made-up slugs cost one request each', async () => {
-    const fetch = vi.fn(async () => respond({ error: 'Not found' }, 404));
+  it("remembers an election the API says isn't public for a while too", async () => {
+    const fetch = vi.fn(async () => respond({ error: NO_PUBLIC_ELECTION }, 404));
     const load = createElectionLoader({ apiUrl: API, fetch });
     expect(await load('ejemplo-a', 'no-existe')).toEqual({ kind: 'missing' });
     await load('ejemplo-a', 'no-existe');
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["a route the API doesn't have", respond({ message: 'Route not found', statusCode: 404 }, 404)],
+    ['a refused request', respond({ error: 'Bad Request' }, 400)],
+    ['a 404 without a body', new Response('Not found', { status: 404 })],
+  ])('takes %s for a failure, never for a missing election', async (_name, answer) => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let now = 0;
+    let fail = false;
+    const fetch = vi.fn(async () => (fail ? answer.clone() : respond(election('Uno'))));
+    const load = createElectionLoader({ apiUrl: API, maxAgeMs: 10, fetch, now: () => now });
+    await load('ejemplo-a', 'generales');
+    fail = true;
+    now = 20;
+    expect(await load('ejemplo-a', 'generales')).toEqual({
+      kind: 'found',
+      election: election('Uno'),
+    });
+    expect(await load('ejemplo-a', 'otra')).toEqual({ kind: 'unavailable' });
   });
 
   it('keeps the last good copy when a refresh fails, and is unavailable with none', async () => {

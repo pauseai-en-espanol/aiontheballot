@@ -1,3 +1,4 @@
+import { NO_PUBLIC_ELECTION } from '@aiontheballot/domain/public-election';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
 import type { ElectionSource } from './election-data.js';
@@ -140,7 +141,7 @@ export const buildApp = ({
       }
       const data = await elections(request.params.slug, request.params.election);
       if (!data) {
-        return reply.code(404).send({ error: 'Not found' });
+        return reply.code(404).send({ error: NO_PUBLIC_ELECTION });
       }
       return data;
     },

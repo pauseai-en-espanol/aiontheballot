@@ -451,7 +451,8 @@
         "checkPublished": "Comprobado: publicado",
         "needsSource": "«Publicado» necesita una fuente del partido marcada como su programa. Añádela antes en sus fuentes.",
         "saved": "Comprobación registrada.",
-        "readOnly": "Esta elección está archivada: el estado de sus programas ya no cambia."
+        "readOnly": "Esta elección está archivada: el estado de sus programas ya no cambia.",
+        "retired": "Este partido dejó la elección: el estado de su programa ya no cambia."
       }
     },
     "criteria": {
@@ -636,6 +637,7 @@
   "election": {
     "question": {
       "demands": "¿Cumple cada partido las demandas de {owner}?",
+      "demandsUnnamed": "¿Cumple cada partido las demandas que recoge la metodología?",
       "descriptive": "¿Qué propone cada partido sobre la IA avanzada?"
     },
     "legend": "Qué significa cada valoración",
@@ -689,6 +691,7 @@
     "title": "Metodología",
     "scale": "Las valoraciones",
     "demands": "Cada valoración dice hasta qué punto un partido cumple las demandas de {owner}.",
+    "demandsUnnamed": "Cada valoración dice hasta qué punto un partido cumple las demandas que recoge esta metodología.",
     "descriptive": "Cada valoración describe lo que propone un partido sobre la IA avanzada.",
     "pending": "Pendiente significa que aún no se ha valorado, que no es lo mismo que «No lo menciona».",
     "reviewers": "Revisión externa",

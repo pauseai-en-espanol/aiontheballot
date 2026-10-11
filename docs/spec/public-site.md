@@ -122,17 +122,24 @@ Shared by all of them:
     own words, and its history, which says why;
   - "No lo menciona" is a rating like the others, with the documents checked and when.
 - **"Actualizado el {date}"** wherever a cell's rating shows, from its current revision.
+- **Language:** content in another language than the page's (a text not yet translated, shown in the site's default
+  language) carries its own `lang`; quotes and source titles carry their document's language, else the site's
+  (WCAG 3.1.2).
+- **Wording:** the scorecard's question and the methodology's lead follow the methodology's kind, as the legend does;
+  for `demands`, they name the demands' owner, or speak of "the methodology's demands" if the owner isn't public.
+- Retired parties and criteria, and their cells, are left out of every page, the dates of latest change included.
 - **A party's programme status:** "Programa aún no publicado (comprobado el {date})" while pending, with the date of
   the last check; nothing while published (its sources show on cells). A status never set shows nothing.
 
 ### 5.1 Scorecard
 
-- **Desktop (≥ 1024 px, Panda's `lg`):** a table, parties down the side and criteria across the top, always (PLAN, Answered:
-  scorecard orientation). Criteria headers use the short title and link to the criterion page; party headers show the
-  logo or colour swatch, the short name (the full name in an `abbr` title and for screen readers) and the programme
-  status, and link to the party page. Each cell is a link to the cell page with the rating's icon and words. Past
-  about 8 criteria the party column stays fixed and the table scrolls sideways inside its own region (with a visible
-  focus and a label), never the page. It is a real `<table>`, with `<th scope>` headers and a caption.
+- **Desktop (≥ 1024 px, Panda's `lg`):** a table, parties down the side and criteria across the top, always (PLAN,
+  Answered: scorecard orientation). Criteria headers use the short title and link to the criterion page; party headers
+  show the logo or colour swatch, the short name (the full name in an `abbr` title and, after it, in text only screen
+  readers read) and the programme status, and link to the party page. Each cell is a link to the cell page with the
+  rating's icon and words. Past about 8 criteria the party column stays fixed and the table scrolls sideways inside
+  its own region (with a visible focus and a label), never the page. It is a real `<table>`, with `<th scope>` headers
+  and a caption.
 - **Mobile:** one card per party, in the parties' order, each listing every criterion with the party's rating, and a
   second view, one card per criterion listing every party. Both are server-rendered; a two-link switch above them
   picks one (`?vista=criterios`, plain links, so it works without scripts; the canonical address has no query).
@@ -180,12 +187,13 @@ external reviewers with their affiliations.
 
 On every response of the web app, pages, images, routes and build assets alike (`headers` in `next.config.js`):
 
-- `Content-Security-Policy`: `default-src 'self'`; `script-src 'self' 'unsafe-inline'`; `style-src 'self'
-'unsafe-inline'`; `img-src 'self' data:`; `font-src 'self'`; `connect-src 'self'`; `manifest-src 'self'`;
-  `form-action 'self'`; `frame-ancestors 'none'`; `base-uri 'none'`; `object-src 'none'`. No nonces, as ADR-0003
-  sets for the public site, so scripts allow inline code: Next writes each page's data into inline scripts. Nothing
-  loads from another host. Whether to move to nonces, now that pages render per request anyway, is a question for
-  Dani (PLAN R126). Colours that come from data (a party's) are SVG fills, never style attributes.
+- `Content-Security-Policy`: `default-src 'self'`; `script-src 'self' 'unsafe-inline'` (and `'unsafe-eval'` only
+  under `pnpm dev`, for React's development build); `style-src 'self' 'unsafe-inline'`; `img-src 'self' data:`;
+  `font-src 'self'`; `connect-src 'self'`; `manifest-src 'self'`; `form-action 'self'`; `frame-ancestors 'none'`;
+  `base-uri 'none'`; `object-src 'none'`. No nonces, as ADR-0003 sets for the public site, so scripts allow inline
+  code: Next writes each page's data into inline scripts. Nothing loads from another host. Whether to move to nonces,
+  now that pages render per request anyway, is a question for Dani (PLAN R126). Colours that come from data (a
+  party's) are SVG fills, never style attributes.
 - `Strict-Transport-Security: max-age=31536000` on https (no `includeSubDomains`: a tenant's hostname may be a
   subdomain of a domain it doesn't control alone, such as `elecciones.pauseai.es`).
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` (the token pages send no
@@ -203,15 +211,19 @@ An e2e test checks the headers on a page, an image and a route handler, and that
 - `/sitemap.xml` per tenant, at its root in its default locale, on its canonical base: every page the site serves
   in its mode, in each language, with its `hreflang` alternates and, where known, the date of its latest change. A
   coming-soon site lists its home and its always-on pages.
-- `/robots.txt` per host: on a canonical host, allow everything and name the sitemap; on an alias it isn't served
-  (aliases redirect); on the preview host, disallow everything.
+- A site whose home redirects to an election (open, or on the preview host) leaves the home out of its sitemap.
+- `/robots.txt` per host, at its root, where crawlers read it: on a canonical host, the site's, allowing everything
+  and naming its sitemap; on an alias it isn't served (aliases redirect); on the preview host, disallow everything; on
+  the platform host, allow everything and name the sitemap of each site whose canonical base it is. The proxy answers
+  the last two itself, since no site is at their root.
 - `<html lang>` is the page's language, from a header the proxy sets with the mode.
 
 ## 9. Performance and caching
 
 - Pages are rendered per request from the web app's copy of the tenant's public data, refreshed at most every 60
-  seconds and kept when the API fails (ADR-0003 guardrail 3), as the home data already is (PLAN R45). On-publish
-  revalidation (M2, PC1) shortens that later.
+  seconds and kept when the API fails (ADR-0003 guardrail 3), as the home data already is (PLAN R45). An election's
+  data is read in one snapshot, and fetched only for an election the home lists: any other slug is a 404 that never
+  reaches the API. On-publish revalidation (M2, PC1) shortens that later.
 - Budgets (PLAN, social sharing): a warm page under 300 ms of server time; no cookies; no client JavaScript needed.
 
 ## 10. Not yet

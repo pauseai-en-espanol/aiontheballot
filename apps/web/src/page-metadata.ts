@@ -13,6 +13,7 @@ import { warmHomeImage } from './home-image';
 import { homeCardContent, homeCardHash, imagePath, ogLocale, pageUrl } from './share';
 import { pageCanonical } from './site';
 import { siteIconPath, siteIconSource } from './site-icon';
+import { openSites } from './tenant-data';
 
 type FoundPage = Extract<TenantPage, { kind: 'found' }>;
 
@@ -55,7 +56,7 @@ export const pageMetadata = async ({
   const name = pickLocalized(home.tenant.displayName, locale, home.tenant.defaultLocale) ?? '';
   const fullTitle = givenTitle ?? (title ? `${title} · ${name}` : name);
   const url = pageCanonical(base, locale, tenant.defaultLocale, target);
-  const card = homeCardContent(home, locale, base);
+  const card = homeCardContent(home, locale, base, openSites.has(slug));
   const hash = homeCardHash(card, LINK_PREVIEW);
   warmHomeImage(slug, locale, LINK_PREVIEW, hash, card);
   const image = {

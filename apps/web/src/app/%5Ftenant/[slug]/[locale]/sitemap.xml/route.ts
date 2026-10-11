@@ -26,8 +26,10 @@ export const GET = async (_request: Request, { params }: Context): Promise<Respo
   }
   const { mode } = await siteContext();
   const { documents, elections } = page.home;
+  // Once the site shows its elections, the home is a redirect to the current one, which a sitemap doesn't list.
+  const showsElections = mode !== 'coming-soon';
   const entries: SitemapEntry[] = [
-    { target: { page: 'home' } },
+    ...(showsElections && elections.length > 0 ? [] : [{ target: { page: 'home' } } as const]),
     { target: { page: 'legalNotice' } },
     ...(documents.privacy_policy
       ? [
@@ -41,7 +43,7 @@ export const GET = async (_request: Request, { params }: Context): Promise<Respo
       ? [{ target: { page: 'about' } as const, lastModified: documents.about_operator.publishedAt }]
       : []),
   ];
-  if (mode !== 'coming-soon') {
+  if (showsElections) {
     for (const election of elections) {
       const result = await loadElection(slug, election.slug);
       if (result.kind === 'found') {

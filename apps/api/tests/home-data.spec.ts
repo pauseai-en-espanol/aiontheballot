@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createHomeSource } from '../src/home-data.js';
 import { inRolledBackTransaction } from './db.js';
-import { TENANT_A } from './fixtures.js';
+import { ELECTIONS_A, TENANT_A } from './fixtures.js';
 
 const asPublic = (trx: Transaction<DB>) => sql`SET LOCAL ROLE aiontheballot_web`.execute(trx);
 
@@ -54,6 +54,17 @@ describe("a site's home data", () => {
           )
         )?.signups,
       ).toBe(true);
+    });
+  });
+
+  it('lists the public elections, the live one first, never a draft', async () => {
+    await inRolledBackTransaction(async (trx) => {
+      await asPublic(trx);
+      const home = await createHomeSource(trx)('test-a');
+      expect(home?.elections.map(({ slug, status }) => ({ slug, status }))).toEqual([
+        { slug: ELECTIONS_A.live.slug, status: 'live' },
+        { slug: ELECTIONS_A.archived.slug, status: 'archived' },
+      ]);
     });
   });
 

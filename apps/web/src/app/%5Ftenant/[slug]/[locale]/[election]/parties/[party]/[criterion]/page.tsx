@@ -7,10 +7,12 @@ import { css, cx } from '@styled-system/css';
 import { notFound } from 'next/navigation';
 
 import { ElectionFrame } from '@/components/election-frame';
+import { InLanguage, Message } from '@/components/message';
 import { ProgrammeStatus } from '@/components/programme-status';
 import { RatingBadge } from '@/components/rating';
 import { RatingLegend } from '@/components/rating-legend';
 import { type ElectionPageParams, loadElectionPage } from '@/election-page';
+import { methodologyOf } from '@/election-view';
 import { localText } from '@/local-text';
 import { pageMetadata } from '@/page-metadata';
 import { ratingLabel } from '@/rating-label';
@@ -58,9 +60,22 @@ export const generateMetadata = async (props: CellProps): Promise<Metadata> => {
 
 const link = cx(focusRing, css({ textDecoration: 'underline', textUnderlineOffset: '3px' }));
 
+/** A source's language, for its title and quotes: the one recorded, else the site's. */
+const sourceLang = (source: PublicSource, defaultLocale: string): string =>
+  source.language ?? defaultLocale;
+
 /** Where a quote or a checked document comes from: its public columns only (data model §5; PLAN P8). */
-const Source = ({ source, locale }: { source: PublicSource; locale: Locale }) => {
+const Source = ({
+  source,
+  locale,
+  defaultLocale,
+}: {
+  source: PublicSource;
+  locale: Locale;
+  defaultLocale: string;
+}) => {
   const t = getTranslator(locale);
+  const lang = sourceLang(source, defaultLocale);
   return (
     <ul
       className={css({ listStyle: 'none', fontSize: '15px', color: 'fg.muted', marginTop: '6px' })}
@@ -68,11 +83,11 @@ const Source = ({ source, locale }: { source: PublicSource; locale: Locale }) =>
       <li>
         {t('cellPage.source')}:{' '}
         {source.url ? (
-          <a href={source.url} className={link}>
+          <a href={source.url} className={link} lang={lang}>
             {source.title}
           </a>
         ) : (
-          source.title
+          <span lang={lang}>{source.title}</span>
         )}
       </li>
       {source.retrievedAt && (
@@ -104,7 +119,8 @@ const Cell = async (props: CellProps) => {
   const t = getTranslator(locale);
   const defaultLocale = page.page.home.tenant.defaultLocale;
   const text = (value: Parameters<typeof localText>[0]) => localText(value, locale, defaultLocale);
-  const { election, methodology } = page.election;
+  const { election } = page.election;
+  const { kind } = methodologyOf(page.election, page.page.home.tenant.methodologyKind);
   const party = text(cell.party.shortName);
   const criterion = text(cell.criterion.title);
   const { current } = cell;
@@ -118,7 +134,15 @@ const Cell = async (props: CellProps) => {
         party: cell.party.slug,
         criterion: cell.criterion.slug,
       }}
-      title={t('cellPage.title', { party: party.text, criterion: criterion.text })}
+      title={
+        <Message
+          format={(values) => t('cellPage.title', values)}
+          parts={{
+            party: <InLanguage text={party} />,
+            criterion: <InLanguage text={criterion} />,
+          }}
+        />
+      }
       trail={[
         {
           href: href({ page: 'party', election: election.slug, party: cell.party.slug }),
@@ -149,7 +173,7 @@ const Cell = async (props: CellProps) => {
       )}
       <RatingLegend
         locale={locale}
-        kind={methodology?.kind ?? page.page.home.tenant.methodologyKind}
+        kind={kind}
         methodologyHref={href({ page: 'methodology', election: election.slug })}
       />
       {summary && (
@@ -190,6 +214,7 @@ const Cell = async (props: CellProps) => {
             {current.evidence.map((item, index) => (
               <li key={index}>
                 <blockquote
+                  lang={sourceLang(item.source, defaultLocale)}
                   className={css({
                     borderInlineStart: '4px solid',
                     borderColor: 'border.default',
@@ -202,10 +227,18 @@ const Cell = async (props: CellProps) => {
                 </blockquote>
                 {item.locationLabel && (
                   <p className={css({ fontSize: '15px', marginTop: '6px' })}>
-                    {t('cellPage.location', { location: item.locationLabel })}
+                    {/* Written by the editors, in the site's language. */}
+                    <Message
+                      format={(values) => t('cellPage.location', values)}
+                      parts={{
+                        location: (
+                          <InLanguage text={{ text: item.locationLabel, lang: defaultLocale }} />
+                        ),
+                      }}
+                    />
                   </p>
                 )}
-                <Source source={item.source} locale={locale} />
+                <Source source={item.source} locale={locale} defaultLocale={defaultLocale} />
               </li>
             ))}
           </ol>
@@ -235,7 +268,7 @@ const Cell = async (props: CellProps) => {
                 <p className={css({ fontSize: '16px' })}>
                   {t('cellPage.checkedOn', { date: new Date(item.checkedAt) })}
                 </p>
-                <Source source={item.source} locale={locale} />
+                <Source source={item.source} locale={locale} defaultLocale={defaultLocale} />
               </li>
             ))}
           </ul>

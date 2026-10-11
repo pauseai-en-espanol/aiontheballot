@@ -1,8 +1,8 @@
-import type { PublicElection } from '@aiontheballot/domain/public-election';
+import { NO_PUBLIC_ELECTION, type PublicElection } from '@aiontheballot/domain/public-election';
 
 export type ElectionResult =
   | { kind: 'found'; election: PublicElection }
-  /** No public election has these slugs (the API answered 404). */
+  /** No public election has these slugs (the API said so). */
   | { kind: 'missing' }
   /** No API, or it failed and there is no earlier copy. */
   | { kind: 'unavailable' };
@@ -25,9 +25,9 @@ interface Entry {
 
 /**
  * Loads a public election's data from the API and keeps it for `maxAgeMs` (public-site spec §9), as the home data is
- * kept (PLAN R45): when a refresh fails, the last good copy stays in use (ADR-0003 guardrail 3). Slugs come from
- * requests, so the cache holds a bounded number of entries; a missing election is remembered too, so asking for
- * made-up slugs can't make every request reach the API.
+ * kept (PLAN R45): when a refresh fails, the last good copy stays in use (ADR-0003 guardrail 3). The pages ask only
+ * for elections the home lists, so made-up slugs never get here; the cache is bounded all the same. Only the API's own
+ * "no public election" is a missing one: any other answer, a route an older API lacks included, is a failure.
  */
 export const createElectionLoader = ({
   apiUrl,
@@ -59,9 +59,13 @@ export const createElectionLoader = ({
       const response = await fetchImpl(new URL(path, apiUrl), {
         signal: AbortSignal.timeout(5_000),
       });
-      if (response.status === 404 || response.status === 400) {
-        keep(key, { result: { kind: 'missing' }, loadedAt: now() });
-        return;
+      if (response.status === 404) {
+        const body = (await response.json().catch(() => undefined)) as
+          { error?: unknown } | undefined;
+        if (body?.error === NO_PUBLIC_ELECTION) {
+          keep(key, { result: { kind: 'missing' }, loadedAt: now() });
+          return;
+        }
       }
       if (!response.ok) {
         throw new Error(`GET ${path} answered ${response.status}`);

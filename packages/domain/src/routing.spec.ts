@@ -4,6 +4,7 @@ import {
   buildRoutingTable,
   canonicalBase,
   normalizeHost,
+  pathHostRobots,
   type Resolution,
   resolve,
   type RoutingConfig,
@@ -255,6 +256,35 @@ describe('canonicalBase', () => {
     expect(canonicalBase(table, tenantA, platform)).toBe('https://ejemplo-a.test');
     expect(canonicalBase(table, tenantB, platform)).toBe('https://plataforma.test/test-b');
     expect(canonicalBase(table, tenantB)).toBeUndefined();
+  });
+});
+
+describe('pathHostRobots', () => {
+  it('keeps every crawler off the preview host', () => {
+    expect(pathHostRobots('Vista-Previa.test:443', table, platform)).toBe(
+      'User-agent: *\nDisallow: /\n',
+    );
+  });
+
+  it('lists, on the platform host, the sitemaps of the tenants whose canonical base is there', () => {
+    expect(pathHostRobots('plataforma.test', table, platform)).toBe(
+      'User-agent: *\nAllow: /\n' +
+        'Sitemap: https://plataforma.test/test-b/sitemap.xml\n' +
+        'Sitemap: https://plataforma.test/test-c/sitemap.xml\n',
+    );
+  });
+
+  it("leaves a tenant's own hosts, and any other, to the tenant's robots.txt", () => {
+    expect(pathHostRobots('ejemplo-a.test', table, platform)).toBeUndefined();
+    expect(pathHostRobots('otro.test', table, platform)).toBeUndefined();
+    expect(pathHostRobots('plataforma.test', table)).toBeUndefined();
+  });
+
+  it("answers the preview host's without routing data, and the platform host's not", () => {
+    expect(pathHostRobots('vista-previa.test', undefined, platform)).toBe(
+      'User-agent: *\nDisallow: /\n',
+    );
+    expect(pathHostRobots('plataforma.test', undefined, platform)).toBeUndefined();
   });
 });
 

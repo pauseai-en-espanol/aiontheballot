@@ -7,6 +7,7 @@ import type { LoadedElectionPage } from '../election-page';
 
 import { localText } from '../local-text';
 import { focusRing, pageTitle } from '../styles';
+import { PageViews } from './page-views';
 import { SiteFrame } from './site-frame';
 
 interface ElectionFrameProps {
@@ -19,7 +20,7 @@ interface ElectionFrameProps {
 
 /**
  * The frame of an election's pages (public-site spec §5): the shared layout, with the election's methodology in the
- * footer (BRIEF §3 invariant 2), a breadcrumb back to the scorecard, and the page's title.
+ * footer (BRIEF §3 invariant 2), a breadcrumb back to the scorecard, the page's title, and its page view.
  */
 export const ElectionFrame = ({
   page,
@@ -33,7 +34,10 @@ export const ElectionFrame = ({
   const name = localText(election.name, page.locale, page.page.home.tenant.defaultLocale);
   const methodology = page.href({ page: 'methodology', election: election.slug });
   const crumbs = [
-    { href: page.href({ page: 'election', election: election.slug }), label: name.text },
+    {
+      href: page.href({ page: 'election', election: election.slug }),
+      label: <span lang={name.lang}>{name.text}</span>,
+    },
     ...trail,
   ];
   return (
@@ -67,6 +71,7 @@ export const ElectionFrame = ({
       )}
       <h1 className={pageTitle}>{title}</h1>
       {children}
+      <PageViews />
     </SiteFrame>
   );
 };

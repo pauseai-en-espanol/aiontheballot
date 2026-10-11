@@ -71,6 +71,7 @@ describe('the routing proxy', () => {
     const told = (response: Response) => ({
       mode: response.headers.get('x-middleware-request-x-aiontheballot-site'),
       root: response.headers.get('x-middleware-request-x-aiontheballot-root'),
+      locale: response.headers.get('x-middleware-request-x-aiontheballot-locale'),
       rewrite: new URL(response.headers.get('x-middleware-rewrite') ?? 'http://x/').pathname,
     });
 
@@ -101,6 +102,7 @@ describe('the routing proxy', () => {
       expect(told(response)).toEqual({
         mode: 'open',
         root: '',
+        locale: 'es',
         rewrite: '/_tenant/ejemplo-a/es/generales-2026/parties/x',
       });
       expect(response.headers.get('x-robots-tag')).toBeNull();
@@ -113,6 +115,7 @@ describe('the routing proxy', () => {
       expect(told(response)).toEqual({
         mode: 'preview',
         root: '/ejemplo-a',
+        locale: 'es',
         rewrite: '/_tenant/ejemplo-a/es/generales-2026',
       });
       expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
@@ -123,10 +126,36 @@ describe('the routing proxy', () => {
         request('ejemplo-a.example.test', '/', {
           'x-aiontheballot-site': 'preview',
           'x-aiontheballot-root': '/otro',
+          'x-aiontheballot-locale': 'en',
         }),
       );
-      expect(told(response)).toMatchObject({ mode: 'coming-soon', root: '' });
+      expect(told(response)).toMatchObject({ mode: 'coming-soon', root: '', locale: 'es' });
     });
+  });
+
+  it("answers robots.txt at the root of the hosts that serve sites by path, and leaves a site's own to it", async () => {
+    const hosts = createRoutingProxy(async () => table, {
+      previewHost: 'vista-previa.example.test',
+      platformHost: 'plataforma.example.test',
+    });
+    const preview = await hosts(request('vista-previa.example.test', '/robots.txt'));
+    expect(preview.status).toBe(200);
+    expect(await preview.text()).toBe('User-agent: *\nDisallow: /\n');
+    const platform = await hosts(request('plataforma.example.test', '/robots.txt'));
+    expect(await platform.text()).toBe('User-agent: *\nAllow: /\n');
+    const own = await hosts(request('ejemplo-a.example.test', '/robots.txt'));
+    expect(new URL(own.headers.get('x-middleware-rewrite') ?? '').pathname).toBe(
+      '/_tenant/ejemplo-a/es/robots.txt',
+    );
+    // Without routing data, the preview host still keeps crawlers off; the platform host can't name its sitemaps.
+    const unrouted = createRoutingProxy(async () => undefined, {
+      previewHost: 'vista-previa.example.test',
+      platformHost: 'plataforma.example.test',
+    });
+    expect(await (await unrouted(request('vista-previa.example.test', '/robots.txt'))).text()).toBe(
+      'User-agent: *\nDisallow: /\n',
+    );
+    expect((await unrouted(request('plataforma.example.test', '/robots.txt'))).status).toBe(503);
   });
 
   it('sets no cookie', async () => {

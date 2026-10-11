@@ -77,6 +77,8 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
       'Ejemplo 2',
     ]);
     await expect(table.getByRole('rowheader')).toHaveText([/PEA/, /PEB/]);
+    // The full name too, for screen readers, which seldom read an abbreviation's title.
+    await expect(table.getByRole('link', { name: 'PEA (Partido Ejemplo A)' })).toBeVisible();
     // The one published cell, and the pending others: icon, words and colour, never colour alone.
     const cells = table.getByRole('cell');
     await expect(cells).toHaveText([
@@ -126,6 +128,8 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
   test("shows a rated cell's summary, quote and source, and its history", async ({ page }) => {
     await page.goto(`${ELECTION}/partidos/partido-ejemplo-a/criterio-de-ejemplo-1`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('PEA · Criterio de ejemplo 1');
+    // Quotes and sources in their document's language (WCAG 3.1.2): the seed's is Spanish.
+    await expect(page.locator('blockquote')).toHaveAttribute('lang', 'es');
     await expect(
       page.getByText('Resumen inventado: propone una moratoria de ejemplo.'),
     ).toBeVisible();
@@ -167,9 +171,10 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     await expectAccessible(page);
   });
 
-  test('puts the operator line on every page, and the methodology link on every election page (BRIEF §3)', async ({
+  test('puts the operator line on every page, and the methodology link on every election page (BRIEF §3), with no CSP violation', async ({
     page,
   }) => {
+    const violations = cspViolations(page);
     const paths = ['/aviso-legal', '/privacidad', ...ELECTION_PAGES];
     for (const path of paths) {
       await page.goto(`${SITE}${path}`);
@@ -178,6 +183,7 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
         await expect(page.locator('[data-invariant="methodology-link"]'), path).toHaveCount(1);
       }
     }
+    expect(violations).toEqual([]);
   });
 
   test('answers 404 for an unknown party, criterion or election, and for English words on a Spanish site', async ({
@@ -201,6 +207,8 @@ test.describe('security headers and search engines (public-site spec §7, §8)',
       const headers = (await request.get(`${TENANT_URL}${path}`)).headers();
       expect(headers['content-security-policy'], path).toContain("frame-ancestors 'none'");
       expect(headers['content-security-policy'], path).toContain("default-src 'self'");
+      // Only `pnpm dev` allows eval: never the production build these tests run against.
+      expect(headers['content-security-policy'], path).not.toContain("'unsafe-eval'");
       expect(headers['x-content-type-options'], path).toBe('nosniff');
       expect(headers['referrer-policy'], path).toBe('strict-origin-when-cross-origin');
       expect(headers['strict-transport-security'], path).toBe('max-age=31536000');
@@ -219,8 +227,14 @@ test.describe('security headers and search engines (public-site spec §7, §8)',
     for (const path of ELECTION_PAGES) {
       expect(preview).toContain(`<loc>${CANONICAL}${path}</loc>`);
     }
+    // There, the home is a redirect to the election: no page of its own.
+    expect(preview).not.toContain(`<loc>${CANONICAL}</loc>`);
     expect(await (await request.get(`${TENANT_URL}/robots.txt`)).text()).toBe(
       `User-agent: *\nAllow: /\nSitemap: ${CANONICAL}/sitemap.xml\n`,
+    );
+    // Crawlers read the preview host's at its root.
+    expect(await (await request.get(`${PREVIEW_URL}/robots.txt`)).text()).toBe(
+      'User-agent: *\nDisallow: /\n',
     );
     expect(await (await request.get(`${SITE}/robots.txt`)).text()).toBe(
       'User-agent: *\nDisallow: /\n',

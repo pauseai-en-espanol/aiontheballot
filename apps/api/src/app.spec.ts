@@ -1,7 +1,7 @@
-import type { PublicElection } from '@aiontheballot/domain/public-election';
 import type { PublicHome } from '@aiontheballot/domain/public-home';
 import type { FastifyInstance } from 'fastify';
 
+import { NO_PUBLIC_ELECTION, type PublicElection } from '@aiontheballot/domain/public-election';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { SignupInput, SignupOutcome, Signups } from './signups.js';
@@ -208,6 +208,8 @@ describe('api', () => {
       expect(found.headers['cache-control']).toBe('no-store');
       expect(found.json()).toEqual(data);
       expect(missing.statusCode).toBe(404);
+      // What tells the web app that no public election has the slugs, not that the route is missing.
+      expect(missing.json()).toEqual({ error: NO_PUBLIC_ELECTION });
       expect(malformed.statusCode).toBe(400);
     });
   });

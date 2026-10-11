@@ -11,6 +11,7 @@ import {
   ogLocale,
   pageUrl,
   parseImageFile,
+  requestedHomeCard,
 } from './share';
 
 const home: PublicHome = {
@@ -77,7 +78,7 @@ describe('share image files', () => {
 
 describe('the home card', () => {
   it('takes its texts from the data and the messages, and the address from the canonical base', () => {
-    expect(homeCardContent(home, 'es', 'https://ejemplo.example.test')).toEqual({
+    expect(homeCardContent(home, 'es', 'https://ejemplo.example.test', false)).toEqual({
       label: 'Próximamente · Elecciones de ejemplo · 15 de enero de 2030',
       name: 'Inquilino de ejemplo',
       question: '¿Qué proponen los partidos frente a los riesgos de la IA?',
@@ -87,12 +88,56 @@ describe('the home card', () => {
     });
   });
 
+  it('names the current election, and no longer says coming soon, once the site is open', () => {
+    const elections = [
+      {
+        slug: 'generales',
+        name: { es: 'Generales de ejemplo' },
+        date: '2031-05-04',
+        status: 'live' as const,
+      },
+    ];
+    expect(
+      homeCardContent({ ...home, elections }, 'es', 'https://ejemplo.example.test', true).label,
+    ).toBe('Generales de ejemplo · 4 de mayo de 2031');
+    // Coming soon still, and open with no public election yet: the coming-soon label.
+    expect(
+      homeCardContent({ ...home, elections }, 'es', 'https://ejemplo.example.test', false).label,
+    ).toBe('Próximamente · Elecciones de ejemplo · 15 de enero de 2030');
+    expect(homeCardContent(home, 'es', 'https://ejemplo.example.test', true).label).toBe(
+      'Próximamente · Elecciones de ejemplo · 15 de enero de 2030',
+    );
+  });
+
+  it("answers an image request with the other mode's card when that is the one asked for, as mid-rollout", () => {
+    const elections = [
+      { slug: 'generales', name: { es: 'Generales' }, date: null, status: 'live' as const },
+    ];
+    const withElection = { ...home, elections };
+    const base = 'https://ejemplo.example.test';
+    const open = homeCardContent(withElection, 'es', base, true);
+    const closed = homeCardContent(withElection, 'es', base, false);
+    expect(
+      requestedHomeCard(
+        withElection,
+        'es',
+        base,
+        false,
+        '1200x630',
+        homeCardHash(open, '1200x630'),
+      ),
+    ).toEqual(open);
+    expect(requestedHomeCard(withElection, 'es', base, false, '1200x630', 'a'.repeat(12))).toEqual(
+      closed,
+    );
+  });
+
   it("names the operator's logo for orange, which then changes its hash", () => {
     const logo = { sha256: 'a'.repeat(64), contentType: 'image/png' };
     const withLogo = { ...home, brand: { operator_logo_on_accent: logo } };
-    const card = homeCardContent(withLogo, 'es', 'https://ejemplo.example.test');
+    const card = homeCardContent(withLogo, 'es', 'https://ejemplo.example.test', false);
     expect(card.operatorLogo).toEqual(logo);
-    const plain = homeCardContent(home, 'es', 'https://ejemplo.example.test');
+    const plain = homeCardContent(home, 'es', 'https://ejemplo.example.test', false);
     expect(homeCardHash(card, '1200x630')).not.toBe(homeCardHash(plain, '1200x630'));
   });
 
@@ -102,16 +147,17 @@ describe('the home card', () => {
       brand: { operator_logo_on_accent: { sha256: 'a'.repeat(64), contentType: 'image/webp' } },
     };
     expect(
-      homeCardContent(withWebp, 'es', 'https://ejemplo.example.test').operatorLogo,
+      homeCardContent(withWebp, 'es', 'https://ejemplo.example.test', false).operatorLogo,
     ).toBeUndefined();
   });
 
   it('gets a new hash when anything on it changes', () => {
-    const card = homeCardContent(home, 'es', 'https://ejemplo.example.test');
+    const card = homeCardContent(home, 'es', 'https://ejemplo.example.test', false);
     const other = homeCardContent(
       { ...home, election: null },
       'es',
       'https://ejemplo.example.test',
+      false,
     );
     expect(homeCardHash(card, '1200x630')).toBe(homeCardHash({ ...card }, '1200x630'));
     expect(homeCardHash(other, '1200x630')).not.toBe(homeCardHash(card, '1200x630'));

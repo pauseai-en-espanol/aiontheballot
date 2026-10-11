@@ -10,6 +10,7 @@ import { ProgrammeStatus } from '@/components/programme-status';
 import { RatingBadge } from '@/components/rating';
 import { RatingLegend } from '@/components/rating-legend';
 import { type ElectionPageParams, loadElectionPage } from '@/election-page';
+import { methodologyOf } from '@/election-view';
 import { localText } from '@/local-text';
 import { pageMetadata } from '@/page-metadata';
 import { ratingLabel } from '@/rating-label';
@@ -49,7 +50,7 @@ const Party = async (props: PartyProps) => {
   const t = getTranslator(locale);
   const defaultLocale = page.page.home.tenant.defaultLocale;
   const text = (value: Parameters<typeof localText>[0]) => localText(value, locale, defaultLocale);
-  const { election, criteria, methodology } = page.election;
+  const { election, criteria } = page.election;
   const name = text(party.name);
   return (
     <ElectionFrame
@@ -76,7 +77,7 @@ const Party = async (props: PartyProps) => {
       )}
       <RatingLegend
         locale={locale}
-        kind={methodology?.kind ?? page.page.home.tenant.methodologyKind}
+        kind={methodologyOf(page.election, page.page.home.tenant.methodologyKind).kind}
         methodologyHref={href({ page: 'methodology', election: election.slug })}
       />
       <h2 className={css({ fontSize: '24px', fontWeight: '700', marginBottom: '12px' })}>
@@ -116,6 +117,11 @@ const Party = async (props: PartyProps) => {
               <p className={css({ marginTop: '8px' })}>
                 <RatingBadge rating={cell.display} label={ratingLabel(locale, cell.display)} />
               </p>
+              {cell.current && (
+                <p className={css({ marginTop: '4px', fontSize: '16px', color: 'fg.muted' })}>
+                  {t('election.updated', { date: new Date(cell.current.publishedAt) })}
+                </p>
+              )}
               {summary && (
                 <p lang={summary.lang} className={css({ marginTop: '8px', fontSize: '17px' })}>
                   {summary.text}

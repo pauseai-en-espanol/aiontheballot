@@ -12,21 +12,26 @@ import {
   type LoadedElectionPage,
   loadElectionPage,
 } from '@/election-page';
+import { methodologyOf } from '@/election-view';
 import { localText } from '@/local-text';
 import { renderMarkdown } from '@/markdown';
 import { pageMetadata } from '@/page-metadata';
 import { ratingLabel } from '@/rating-label';
 import { focusRing, prose } from '@/styles';
 
+/** What the ratings say, in the words of the methodology's kind, as its scale below. */
 const lead = (page: LoadedElectionPage): string => {
   const t = getTranslator(page.locale);
-  const { methodology } = page.election;
-  const owner = methodology?.demandsOwner;
+  const { home } = page.page;
+  const { kind, owner } = methodologyOf(page.election, home.tenant.methodologyKind);
+  if (kind === 'descriptive') {
+    return t('methodologyPage.descriptive');
+  }
   return owner
     ? t('methodologyPage.demands', {
-        owner: pickLocalized(owner.name, page.locale, page.page.home.tenant.defaultLocale) ?? '',
+        owner: pickLocalized(owner.name, page.locale, home.tenant.defaultLocale) ?? '',
       })
-    : t('methodologyPage.descriptive');
+    : t('methodologyPage.demandsUnnamed');
 };
 
 export const generateMetadata = async (props: ElectionPageParams): Promise<Metadata> => {
@@ -50,9 +55,8 @@ const Methodology = async (props: ElectionPageParams) => {
   const t = getTranslator(locale);
   const defaultLocale = page.page.home.tenant.defaultLocale;
   const { methodology } = page.election;
-  const kind = methodology?.kind ?? page.page.home.tenant.methodologyKind;
+  const { kind, owner } = methodologyOf(page.election, page.page.home.tenant.methodologyKind);
   const body = methodology ? localText(methodology.body, locale, defaultLocale) : undefined;
-  const owner = methodology?.demandsOwner;
   return (
     <ElectionFrame
       page={page}

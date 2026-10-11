@@ -81,9 +81,14 @@ export interface PublicEvidence {
 /** A source's public columns only (data model §5): never its stored copy, which stays private (PLAN P8). */
 export interface PublicSource {
   title: string;
+  /** The document's language, for its title and quotes; null if no one recorded it. */
+  language: string | null;
   url: string | null;
   kind: string;
   sha256: string | null;
   retrievedAt: string | null;
   archiveUrl: string | null;
 }
+
+/** The API's answer when no public election has the slugs, told apart from a route the API doesn't have (yet). */
+export const NO_PUBLIC_ELECTION = 'No public election';

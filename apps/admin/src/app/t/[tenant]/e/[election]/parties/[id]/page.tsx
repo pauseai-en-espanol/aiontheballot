@@ -68,7 +68,7 @@ const PartyPage = async ({ params }: Params) => {
             ? t('admin.parties.programme.checkedOn', { date: new Date(item.programmeCheckedAt) })
             : t('admin.parties.programme.neverChecked')}
         </p>
-        {data.canEdit && election.status !== 'archived' ? (
+        {data.canEdit && election.status !== 'archived' && !item.retired ? (
           <ProgrammeForm
             path={`${api}/${item.id}/programme`}
             canPublish={item.hasProgrammeSource}
@@ -82,6 +82,8 @@ const PartyPage = async ({ params }: Params) => {
           />
         ) : election.status === 'archived' ? (
           <p className={styles.text}>{t('admin.parties.programme.readOnly')}</p>
+        ) : item.retired ? (
+          <p className={styles.text}>{t('admin.parties.programme.retired')}</p>
         ) : null}
       </section>
       {editable ? (

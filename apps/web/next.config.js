@@ -9,11 +9,12 @@ const { name, version } = JSON.parse(readFileSync(join(appDir, 'package.json'), 
  * The public site's Content Security Policy (public-site spec §7). ADR-0003 keeps nonces off the public site, so
  * scripts allow inline code: Next writes the page's data into inline scripts. Everything else is closed: nothing loads
  * from another host (fonts, the analytics script and the relays are the site's own), no frame may hold a page, and a
- * form posts only to the site.
+ * form posts only to the site. `pnpm dev` alone adds 'unsafe-eval', which React's development build needs; a
+ * production build never has it.
  */
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",

@@ -6,6 +6,7 @@ import { getTranslator } from '@aiontheballot/i18n/messages';
 import { css, cx } from '@styled-system/css';
 
 import { ElectionFrame } from '@/components/election-frame';
+import { InLanguage, Message } from '@/components/message';
 import { PartySwatch } from '@/components/party-swatch';
 import { ProgrammeStatus } from '@/components/programme-status';
 import { RatingBadge } from '@/components/rating';
@@ -15,6 +16,7 @@ import {
   type LoadedElectionPage,
   loadElectionPage,
 } from '@/election-page';
+import { methodologyOf } from '@/election-view';
 import { localText } from '@/local-text';
 import { pageMetadata } from '@/page-metadata';
 import { ratingLabel } from '@/rating-label';
@@ -24,15 +26,19 @@ interface ScorecardProps extends ElectionPageParams {
   searchParams: Promise<{ vista?: string | string[] }>;
 }
 
+/** The scorecard's question, in the words of its methodology's kind, as the legend's scale. */
 const question = (page: LoadedElectionPage): string => {
   const t = getTranslator(page.locale);
-  const { methodology } = page.election;
-  const defaultLocale = page.page.home.tenant.defaultLocale;
-  return methodology?.kind === 'demands' && methodology.demandsOwner
+  const { home } = page.page;
+  const { kind, owner } = methodologyOf(page.election, home.tenant.methodologyKind);
+  if (kind === 'descriptive') {
+    return t('election.question.descriptive');
+  }
+  return owner
     ? t('election.question.demands', {
-        owner: pickLocalized(methodology.demandsOwner.name, page.locale, defaultLocale) ?? '',
+        owner: pickLocalized(owner.name, page.locale, home.tenant.defaultLocale) ?? '',
       })
-    : t('election.question.descriptive');
+    : t('election.question.demandsUnnamed');
 };
 
 export const generateMetadata = async (props: ScorecardProps): Promise<Metadata> => {
@@ -57,7 +63,8 @@ const Scorecard = async (props: ScorecardProps) => {
   const { locale, href } = page;
   const t = getTranslator(locale);
   const defaultLocale = page.page.home.tenant.defaultLocale;
-  const { election, parties, criteria, methodology } = page.election;
+  const { election, parties, criteria } = page.election;
+  const { kind } = methodologyOf(page.election, page.page.home.tenant.methodologyKind);
   const text = (value: Parameters<typeof localText>[0]) => localText(value, locale, defaultLocale);
   const name = text(election.name);
   const byCriterion = (await props.searchParams).vista === 'criterios';
@@ -89,7 +96,7 @@ const Scorecard = async (props: ScorecardProps) => {
       </p>
       <RatingLegend
         locale={locale}
-        kind={methodology?.kind ?? page.page.home.tenant.methodologyKind}
+        kind={kind}
         methodologyHref={href({ page: 'methodology', election: election.slug })}
       />
       <p className={css({ fontSize: '16px', color: 'fg.muted', marginBottom: '24px' })}>
@@ -127,7 +134,10 @@ const Scorecard = async (props: ScorecardProps) => {
                   fontSize: '17px',
                 })}
               >
-                {t('election.tableCaption', { election: name.text })}
+                <Message
+                  format={(values) => t('election.tableCaption', values)}
+                  parts={{ election: <InLanguage text={name} /> }}
+                />
               </caption>
               <thead>
                 <tr>
@@ -211,6 +221,12 @@ const Scorecard = async (props: ScorecardProps) => {
                           >
                             {short.text}
                           </abbr>
+                          {/* The full name for screen readers, which seldom read a title (spec §5.1). */}
+                          {full.text !== short.text && (
+                            <span lang={full.lang} className={css({ srOnly: true })}>
+                              {`(${full.text})`}
+                            </span>
+                          )}
                         </a>
                         <ProgrammeStatus party={party} locale={locale} compact />
                       </th>

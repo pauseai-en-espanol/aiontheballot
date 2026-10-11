@@ -170,6 +170,35 @@ export const canonicalBase = (
   return config.platformHost ? `https://${config.platformHost}/${tenant.slug}` : undefined;
 };
 
+/**
+ * The robots.txt of a host that serves tenants by path (public-site spec §8), which crawlers read only at a host's
+ * root: on the preview host, nothing is to be crawled; on the platform host, everything, with the sitemap of each
+ * tenant whose canonical base is there (undefined without routing data). Undefined for any other host, which serves its
+ * own tenant's robots.txt.
+ */
+export const pathHostRobots = (
+  requestHost: string,
+  table: RoutingTable | undefined,
+  config: RoutingConfig = {},
+): string | undefined => {
+  const host = normalizeHost(requestHost);
+  if (!host) {
+    return undefined;
+  }
+  // The preview host's needs no routing data, so it holds while the API is away.
+  if (host === config.previewHost) {
+    return 'User-agent: *\nDisallow: /\n';
+  }
+  if (host !== config.platformHost || !table) {
+    return undefined;
+  }
+  const sitemaps = [...table.tenantsBySlug.values()]
+    .filter((tenant) => !table.canonicalHosts.has(tenant.id))
+    .map((tenant) => `Sitemap: https://${host}/${tenant.slug}/sitemap.xml\n`)
+    .sort();
+  return `User-agent: *\nAllow: /\n${sitemaps.join('')}`;
+};
+
 /** Whether the first path segment, percent-decoded, starts with `_` (reserved). Malformed encodings count too. */
 const isReserved = (path: string): boolean => {
   const [, first = ''] = path.split('/');

@@ -5,7 +5,10 @@ import { SHARE_SIZES, type ShareSize } from './sizes.js';
 
 /** What the coming-soon card shows. Every text comes from the tenant's data and the i18n messages. */
 export interface ComingSoonCard {
-  /** "Próximamente", or the next election's name and date when there is one. */
+  /**
+   * "Próximamente", with the announced election's name and date when there is one; once the site is open, the current
+   * election's name and date alone.
+   */
   label: string;
   /** The tenant's name: the product people share. */
   name: string;
