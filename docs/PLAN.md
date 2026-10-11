@@ -1041,6 +1041,25 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   site's language and any it already has, none required on its own. Not yet: the logo (uploads), linking endorsers to
   a site (P2.3), and deleting an organization.
 
+**Towards the preview (Dani's task list after R119):**
+
+- **R120. Pull requests run CI on GitHub-hosted runners; Renovate opens one non-major PR a week** (Dani's decision,
+  ADR-0001 amended). Every `pull_request` job runs on `ubuntu-24.04` (amd64, the cluster's architecture; the
+  self-hosted runner is arm64), named rather than `ubuntu-latest` so a new Ubuntu release is a commit; pushes to
+  `main` and manual runs stay on the self-hosted runner, which the release needs for Harbor. Each job picks its runner
+  with one expression on the event (`runs-on` can't read `env`); the Renovate changeset job only ever runs on pull
+  requests, so it names the hosted runner outright and keeps its write token. Every job PRs ran before still runs,
+  with the same timeouts until a hosted run shows they're short; a hosted run installs dependencies from scratch.
+  Renovate: one group for patch, pin, minor, digest and pin-digest updates (with `rebaseWhen` repeated in it, since
+  Renovate's defaults for pins would override the top-level one); the window is `* 0-5 * * 1` in Europe/Madrid, six
+  hours, wider than the `schedule:weekly` preset's four, since the hosted app runs an active repository about every
+  four hours; `updateNotScheduled: false`, so open PRs change only in the window too (a conflicted one waits for it,
+  or for the dependency dashboard); `prHourlyLimit: 0`, since the default of two an hour could hold a major or the
+  lock-file PR back a whole week; `rebaseWhen: conflicted`. Security PRs ignore the window, which a config can't
+  change, though for npm packages pnpm's own 3-day minimum (`pnpm-workspace.yaml`) may still refuse a fix younger
+  than that in the lockfile. Lock-file maintenance keeps its own weekly PR (`config:best-practices`), since Renovate
+  can't group it with other updates. From the adversarial review. To verify on the next Renovate PR's run.
+
 ## Open decisions for Dani
 
 None open: D1–D11 are decided (see [Answered](#answered)). Backups, which D2 decided, aren't running yet (see

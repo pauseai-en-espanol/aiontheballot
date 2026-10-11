@@ -120,13 +120,21 @@ fix them rather than copy them.
   - Tagged `harbor.danilupion.com/aiontheballot/<component>:<version>.<sha>`, never `:latest`.
   - The base image is pinned by digest.
 - **CI:**
-  - Runs on the `pauseai-en-espanol` self-hosted runner, with actions pinned by SHA.
+  - Amended (PLAN R120): pull requests run on GitHub-hosted runners (`ubuntu-24.04`). The repository is public, so a
+    pull request's code, a fork's included, never runs on our runner. Pushes to `main`, manual runs and the release
+    run on the `pauseai-en-espanol` self-hosted runner, the only one that can push images to Harbor. Both run the
+    same jobs. Actions are pinned by SHA.
   - Changesets bump versions, `turbo docker:push` pushes images, and a pinned `yq` writes the image tags into the
     umbrella chart's `values.yaml`.
   - One release workflow runs after CI passes on `main`, on the exact commit CI tested. It rebuilds each deployable
     whose package version is ahead of its tag in the chart, so a failed or skipped release is picked up by the next.
   - No `pull_request_target` workflows.
   - **CI never holds cluster credentials;** Argo CD pulls.
+- **Dependency updates** (amended, PLAN R120): Renovate opens and updates PRs only in a window early on Monday,
+  Europe/Madrid: one PR for every non-major update (patch, pin, minor and digest updates together), majors on their
+  own (a whole monorepo together, as Renovate's presets group them), and lock-file maintenance in its own PR. It
+  rebases a PR only when it conflicts. Security fixes are raised at once, whatever the window, as Renovate always
+  does. The 3-day minimum release age stays (ADR-0003).
 - **Sync order:** the gitops Secrets and the default ServiceAccount patch (wave -2), then the migration Job (a
   Sync hook in wave -1), then everything else. Not a PreSync hook: on a first sync it would run before the Secrets
   and the pull secret exist. Migrations are expand/contract, because old pods serve until the rollout finishes.

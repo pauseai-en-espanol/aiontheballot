@@ -19,11 +19,14 @@ concurrency:
   # Superseded PR runs are cancelled; runs on main finish, because the release workflow follows each one.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Runners (ADR-0001, PLAN R120): every pull_request job runs on a GitHub-hosted runner, since the repository is public
+# and a pull request's code, a fork's included, must never run on ours; pushes to main (and a manual run) use the
+# self-hosted runner, as the release that follows them does. Each job repeats the choice: `runs-on` can't read `env`.
 jobs:
   checks:
     name: Checks
     if: github.event.pull_request.draft != true
-    runs-on: [self-hosted, juggernaut]
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-24.04"]' || '["self-hosted", "juggernaut"]') }}
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -102,7 +105,7 @@ jobs:
   database:
     name: Database
     if: github.event.pull_request.draft != true
-    runs-on: [self-hosted, juggernaut]
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-24.04"]' || '["self-hosted", "juggernaut"]') }}
     timeout-minutes: 20
     services:
       postgres:
@@ -165,7 +168,7 @@ jobs:
     name: E2E smoke
     # After the checks, so the production builds come from the Turborepo cache they just saved.
     needs: checks
-    runs-on: [self-hosted, juggernaut]
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-24.04"]' || '["self-hosted", "juggernaut"]') }}
     timeout-minutes: 20
     # The public site routes by data the API reads from the database: a migrated database with the fictional seeds.
     services:
@@ -257,7 +260,8 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login == 'renovate[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, juggernaut]
+    # A pull_request job only.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
