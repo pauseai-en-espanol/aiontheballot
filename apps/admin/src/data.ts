@@ -111,7 +111,9 @@ export interface Invitation {
 export const getInvitations = cache(
   async (
     slug: string,
-  ): Promise<{ invitations: Invitation[]; canInvite: boolean; mailReady: boolean } | undefined> => {
+  ): Promise<
+    { invitations: Invitation[]; canInvite: boolean; mailReady: boolean; days: number } | undefined
+  > => {
     const body = await readApi(`${tenantPath(slug)}/invitations`);
     return body === undefined
       ? undefined

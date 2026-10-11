@@ -12,8 +12,9 @@ import {
   type PreparedSource,
   prepareSource,
 } from '@aiontheballot/domain/quote-match';
-import { isLocale } from '@aiontheballot/i18n/messages';
+import { isLocale, LOCALES } from '@aiontheballot/i18n/messages';
 import { captureException } from '@sentry/node';
+import * as z from 'zod';
 
 import type { InvitedAccounts } from '../auth/invited-accounts.js';
 import type { ProfileSource } from './profiles.js';
@@ -58,10 +59,13 @@ import {
   deleteInvitation,
   hashInvitationToken,
   holdsRole,
+  INVITATION_DAYS,
   type InvitationSender,
   listInvitations,
   makeInvitationToken,
+  operatorOf,
   revokeInvitation,
+  revokeOthers,
 } from './invitations.js';
 import { localizedInput, localizedSchema } from './localized-input.js';
 import { addRole, listMemberships, removeRole } from './members.js';
@@ -137,8 +141,9 @@ export type ApiRefusalKey = (typeof API_REFUSAL_KEYS)[number];
  */
 export class Refusal extends Error {
   constructor(
-    readonly status: 400 | 403 | 404 | 409 | 422,
-    readonly key: ApiRefusalKey | 'forbidden' | 'invalid' | 'incomplete' | 'stale' | 'taken',
+    readonly status: 400 | 403 | 404 | 409 | 422 | 429,
+    readonly key:
+      ApiRefusalKey | 'forbidden' | 'invalid' | 'incomplete' | 'stale' | 'taken' | 'limit',
   ) {
     super(key);
   }
@@ -527,6 +532,9 @@ const refuseUnless = (result: ChangeResult): void => {
   }
 };
 
+/** Better Auth's own rule for an address, so an invitation goes only where an account can be made. */
+const INVITABLE_EMAIL = z.email();
+
 /** Turns a cell change that didn't happen into its refusal: gone, or changed by someone else first (C14). */
 const refuseUnlessCell = (result: CellChange): void => {
   if (result === 'not-found') {
@@ -710,6 +718,9 @@ export const adminDataRoutes =
      * send one with the session anyway, and this refuses it outright. A refusal, the API's or the database's, becomes
      * its answer (§2.3); anything else is a fault, reported without the request's body.
      */
+    // Invitation emails per inviter and day (A2): enough for a team, too few for a spammer with a stolen account.
+    const allowInvitation = createRateLimiter({ limit: 50, windowMs: 24 * 60 * 60_000 });
+
     // The live match's limits (C2.6): requests per member and minute, and the sources' prepared text it keeps.
     const allowMatch = createRateLimiter({ limit: 120, windowMs: 60_000 });
     const preparedSources = new Map<string, PreparedSource>();
@@ -832,13 +843,15 @@ export const adminDataRoutes =
               invitations: await listInvitations(trx, access.tenantId),
               canInvite: holds(access, 'country_admin'),
               mailReady: invitations !== undefined,
+              days: INVITATION_DAYS,
             };
           }),
         ),
     );
 
-    // Invites someone with a role (A2): stored as the token's hash, then the link goes out by email. If the email
-    // can't be sent, the invitation is revoked again and nothing is pending.
+    // Invites someone with a role (A2): stored as the token's hash, then the link goes out by email, on the site's
+    // behalf (R115). A pending invitation for the same address and role is revoked once the new one went out; if it
+    // can't go out, the new one is revoked instead, and the old one still works.
     scope.post<{ Params: { tenant: string }; Body: { email: string; role: TenantRole } }>(
       '/t/:tenant/invitations',
       {
@@ -859,10 +872,21 @@ export const adminDataRoutes =
           }
           const email = request.body.email.trim().toLowerCase();
           const { role } = request.body;
+          // An address an account could never be made for (Better Auth's rule) gets no invitation.
+          if (!INVITABLE_EMAIL.safeParse(email).success) {
+            throw new Refusal(400, 'invalid');
+          }
           const token = makeInvitationToken();
-          const existing = await invitations.accounts.accountId(email);
           const made = await withActor(db, actor, async (trx) => {
             const access = await tenantFor(trx, actor, request.params.tenant);
+            // Before anything is looked up, so nobody else learns who holds which role.
+            if (!holds(access, 'country_admin')) {
+              throw new Refusal(403, 'forbidden');
+            }
+            if (!allowInvitation(actor.userId)) {
+              throw new Refusal(429, 'limit');
+            }
+            const existing = await invitations.accounts.accountId(email);
             if (existing !== undefined && (await holdsRole(trx, access.tenantId, existing, role))) {
               throw new Refusal(409, 'holdsRole');
             }
@@ -872,9 +896,18 @@ export const adminDataRoutes =
               tokenHash: hashInvitationToken(token),
             });
             const overview = await tenantOverview(trx, access);
-            return { id, access, name: overview.tenant.name };
+            return {
+              id,
+              access,
+              name: overview.tenant.name,
+              operator: await operatorOf(trx, access.tenantId),
+            };
           });
-          const locale = isLocale(made.access.defaultLocale) ? made.access.defaultLocale : 'es';
+          const locale = isLocale(made.access.defaultLocale)
+            ? made.access.defaultLocale
+            : LOCALES[0];
+          const local = (value: Record<string, string>) =>
+            value[locale] ?? Object.values(value)[0] ?? '';
           const inviter = profiles
             ? ((await profiles([actor.userId], { emails: false })).get(actor.userId)?.name ?? '')
             : '';
@@ -883,7 +916,10 @@ export const adminDataRoutes =
               email,
               role,
               locale,
-              site: made.name[locale] ?? Object.values(made.name)[0] ?? request.params.tenant,
+              site: local(made.name) || request.params.tenant,
+              operator: made.operator
+                ? { name: local(made.operator.name), contactEmail: made.operator.contactEmail }
+                : undefined,
               inviter,
               token,
             });
@@ -896,6 +932,9 @@ export const adminDataRoutes =
             );
             return reply.code(502).send({ error: 'mailFailed' });
           }
+          await withActor(db, actor, (trx) =>
+            revokeOthers(trx, made.access.tenantId, { id: made.id, email, role }),
+          );
           return reply.code(201).send({ id: made.id });
         }),
     );

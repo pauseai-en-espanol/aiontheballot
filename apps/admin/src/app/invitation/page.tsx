@@ -45,6 +45,7 @@ const InvitationPage = async () => {
           otherAccount: t('auth.invitation.otherAccount'),
           failed: t('auth.invitation.failed'),
           limit: t('auth.invitation.limit'),
+          nameMissing: t('auth.invitation.nameMissing'),
         }}
       />
     </main>

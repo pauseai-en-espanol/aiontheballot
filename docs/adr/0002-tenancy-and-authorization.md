@@ -35,13 +35,13 @@ The UI repeats some checks, but only for user experience.
 
 ### 2. Database roles
 
-| Role                   | Used by                                                                                                                                                              | Notes                                                                                                   |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `aiontheballot_owner`  | The migration Job only                                                                                                                                               | Owns the schemas; never used by the running apps                                                        |
-| `aiontheballot_admin`  | API admin routes and the worker                                                                                                                                      | Runtime role                                                                                            |
-| `aiontheballot_web`    | API public routes (read-only)                                                                                                                                        | Runtime role                                                                                            |
-| `aiontheballot_worker` | Background worker                                                                                                                                                    | Runtime role; only job tables, scoped to the one open `job_requests` row it runs (`app.job_request_id`) |
-| `aiontheballot_auth`   | Better Auth, inside the API; members' names and emails for the members RLS shows (PLAN R94); the daily sign-in clean-up; the owner's account command (PLAN R90, R93) | Runtime role; only Better Auth's tables in the `auth` schema, nothing in `app` or `private`             |
+| Role                   | Used by                                                                                                                                                                                            | Notes                                                                                                   |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `aiontheballot_owner`  | The migration Job only                                                                                                                                                                             | Owns the schemas; never used by the running apps                                                        |
+| `aiontheballot_admin`  | API admin routes and the worker                                                                                                                                                                    | Runtime role                                                                                            |
+| `aiontheballot_web`    | API public routes (read-only)                                                                                                                                                                      | Runtime role                                                                                            |
+| `aiontheballot_worker` | Background worker                                                                                                                                                                                  | Runtime role; only job tables, scoped to the one open `job_requests` row it runs (`app.job_request_id`) |
+| `aiontheballot_auth`   | Better Auth, inside the API; members' names and emails for the members RLS shows (PLAN R94); invited accounts (PLAN R114); the daily sign-in clean-up; the owner's account command (PLAN R90, R93) | Runtime role; only Better Auth's tables in the `auth` schema, nothing in `app` or `private`             |
 
 All runtime roles are `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB` and own nothing. A catalog
 meta-test fails if this ever changes.
@@ -53,7 +53,11 @@ adapter need it, another schema of their own: never `app` or `public`), owned by
 `aiontheballot_worker` can reach a credential. They hold no tenant data (one account can belong to several tenants),
 so grants keep them apart rather than RLS. The API keeps two pools: Better Auth's, which establishes who the user
 is, and the admin role's, which runs everything they do through `withActor` (§3). What the app needs from `auth`, the
-verified email an invitation checks, comes through `private.accept_invitation` (§10, already on the allowlist). Members'
+verified email an invitation checks, comes through `private.accept_invitation` (§10, already on the allowlist).
+Amended (PLAN R114): invitations also use Better Auth's pool to ask whether an invited email has an account, and to
+create an invited person's account with that email verified, as Better Auth's sign-up would.
+`private.pending_invitation` runs on the admin pool without an actor, since whoever holds the link is nobody yet; it
+reads only the invitation that token names (§10). Members'
 names and emails are read through Better Auth's pool by account id, only for the memberships RLS has just shown the
 actor in their `withActor` transaction, and the API gives emails only to country admins and platform admins (PLAN
 R94).
@@ -161,7 +165,8 @@ expires_at)`, under RLS.
   token's SHA-256 (hex), never the token, which so stays out of the database's logs:
   - `private.pending_invitation(token_hash)` returns the email and role of a pending, unexpired invitation, and
     nothing for any other hash, so the acceptance page can say what is offered and the API can create the account
-    with that email. No runtime role reads `app.invitations` otherwise without being the tenant's country admin.
+    with that email. No runtime role reads `app.invitations` otherwise without being the tenant's country admin or a
+    platform admin.
   - `private.accept_invitation(token_hash)` accepts it for the current actor only if the actor's account
     (`auth.users`, which no runtime role reads) has the invited email, verified; it adds the membership (holding the
     role already is no refusal) and marks the invitation accepted through its transition trigger, at aal1 too: the

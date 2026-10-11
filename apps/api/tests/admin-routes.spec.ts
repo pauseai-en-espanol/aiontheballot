@@ -1042,6 +1042,8 @@ describe('invitations (editorial workflow A2)', () => {
           role: 'editor',
           locale: 'es',
           site: expect.any(String),
+          // On the site's behalf (R115): its operator's name.
+          operator: { name: 'Organización de ejemplo A', contactEmail: null },
           inviter: expect.any(String),
           token: expect.stringMatching(/^[\w-]{43}$/),
         },
@@ -1060,21 +1062,22 @@ describe('invitations (editorial workflow A2)', () => {
     }
   });
 
-  it("revoke the invitation again when its email can't be sent, so nothing is pending", async () => {
+  it("revoke the new invitation again when its email can't be sent, and keep the earlier one working", async () => {
     const email = `fallida-${crypto.randomUUID()}@example.org`;
     try {
+      await call('POST', url, USERS.countryAdminA, { email, role: 'reviewer' });
       failing = true;
       const answer = await call('POST', url, USERS.countryAdminA, { email, role: 'reviewer' });
       expect(answer.statusCode).toBe(502);
       expect(answer.json()).toEqual({ error: 'mailFailed' });
-      expect(await stateOf(email)).toEqual(['revoked']);
+      expect(await stateOf(email)).toEqual(['pending', 'revoked']);
     } finally {
       failing = false;
       await cleanUp(email);
     }
   });
 
-  it('refuse someone who already holds the role, and anyone but a country admin', async () => {
+  it('refuse someone who already holds the role, and anyone but a country admin before looking', async () => {
     known.set('persona-editora@example.org', USERS.editorA);
     const holds = await call('POST', url, USERS.countryAdminA, {
       email: 'persona-editora@example.org',
@@ -1082,6 +1085,19 @@ describe('invitations (editorial workflow A2)', () => {
     });
     expect(holds.statusCode).toBe(409);
     expect(holds.json()).toEqual({ error: 'holdsRole' });
+    // An editor learns nothing about who holds which role: the same refusal, whoever the address is.
+    expect(
+      (
+        await call('POST', url, USERS.editorA, {
+          email: 'persona-editora@example.org',
+          role: 'editor',
+        })
+      ).json(),
+    ).toEqual({ error: 'forbidden' });
+    expect(
+      (await call('POST', url, USERS.countryAdminA, { email: 'persona@ejemplo', role: 'editor' }))
+        .statusCode,
+    ).toBe(400);
     const email = `no-${crypto.randomUUID()}@example.org`;
     try {
       expect((await call('POST', url, USERS.editorA, { email, role: 'editor' })).statusCode).toBe(

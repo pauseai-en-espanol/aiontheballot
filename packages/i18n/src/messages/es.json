@@ -162,7 +162,7 @@
       "name": "Tu nombre",
       "nameHint": "Tal como lo verá tu equipo.",
       "password": "Contraseña",
-      "passwordHint": "Al menos 12 caracteres.",
+      "passwordHint": "Entre 12 y 128 caracteres.",
       "confirm": "Repite la contraseña",
       "mismatch": "Las dos contraseñas no coinciden.",
       "create": "Crear la cuenta y aceptar",
@@ -174,7 +174,8 @@
       "toAdmin": "Ir al admin",
       "otherAccount": "Has entrado con otra cuenta. Sal y vuelve a abrir el enlace.",
       "failed": "No ha funcionado. Inténtalo de nuevo en un momento.",
-      "limit": "Demasiados intentos desde aquí. Espera unos minutos y vuelve a intentarlo."
+      "limit": "Demasiados intentos desde aquí. Espera unos minutos y vuelve a intentarlo.",
+      "nameMissing": "Escribe tu nombre."
     }
   },
   "admin": {
@@ -833,7 +834,6 @@
       "deleteBody": "Su registro, con el correo, se borra para siempre. Solo se puede borrar una invitación aceptada, revocada o caducada.",
       "deleted": "Invitación borrada.",
       "noMail": "Las invitaciones necesitan el correo de la plataforma, que no está configurado en este despliegue.",
-      "holdsRole": "Esta persona ya tiene ese rol aquí.",
       "actions": "Acciones"
     }
   },
@@ -843,11 +843,11 @@
       "body": "Hola:\n\nAlguien, probablemente tú, ha pedido a {operator} que avise a esta dirección cuando el sitio {site} esté listo{future, select, true { y de futuras elecciones en él} other {}}.\n\nPara confirmarlo, abre este enlace y pulsa «Confirmar»:\n{confirmUrl}\n\nSi no has sido tú, ignora este mensaje: la dirección se borrará en un máximo de 7 días. O bórrala ahora:\n{unsubscribeUrl}\n\nCómo tratamos tu dirección: {privacyUrl}\n\n{operator}"
     },
     "invitation": {
-      "subject": "Te invitan a trabajar en {site} como {role}",
-      "body": "Hola:\n\n{inviter} ha invitado a esta dirección a trabajar en {site}, en {platform}, como {role}.\n\nPara aceptar, abre este enlace antes de {days} días. Si aún no tienes cuenta, ahí eliges tu nombre y una contraseña, y luego configuras un segundo factor para entrar:\n{link}\n\nSi no lo esperabas, ignora este correo: no pasa nada si no se abre el enlace.\n\n{platform}"
+      "subject": "Te invitan a trabajar en {site} con el rol de {role}",
+      "body": "Hola:\n\n{inviter} ha invitado a esta dirección a trabajar en {site}, en {platform}, con el rol de {role}.\n\nPara aceptar, abre este enlace en los próximos {days} días. Si aún no tienes cuenta, ahí eliges tu nombre y una contraseña, y luego configuras un segundo factor para entrar:\n{link}\n\nSi no lo esperabas, ignora este correo: no pasa nada si no se abre el enlace.\n\n{platform}"
     },
     "roles": {
-      "country_admin": "administración del país",
+      "country_admin": "coordinación",
       "editor": "edición",
       "reviewer": "revisión"
     }

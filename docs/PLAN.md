@@ -1007,10 +1007,17 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   button. Lookups and acceptances share a limit of 20 per visitor per 10 minutes; an unknown, spent, revoked or
   expired token gets the same 404. Country admins and platform admins invite from the members page (A2): a pending
   invitation for the same address and role is revoked by the new one, someone who holds the role already is refused,
-  and an email that can't be sent revokes the invitation again (502), so nothing is pending that nobody received.
-  They revoke pending invitations and delete decided ones. The email goes through the platform's sender (R115) in
-  the site's main language, from the platform's name. Mutation check: every rule killed but `accept_invitation`'s
-  early return for no actor, an equivalent mutant (the email check that follows refuses it too).
+  and an email that can't be sent revokes the new invitation again (502), the earlier one still working: the earlier
+  one is revoked only once the new one went out. They revoke pending invitations and delete decided ones. The email
+  goes through the platform's sender (R115), on the site's behalf: from its operator's name, replies to its contact
+  address, in the site's main language; the inviter's name in it is cut to one plain line without links. Only
+  country admins and platform admins get as far as looking up an address (so nobody else learns who holds a role),
+  each may send 50 a day (per API replica), and an address Better Auth would refuse gets none. Signed in as another
+  account, the page says so (409 `otherAccount`) rather than offer a form that can't work. Passwords are 12 to 128
+  characters on every path (Better Auth's maximum, now set explicitly). A fault while accepting removes the account
+  just made, and is logged by its error class only, never with the address. Mutation check: every rule killed but
+  `accept_invitation`'s early return for no actor, an equivalent mutant (the email check that follows refuses it
+  too). Changed after an adversarial review, which found no takeover or escalation.
 - **R115. Email: one platform sender now, each organization's own later** (decided with Dani). Everything goes through
   the platform's Mailu account. Account mail (password resets) comes from the platform; mail on a site's behalf
   (invitations, later report answers) shows the operator's name as the sender and replies go to its contact email

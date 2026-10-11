@@ -96,9 +96,9 @@ _As an invited volunteer, I follow the link and end up with an account and my ro
    message, so the page reveals nothing about the invitation. [API]
 2. If no account has the invited email, the person sets a password (A5) and the account is created with that email
    verified, since following the link proves the address, and the invitation is accepted at once (3). [API]
-3. If an account already has that email, the person signs in first. Either way, `private.accept_invitation(token)`
-   accepts only if the user's verified email is the invited one. [DB: _new_ `accept_invitation`, on the ADR-0002
-   allowlist]
+3. If an account already has that email, the person signs in first. Either way, `private.accept_invitation` (given
+   the token's hash) accepts only if the user's verified email is the invited one. [DB: `accept_invitation`, on the
+   ADR-0002 allowlist]
 4. Accepting creates the membership and marks the invitation accepted once, with the time and the user taken from
    the session. [DB: `invitation_transition`]
 5. A new account goes straight to TOTP enrolment. The membership grants nothing until TOTP is done, because every

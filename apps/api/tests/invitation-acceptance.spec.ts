@@ -14,9 +14,11 @@ import {
   browser,
   createAccount,
   deleteAccount,
+  PASSWORD as PASSWORD_FIXTURE,
   SECRET,
   testAddress,
   TOTP_ISSUER,
+  totpCode,
 } from './auth-fixtures.js';
 import { TENANT_A } from './fixtures.js';
 import './db.js';
@@ -115,16 +117,17 @@ describe('accepting an invitation (editorial workflow A3; PLAN R114)', () => {
       name: '  Persona invitada  ',
       password: PASSWORD,
     });
-    expect(created.statusCode).toBe(201);
     const { rows } = await superuser.query<{ id: string; name: string; email_verified: boolean }>(
       'SELECT id, name, email_verified FROM auth.users WHERE email = $1',
       [email],
     );
+    // Recorded before anything is asserted, so a failing test still removes it.
+    made.users.push(...rows.map((r) => r.id));
+    expect(created.statusCode).toBe(201);
     expect(rows).toEqual([
       { id: expect.any(String), name: 'Persona invitada', email_verified: true },
     ]);
     const userId = rows[0]?.id ?? '';
-    made.users.push(userId);
     const membership = await superuser.query(
       `SELECT m.role, i.accepted_by FROM app.memberships m
          JOIN app.invitations i ON i.tenant_id = m.tenant_id AND i.email = $2
@@ -151,6 +154,70 @@ describe('accepting an invitation (editorial workflow A3; PLAN R114)', () => {
         })
       ).statusCode,
     ).toBe(404);
+  });
+
+  it('refuses a password Better Auth would never sign in with, and makes no account', async () => {
+    const email = `larga-${crypto.randomUUID()}@example.org`;
+    const token = await invite(email);
+    const answer = await browser(app).send('POST', '/api/invitations/accept', {
+      token,
+      name: 'Persona invitada',
+      password: 'x'.repeat(129),
+    });
+    expect(answer.statusCode).toBe(400);
+    const { rows } = await superuser.query('SELECT 1 FROM auth.users WHERE email = $1', [email]);
+    expect(rows).toEqual([]);
+  });
+
+  it('accepts for an existing account once signed in with its second factor, and for no other', async () => {
+    const existing = await createAccount(authPool);
+    const other = await createAccount(authPool);
+    made.users.push(existing.id, other.id);
+    const token = await invite(existing.email);
+    const enrol = async (account: { email: string }) => {
+      const who = browser(app);
+      expect(
+        (
+          await who.send('POST', '/api/auth/sign-in/email', {
+            email: account.email,
+            password: PASSWORD_FIXTURE,
+          })
+        ).statusCode,
+      ).toBe(200);
+      const enabled = await who.send('POST', '/api/auth/two-factor/enable', {
+        password: PASSWORD_FIXTURE,
+      });
+      const { totpURI } = enabled.json<{ totpURI: string }>();
+      expect(
+        (await who.send('POST', '/api/auth/two-factor/verify-totp', { code: totpCode(totpURI) }))
+          .statusCode,
+      ).toBe(200);
+      return who;
+    };
+    const stranger = await enrol(other);
+    expect(
+      (await stranger.send('POST', '/api/invitations/lookup', { token })).json(),
+    ).toMatchObject({
+      account: true,
+      session: 'other',
+    });
+    const refused = await stranger.send('POST', '/api/invitations/accept', { token });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toEqual({ error: 'otherAccount' });
+
+    const invited = await enrol(existing);
+    expect((await invited.send('POST', '/api/invitations/lookup', { token })).json()).toMatchObject(
+      {
+        session: 'same',
+      },
+    );
+    const accepted = await invited.send('POST', '/api/invitations/accept', { token });
+    expect(accepted.statusCode).toBe(200);
+    const { rows } = await superuser.query(
+      `SELECT role FROM app.memberships WHERE user_id = $1 AND tenant_id = $2`,
+      [existing.id, TENANT_A],
+    );
+    expect(rows).toEqual([{ role: 'reviewer' }]);
   });
 
   it('asks an existing account to sign in first, and never makes a second one', async () => {

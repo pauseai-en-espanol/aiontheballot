@@ -32,6 +32,7 @@ export interface InvitationText {
   otherAccount: string;
   failed: string;
   limit: string;
+  nameMissing: string;
 }
 
 interface Offer {
@@ -49,8 +50,9 @@ type View =
   | { kind: 'done'; created: boolean };
 
 const ERROR_ID = 'invitation-error';
-/** At least this long (the API's rule, editorial workflow A5.1). */
+/** At least this long, and at most that (the API's and Better Auth's rule, editorial workflow A5.1). */
 const MIN_LENGTH = 12;
+const MAX_LENGTH = 128;
 
 /** The link's token, from the fragment (`#token=…`), which no server ever sees (PLAN R114, as R93's). */
 const readToken = (): string | null =>
@@ -82,6 +84,9 @@ export const InvitationForm = ({ text }: { text: InvitationText }) => {
   const [error, setError] = useState<string>();
   const [pending, setPending] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
+  const message = useRef<HTMLParagraphElement>(null);
+  // Too many lookups from here: said in the page's words when it renders, so the lookup never depends on them.
+  const [limited, setLimited] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -95,21 +100,22 @@ export const InvitationForm = ({ text }: { text: InvitationText }) => {
       }
       if (status === 200) {
         setView({ kind: 'offer', offer: body as unknown as Offer });
-      } else if (status === 429) {
-        setView({ kind: 'invalid' });
-        setError(text.limit);
       } else {
         setView({ kind: 'invalid' });
+        setLimited(status === 429);
       }
     });
     return () => {
       live = false;
     };
-  }, [token, text.limit]);
+  }, [token]);
 
+  // Where the page lands after a change it didn't make by itself: the result's heading, or the refusal's words.
   useEffect(() => {
     if (view.kind === 'done') {
       heading.current?.focus();
+    } else if (view.kind === 'invalid') {
+      message.current?.focus();
     }
   }, [view.kind]);
 
@@ -126,9 +132,11 @@ export const InvitationForm = ({ text }: { text: InvitationText }) => {
     } else if (answer.status === 404) {
       setView({ kind: 'invalid' });
     } else if (answer.status === 409) {
-      setError(text.existing);
+      setError(answer.body.error === 'otherAccount' ? text.otherAccount : text.existing);
     } else if (answer.status === 400 && answer.body.error === 'password') {
       setError(text.passwordHint);
+    } else if (answer.status === 400 && answer.body.error === 'name') {
+      setError(text.nameMissing);
     } else {
       setError(answer.status === 429 ? text.limit : text.failed);
     }
@@ -157,17 +165,20 @@ export const InvitationForm = ({ text }: { text: InvitationText }) => {
   );
 
   if (view.kind === 'checking') {
-    return <p className={styles.text}>{text.checking}</p>;
+    return (
+      <p role="status" className={styles.text}>
+        {text.checking}
+      </p>
+    );
   }
   if (view.kind === 'missing') {
     return <p className={styles.text}>{text.missing}</p>;
   }
   if (view.kind === 'invalid') {
     return (
-      <>
-        <p className={styles.text}>{text.invalid}</p>
-        {alert}
-      </>
+      <p ref={message} tabIndex={-1} role="status" className={styles.text}>
+        {limited ? text.limit : (error ?? text.invalid)}
+      </p>
     );
   }
   if (view.kind === 'done') {
@@ -189,6 +200,15 @@ export const InvitationForm = ({ text }: { text: InvitationText }) => {
       {fill(text.offer, { email: offer.email, role: text.roles[offer.role] })}
     </p>
   );
+  // Signed in as someone else: whatever the invited address has, this account can't take it.
+  if (offer.session === 'other') {
+    return (
+      <div className={styles.form}>
+        {offered}
+        <p className={styles.text}>{text.otherAccount}</p>
+      </div>
+    );
+  }
   if (offer.account) {
     if (offer.session === 'same') {
       return (
@@ -210,14 +230,10 @@ export const InvitationForm = ({ text }: { text: InvitationText }) => {
     return (
       <div className={styles.form}>
         {offered}
-        <p className={styles.text}>
-          {offer.session === 'other' ? text.otherAccount : text.existing}
-        </p>
-        {offer.session === 'none' ? (
-          <Link className={styles.link} href="/sign-in">
-            {text.signIn}
-          </Link>
-        ) : null}
+        <p className={styles.text}>{text.existing}</p>
+        <Link className={styles.link} href="/sign-in">
+          {text.signIn}
+        </Link>
       </div>
     );
   }
@@ -249,6 +265,7 @@ export const InvitationForm = ({ text }: { text: InvitationText }) => {
           type="password"
           autoComplete="new-password"
           minLength={MIN_LENGTH}
+          maxLength={MAX_LENGTH}
           aria-describedby={describedBy('invitation-password-hint', error && ERROR_ID)}
         />
       </Field.Root>
@@ -260,6 +277,7 @@ export const InvitationForm = ({ text }: { text: InvitationText }) => {
           type="password"
           autoComplete="new-password"
           minLength={MIN_LENGTH}
+          maxLength={MAX_LENGTH}
           aria-describedby={describedBy(error && ERROR_ID)}
         />
       </Field.Root>

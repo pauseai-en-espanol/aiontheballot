@@ -15,9 +15,6 @@ import { roleNames, template, writeErrors } from '@/ui/text';
 
 type Params = { params: Promise<{ tenant: string }> };
 
-/** An invitation lasts this long (the API's INVITATION_DAYS, editorial workflow A2.3). */
-const INVITATION_DAYS = 7;
-
 export const generateMetadata = async ({ params }: Params): Promise<Metadata> => {
   const overview = await getTenant((await params).tenant);
   const locale = await getLocale();
@@ -89,7 +86,7 @@ const MembersPage = async ({ params }: Params) => {
           <h2 id="invitations" className={styles.h2}>
             {t('admin.invitations.title')}
           </h2>
-          <p className={styles.text}>{t('admin.invitations.intro', { days: INVITATION_DAYS })}</p>
+          <p className={styles.text}>{t('admin.invitations.intro', { days: invited.days })}</p>
           {invited.invitations.length === 0 ? (
             <p className={styles.text}>{t('admin.invitations.none')}</p>
           ) : (

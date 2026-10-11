@@ -2,9 +2,11 @@ import type { Database } from '@aiontheballot/db/client';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import { withActor } from '@aiontheballot/db/actor';
+import { captureException } from '@sentry/node';
 
 import { acceptInvitation, pendingInvitation } from '../admin/invitations.js';
-import { createRateLimiter } from '../rate-limit.js';
+import { createRateLimiter, visitorKey } from '../rate-limit.js';
+import { MAX_PASSWORD_LENGTH } from './auth.js';
 import { InvitedAccountRefusal, type InvitedAccounts } from './invited-accounts.js';
 import { actorOf, type FoundSession, stageOf } from './session.js';
 import { visitorAddress } from './visitor.js';
@@ -44,6 +46,26 @@ export const invitationRoutes =
     const allow = createRateLimiter({ limit: attemptsPerVisitor, windowMs: 10 * 60_000 });
     const invalid = { error: 'invalid' } as const;
 
+    // A fault here is logged by its database error class and where it came from, never its message or detail, which
+    // can quote the invited address (a unique violation on auth.users' email, say).
+    scope.setErrorHandler(async (error, request, reply) => {
+      const { code, routine, statusCode } = error as {
+        code?: unknown;
+        routine?: unknown;
+        statusCode?: unknown;
+      };
+      if (typeof statusCode === 'number' && statusCode < 500) {
+        return reply.code(statusCode).send({ error: 'invalid' });
+      }
+      request.log.error({ code, routine }, 'Accepting an invitation failed');
+      captureException(
+        new Error(
+          `Accepting an invitation failed: ${typeof code === 'string' ? code : 'not a database error'}`,
+        ),
+      );
+      return reply.code(500).send({ error: 'unexpected' });
+    });
+
     const guard = (request: FastifyRequest): 403 | 429 | 503 | undefined => {
       if (!admin || !accounts) {
         return 503;
@@ -56,7 +78,8 @@ export const invitationRoutes =
         request.headers['x-forwarded-for'],
         request.socket.remoteAddress,
       );
-      return allow(visitor ?? 'unknown') ? undefined : 429;
+      // Counted by visitor, an IPv6 /64 as one, as signups and sign-in count (rate-limit.ts).
+      return allow(visitorKey(visitor ?? 'unknown')) ? undefined : 429;
     };
 
     scope.post<{ Body: { token: string } }>(
@@ -106,7 +129,7 @@ export const invitationRoutes =
             properties: {
               token: TOKEN,
               name: { type: 'string', maxLength: 200 },
-              password: { type: 'string', maxLength: 256 },
+              password: { type: 'string', maxLength: MAX_PASSWORD_LENGTH },
             },
             required: ['token'],
             additionalProperties: false,
@@ -124,7 +147,13 @@ export const invitationRoutes =
         const actor = actorOf(await findSession(request));
         if (actor) {
           const accepted = await withActor(admin, actor, (trx) => acceptInvitation(trx, token));
-          return accepted ? { accepted: true } : reply.code(404).send(invalid);
+          if (accepted) {
+            return { accepted: true };
+          }
+          // Still pending, then it was refused for the email: the visitor holds the link, so they may hear that.
+          return (await pendingInvitation(admin, token))
+            ? reply.code(409).send({ error: 'otherAccount' })
+            : reply.code(404).send(invalid);
         }
         const offer = await pendingInvitation(admin, token);
         if (!offer) {
@@ -148,15 +177,18 @@ export const invitationRoutes =
           }
           throw error;
         }
-        const accepted = await withActor(admin, { userId, aal: 1 }, (trx) =>
-          acceptInvitation(trx, token),
-        );
-        if (!accepted) {
-          // Revoked or used in between: no account is left behind for a link that no longer works.
-          await accounts.remove(userId);
-          return reply.code(404).send(invalid);
+        let accepted = false;
+        try {
+          accepted = await withActor(admin, { userId, aal: 1 }, (trx) =>
+            acceptInvitation(trx, token),
+          );
+        } finally {
+          // Revoked or used in between, or a fault: no account is left behind for a link that didn't work.
+          if (!accepted) {
+            await accounts.remove(userId).catch(() => undefined);
+          }
         }
-        return reply.code(201).send({ created: true });
+        return accepted ? reply.code(201).send({ created: true }) : reply.code(404).send(invalid);
       },
     );
   };

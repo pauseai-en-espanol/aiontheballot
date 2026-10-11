@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import * as z from 'zod';
 
-import { type AuthOptions, authOptions, MIN_PASSWORD_LENGTH } from './auth.js';
+import { type AuthOptions, authOptions, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from './auth.js';
 
 /**
  * What invitations need of Better Auth's tables (editorial workflow A2, A3; PLAN R114), as aiontheballot_auth, the only
@@ -42,7 +42,7 @@ export const createInvitedAccounts = (options: AuthOptions): InvitedAccounts => 
         throw new InvitedAccountRefusal('name');
       }
       // Counted as Better Auth counts it on sign-in and reset, so the same passwords pass.
-      if (password.length < MIN_PASSWORD_LENGTH || password.length > 256) {
+      if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
         throw new InvitedAccountRefusal('password');
       }
       const context = await auth.$context;
@@ -61,7 +61,8 @@ export const createInvitedAccounts = (options: AuthOptions): InvitedAccounts => 
           password: await context.password.hash(password),
         });
       } catch (error) {
-        await context.internalAdapter.deleteUser(user.id);
+        // An account with no password is never left behind; if even that fails, the first error is the one to see.
+        await context.internalAdapter.deleteUser(user.id).catch(() => undefined);
         throw error;
       }
       return user.id;

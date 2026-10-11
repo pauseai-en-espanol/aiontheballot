@@ -162,7 +162,7 @@
       "name": "Your name",
       "nameHint": "As your team will see it.",
       "password": "Password",
-      "passwordHint": "At least 12 characters.",
+      "passwordHint": "Between 12 and 128 characters.",
       "confirm": "Password again",
       "mismatch": "The two passwords are different.",
       "create": "Create account and accept",
@@ -174,7 +174,8 @@
       "toAdmin": "Go to the admin",
       "otherAccount": "You are signed in with another account. Sign out, then open the link again.",
       "failed": "That didn't work. Try again in a moment.",
-      "limit": "Too many attempts from here. Wait a few minutes and try again."
+      "limit": "Too many attempts from here. Wait a few minutes and try again.",
+      "nameMissing": "Enter your name."
     }
   },
   "admin": {
@@ -833,7 +834,6 @@
       "deleteBody": "Its record, with the email, goes for good. Only an accepted, revoked or expired invitation can be deleted.",
       "deleted": "Invitation deleted.",
       "noMail": "Invitations need the platform's email, which isn't set up on this deployment.",
-      "holdsRole": "This person already holds that role here.",
       "actions": "Actions"
     }
   },

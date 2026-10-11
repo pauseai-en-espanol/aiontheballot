@@ -12,6 +12,9 @@ export const SESSION_SECONDS = 12 * 60 * 60;
 /** Shorter passwords are refused (editorial workflow A5.1). */
 export const MIN_PASSWORD_LENGTH = 12;
 
+/** Longer ones too: Better Auth's own maximum, which sign-in and resets apply, set here so every path agrees. */
+export const MAX_PASSWORD_LENGTH = 128;
+
 /** Where Better Auth's endpoints live on the admin host (ADR-0003 §2). */
 export const AUTH_BASE_PATH = '/api/auth';
 
@@ -87,6 +90,7 @@ export const authOptions = ({
       // Accounts come only from invitations and the owner's command (editorial workflow A1, A3).
       disableSignUp: true,
       minPasswordLength: MIN_PASSWORD_LENGTH,
+      maxPasswordLength: MAX_PASSWORD_LENGTH,
       // A link to set a password: single use, an hour. Setting one ends all the account's sessions (A5.3), and every
       // other link or pending sign-in the account still has (verification values name their user), so an older link
       // can't set a password over the new one.
