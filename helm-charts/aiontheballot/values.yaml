@@ -11,8 +11,8 @@ aiontheballot-api:
 aiontheballot-web:
   nameOverride: web
   image:
-    tag: '0.9.5.f45bf51'
+    tag: '0.9.6.374b2fd'
 aiontheballot-admin:
   nameOverride: admin
   image:
-    tag: '0.7.0.f45bf51'
+    tag: '0.8.0.374b2fd'
