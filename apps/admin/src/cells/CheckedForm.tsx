@@ -44,7 +44,7 @@ export const CheckedForm = ({
       () => sendToApi('POST', path, { version, sourceId: formText(form, 'sourceId') }),
       text.done,
     );
-    if (answer?.error === 'stale') {
+    if (answer?.error === 'cellChanged') {
       setStale(true);
     }
   };

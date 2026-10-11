@@ -22,10 +22,15 @@ test.describe('cells (editorial workflow §8)', () => {
     await page.goto(GRID);
     await expect(page.getByRole('heading', { level: 2, name: cells.title })).toBeVisible();
     const row = page.getByRole('row', { name: /Partido Ejemplo A/ });
+    // Each link names its party and criterion too, for a list of links.
     await expect(
-      row.getByRole('link', { name: `${cells.states.published} · ${en.rating.meets}` }),
+      row.getByRole('link', {
+        name: `PEA, Ejemplo 1: ${cells.states.published} · ${en.rating.meets}`,
+      }),
     ).toBeVisible();
-    await expect(row.getByRole('link', { name: cells.states.draft })).toBeVisible();
+    await expect(
+      row.getByRole('link', { name: `PEA, Ejemplo 2: ${cells.states.draft}` }),
+    ).toBeVisible();
     await expectAccessible(page);
   });
 
@@ -37,7 +42,7 @@ test.describe('cells (editorial workflow §8)', () => {
     await page.goto(GRID);
     await page
       .getByRole('row', { name: /Partido Ejemplo A/ })
-      .getByRole('link', { name: cells.states.draft })
+      .getByRole('link', { name: `PEA, Ejemplo 2: ${cells.states.draft}` })
       .click();
     await expect(page.getByRole('heading', { level: 3, name: cells.checked })).toBeVisible();
     await expectAccessible(page);
@@ -60,7 +65,8 @@ test.describe('cells (editorial workflow §8)', () => {
 
     // Back as it was: other tests read this cell.
     await added.getByRole('button', { name: new RegExp(cells.removeQuote) }).click();
-    await expect(page.getByRole('status').filter({ hasText: cells.quoteRemoved })).toBeVisible();
+    // The page's own status line says so, since the quote and its button are gone.
+    await expect(page.locator('#page-announcer')).toHaveText(cells.quoteRemoved);
     await expect(added).toHaveCount(0);
   });
 
@@ -70,8 +76,7 @@ test.describe('cells (editorial workflow §8)', () => {
     await page.goto(GRID);
     await page
       .getByRole('row', { name: /Partido Ejemplo B/ })
-      .getByRole('link', { name: cells.states.none })
-      .first()
+      .getByRole('link', { name: `PEB, Ejemplo 2: ${cells.states.none}` })
       .click();
     await expect(page.getByText(cells.notStarted)).toBeVisible();
     await page.getByRole('button', { name: cells.create }).click();

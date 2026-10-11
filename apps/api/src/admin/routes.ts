@@ -7,7 +7,11 @@ import type { Transaction } from 'kysely';
 
 import { withActor } from '@aiontheballot/db/actor';
 import { type Rating, RATINGS } from '@aiontheballot/domain/methodology';
-import { matchQuote } from '@aiontheballot/domain/quote-match';
+import {
+  matchPrepared,
+  type PreparedSource,
+  prepareSource,
+} from '@aiontheballot/domain/quote-match';
 import { isLocale } from '@aiontheballot/i18n/messages';
 import { captureException } from '@sentry/node';
 
@@ -16,6 +20,7 @@ import type { ProfileSource } from './profiles.js';
 
 import { databaseRefusal } from '../database-errors.js';
 import { mailFailure } from '../mail/mailer.js';
+import { createRateLimiter } from '../rate-limit.js';
 import { type Access, accessTo, holds, isPlatformAdmin, TENANT_ROLES } from './access.js';
 import { cellGrid } from './cell-grid.js';
 import {
@@ -35,6 +40,7 @@ import {
   removeQuote,
   saveCell,
   sourceUnits,
+  sourceVisible,
 } from './cells.js';
 import { goLiveChecklist } from './checklist.js';
 import {
@@ -121,6 +127,7 @@ export const API_REFUSAL_KEYS = [
   'noMethodology',
   'holdsRole',
   'mailFailed',
+  'cellChanged',
 ] as const;
 export type ApiRefusalKey = (typeof API_REFUSAL_KEYS)[number];
 
@@ -526,7 +533,7 @@ const refuseUnlessCell = (result: CellChange): void => {
     throw new Refusal(404, 'notFound');
   }
   if (result === 'stale') {
-    throw new Refusal(409, 'stale');
+    throw new Refusal(409, 'cellChanged');
   }
   if (result === 'forbidden') {
     throw new Refusal(403, 'forbidden');
@@ -703,6 +710,19 @@ export const adminDataRoutes =
      * send one with the session anyway, and this refuses it outright. A refusal, the API's or the database's, becomes
      * its answer (§2.3); anything else is a fault, reported without the request's body.
      */
+    // The live match's limits (C2.6): requests per member and minute, and the sources' prepared text it keeps.
+    const allowMatch = createRateLimiter({ limit: 120, windowMs: 60_000 });
+    const preparedSources = new Map<string, PreparedSource>();
+    const keepPrepared = (sourceId: string, prepared: PreparedSource) => {
+      if (preparedSources.size >= 50) {
+        const oldest = preparedSources.keys().next().value;
+        if (oldest !== undefined) {
+          preparedSources.delete(oldest);
+        }
+      }
+      preparedSources.set(sourceId, prepared);
+    };
+
     const signedIn = async (
       request: FastifyRequest,
       reply: FastifyReply,
@@ -1313,7 +1333,7 @@ export const adminDataRoutes =
       { schema: { params: CELL_PAIR_PARAMS } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
-          const { access, cell } = await withActor(db, actor, async (trx) => {
+          const { access, cell, memberIds } = await withActor(db, actor, async (trx) => {
             const found = await electionFor(trx, actor, request.params);
             const pair = await getCell(
               trx,
@@ -1324,15 +1344,24 @@ export const adminDataRoutes =
             if (!pair) {
               throw new Refusal(404, 'notFound');
             }
-            return { access: found.access, cell: pair };
+            const memberships = await listMemberships(trx, found.access.tenantId);
+            return {
+              access: found.access,
+              cell: pair,
+              memberIds: memberships.map((m) => m.userId),
+            };
           });
-          const ids = cell.draft
-            ? [
-                ...cell.draft.events.map((e) => e.actorId),
-                ...cell.draft.contributors,
-                ...cell.draft.checkedDocuments.map((c) => c.checkedBy),
-              ]
-            : [];
+          // Names only for the site's members RLS shows (ADR-0002 §2, R94); anyone else is named by the admin as such.
+          const members = new Set(memberIds);
+          const ids = (
+            cell.draft
+              ? [
+                  ...cell.draft.events.map((e) => e.actorId),
+                  ...cell.draft.contributors,
+                  ...cell.draft.checkedDocuments.map((c) => c.checkedBy),
+                ]
+              : []
+          ).filter((id) => members.has(id));
           const found = profiles ? await profiles(ids, { emails: false }) : new Map();
           return {
             ...cell,
@@ -1658,7 +1687,7 @@ export const adminDataRoutes =
     );
 
     // The live match of a quote against a source (C2.6, W13): what the database will decide on save, as the editor
-    // types. The source's units are read under RLS each time; they never change once extracted.
+    // pauses typing. Each member may ask 120 times a minute; a source's normalised text is kept for the next ask.
     scope.post<{
       Params: { tenant: string; election: string; id: string };
       Body: { quote: string };
@@ -1677,14 +1706,31 @@ export const adminDataRoutes =
       },
       async (request, reply) =>
         signedIn(request, reply, (db, actor) =>
-          withActor(db, actor, async (trx) => {
-            const { election } = await electionFor(trx, actor, request.params);
-            const units = await sourceUnits(trx, election.id, request.params.id);
-            if (!units) {
-              throw new Refusal(404, 'notFound');
+          (async () => {
+            if (!allowMatch(actor.userId)) {
+              return reply.code(429).send({ error: 'limit' });
             }
-            return matchQuote(request.body.quote, units);
-          }),
+            const sourceId = request.params.id;
+            // Read and checked under RLS every time; the prepared text is kept only once extraction is over.
+            const prepared = await withActor(db, actor, async (trx) => {
+              const { election } = await electionFor(trx, actor, request.params);
+              const kept = preparedSources.get(sourceId);
+              if (kept && (await sourceVisible(trx, election.id, sourceId))) {
+                return kept;
+              }
+              const found = await sourceUnits(trx, election.id, sourceId);
+              if (!found) {
+                throw new Refusal(404, 'notFound');
+              }
+              const ready = prepareSource(found.units);
+              if (found.final) {
+                keepPrepared(sourceId, ready);
+              }
+              return ready;
+            });
+            // Outside the transaction: matching is CPU work that needs no connection.
+            return matchPrepared(request.body.quote, prepared);
+          })(),
         ),
     );
 

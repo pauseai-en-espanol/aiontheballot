@@ -86,7 +86,34 @@ const longestFound = (needle: string[], haystack: string, part: 'start' | 'end')
   return slice(found);
 };
 
-export const matchQuote = (quote: string, units: readonly SourceUnit[]): QuoteMatch => {
+/** A source's units normalised and joined once, to match many quotes against: its text never changes once extracted. */
+export interface PreparedSource {
+  ordered: readonly SourceUnit[];
+  joined: string;
+  /** Where each unit starts in `joined`. */
+  starts: readonly number[];
+}
+
+export const prepareSource = (units: readonly SourceUnit[]): PreparedSource => {
+  const ordered = [...units].sort((a, b) => a.index - b.index);
+  const texts = ordered.map((unit) => normalizeForMatch(unit.body));
+  const starts: number[] = [];
+  let next = 0;
+  for (const text of texts) {
+    starts.push(next);
+    next += text.length + 1;
+  }
+  return { ordered, joined: texts.join(' '), starts };
+};
+
+export const matchQuote = (quote: string, units: readonly SourceUnit[]): QuoteMatch =>
+  matchPrepared(quote, prepareSource(units));
+
+/** `matchQuote` against a source prepared beforehand. */
+export const matchPrepared = (
+  quote: string,
+  { ordered, joined, starts }: PreparedSource,
+): QuoteMatch => {
   // The column's CHECK first: normalising can lengthen a quote (a ligature becomes two letters), never make it savable.
   const stored = characters(trimSpaces(quote));
   if (stored > MAX_QUOTE_LENGTH) {
@@ -99,15 +126,6 @@ export const matchQuote = (quote: string, units: readonly SourceUnit[]): QuoteMa
   const length = characters(needle);
   if (length < MIN_QUOTE_LENGTH) {
     return { kind: 'too-short', length, counted: 'normalised' };
-  }
-  const ordered = [...units].sort((a, b) => a.index - b.index);
-  const texts = ordered.map((unit) => normalizeForMatch(unit.body));
-  const joined = texts.join(' ');
-  const starts: number[] = [];
-  let next = 0;
-  for (const text of texts) {
-    starts.push(next);
-    next += text.length + 1;
   }
   const unitAt = (offset: number): SourceUnit => {
     let found = 0;

@@ -99,20 +99,16 @@ describe('a cell (editorial workflow §8)', () => {
 
   it('is created as an empty draft, once per party and criterion', async () => {
     await as(USERS.editorA, async (trx) => {
-      const [party] = ELECTIONS_A.live.parties;
-      const [, criterion] = ELECTIONS_A.live.criteria;
-      const taken = await sql<{ n: number }>`
-        SELECT count(*)::int AS n FROM app.assessments
-         WHERE party_id = ${party} AND criterion_id = ${criterion}`.execute(trx);
-      if (taken.rows[0]?.n === 0) {
-        const id = await createCell(trx, TENANT_A, LIVE_A.id, party, criterion);
-        expect((await getCell(trx, LIVE_A.id, party, criterion))?.draft).toMatchObject({
-          id,
-          state: 'draft',
-          rating: null,
-          quotes: [],
-        });
-      }
+      // A's draft election has no cells at all.
+      const [party] = ELECTIONS_A.draft.parties;
+      const [criterion] = ELECTIONS_A.draft.criteria;
+      const id = await createCell(trx, TENANT_A, ELECTIONS_A.draft.id, party, criterion);
+      expect((await getCell(trx, ELECTIONS_A.draft.id, party, criterion))?.draft).toMatchObject({
+        id,
+        state: 'draft',
+        rating: null,
+        quotes: [],
+      });
       const pair = await pairOf(trx, LIVE_A.cells.draft);
       await expect(
         createCell(trx, TENANT_A, LIVE_A.id, pair.party_id, pair.criterion_id),
@@ -273,10 +269,49 @@ describe('the workflow (C5–C9, C12, C13)', () => {
       expect(
         await moveCell(trx, LIVE_A.id, LIVE_A.cells.inReview, pair.content_version, 'draft'),
       ).toBe('changed');
-      // Its editor can't publish their own work while four-eyes is on (C7.2).
-      await moveCell(trx, LIVE_A.id, LIVE_A.cells.inReview, pair.content_version, 'in_review');
+      // A step from the wrong state is refused, though the version is right: transitions don't change it.
+      expect(
+        await moveCell(trx, LIVE_A.id, LIVE_A.cells.inReview, pair.content_version, 'draft'),
+      ).toBe('stale');
+      expect(
+        await rejectCell(
+          trx,
+          TENANT_A,
+          LIVE_A.id,
+          LIVE_A.cells.inReview,
+          pair.content_version,
+          'Nota',
+        ),
+      ).toBe('stale');
+      expect(await publishCell(trx, LIVE_A.id, LIVE_A.cells.inReview, pair.content_version)).toBe(
+        'stale',
+      );
+    });
+  });
+
+  it('is not published by someone who worked on it while four-eyes is on (C7.2)', async () => {
+    await inRolledBackTransaction(async (trx) => {
+      const pair = await pairOf(trx, LIVE_A.cells.inReview);
+      // A country admin may both edit and publish: only four-eyes stands in the way of their own work.
+      await actAs(trx, USERS.countryAdminA);
+      await rejectCell(
+        trx,
+        TENANT_A,
+        LIVE_A.id,
+        LIVE_A.cells.inReview,
+        pair.content_version,
+        'Lo reviso yo',
+      );
+      await saveCell(trx, LIVE_A.id, LIVE_A.cells.inReview, pair.content_version, {
+        rating: LIVE_A.publishedRating,
+        summary: { es: 'Resumen de ejemplo de la administración' },
+        changeKind: null,
+        publicNote: null,
+      });
+      const { content_version: version } = await pairOf(trx, LIVE_A.cells.inReview);
+      await moveCell(trx, LIVE_A.id, LIVE_A.cells.inReview, version, 'in_review');
       await expect(
-        publishCell(trx, LIVE_A.id, LIVE_A.cells.inReview, pair.content_version),
+        publishCell(trx, LIVE_A.id, LIVE_A.cells.inReview, version),
       ).rejects.toMatchObject({ code: '42501' });
     });
   });
@@ -316,6 +351,18 @@ describe('the workflow (C5–C9, C12, C13)', () => {
     });
   });
 
+  it('keeps a cell never published once it has a trail (C13.2)', async () => {
+    await as(USERS.editorA, async (trx) => {
+      const [party] = ELECTIONS_A.draft.parties;
+      const [criterion] = ELECTIONS_A.draft.criteria;
+      const id = await createCell(trx, TENANT_A, ELECTIONS_A.draft.id, party, criterion);
+      await commentOnCell(trx, TENANT_A, ELECTIONS_A.draft.id, id, 'Un comentario de ejemplo');
+      await expect(deleteCell(trx, ELECTIONS_A.draft.id, id, 0)).rejects.toMatchObject({
+        code: '23503',
+      });
+    });
+  });
+
   it('deletes a cell never published, and keeps one with a trail', async () => {
     await inRolledBackTransaction(async (trx) => {
       const pair = await pairOf(trx, LIVE_A.cells.published);
@@ -340,8 +387,9 @@ describe('the workflow (C5–C9, C12, C13)', () => {
 
   it("reads a source's units for the live match, in order", async () => {
     await as(USERS.editorA, async (trx) => {
-      const units = await sourceUnits(trx, LIVE_A.id, SOURCE_A);
-      expect(units?.map(({ index, label }) => ({ index, label }))).toEqual([
+      const found = await sourceUnits(trx, LIVE_A.id, SOURCE_A);
+      expect(found?.final).toBe(true);
+      expect(found?.units.map(({ index, label }) => ({ index, label }))).toEqual([
         { index: 1, label: 'p. 1' },
         { index: 2, label: 'p. 2' },
       ]);

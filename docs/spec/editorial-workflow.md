@@ -513,7 +513,11 @@ _As a reviewer, I check someone else's draft against its sources and publish it.
 1. Each save of a quote or field is its own change. If someone else changed the cell since it was loaded, the screen
    says so and offers to reload before saving. [API: `content_version`; UI]
 
-_Built (PLAN R131): C1.1, C2, C3, C5–C14 on `…/cells` and each cell's page. Not yet: C1.2's queues, C4 and C10.4._
+_Built (PLAN R131) on `…/cells` and each cell's page: C1.1 (states and ratings in words; the rating icons of §2.5
+are not on the admin yet), C2, C3, C5 (without the editor's checklist of C5.2: a refused submission says only what
+kind of thing is missing), C6–C9, C10.1–3, C11–C14. C7.4 shows the draft, the published revisions and each quote's
+match; side by side, and each quote highlighted in its source, wait for the source viewer (S6). Not yet: C1.2's
+queues, C4 and C10.4._
 
 ## 9. Programme status
 

@@ -21,6 +21,7 @@ export const WRITE_ERRORS = [
   'noMethodology',
   'holdsRole',
   'mailFailed',
+  'cellChanged',
   'signedOut',
   'unexpected',
 ] as const;

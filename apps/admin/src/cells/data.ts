@@ -44,6 +44,7 @@ export interface CellSource {
   id: string;
   title: string;
   kind: string;
+  language: string | null;
 }
 
 export interface Cell {
@@ -55,6 +56,7 @@ export interface Cell {
     shortTitle: Localized | null;
     retired: boolean;
   };
+  electionStatus: 'draft' | 'live' | 'archived';
   requireSecondReviewer: boolean;
   draft: {
     id: string;

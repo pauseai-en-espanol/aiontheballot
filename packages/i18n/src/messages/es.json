@@ -77,7 +77,8 @@
     "needsDefaultLanguage": "Para publicar hace falta el texto en el idioma principal del sitio.",
     "noMethodology": "Escribe antes la metodología.",
     "mailFailed": "No se ha podido enviar el correo, así que no se ha guardado nada. Inténtalo más tarde.",
-    "holdsRole": "Esta persona ya tiene ese rol aquí."
+    "holdsRole": "Esta persona ya tiene ese rol aquí.",
+    "cellChanged": "Alguien ha cambiado esta celda desde que la abriste."
   },
   "auth": {
     "otherAccount": "Iniciar sesión con otra cuenta",
@@ -686,13 +687,11 @@
         "published": "Publicada",
         "published_with_draft": "Publicada, con un borrador más nuevo"
       },
-      "pending": "Pendiente",
       "withdrawn": "Retirada",
       "rejected": "Devuelta",
       "recheck": "Revisar de nuevo",
       "noStructure": "Añade antes partidos y criterios.",
       "back": "Todas las celdas",
-      "cellTitle": "{party} · {criterion}",
       "state": "Estado: {state}",
       "version": "Versión {version}",
       "notStarted": "Nadie ha empezado esta celda. Su página pública dice que está pendiente.",
@@ -703,7 +702,7 @@
       "rating": "Valoración",
       "noRating": "Sin valoración aún",
       "ratingWithdrawal": "Sin valoración: este borrador retira la publicada.",
-      "summary": "Por qué",
+      "summary": "Por qué esta valoración",
       "summaryHint": "Lo que el público lee bajo la valoración. Para enviarla hace falta el idioma principal del sitio.",
       "changeKind": "Tipo de cambio",
       "changeKindHint": "Una corrección cuando lo publicado estaba mal; una actualización cuando cambiaron los hechos, como un programa nuevo; una retirada quita la valoración.",
@@ -739,7 +738,6 @@
       "add": "Añadir cita",
       "added": "Cita añadida.",
       "live": {
-        "checking": "Comprobando con la fuente…",
         "matched": "Coincide con la fuente, {location}.",
         "tooShortStored": "Demasiado corta: {length} caracteres, al menos 15.",
         "tooShortNormalised": "Demasiado corta una vez igualados los espacios y la tipografía: {length} caracteres, al menos 15.",
@@ -762,15 +760,14 @@
       "actions": "Flujo de trabajo",
       "submit": "Enviar a revisión",
       "submitted": "Enviada a revisión.",
-      "recall": "Retirar para editar",
+      "recall": "Sacar de revisión para editarla",
       "recalled": "De vuelta en borrador.",
       "publish": "Aprobar y publicar",
       "published": "Publicada.",
       "publishTitle": "¿Publicar esta versión?",
       "publishBody": "El público la ve en menos de un minuto: la valoración, el resumen y cada cita con su fuente.",
-      "publishSelfBody": "La revisión por una segunda persona está desactivada en esta elección, así que puedes publicar tu propio trabajo; queda registrado como autorrevisado. El público lo ve en menos de un minuto.",
+      "publishSelfBody": "La revisión por una segunda persona está desactivada en esta elección, así que puedes publicar tu propio trabajo; queda registrado como autorrevisado. El público la ve en menos de un minuto.",
       "cannotPublishOwn": "Has trabajado en este borrador, y esta elección pide que lo publique otra persona.",
-      "reject": "Devolver",
       "rejectNote": "Por qué se devuelve",
       "rejectNoteHint": "Quien la redactó lo lee en la celda y en su cola.",
       "rejectButton": "Devolver con esta nota",
@@ -787,12 +784,12 @@
       "noComments": "Nada aún.",
       "events": {
         "submitted": "{name} la envió a revisión",
-        "recalled": "{name} la retiró para editarla",
+        "recalled": "{name} la sacó de revisión para editarla",
         "approved": "{name} la aprobó y publicó",
         "rejected": "{name} la devolvió",
         "commented": "{name} comentó"
       },
-      "someone": "Una persona que ya no es miembro",
+      "someone": "Alguien que no es miembro de este sitio",
       "comment": "Comentario",
       "commentButton": "Añadir comentario",
       "commented": "Comentario añadido.",
@@ -806,7 +803,9 @@
         "correction": "Corrección",
         "withdrawal": "Retirada"
       },
-      "on": "{date, date, long}"
+      "on": "{date, date, long}",
+      "publishNotYet": "Las celdas se publican cuando la elección está en curso: hasta entonces se pueden revisar y devolver.",
+      "gridCell": "{party}, {criterion}: {state}"
     },
     "invitations": {
       "title": "Invitaciones",

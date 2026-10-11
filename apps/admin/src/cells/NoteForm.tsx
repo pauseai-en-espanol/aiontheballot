@@ -2,6 +2,7 @@
 
 import { type FormEvent, useId, useState } from 'react';
 
+import { announce } from '@/ui/announce';
 import { FormMessages } from '@/ui/FormMessages';
 import { formText } from '@/ui/forms';
 import * as styles from '@/ui/styles';
@@ -45,12 +46,16 @@ export const NoteForm = ({
           ...(version === undefined ? {} : { version }),
           note: formText(form, 'note'),
         }),
-      text.done,
+      version === undefined ? text.done : () => undefined,
     );
     if (answer?.ok) {
       form.reset();
+      // A rejection takes this form away with the review: the page's own status line says it's done.
+      if (version !== undefined) {
+        announce(text.done);
+      }
     }
-    if (answer?.error === 'stale') {
+    if (answer?.error === 'cellChanged') {
       setStale(true);
     }
   };

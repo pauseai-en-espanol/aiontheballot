@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useState } from 'react';
 
+import { fill } from '@/fill';
 import { FormMessages } from '@/ui/FormMessages';
 import { formText } from '@/ui/forms';
 import * as styles from '@/ui/styles';
@@ -32,7 +33,6 @@ export interface QuoteFormText {
   stale: string;
   reload: string;
   live: {
-    checking: string;
     matched: string;
     tooShortStored: string;
     tooShortNormalised: string;
@@ -48,9 +48,6 @@ export interface QuoteFormText {
 const ERROR_ID = 'quote-error';
 /** How long typing must pause before the quote is checked: one request per pause, not per key. */
 const PAUSE_MS = 400;
-
-const fill = (template: string, values: Record<string, string | number>) =>
-  template.replaceAll(/\{(\w+)\}/gu, (whole, key: string) => String(values[key] ?? whole));
 
 /**
  * Adds a quote to a draft (editorial workflow C2.4–7). As the editor types, it says whether the quote matches its
@@ -69,7 +66,8 @@ export const QuoteForm = ({
   /** The election's sources route in the API: a source's live match is under it. */
   matchBase: string;
   version: number;
-  sources: { id: string; title: string }[];
+  /** Each with its language, which a quote from it is in. */
+  sources: { id: string; title: string; lang: string }[];
   text: QuoteFormText;
 }) => {
   const { pending, error, status, statusLine, run } = useWrite();
@@ -85,7 +83,6 @@ export const QuoteForm = ({
     }
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      setLive(text.live.checking);
       void fetch(`${matchBase}/${encodeURIComponent(source)}/match`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -101,13 +98,13 @@ export const QuoteForm = ({
             match.kind === 'matched'
               ? fill(text.live.matched, { location: match.span.location })
               : match.kind === 'too-long'
-                ? fill(text.live.tooLong, { length: match.length })
+                ? fill(text.live.tooLong, { length: String(match.length) })
                 : match.kind === 'too-short'
                   ? fill(
                       match.counted === 'stored'
                         ? text.live.tooShortStored
                         : text.live.tooShortNormalised,
-                      { length: match.length },
+                      { length: String(match.length) },
                     )
                   : [
                       text.live.unmatched,
@@ -155,7 +152,7 @@ export const QuoteForm = ({
       setQuote('');
       form.reset();
     }
-    if (answer?.error === 'stale') {
+    if (answer?.error === 'cellChanged') {
       setStale(true);
     }
   };
@@ -172,13 +169,16 @@ export const QuoteForm = ({
           name="sourceId"
           required
           value={source}
-          onChange={(event) => setSource(event.target.value)}
+          onChange={(event) => {
+            setLive('');
+            setSource(event.target.value);
+          }}
         >
           <option value="" disabled>
             {text.chooseSource}
           </option>
           {sources.map((s) => (
-            <option key={s.id} value={s.id}>
+            <option key={s.id} value={s.id} lang={s.lang}>
               {s.title}
             </option>
           ))}
@@ -194,11 +194,16 @@ export const QuoteForm = ({
         <textarea
           id="quote-text"
           className={styles.textarea}
+          lang={sources.find((s) => s.id === source)?.lang}
           name="quote"
           required
           maxLength={4000}
           value={quote}
-          onChange={(event) => setQuote(event.target.value)}
+          onChange={(event) => {
+            // The last answer was about the text before this change.
+            setLive('');
+            setQuote(event.target.value);
+          }}
           aria-describedby={['quote-hint', 'quote-live', error ? ERROR_ID : '']
             .filter(Boolean)
             .join(' ')}

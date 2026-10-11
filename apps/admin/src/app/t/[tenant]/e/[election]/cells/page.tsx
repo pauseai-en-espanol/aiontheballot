@@ -89,10 +89,21 @@ const CellsPage = async ({ params }: CellsParams) => {
                   </th>
                   {criteria.map((criterion) => {
                     const cell = byPair.get(`${party.id}/${criterion.id}`);
+                    const state = describe(cell).join(' · ');
                     return (
                       <td key={criterion.id}>
-                        <Link className={styles.link} href={`${base}/${party.id}/${criterion.id}`}>
-                          {describe(cell).join(' · ')}
+                        <Link
+                          className={styles.link}
+                          href={`${base}/${party.id}/${criterion.id}`}
+                          // Its row and column say which cell; a list of links needs them in the name.
+                          aria-label={t('admin.cells.gridCell', {
+                            party: text(party.shortName, party.slug).text,
+                            criterion: text(criterion.shortTitle ?? criterion.title, criterion.slug)
+                              .text,
+                            state,
+                          })}
+                        >
+                          {state}
                         </Link>
                       </td>
                     );

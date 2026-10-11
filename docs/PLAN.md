@@ -1213,20 +1213,30 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   Spanish or English, and takes only a slug, so it can't put fictional content into iaenlasurnas.es's tenant. Its test
   runs it as the owner role.
 - **R131. The cell editor and the review workflow, as built** (editorial workflow C1–C3, C5–C14; task 6): the
-  election's grid (`…/cells`), each cell with its state, published rating and flags in words; a cell's page with its
-  draft (rating on the methodology's scale, summary per language, and after the first publish a kind of change and a
-  public note), its quotes with where each matches, the documents checked for "not mentioned", the workflow open to
-  the user (start, submit, recall, approve and publish behind a confirmation, send back with a note, delete while never
-  published), its recheck flag, its comments and trail with names, and every published revision. Every change names
-  the content version the editor loaded; the API locks the cell, compares, and answers 409 `stale` if someone changed
-  it first, and the screen offers a full reload (C14). The live match (W13) answers as the editor pauses typing (400
-  ms), through `POST …/sources/{id}/match`, which reads the source's units under RLS each time rather than keeping
-  them in memory (R77's suggestion, left for when programmes are long). The database decides every step, as before;
-  the API adds only the version check, a non-empty note, and the languages a text may be in. A cell RLS won't let the
-  actor delete (a published one) is a 403, never a silent success. Publish is offered only to reviewers, country
-  admins and platform admins, and replaced by the reason when four-eyes forbids the user's own work. Not built: C4
-  (attested quotes, which need uploads, with sources, task 8), C10.4 (linking a right-of-reply report, which has no
-  screen yet), and the dashboard queues of C1.2. The e2e test leaves the seeded cells as it found them.
+  election's grid (`…/cells`), each cell with its state, published rating and flags in words (the rating icons of
+  §2.5 not yet); a cell's page with its draft (rating on the methodology's scale, summary per language, and after the
+  first publish a kind of change and a public note), its quotes with where each matches and in their document's
+  language, the documents checked for "not mentioned", the workflow open to the user (start, submit, recall, approve
+  and publish behind a confirmation, send back with a note, delete while never published and without a trail), its
+  recheck flag, its comments and trail, and every published revision. Every change names the content version the
+  editor loaded, and each transition the state it starts from (transitions don't change the version); the API locks
+  the cell, compares, and answers 409 `cellChanged` if someone changed it first, and the screen offers a full reload
+  (C14), apart from the database's own refusals, which keep their words. The draft form sends the version its fields
+  were loaded at: when the page reloads after any step with a newer one, untouched fields show it, and edited ones say
+  at once that the cell changed rather than save over it. The live match (W13) answers as the editor pauses typing
+  (400 ms), through `POST …/sources/{id}/match`: up to 120 times a minute per member, the source checked under RLS
+  every time, its normalised text kept (50 sources at most) once extraction is over, the matching itself outside the
+  transaction. The trail names the site's members only (ADR-0002 §2, R94); anyone else, a platform admin included,
+  is named as not a member. Publish is offered only to reviewers, country admins and platform admins, only in a live
+  election (or an archived one, for a correction or withdrawal), and replaced by the reason when four-eyes forbids the
+  user's own work (but not when they uploaded a file a quote cites, which the database refuses all the same). A step
+  that removes its own button says it's done in the page's status line. A cell RLS won't let the actor delete (a
+  published one) is a 403, never a silent success. Not built: the checklist of C5.2, C7.4's side-by-side view and
+  quotes highlighted in their source (with the source viewer, S6), C4 (attested quotes, which need uploads, with
+  sources, task 8), C10.4 (linking a right-of-reply report, which has no screen yet), and the dashboard queues of
+  C1.2. The e2e test leaves the seeded cell's content as it found it, though its version moves on and its trail
+  names the test's account. Changed after an adversarial review: the state checks, the `cellChanged` key, the
+  draft form's version, names, the match's limits, announcements, and when Publish and Delete are offered.
 
 ## Open decisions for Dani
 

@@ -11,6 +11,7 @@ import { adminDataRoutes } from '../src/admin/routes.js';
 import { createAccount, deleteAccount } from './auth-fixtures.js';
 import {
   LIVE_A,
+  LIVE_B,
   OPERATOR_A,
   SHARED_BRAND_ASSET,
   TENANT_A,
@@ -849,7 +850,57 @@ describe('cells (editorial workflow §8)', () => {
       body: { version: 9999, rating: null, summary: null, changeKind: null, publicNote: null },
     });
     expect(answer.statusCode).toBe(409);
-    expect(answer.json()).toEqual({ error: 'stale' });
+    expect(answer.json()).toEqual({ error: 'cellChanged' });
+  });
+
+  it("never act on another tenant's cell or source under this tenant's path, even for a member of both", async () => {
+    const { rows } = await sql<{
+      id: string;
+      party_id: string;
+      criterion_id: string;
+      content_version: number;
+    }>`
+      SELECT id, party_id, criterion_id, content_version FROM app.assessments
+       WHERE election_id = ${LIVE_B.id} LIMIT 1`.execute(owner);
+    const b = rows[0];
+    const sourceB = '0190f8c4-0000-7000-8000-000000000653';
+    const who = USERS.editorAReviewerB;
+    expect((await send('GET', `${grid}/${b?.party_id}/${b?.criterion_id}`, who)).statusCode).toBe(
+      404,
+    );
+    expect(
+      (
+        await send('PUT', `${grid}/${b?.id}`, who, {
+          body: {
+            version: b?.content_version,
+            rating: null,
+            summary: null,
+            changeKind: null,
+            publicNote: null,
+          },
+        })
+      ).statusCode,
+    ).toBe(404);
+    // B's own member matches against it first, so the API keeps its text: A's path must still not reach it.
+    expect(
+      (
+        await send(
+          'POST',
+          `/api/t/test-b/e/generales-de-ejemplo/sources/${sourceB}/match`,
+          USERS.countryAdminB,
+          {
+            body: { quote: 'Texto de ejemplo del programa ficticio' },
+          },
+        )
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await send('POST', `/api/t/test-a/e/generales-de-ejemplo/sources/${sourceB}/match`, who, {
+          body: { quote: 'Texto de ejemplo del programa ficticio' },
+        })
+      ).statusCode,
+    ).toBe(404);
   });
 
   it('match a quote as the editor types, without saving anything (C2.6)', async () => {
@@ -866,6 +917,37 @@ describe('cells (editorial workflow §8)', () => {
     expect(
       (await send('POST', url, USERS.countryAdminB, { body: { quote: 'x' } })).statusCode,
     ).toBe(404);
+  });
+
+  it("name in the trail only the site's members, never a platform admin or anyone else", async () => {
+    const shown = await send('GET', grid, USERS.editorA);
+    const cell = shown
+      .json<{ cells: { partyId: string; criterionId: string; assessmentId: string | null }[] }>()
+      .cells.find((c) => c.assessmentId === LIVE_A.cells.published);
+    // A platform admin's comment: written for good, on the fixture's published cell.
+    await send('POST', `${grid}/${LIVE_A.cells.published}/comments`, USERS.platformAdmin, {
+      body: { note: 'Comentario de la plataforma' },
+    });
+    const one = await send('GET', `${grid}/${cell?.partyId}/${cell?.criterionId}`, USERS.editorA);
+    const { names, draft } = one.json<{
+      names: Record<string, string | null>;
+      draft: { events: { actorId: string }[] };
+    }>();
+    expect(draft.events.map((e) => e.actorId)).toContain(USERS.platformAdmin);
+    expect(Object.keys(names)).not.toContain(USERS.platformAdmin);
+    expect(Object.keys(names)).toContain(USERS.editorA);
+  });
+
+  it('limit the live match per member', async () => {
+    const url = `/api/t/test-a/e/generales-de-ejemplo/sources/${SOURCE_A}/match`;
+    const statuses = new Set<number>();
+    for (let n = 0; n < 121; n += 1) {
+      statuses.add(
+        (await send('POST', url, USERS.countryAdminA, { body: { quote: 'propone una moratoria' } }))
+          .statusCode,
+      );
+    }
+    expect([...statuses].sort((a, b) => a - b)).toEqual([200, 429]);
   });
 
   it('refuse a rejection without a note, before the database is asked', async () => {

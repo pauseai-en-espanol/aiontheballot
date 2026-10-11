@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { RATING_SCALES } from '@aiontheballot/domain/methodology';
-import { getTranslator, messages } from '@aiontheballot/i18n/messages';
+import { getTranslator } from '@aiontheballot/i18n/messages';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -18,15 +18,29 @@ import { ConfirmButton } from '@/ui/ConfirmButton';
 import { Lang } from '@/ui/Lang';
 import { localeOptions } from '@/ui/locales';
 import * as styles from '@/ui/styles';
-import { writeErrors } from '@/ui/text';
+import { template, writeErrors } from '@/ui/text';
 
 interface CellParams {
   params: Promise<{ tenant: string; election: string; party: string; criterion: string }>;
 }
 
-export const generateMetadata = async (): Promise<Metadata> => ({
-  title: getTranslator(await getLocale())('admin.cells.title'),
-});
+export const generateMetadata = async ({ params }: CellParams): Promise<Metadata> => {
+  const { tenant: slug, election, party, criterion } = await params;
+  const [overview, cell] = await Promise.all([
+    getTenant(slug),
+    getCell(slug, election, party, criterion),
+  ]);
+  const locale = await getLocale();
+  const t = getTranslator(locale);
+  if (!overview || !cell) {
+    return { title: t('admin.notFound.title') };
+  }
+  const local = (value: Record<string, string>) =>
+    inLanguage(value, locale, overview.tenant.defaultLocale)?.text ?? '';
+  return {
+    title: `${local(cell.party.shortName)} · ${local(cell.criterion.title)} · ${t('admin.cells.title')}`,
+  };
+};
 
 /**
  * One cell (editorial workflow §8): its draft and what it needs (C2, C3, C10, C11), its quotes with where each matches
@@ -64,7 +78,28 @@ const CellPage = async ({ params }: CellParams) => {
   const youContributed = draft?.contributors.includes(cell.you) ?? false;
   const nameOf = (id: string) => cell.names[id] ?? t('admin.cells.someone');
   const ratingWords = (rating: Rating | null) =>
-    rating === null ? t('admin.cells.noRating') : t(`rating.${rating}`);
+    rating !== null
+      ? t(`rating.${rating}`)
+      : draft?.changeKind === 'withdrawal'
+        ? t('admin.cells.ratingWithdrawal')
+        : t('admin.cells.noRating');
+  const sourceLang = (source: { language: string | null }) =>
+    source.language ?? tenant.defaultLocale;
+  // Publishing needs a live election, or an archived one for a correction or withdrawal (C7.6).
+  const publishable =
+    cell.electionStatus === 'live' ||
+    (cell.electionStatus === 'archived' &&
+      (draft?.changeKind === 'correction' || draft?.changeKind === 'withdrawal'));
+  // A rejection's note is both a comment and the rejection's own: shown once, with the rejection.
+  const events = (draft?.events ?? []).filter(
+    (event, index, all) =>
+      !(
+        event.kind === 'commented' &&
+        all[index + 1]?.kind === 'rejected' &&
+        all[index + 1]?.note === event.note &&
+        all[index + 1]?.actorId === event.actorId
+      ),
+  );
   const scale = RATING_SCALES[tenant.methodologyKind];
   const citable = cell.sources.filter((s) => s.citable && s.admittedForQuotes);
   const checkable = cell.sources.filter(
@@ -73,7 +108,16 @@ const CellPage = async ({ params }: CellParams) => {
       s.admittedForChecks &&
       !draft?.checkedDocuments.some((c) => c.source.id === s.id),
   );
-  const live = messages[locale].admin.cells.live;
+  const live = {
+    matched: template(t, 'admin.cells.live.matched'),
+    tooShortStored: template(t, 'admin.cells.live.tooShortStored'),
+    tooShortNormalised: template(t, 'admin.cells.live.tooShortNormalised'),
+    tooLong: template(t, 'admin.cells.live.tooLong'),
+    unmatched: template(t, 'admin.cells.live.unmatched'),
+    longestStart: template(t, 'admin.cells.live.longestStart'),
+    longestEnd: template(t, 'admin.cells.live.longestEnd'),
+    failed: template(t, 'admin.cells.live.failed'),
+  };
 
   return (
     <>
@@ -229,7 +273,9 @@ const CellPage = async ({ params }: CellParams) => {
               <ol className={styles.list}>
                 {draft.quotes.map((quote) => (
                   <li key={quote.id}>
-                    <blockquote className={styles.text}>{quote.quote}</blockquote>
+                    <blockquote className={styles.text} lang={sourceLang(quote.source)}>
+                      {quote.quote}
+                    </blockquote>
                     <p className={styles.hint}>
                       {quote.matchStatus === 'matched'
                         ? t('admin.cells.matched', { location: quote.location ?? '' })
@@ -270,7 +316,11 @@ const CellPage = async ({ params }: CellParams) => {
                     path={`${cellApi}/quotes`}
                     matchBase={matchBase}
                     version={draft.contentVersion}
-                    sources={citable.map(({ id, title }) => ({ id, title }))}
+                    sources={citable.map((s) => ({
+                      id: s.id,
+                      title: s.title,
+                      lang: sourceLang(s),
+                    }))}
                     text={{
                       source: t('admin.cells.quoteSource'),
                       chooseSource: t('admin.cells.chooseSource'),
@@ -387,7 +437,9 @@ const CellPage = async ({ params }: CellParams) => {
                 />
               ) : null}
               {draft.state === 'in_review' && canReview ? (
-                youContributed && cell.requireSecondReviewer ? (
+                !publishable ? (
+                  <p className={styles.notice}>{t('admin.cells.publishNotYet')}</p>
+                ) : youContributed && cell.requireSecondReviewer ? (
                   <p className={styles.notice}>{t('admin.cells.cannotPublishOwn')}</p>
                 ) : (
                   <ConfirmButton
@@ -395,6 +447,7 @@ const CellPage = async ({ params }: CellParams) => {
                     path={`${cellApi}/publish`}
                     body={{ version: draft.contentVersion }}
                     secondary={false}
+                    removes
                     text={{
                       button: t('admin.cells.publish'),
                       title: t('admin.cells.publishTitle'),
@@ -409,7 +462,10 @@ const CellPage = async ({ params }: CellParams) => {
                   />
                 )
               ) : null}
-              {draft.generation === 0 && draft.state === 'draft' && canEdit ? (
+              {draft.generation === 0 &&
+              draft.state === 'draft' &&
+              draft.events.length === 0 &&
+              canEdit ? (
                 <ConfirmButton
                   method="DELETE"
                   path={`${cellApi}?version=${draft.contentVersion}`}
@@ -446,11 +502,11 @@ const CellPage = async ({ params }: CellParams) => {
             <h3 id="comments" className={styles.h3}>
               {t('admin.cells.comments')}
             </h3>
-            {draft.events.length === 0 ? (
+            {events.length === 0 ? (
               <p className={styles.text}>{t('admin.cells.noComments')}</p>
             ) : (
               <ol className={styles.list}>
-                {draft.events.map((event, index) => (
+                {events.map((event, index) => (
                   <li key={`${event.createdAt}-${index}`}>
                     <p>
                       <strong>

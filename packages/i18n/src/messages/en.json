@@ -77,7 +77,8 @@
     "needsDefaultLanguage": "Publishing needs the text in the site's default language.",
     "noMethodology": "Write the methodology first.",
     "mailFailed": "The email couldn't be sent, so nothing was kept. Try again later.",
-    "holdsRole": "This person already holds that role here."
+    "holdsRole": "This person already holds that role here.",
+    "cellChanged": "Someone changed this cell since you opened it."
   },
   "auth": {
     "otherAccount": "Sign in with another account",
@@ -686,13 +687,11 @@
         "published": "Published",
         "published_with_draft": "Published, with a newer draft"
       },
-      "pending": "Pending",
       "withdrawn": "Withdrawn",
       "rejected": "Sent back",
       "recheck": "Recheck",
       "noStructure": "Add parties and criteria first.",
       "back": "All cells",
-      "cellTitle": "{party} · {criterion}",
       "state": "State: {state}",
       "version": "Version {version}",
       "notStarted": "Nobody has started this cell. Its public page says it is pending.",
@@ -703,7 +702,7 @@
       "rating": "Rating",
       "noRating": "No rating yet",
       "ratingWithdrawal": "No rating: this draft withdraws the published one.",
-      "summary": "Why",
+      "summary": "Why this rating",
       "summaryHint": "What the public reads under the rating. The site's main language is needed to submit.",
       "changeKind": "Kind of change",
       "changeKindHint": "A correction when what was published was wrong; an update when the facts changed, such as a new programme; a withdrawal takes the rating down.",
@@ -739,7 +738,6 @@
       "add": "Add quote",
       "added": "Quote added.",
       "live": {
-        "checking": "Checking against the source…",
         "matched": "Matches the source, {location}.",
         "tooShortStored": "Too short: {length} characters, at least 15.",
         "tooShortNormalised": "Too short once spaces and typography are evened out: {length} characters, at least 15.",
@@ -770,7 +768,6 @@
       "publishBody": "The public sees it within a minute: the rating, the summary and every quote with its source.",
       "publishSelfBody": "Four-eyes is off for this election, so you can publish your own work; it is recorded as self-reviewed. The public sees it within a minute.",
       "cannotPublishOwn": "You worked on this draft, and this election needs a second person to publish it.",
-      "reject": "Send back",
       "rejectNote": "Why it goes back",
       "rejectNoteHint": "Its editors read this on the cell and in their queue.",
       "rejectButton": "Send back with this note",
@@ -792,7 +789,7 @@
         "rejected": "{name} sent it back",
         "commented": "{name} commented"
       },
-      "someone": "A former member",
+      "someone": "Someone who isn't a member of this site",
       "comment": "Comment",
       "commentButton": "Add comment",
       "commented": "Comment added.",
@@ -806,7 +803,9 @@
         "correction": "Correction",
         "withdrawal": "Withdrawal"
       },
-      "on": "{date, date, long}"
+      "on": "{date, date, long}",
+      "publishNotYet": "Cells are published once the election is live: until then they can be reviewed and sent back.",
+      "gridCell": "{party}, {criterion}: {state}"
     },
     "invitations": {
       "title": "Invitations",

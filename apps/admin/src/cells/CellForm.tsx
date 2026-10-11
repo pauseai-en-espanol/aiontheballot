@@ -36,8 +36,10 @@ const ERROR_ID = 'cell-error';
 
 /**
  * A draft's rating, summary and, after the first publish, its kind of change and public note (editorial workflow C2,
- * C10, C11), saved all at once at the version loaded (C14). The scale is the methodology's; the database checks it,
- * and everything a submission needs, again.
+ * C10, C11), saved all at once at the version its fields were loaded at (C14). When the page reloads its data (after
+ * any step, a comment included) with a newer version, untouched fields show it; edited ones keep their text and say at
+ * once that the cell changed, rather than saving over someone else's change. The scale is the methodology's; the
+ * database checks it, and everything a submission needs, again.
  */
 export const CellForm = ({
   path,
@@ -65,7 +67,16 @@ export const CellForm = ({
   text: CellFormText;
 }) => {
   const { pending, error, status, statusLine, run } = useWrite();
-  const [stale, setStale] = useState(false);
+  const [staleOnSave, setStaleOnSave] = useState(false);
+  // The version the fields show, and whether they were edited since: a newer one replaces untouched fields.
+  const [loaded, setLoaded] = useState(version);
+  const [edited, setEdited] = useState(false);
+  const [fields, setFields] = useState(0);
+  if (version !== loaded && !edited) {
+    setLoaded(version);
+    setFields((n) => n + 1);
+  }
+  const stale = staleOnSave || (version !== loaded && edited);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -73,21 +84,25 @@ export const CellForm = ({
     const rating = formText(form, 'rating');
     const changeKind = formText(form, 'changeKind');
     const body = {
-      version,
+      version: loaded,
       rating: rating === '' ? null : rating,
       summary: localizedFromForm(form, 'summary', locales),
       changeKind: afterFirstPublish && changeKind !== '' ? changeKind : null,
       publicNote: afterFirstPublish ? localizedFromForm(form, 'publicNote', locales) : null,
     };
-    setStale(false);
+    setStaleOnSave(false);
     const answer = await run(() => sendToApi('PUT', path, body), text.saved);
-    if (answer?.error === 'stale') {
-      setStale(true);
+    if (answer?.ok) {
+      // Saved: the version the reload brings is these fields' own.
+      setEdited(false);
+    }
+    if (answer?.error === 'cellChanged') {
+      setStaleOnSave(true);
     }
   };
 
   return (
-    <form className={styles.form} onSubmit={submit}>
+    <form key={fields} className={styles.form} onSubmit={submit} onChange={() => setEdited(true)}>
       <fieldset className={styles.fieldset}>
         <legend className={styles.label}>{text.rating}</legend>
         {[...scale, null].map((rating) => {

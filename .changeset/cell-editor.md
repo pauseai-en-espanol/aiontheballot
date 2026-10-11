@@ -3,6 +3,7 @@
 '@aiontheballot/admin': minor
 '@aiontheballot/i18n': minor
 '@aiontheballot/e2e': patch
+'@aiontheballot/domain': patch
 ---
 
 The cell editor and the review workflow (PLAN R131): the election's cell grid, and each cell's page to draft a rating

@@ -23,6 +23,8 @@ export interface CellSource {
   id: string;
   title: string;
   kind: string;
+  /** The document's language, for its title and quotes; null if no one recorded it. */
+  language: string | null;
 }
 
 export interface CellQuote {
@@ -95,6 +97,8 @@ export interface Cell {
     shortTitle: Localized | null;
     retired: boolean;
   };
+  /** Publishing needs a live election, or an archived one for a correction or withdrawal (C7.6). */
+  electionStatus: 'draft' | 'live' | 'archived';
   /** Whether the election asks for a second person to publish (four-eyes, P1). */
   requireSecondReviewer: boolean;
   /** None until someone creates the cell. */
@@ -144,6 +148,7 @@ export const getCell = async (
       .selectFrom('app.elections as e')
       .leftJoin('app.methodologies as m', 'm.election_id', 'e.id')
       .select([
+        'e.status',
         'e.require_second_reviewer',
         sql<string[] | null>`m.admissible_source_kinds::text[]`.as('admissible'),
         sql<string[] | null>`m.not_mentioned_source_kinds::text[]`.as('not_mentioned'),
@@ -173,7 +178,16 @@ export const getCell = async (
     .executeTakeFirst();
   const sources = await trx
     .selectFrom('app.source_documents')
-    .select(['id', 'title', 'kind', 'party_id', 'is_programme', 'file_id', 'extraction_status'])
+    .select([
+      'id',
+      'title',
+      'kind',
+      'language',
+      'party_id',
+      'is_programme',
+      'file_id',
+      'extraction_status',
+    ])
     .where('election_id', '=', electionId)
     .where((eb) => eb.or([eb('party_id', '=', partyId), eb('party_id', 'is', null)]))
     .orderBy('is_programme', 'desc')
@@ -185,6 +199,7 @@ export const getCell = async (
     id: s.id,
     title: s.title,
     kind: s.kind,
+    language: s.language,
     partyId: s.party_id,
     isProgramme: s.is_programme,
     citable:
@@ -223,6 +238,7 @@ export const getCell = async (
       shortTitle: optionalLocalized(criterion.short_title, 'criteria.short_title'),
       retired: criterion.retired_at !== null,
     },
+    electionStatus: election.status,
     requireSecondReviewer: election.require_second_reviewer,
     draft: assessment ? await draftOf(trx, assessment) : null,
     revisions: revisions.map((r) => ({
@@ -264,6 +280,7 @@ const draftOf = async (
         's.id as source_id',
         's.title',
         's.kind',
+        's.language',
         // The labels the public would see: the first matched unit's, then the last one's if it differs.
         sql<string | null>`(
           SELECT string_agg(t.label, '–' ORDER BY t.unit_index)
@@ -282,6 +299,7 @@ const draftOf = async (
         's.id as source_id',
         's.title',
         's.kind',
+        's.language',
         instant('c.checked_at').as('checked_at'),
         'c.checked_by',
       ])
@@ -318,12 +336,12 @@ const draftOf = async (
       ordinal: q.ordinal,
       quote: q.quote,
       sectionLabel: q.section_label,
-      source: { id: q.source_id, title: q.title, kind: q.kind },
+      source: { id: q.source_id, title: q.title, kind: q.kind, language: q.language },
       matchStatus: q.match_status,
       location: q.match_status === 'matched' ? q.location : null,
     })),
     checkedDocuments: checked.map((c) => ({
-      source: { id: c.source_id, title: c.title, kind: c.kind },
+      source: { id: c.source_id, title: c.title, kind: c.kind, language: c.language },
       checkedAt: c.checked_at,
       checkedBy: c.checked_by,
     })),
@@ -352,10 +370,12 @@ const lockedAt = async (
   electionId: string,
   cellId: string,
   version: number,
+  /** The states the step starts from: a transition doesn't change the version, so it is checked too. */
+  states?: readonly CellState[],
 ): Promise<CellChange> => {
   const row = await trx
     .selectFrom('app.assessments')
-    .select('content_version')
+    .select(['content_version', 'state'])
     .where('election_id', '=', electionId)
     .where('id', '=', cellId)
     .forUpdate()
@@ -363,7 +383,9 @@ const lockedAt = async (
   if (!row) {
     return 'not-found';
   }
-  return row.content_version === version ? 'changed' : 'stale';
+  return row.content_version === version && (!states || states.includes(row.state))
+    ? 'changed'
+    : 'stale';
 };
 
 /**
@@ -515,7 +537,9 @@ export const moveCell = async (
   version: number,
   state: 'draft' | 'in_review',
 ): Promise<CellChange> => {
-  const locked = await lockedAt(trx, electionId, cellId, version);
+  const locked = await lockedAt(trx, electionId, cellId, version, [
+    state === 'in_review' ? 'draft' : 'in_review',
+  ]);
   if (locked !== 'changed') {
     return locked;
   }
@@ -535,7 +559,7 @@ export const rejectCell = async (
   version: number,
   note: string,
 ): Promise<CellChange> => {
-  const locked = await lockedAt(trx, electionId, cellId, version);
+  const locked = await lockedAt(trx, electionId, cellId, version, ['in_review']);
   if (locked !== 'changed') {
     return locked;
   }
@@ -558,7 +582,7 @@ export const publishCell = async (
   cellId: string,
   version: number,
 ): Promise<CellChange> => {
-  const locked = await lockedAt(trx, electionId, cellId, version);
+  const locked = await lockedAt(trx, electionId, cellId, version, ['in_review']);
   if (locked !== 'changed') {
     return locked;
   }
@@ -639,10 +663,10 @@ export const sourceUnits = async (
   trx: Transaction<DB>,
   electionId: string,
   sourceId: string,
-): Promise<SourceUnit[] | undefined> => {
+): Promise<{ units: SourceUnit[]; final: boolean } | undefined> => {
   const source = await trx
     .selectFrom('app.source_documents')
-    .select('id')
+    .select('extraction_status')
     .where('election_id', '=', electionId)
     .where('id', '=', sourceId)
     .executeTakeFirst();
@@ -655,5 +679,22 @@ export const sourceUnits = async (
     .where('source_document_id', '=', sourceId)
     .orderBy('unit_index')
     .execute();
-  return units.map((u) => ({ index: u.unit_index, label: u.label, body: u.body }));
+  return {
+    units: units.map((u) => ({ index: u.unit_index, label: u.label, body: u.body })),
+    // Once extraction is over, the text never changes (S3.3): it can be kept.
+    final: source.extraction_status !== 'pending',
+  };
 };
+
+/** Whether the source exists in the election, under RLS: the live match's check before it uses a kept copy. */
+export const sourceVisible = async (
+  trx: Transaction<DB>,
+  electionId: string,
+  sourceId: string,
+): Promise<boolean> =>
+  (await trx
+    .selectFrom('app.source_documents')
+    .select('id')
+    .where('election_id', '=', electionId)
+    .where('id', '=', sourceId)
+    .executeTakeFirst()) !== undefined;
