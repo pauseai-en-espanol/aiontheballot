@@ -47,8 +47,14 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - uses: ./.github/actions/install-pnpm-dependencies
 
+      # Changesets 3 fails when there is nothing to version (a push of docs only, say): then there is nothing to do.
       - name: Apply changesets
-        run: pnpm release:bump
+        run: |
+          if find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | grep -q .; then
+            pnpm release:bump
+          else
+            echo "::notice::No changesets: nothing to version."
+          fi
 
       - name: Commit the release
         id: commit
