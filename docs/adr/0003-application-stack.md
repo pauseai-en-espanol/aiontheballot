@@ -76,6 +76,10 @@ cross-country views and an open-data export.
 - Sign-up is disabled. Accounts come only from our invitation flow (`app.invitations` creates the membership).
 - A user who hasn't enrolled TOTP can only reach the enrolment page. The API sets `app.aal = '2'` only for sessions
   that completed TOTP, and the database enforces that (ADR-0002 §9).
+- Only the endpoints the admin uses are reachable, each with only the body fields it needs: no "remember me", no
+  trusted devices, no sign-up (PLAN R85). Sessions last 12 hours and are never extended; attempts are limited per
+  address in the database, the address being the gateway's `X-Forwarded-For` entry (PLAN R87, R88). A CronJob from
+  the API's image deletes expired sessions daily (PLAN R90).
 - Better Auth's tables are generated as SQL and committed as ordinary dbmate migrations.
 
 **Options considered:**

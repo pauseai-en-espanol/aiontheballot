@@ -59,5 +59,62 @@
     "linked": "Something this refers to has gone, or something still refers to it.",
     "invalid": "That value isn't valid.",
     "limit": "That limit has been reached. Try again later."
+  },
+  "auth": {
+    "otherAccount": "Sign in with another account",
+    "signIn": {
+      "title": "Sign in",
+      "intro": "Sign in with the email address your invitation was sent to.",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign in",
+      "noAccount": "Accounts are by invitation only. If you need one, ask your team's coordinator.",
+      "unavailable": "Signing in isn't available yet."
+    },
+    "challenge": {
+      "title": "Two-step verification",
+      "intro": "Enter the 6-digit code your authenticator app shows for this account.",
+      "code": "Code",
+      "submit": "Verify",
+      "useBackupCode": "Use a backup code instead",
+      "backupIntro": "Enter one of the backup codes you saved when you set up two-step verification. Each one works once.",
+      "backupCode": "Backup code",
+      "useAuthenticator": "Use your authenticator app instead",
+      "restart": "Sign in again"
+    },
+    "enrol": {
+      "title": "Set up two-step verification",
+      "intro": "Every account needs a second step: a code from an authenticator app on your phone, such as Google Authenticator, Microsoft Authenticator, Aegis or 2FAS.",
+      "passwordStep": "Confirm your password to begin.",
+      "password": "Password",
+      "begin": "Continue",
+      "scanTitle": "Add this account to your app",
+      "scan": "Scan this QR code with your authenticator app.",
+      "qrLabel": "QR code to add this account to an authenticator app",
+      "manual": "If you can't scan it, add the account by hand with this key:",
+      "code": "Code from the app",
+      "codeHint": "Enter the 6-digit code the app now shows, to check it works.",
+      "verify": "Verify",
+      "backupTitle": "Save your backup codes",
+      "backupIntro": "If you lose your phone, each of these codes lets you sign in once. Keep them somewhere safe, such as a password manager: they won't be shown again.",
+      "backupList": "Backup codes",
+      "done": "I've saved them, continue"
+    },
+    "home": {
+      "title": "Your sites",
+      "signedInAs": "Signed in as {name}",
+      "noTenants": "You don't have access to any site yet. Your team's coordinator can give you a role.",
+      "signOut": "Sign out"
+    },
+    "errors": {
+      "invalidCredentials": "The email address or password is not right.",
+      "invalidPassword": "That password is not right.",
+      "invalidCode": "That code is not right. Check it and try again.",
+      "rateLimited": "Too many attempts. Wait a moment and try again.",
+      "locked": "Too many wrong codes. Wait a few minutes, then sign in again.",
+      "tooManyCodes": "Too many wrong codes for this sign-in. Please sign in again.",
+      "expired": "This sign-in has expired. Please sign in again.",
+      "unexpected": "Something went wrong. Please try again later."
+    }
   }
 }

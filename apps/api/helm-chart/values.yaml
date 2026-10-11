@@ -28,9 +28,45 @@ securityContext:
   capabilities:
     drop: [ALL]
 # Extra environment (plain values, or secretKeyRef for credentials sealed in gitops). Public routes (the web app's routing
-# data) need WEB_DATABASE_URL, the aiontheballot_web role's connection; without it they answer 503.
+# data) need WEB_DATABASE_URL, the aiontheballot_web role's connection; without it they answer 503. Signed-in routes need
+# ADMIN_DATABASE_URL (aiontheballot_admin).
 env: []
 envFrom: []
+
+# The platform's name (PLATFORM_NAME), from each deployment's configuration: what authenticator apps file the admin
+# accounts under. Sign-in needs it.
+platformName: ''
+
+# Sign-in (Better Auth, ADR-0003 §2) on the central admin host's /api. Set all three and platformName, or none of the
+# three: with none, /api answers 503; with some, the chart refuses to render (and the API to start).
+auth:
+  # The admin host's origin, e.g. https://admin.example.org: the only host /api answers on.
+  adminOrigin: ''
+  # The aiontheballot_auth role's connection (ADR-0002 §2), the only role that reaches Better Auth's tables.
+  databaseUrlSecret:
+    name: ''
+    key: DATABASE_URL
+  # Signs Better Auth's cookies and encrypts TOTP secrets and backup codes. Changing it signs everyone out and makes
+  # every enrolled authenticator unreadable, so it is set once.
+  betterAuthSecret:
+    name: ''
+    key: BETTER_AUTH_SECRET
+  # A daily CronJob from this image deletes expired sessions and sign-in data Better Auth never meets again (personal
+  # data, PLAN R81), as aiontheballot_auth and with no other credential. Rendered once databaseUrlSecret is set.
+  cleanup:
+    # Its own extra environment, never the API's, which holds other roles' credentials: e.g. the secret with the
+    # API's SENTRY_DSN, so its failures reach error tracking.
+    envFrom: []
+    # UTC, at a quiet hour.
+    schedule: '17 3 * * *'
+    # Node, pg and the Sentry SDK: about 110 MiB at its peak, measured locally.
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
 
 # Stored files' bytes (ADR-0001, files; ADR-0004): a persistent volume every API pod mounts, holding each file under
 # its tenant, bucket and SHA-256 (FILES_ROOT). No database dump covers it, so it needs its own backup (gitops backup

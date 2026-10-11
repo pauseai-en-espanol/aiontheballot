@@ -3,8 +3,10 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import {
+  ADMIN_SERVER_URL,
   ADMIN_URL,
   API_URL,
+  AUTH,
   DSNS,
   GLITCHTIP_URL,
   PLATFORM_HOST,
@@ -20,12 +22,19 @@ import {
 if (existsSync('../.env')) {
   process.loadEnvFile('../.env');
 }
-const WEB_DATABASE_URL = process.env.WEB_DATABASE_URL;
-if (!WEB_DATABASE_URL) {
-  throw new Error(
-    'WEB_DATABASE_URL is not set: run `pnpm db:up && pnpm db:migrate && pnpm db:seed` and set it in .env.',
-  );
-}
+const required = (name: string): string => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(
+      `${name} is not set: run \`pnpm db:up && pnpm db:migrate && pnpm db:seed\` and set it in .env (see .env.example).`,
+    );
+  }
+  return value;
+};
+const WEB_DATABASE_URL = required('WEB_DATABASE_URL');
+// Sign-in runs as Better Auth's role, and what a signed-in user reads as the admin role (ADR-0002 §2).
+const AUTH_DATABASE_URL = required('AUTH_DATABASE_URL');
+const ADMIN_DATABASE_URL = required('ADMIN_DATABASE_URL');
 
 // Runs against production builds (turbo builds the apps first), never against dev servers.
 export default defineConfig({
@@ -78,6 +87,11 @@ export default defineConfig({
         LOG_LEVEL: 'warn',
         SENTRY_DSN: DSNS.api,
         WEB_DATABASE_URL,
+        AUTH_DATABASE_URL,
+        ADMIN_DATABASE_URL,
+        BETTER_AUTH_SECRET: AUTH.secret,
+        ADMIN_ORIGIN: ADMIN_URL,
+        PLATFORM_NAME,
         // Where `pnpm db:seed` put the seeds' file bytes (ADR-0004: the volume, here a folder).
         FILES_ROOT:
           process.env.FILES_ROOT || fileURLToPath(new URL('../.data/files', import.meta.url)),
@@ -87,8 +101,19 @@ export default defineConfig({
       name: 'admin',
       command: `pnpm exec next start --port ${PORTS.admin} --hostname 127.0.0.1`,
       cwd: '../apps/admin',
+      url: `${ADMIN_SERVER_URL}/healthz`,
+      env: { PLATFORM_NAME, SENTRY_DSN: DSNS.admin, API_URL },
+    },
+    {
+      // The admin host as browsers reach it: /api to the API, the rest to the admin (fake-gateway.ts).
+      name: 'gateway',
+      command: 'node fake-gateway.ts',
       url: `${ADMIN_URL}/healthz`,
-      env: { PLATFORM_NAME, SENTRY_DSN: DSNS.admin },
+      env: {
+        PORT: String(PORTS.gateway),
+        API_UPSTREAM: API_URL,
+        ADMIN_UPSTREAM: ADMIN_SERVER_URL,
+      },
     },
   ],
 });

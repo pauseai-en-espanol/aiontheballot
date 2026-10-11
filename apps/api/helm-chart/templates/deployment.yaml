@@ -40,6 +40,27 @@ spec:
             - name: FILES_ROOT
               value: {{ printf "%s/files" .Values.persistence.mountPath | quote }}
             {{- end }}
+            {{- $signIn := or .Values.auth.adminOrigin .Values.auth.databaseUrlSecret.name .Values.auth.betterAuthSecret.name }}
+            {{- if $signIn }}
+            # Sign-in takes all of these or none (apps/api/src/config.ts), so a partial set fails here, not at startup.
+            - name: ADMIN_ORIGIN
+              value: {{ required "auth.adminOrigin is required with sign-in" .Values.auth.adminOrigin | quote }}
+            - name: PLATFORM_NAME
+              value: {{ required "platformName is required with sign-in" .Values.platformName | quote }}
+            - name: AUTH_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "auth.databaseUrlSecret.name is required with sign-in" .Values.auth.databaseUrlSecret.name }}
+                  key: {{ .Values.auth.databaseUrlSecret.key }}
+            - name: BETTER_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "auth.betterAuthSecret.name is required with sign-in" .Values.auth.betterAuthSecret.name }}
+                  key: {{ .Values.auth.betterAuthSecret.key }}
+            {{- else if .Values.platformName }}
+            - name: PLATFORM_NAME
+              value: {{ .Values.platformName | quote }}
+            {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

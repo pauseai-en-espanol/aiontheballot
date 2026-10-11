@@ -1,0 +1,290 @@
+import { messages } from '@aiontheballot/i18n/messages';
+import { AxeBuilder } from '@axe-core/playwright';
+import { expect, type Page, test } from '@playwright/test';
+
+import {
+  addMembership,
+  createAccount as createTestAccount,
+  deleteAccounts,
+  PASSWORD,
+  visitorAddress,
+} from '../accounts.js';
+import { ADMIN_URL, PLATFORM_NAME, TENANT_URL } from '../servers.js';
+import { totpCode } from '../totp.js';
+
+const en = messages.en.auth;
+const es = messages.es.auth;
+
+/** WCAG 2.2 AA, as far as axe can tell (editorial workflow §2.6). */
+const expectAccessible = async (page: Page) => {
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  expect(
+    violations.map((v) => `${v.id}: ${v.nodes.map((n) => String(n.target)).join(', ')}`),
+  ).toEqual([]);
+};
+
+// Each test is its own visitor at the gateway, so tests running together don't share the sign-in rate limit.
+test.beforeEach(async ({ page }) => {
+  await page.setExtraHTTPHeaders({ 'x-e2e-client-address': visitorAddress() });
+});
+
+// The accounts this worker created, deleted when it is done, so the local database doesn't collect them.
+const created: string[] = [];
+const createAccount = async () => {
+  const account = await createTestAccount();
+  created.push(account.id);
+  return account;
+};
+test.afterAll(async () => {
+  await deleteAccounts(created.splice(0));
+});
+
+/** The form's own alert: Next's route announcer is an alert too. */
+const formAlert = (page: Page) => page.locator('[role="alert"]:not(#__next-route-announcer__)');
+
+const signIn = async (page: Page, email: string, password = PASSWORD) => {
+  await page.goto(`${ADMIN_URL}/sign-in`);
+  await page.getByLabel(en.signIn.email).fill(email);
+  await page.getByLabel(en.signIn.password, { exact: true }).fill(password);
+  await page.getByRole('button', { name: en.signIn.submit }).click();
+};
+
+/** Enrols TOTP through the pages, checking each step, and returns what they showed. */
+const enrol = async (page: Page) => {
+  await expect(page).toHaveURL(`${ADMIN_URL}/two-factor/enrol`);
+  await page.getByLabel(en.enrol.password, { exact: true }).fill(PASSWORD);
+  await page.getByRole('button', { name: en.enrol.begin }).click();
+  await expect(page.getByRole('heading', { name: en.enrol.scanTitle })).toBeFocused();
+  await expect(page.getByRole('img', { name: en.enrol.qrLabel })).toBeVisible();
+  const key = (await page.getByTestId('setup-key').textContent()) ?? '';
+  await page.getByLabel(en.enrol.code, { exact: true }).fill(totpCode(key));
+  await page.getByRole('button', { name: en.enrol.verify }).click();
+  const codes = page.getByRole('list', { name: en.enrol.backupList }).getByRole('listitem');
+  await expect(codes).toHaveCount(10);
+  const backupCodes = await codes.allTextContents();
+  await page.getByRole('button', { name: en.enrol.done }).click();
+  await expect(page).toHaveURL(`${ADMIN_URL}/`);
+  return { key, backupCodes };
+};
+
+const signOut = async (page: Page) => {
+  await page.getByRole('button', { name: en.home.signOut }).click();
+  await expect(page).toHaveURL(`${ADMIN_URL}/sign-in`);
+};
+
+test.describe('admin sign-in (editorial workflow A4)', () => {
+  test("sends a signed-out visitor to sign-in, in the browser's language, with nothing for search engines", async ({
+    page,
+  }) => {
+    const response = await page.goto(ADMIN_URL);
+    expect(response?.status()).toBe(200);
+    await expect(page).toHaveURL(`${ADMIN_URL}/sign-in`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(en.signIn.title);
+    await expect(page).toHaveTitle(`${en.signIn.title} · ${PLATFORM_NAME}`);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      'content',
+      'noindex, nofollow',
+    );
+    expect(await page.context().cookies()).toEqual([]);
+    await expectAccessible(page);
+  });
+
+  test.describe('in Spanish', () => {
+    test.use({ locale: 'es-ES' });
+
+    test('speaks Spanish to a Spanish browser', async ({ page }) => {
+      await page.goto(ADMIN_URL);
+      await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(es.signIn.title);
+      await expect(page).toHaveTitle(`${es.signIn.title} · ${PLATFORM_NAME}`);
+      await expect(page.getByLabel(es.signIn.email)).toBeVisible();
+      await expect(page.getByLabel(es.signIn.password, { exact: true })).toBeVisible();
+      await page.getByLabel(es.signIn.email).fill('nadie@example.org');
+      await page.getByLabel(es.signIn.password, { exact: true }).fill(PASSWORD);
+      await page.getByRole('button', { name: es.signIn.submit }).click();
+      await expect(formAlert(page)).toHaveText(`⚠ ${es.errors.invalidCredentials}`);
+      await expectAccessible(page);
+    });
+  });
+
+  test('says when the email or password is wrong, and then that there were too many attempts', async ({
+    page,
+  }) => {
+    const { email } = await createAccount();
+    await signIn(page, email, 'una contraseña equivocada');
+    const alert = formAlert(page);
+    await expect(alert).toHaveText(`⚠ ${en.errors.invalidCredentials}`);
+    await expectAccessible(page);
+    // Better Auth's limit for sign-in: three attempts per address every ten seconds.
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await page.getByRole('button', { name: en.signIn.submit }).click();
+      await expect(page.getByRole('button', { name: en.signIn.submit })).toBeEnabled();
+    }
+    await page.getByRole('button', { name: en.signIn.submit }).click();
+    await expect(alert).toHaveText(`⚠ ${en.errors.rateLimited}`);
+  });
+
+  test('enrols a new account in TOTP, shows its backup codes once, and signs it in', async ({
+    page,
+  }) => {
+    const { email, name } = await createAccount();
+    await signIn(page, email);
+    await expect(page).toHaveURL(`${ADMIN_URL}/two-factor/enrol`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(en.enrol.title);
+    await expectAccessible(page);
+
+    await page.getByLabel(en.enrol.password, { exact: true }).fill(PASSWORD);
+    await page.getByRole('button', { name: en.enrol.begin }).click();
+    await expect(page.getByRole('img', { name: en.enrol.qrLabel })).toBeVisible();
+    await expectAccessible(page);
+    // A wrong code leaves the account without TOTP.
+    await page.getByLabel(en.enrol.code, { exact: true }).fill('000000');
+    await page.getByRole('button', { name: en.enrol.verify }).click();
+    await expect(formAlert(page)).toHaveText(`⚠ ${en.errors.invalidCode}`);
+    await expect(page.getByLabel(en.enrol.code, { exact: true })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+
+    const key = (await page.getByTestId('setup-key').textContent()) ?? '';
+    await page.getByLabel(en.enrol.code, { exact: true }).fill(totpCode(key));
+    await page.getByRole('button', { name: en.enrol.verify }).click();
+    await expect(page.getByRole('heading', { name: en.enrol.backupTitle })).toBeFocused();
+    await expect(
+      page.getByRole('list', { name: en.enrol.backupList }).getByRole('listitem'),
+    ).toHaveCount(10);
+    await expectAccessible(page);
+    await page.getByRole('button', { name: en.enrol.done }).click();
+
+    await expect(page).toHaveURL(`${ADMIN_URL}/`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(en.home.title);
+    await expect(page.getByText(en.home.signedInAs.replace('{name}', name))).toBeVisible();
+    await expect(page.getByText(en.home.noTenants)).toBeVisible();
+    await expectAccessible(page);
+
+    // The session is a host-only cookie, sent only over https (or to localhost), out of scripts' reach.
+    const cookies = await page.context().cookies();
+    expect(cookies.map((cookie) => cookie.name)).toEqual(['__Host-admin.session_token']);
+    expect(cookies[0]).toMatchObject({
+      domain: 'localhost',
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      sameSite: 'Lax',
+    });
+    expect(await page.evaluate('document.cookie')).toBe('');
+
+    // Signed in, the sign-in and enrolment pages lead home.
+    await page.goto(`${ADMIN_URL}/sign-in`);
+    await expect(page).toHaveURL(`${ADMIN_URL}/`);
+    await page.goto(`${ADMIN_URL}/two-factor/enrol`);
+    await expect(page).toHaveURL(`${ADMIN_URL}/`);
+  });
+
+  test('gives a password-only session nothing but enrolment', async ({ page }) => {
+    const { email } = await createAccount();
+    await signIn(page, email);
+    await expect(page).toHaveURL(`${ADMIN_URL}/two-factor/enrol`);
+    for (const path of ['/', '/two-factor']) {
+      await page.goto(`${ADMIN_URL}${path}`);
+      await expect(page).toHaveURL(`${ADMIN_URL}/two-factor/enrol`);
+    }
+    const tenants = await page.request.get(`${ADMIN_URL}/api/tenants`);
+    expect(tenants.status()).toBe(401);
+    // Someone on the wrong account, or a shared computer, can leave.
+    await page.goto(`${ADMIN_URL}/two-factor/enrol`);
+    await signOut(page);
+    expect(await page.context().cookies()).toEqual([]);
+  });
+
+  test('asks an enrolled account for its code at every sign-in, and refuses a wrong one', async ({
+    page,
+  }) => {
+    const { email } = await createAccount();
+    await signIn(page, email);
+    const { key } = await enrol(page);
+    await signOut(page);
+    expect(await page.context().cookies()).toEqual([]);
+
+    await signIn(page, email);
+    await expect(page).toHaveURL(`${ADMIN_URL}/two-factor`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(en.challenge.title);
+    await expectAccessible(page);
+    // Before the code, only the short-lived cookie that holds the sign-in exists, and nothing past it opens.
+    expect((await page.context().cookies()).map((cookie) => cookie.name)).toEqual([
+      '__Host-admin.two_factor',
+    ]);
+    expect((await page.request.get(`${ADMIN_URL}/api/tenants`)).status()).toBe(401);
+
+    await page.getByLabel(en.challenge.code, { exact: true }).fill('000000');
+    await page.getByRole('button', { name: en.challenge.submit }).click();
+    await expect(formAlert(page)).toHaveText(`⚠ ${en.errors.invalidCode}`);
+    await expect(page.getByLabel(en.challenge.code, { exact: true })).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    );
+    await expectAccessible(page);
+
+    await page.getByLabel(en.challenge.code, { exact: true }).fill(totpCode(key));
+    await page.getByRole('button', { name: en.challenge.submit }).click();
+    await expect(page).toHaveURL(`${ADMIN_URL}/`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(en.home.title);
+  });
+
+  test('signs in once with each backup code', async ({ page }) => {
+    const { email } = await createAccount();
+    await signIn(page, email);
+    const { backupCodes } = await enrol(page);
+    const [code = ''] = backupCodes;
+    await signOut(page);
+
+    await signIn(page, email);
+    await page.getByRole('button', { name: en.challenge.useBackupCode }).click();
+    const field = page.getByLabel(en.challenge.backupCode, { exact: true });
+    await expect(field).toBeFocused();
+    await expectAccessible(page);
+    await field.fill(code);
+    await page.getByRole('button', { name: en.challenge.submit }).click();
+    await expect(page).toHaveURL(`${ADMIN_URL}/`);
+    await signOut(page);
+
+    await signIn(page, email);
+    await page.getByRole('button', { name: en.challenge.useBackupCode }).click();
+    await page.getByLabel(en.challenge.backupCode, { exact: true }).fill(code);
+    await page.getByRole('button', { name: en.challenge.submit }).click();
+    await expect(formAlert(page)).toHaveText(`⚠ ${en.errors.invalidCode}`);
+  });
+
+  test('lists the tenants a member may open, once signed in with the second factor', async ({
+    page,
+  }) => {
+    const { id, email } = await createAccount();
+    await addMembership(id, 'ejemplo-a');
+    await signIn(page, email);
+    await enrol(page);
+    // In the admin's language where the tenant has one (the seeds name ejemplo-a in English too).
+    await expect(page.getByRole('listitem')).toHaveText(['Example tenant A']);
+  });
+
+  // The gateway's half of ADR-0002 T8: a public host routes nothing to the API's /api, so sign-in isn't there at all
+  // (the API's own refusal of other hosts is in its tests).
+  test('has no sign-in on a public host', async ({ page }) => {
+    await page.goto(TENANT_URL);
+    const answer = await page.evaluate(async () => {
+      const response = await fetch('/api/auth/sign-in/email', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          email: 'persona@example.org',
+          password: 'una contraseña de ejemplo',
+        }),
+      });
+      return response.status;
+    });
+    expect(answer).toBe(404);
+    expect(await page.context().cookies()).toEqual([]);
+  });
+});

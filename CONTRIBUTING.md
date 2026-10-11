@@ -16,7 +16,21 @@ the checklists.
 
    For changes to the apps, also run `pnpm test:e2e` (Playwright, against production builds). Install its browser
    once with `pnpm --filter @aiontheballot/e2e exec playwright install chromium`. It needs the local database,
-   migrated and seeded (`pnpm db:up && pnpm db:migrate && pnpm db:seed`), and `WEB_DATABASE_URL` in `.env`.
+   migrated and seeded (`pnpm db:up && pnpm db:migrate && pnpm db:seed`), and `WEB_DATABASE_URL`, `AUTH_DATABASE_URL`
+   and `ADMIN_DATABASE_URL` in `.env` (see `.env.example`). The admin's sign-in runs through a stand-in for the
+   cluster's gateway (`e2e/fake-gateway.ts`), and each test creates its own account, since sign-up is closed.
+
+   **Signing in to the admin locally.** The API serves `/api` only on the admin host, as the gateway routes it, so run
+   the stand-in gateway in front of `pnpm dev`, and give the API sign-in's settings (development values only):
+
+   ```sh
+   PORT=3003 API_UPSTREAM=http://127.0.0.1:3001 ADMIN_UPSTREAM=http://127.0.0.1:3002 node e2e/fake-gateway.ts
+   # the API's environment, besides .env: ADMIN_ORIGIN=http://localhost:3003, PLATFORM_NAME,
+   # BETTER_AUTH_SECRET (any 32 characters or more); the admin's: API_URL=http://127.0.0.1:3001
+   ```
+
+   Then open `http://localhost:3003`. Accounts come from invitations; until those exist, create one as
+   `e2e/accounts.ts` does.
    The seeds' file bytes go to `.data/files` (or `FILES_ROOT`, see `.env.example`); `pnpm db:seed` writes them again
    on every run.
 

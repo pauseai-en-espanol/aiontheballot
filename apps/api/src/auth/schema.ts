@@ -23,6 +23,14 @@ export const AUTH_MODELS = {
       userId: 'user_id',
       ...timestamps,
     },
+    additionalFields: {
+      /**
+       * 2 only for a session that a TOTP or backup code created (ADR-0002 §9): the API sets app.aal from it. Every
+       * other session, such as the one a password alone opens for enrolment, stays 1 for life, so a session opened
+       * before its user enrolled can't become aal2 when they enrol elsewhere. Set by the API (`input: false`).
+       */
+      aal: { type: 'number', required: true, defaultValue: 1, input: false },
+    },
   },
   account: {
     modelName: 'accounts',

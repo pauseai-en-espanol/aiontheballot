@@ -59,5 +59,62 @@
     "linked": "Algo a lo que esto se refiere ya no existe, o algo todavía se refiere a esto.",
     "invalid": "Ese valor no es válido.",
     "limit": "Se ha alcanzado el límite. Vuelve a intentarlo más tarde."
+  },
+  "auth": {
+    "otherAccount": "Iniciar sesión con otra cuenta",
+    "signIn": {
+      "title": "Iniciar sesión",
+      "intro": "Inicia sesión con la dirección de correo a la que se envió tu invitación.",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "submit": "Iniciar sesión",
+      "noAccount": "Las cuentas son solo por invitación. Si necesitas una, pídesela a quien coordina tu equipo.",
+      "unavailable": "Todavía no se puede iniciar sesión."
+    },
+    "challenge": {
+      "title": "Verificación en dos pasos",
+      "intro": "Escribe el código de 6 cifras que muestra tu aplicación de autenticación para esta cuenta.",
+      "code": "Código",
+      "submit": "Verificar",
+      "useBackupCode": "Usar un código de recuperación",
+      "backupIntro": "Escribe uno de los códigos de recuperación que guardaste al configurar la verificación en dos pasos. Cada uno sirve una sola vez.",
+      "backupCode": "Código de recuperación",
+      "useAuthenticator": "Usar la aplicación de autenticación",
+      "restart": "Volver a iniciar sesión"
+    },
+    "enrol": {
+      "title": "Configura la verificación en dos pasos",
+      "intro": "Todas las cuentas necesitan un segundo paso: un código de una aplicación de autenticación en tu móvil, como Google Authenticator, Microsoft Authenticator, Aegis o 2FAS.",
+      "passwordStep": "Confirma tu contraseña para empezar.",
+      "password": "Contraseña",
+      "begin": "Continuar",
+      "scanTitle": "Añade esta cuenta a tu aplicación",
+      "scan": "Escanea este código QR con tu aplicación de autenticación.",
+      "qrLabel": "Código QR para añadir esta cuenta a una aplicación de autenticación",
+      "manual": "Si no puedes escanearlo, añade la cuenta a mano con esta clave:",
+      "code": "Código de la aplicación",
+      "codeHint": "Escribe el código de 6 cifras que muestra ahora la aplicación, para comprobar que funciona.",
+      "verify": "Verificar",
+      "backupTitle": "Guarda tus códigos de recuperación",
+      "backupIntro": "Si pierdes el móvil, cada uno de estos códigos te permite iniciar sesión una vez. Guárdalos en un lugar seguro, como un gestor de contraseñas: no se volverán a mostrar.",
+      "backupList": "Códigos de recuperación",
+      "done": "Ya los he guardado, continuar"
+    },
+    "home": {
+      "title": "Tus sitios",
+      "signedInAs": "Sesión iniciada como {name}",
+      "noTenants": "Todavía no tienes acceso a ningún sitio. Quien coordina tu equipo puede darte un rol.",
+      "signOut": "Cerrar sesión"
+    },
+    "errors": {
+      "invalidCredentials": "El correo electrónico o la contraseña no son correctos.",
+      "invalidPassword": "La contraseña no es correcta.",
+      "invalidCode": "El código no es correcto. Revísalo e inténtalo de nuevo.",
+      "rateLimited": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
+      "locked": "Demasiados códigos incorrectos. Espera unos minutos y vuelve a iniciar sesión.",
+      "tooManyCodes": "Demasiados códigos incorrectos para este inicio de sesión. Vuelve a iniciar sesión.",
+      "expired": "Este inicio de sesión ha caducado. Vuelve a iniciar sesión.",
+      "unexpected": "Algo ha ido mal. Inténtalo de nuevo más tarde."
+    }
   }
 }

@@ -107,12 +107,12 @@ _As a member, I sign in with a password and a second factor._
 
 1. Sign-in is email and password, then a TOTP code or a backup code. There is no self sign-up. [API: Better Auth]
 2. A session without TOTP reaches only the enrolment and challenge pages, and the database gives it nothing. [API;
-   DB: `aal`]
+   DB: `aal`, recorded per session, PLAN R84]
 3. Enrolment shows a QR code and the secret, needs one valid code to finish, and then shows ten backup codes once.
    [API]
 4. TOTP is asked at every sign-in; there are no remembered devices. A session ends 12 hours after sign-in, or at
    sign-out. [API]
-5. Failed attempts are rate limited. [API: Better Auth's limiter]
+5. Failed attempts are rate limited. [API: Better Auth's limiter, PLAN R88]
 6. The session cookie is host-only (`__Host-`), `Secure`, `HttpOnly` and `SameSite=Lax`, on the admin host only. The
    public site never sets a cookie. [API; ADR-0002 §15]
 

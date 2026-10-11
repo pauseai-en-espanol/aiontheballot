@@ -41,12 +41,12 @@ test.describe('public site', () => {
 });
 
 test.describe('admin', () => {
-  test('renders the home page with the configured name', async ({ page }) => {
+  test('renders the sign-in page with the configured name', async ({ page }) => {
     const response = await page.goto(ADMIN_URL);
 
     expect(response?.status()).toBe(200);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(comingSoon);
-    await expect(page).toHaveTitle(PLATFORM_NAME);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(messages.en.auth.signIn.title);
+    await expect(page).toHaveTitle(`${messages.en.auth.signIn.title} · ${PLATFORM_NAME}`);
   });
 
   test('answers the health probe', async ({ request }) => {

@@ -144,6 +144,7 @@ jobs:
             echo "TEST_DATABASE_URL=postgres://aiontheballot_owner:ci-owner@localhost:$PG_PORT/aiontheballot_test?sslmode=disable"
             echo "TEST_SUPERUSER_DATABASE_URL=postgres://postgres:postgres@localhost:$PG_PORT/aiontheballot_test?sslmode=disable"
             echo "TEST_AUTH_DATABASE_URL=postgres://aiontheballot_auth:ci-auth@localhost:$PG_PORT/aiontheballot_test?sslmode=disable"
+            echo "TEST_ADMIN_DATABASE_URL=postgres://aiontheballot_admin:ci-admin@localhost:$PG_PORT/aiontheballot_test?sslmode=disable"
           } >> "$GITHUB_ENV"
 
       # Rebuilds aiontheballot_test from the migrations, then runs the RLS matrix, the catalog meta-tests and the data rules.
@@ -204,6 +205,8 @@ jobs:
           {
             echo "DATABASE_URL=postgres://aiontheballot_owner:ci-owner@localhost:$PG_PORT/aiontheballot?sslmode=disable"
             echo "WEB_DATABASE_URL=postgres://aiontheballot_web:ci-web@localhost:$PG_PORT/aiontheballot?sslmode=disable"
+            echo "AUTH_DATABASE_URL=postgres://aiontheballot_auth:ci-auth@localhost:$PG_PORT/aiontheballot?sslmode=disable"
+            echo "ADMIN_DATABASE_URL=postgres://aiontheballot_admin:ci-admin@localhost:$PG_PORT/aiontheballot?sslmode=disable"
           } >> "$GITHUB_ENV"
 
       # The fictional seeds; their guard admits this database because it is reached on localhost.

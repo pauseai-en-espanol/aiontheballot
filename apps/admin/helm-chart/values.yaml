@@ -40,7 +40,7 @@ route:
   trafficPolicy:
     enabled: true
 
-# Where /api on the admin host is sent (the umbrella chart sets the release-specific service name).
+# Where /api on the admin host is sent, and where the admin's server calls the API (API_URL).
 api:
   # Defaults to <release>-api, the API service of the same release.
   serviceName: ''

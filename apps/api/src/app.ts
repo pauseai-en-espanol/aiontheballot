@@ -3,6 +3,8 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import type { BrandImageSource, HomeSource } from './home-data.js';
 import type { RoutingSource } from './routing-data.js';
 
+import { adminRoutes, type AdminRoutesOptions } from './auth/routes.js';
+
 export interface AppOptions {
   logger?: FastifyServerOptions['logger'];
   /** Public routing data, read as aiontheballot_web; without it the route answers 503. */
@@ -11,6 +13,8 @@ export interface AppOptions {
   home?: HomeSource;
   /** A tenant's public brand images; without it the route answers 503. */
   brandImages?: BrandImageSource;
+  /** Sign-in and the signed-in routes under /api, on the admin host only; without sign-in they answer 503. */
+  admin?: AdminRoutesOptions;
 }
 
 export const buildApp = ({
@@ -18,6 +22,7 @@ export const buildApp = ({
   routing,
   home,
   brandImages,
+  admin = {},
 }: AppOptions = {}): FastifyInstance => {
   const app = Fastify({
     logger,
@@ -91,6 +96,8 @@ export const buildApp = ({
       return reply.type(image.contentType).send(Buffer.from(image.content));
     },
   );
+
+  void app.register(adminRoutes(admin), { prefix: '/api' });
 
   return app;
 };

@@ -1,8 +1,10 @@
+import { createAuthPool } from '@aiontheballot/db/auth-pool';
 import { createDatabase } from '@aiontheballot/db/client';
 import { createFileStore } from '@aiontheballot/db/file-store';
 import { captureException } from '@sentry/node';
 
 import { buildApp } from './app.js';
+import { createAuth } from './auth/auth.js';
 import { loadConfig } from './config.js';
 import { initErrorTracking } from './error-tracking.js';
 import { createBrandImageSource, createHomeSource } from './home-data.js';
@@ -18,11 +20,35 @@ const web = config.webDatabaseUrl
     })
   : undefined;
 const files = config.filesRoot ? createFileStore(config.filesRoot) : undefined;
+// Sign-in runs as aiontheballot_auth, which reaches only Better Auth's tables; what a signed-in user does runs as
+// aiontheballot_admin, through withActor (ADR-0002 §2, §3).
+const authPool = config.auth
+  ? createAuthPool({
+      connectionString: config.auth.databaseUrl,
+      applicationName: 'aiontheballot-api-auth',
+    })
+  : undefined;
+const admin = config.adminDatabaseUrl
+  ? createDatabase({
+      connectionString: config.adminDatabaseUrl,
+      applicationName: 'aiontheballot-api-admin',
+    })
+  : undefined;
 const app = buildApp({
   logger: { level: config.logLevel },
   routing: web ? createRoutingSource(web) : undefined,
   home: web ? createHomeSource(web) : undefined,
   brandImages: web && files ? createBrandImageSource(web, files) : undefined,
+  admin: {
+    auth:
+      config.auth && authPool
+        ? {
+            auth: createAuth({ ...config.auth, pool: authPool }),
+            adminOrigin: config.auth.adminOrigin,
+          }
+        : undefined,
+    admin,
+  },
 });
 
 // Says at startup whether stored files can be written, so a volume mounted without write access shows in the logs
@@ -43,6 +69,8 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   app.log.info({ signal }, 'Shutting down');
   await app.close();
   await web?.destroy();
+  await admin?.destroy();
+  await authPool?.end();
   process.exit(0);
 };
 

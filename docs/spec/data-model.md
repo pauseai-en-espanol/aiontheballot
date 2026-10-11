@@ -1204,7 +1204,8 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
 1. ~~**Worker database role.**~~ **Decided:** `aiontheballot_worker`, scoped to one job request at a time (§8).
 2. ~~**Better Auth tables.**~~ **Done:** in the `auth` schema with uuid ids, through connections whose search path
    is `auth`; only `aiontheballot_auth` reaches them (ADR-0002 §2; spec O2, decided; migration `auth_schema`, PLAN
-   R81).
+   R81). `auth.sessions.aal` records whether a second factor opened the session (migration `auth_session_aal`, PLAN
+   R84).
 3. **The descriptive scale** (PLAN P6): define `red` versus `not_mentioned`.
 4. **Admissible sources** (PLAN Q9): both methodology lists default to `{pdf, web_page}` until the chapter decides.
 5. **Party names localized?** They're assumed to be `jsonb`, because some coalitions use different names in

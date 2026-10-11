@@ -4,6 +4,13 @@ aiontheballot-migrations:
   databaseUrlSecret: { name: aiontheballot-owner-db }
 aiontheballot-api:
   image: { repository: registry.example/aiontheballot/api, tag: 0.1.0.abc1234 }
+  platformName: Plataforma de ejemplo
+  auth:
+    adminOrigin: https://admin.example-platform.test
+    databaseUrlSecret: { name: aiontheballot-auth-db }
+    betterAuthSecret: { name: aiontheballot-better-auth }
+    cleanup:
+      envFrom: [{ secretRef: { name: aiontheballot-api-glitchtip } }]
 aiontheballot-web:
   image: { repository: registry.example/aiontheballot/web, tag: 0.1.0.abc1234 }
   route:

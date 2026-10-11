@@ -3674,7 +3674,8 @@ CREATE TABLE auth.sessions (
     updated_at timestamp with time zone NOT NULL,
     ip_address text,
     user_agent text,
-    user_id uuid NOT NULL
+    user_id uuid NOT NULL,
+    aal integer NOT NULL
 );
 
 
@@ -3692,6 +3693,13 @@ COMMENT ON COLUMN auth.sessions.ip_address IS 'personal data';
 --
 
 COMMENT ON COLUMN auth.sessions.user_agent IS 'personal data';
+
+
+--
+-- Name: COLUMN sessions.aal; Type: COMMENT; Schema: auth; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN auth.sessions.aal IS '2 only for a session created by a TOTP or backup-code verification; the API sets app.aal from it';
 
 
 --

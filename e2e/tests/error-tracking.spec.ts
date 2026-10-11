@@ -52,10 +52,20 @@ const parseEnvelope = (body: string) => {
 const apps = [
   // The page is a tenant's (every other host gets the proxy's 404); the relay is a system path, served on any host, so
   // requests from Node (which can't resolve .localhost names everywhere, unlike the browser) use the server's address.
-  { name: 'web', url: TENANT_URL, server: WEB_URL, dsn: DSNS.web, project: '1', key: 'e2e-web' },
+  {
+    name: 'web',
+    url: TENANT_URL,
+    page: '/',
+    server: WEB_URL,
+    dsn: DSNS.web,
+    project: '1',
+    key: 'e2e-web',
+  },
+  // A signed-out visitor's admin page is the sign-in page.
   {
     name: 'admin',
     url: ADMIN_URL,
+    page: '/sign-in',
     server: ADMIN_URL,
     dsn: DSNS.admin,
     project: '2',
@@ -71,7 +81,7 @@ for (const app of apps) {
     }) => {
       const marker = `e2e-${app.name}-${Date.now()}`;
 
-      await page.goto(`${app.url}/?token=secret-token`);
+      await page.goto(`${app.url}${app.page}?token=secret-token`);
       const relayed = page.waitForResponse(
         (response) => new URL(response.url()).pathname === RELAY_PATH,
       );
@@ -95,7 +105,7 @@ for (const app of apps) {
       expect(event.exception?.values?.[0]?.value).toBe(`${marker} [email]`);
       expect(event.release).toMatch(new RegExp(`^${app.name}@\\d+\\.\\d+\\.\\d+$`));
       expect(event.user).toBeUndefined();
-      expect(event.request?.url).toBe(`${app.url}/`);
+      expect(event.request?.url).toBe(`${app.url}${app.page}`);
       expect(Object.keys(event.request?.headers ?? {})).toEqual(['User-Agent']);
 
       // GlitchTip's own headers (the fake sets a cookie) never reach the browser.
