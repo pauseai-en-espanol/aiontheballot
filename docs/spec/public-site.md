@@ -195,7 +195,7 @@ On every response of the web app, pages, images, routes and build assets alike (
   now that pages render per request anyway, is a question for Dani (PLAN R126). Colours that come from data (a
   party's) are SVG fills, never style attributes.
 - `Strict-Transport-Security: max-age=31536000` on https (no `includeSubDomains`: a tenant's hostname may be a
-  subdomain of a domain it doesn't control alone, such as `elecciones.pauseai.es`).
+  subdomain of a domain it doesn't control alone, such as a chapter's own domain).
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` (the token pages send no
   referrer at all), `Permissions-Policy` denying camera, microphone, geolocation and the like,
   `Cross-Origin-Opener-Policy: same-origin`, `X-Frame-Options: DENY`.

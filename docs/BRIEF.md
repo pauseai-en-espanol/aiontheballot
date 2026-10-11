@@ -38,7 +38,7 @@ Parties will try to discredit the table. Every design decision should make the t
 - **TLS for custom hostnames** is issued only for verified hostnames: on-demand TLS with an allow-check against the table, or a host's managed custom-hostname feature.
 - **Spain pilot hostnames:**
   - Canonical: a Spanish product domain (candidate: `iaenlasurnas.es`; final name TBD).
-  - `elecciones.pauseai.es` as a verified alias that redirects to it.
+  - No alias on the chapter's domain (Dani's decision, PLAN R134): `elecciones.pauseai.es` was dropped.
 
 ### Authorization
 - **Authorization is never derived from the `Host` header.** The host only selects which public content to render.

@@ -168,7 +168,7 @@ fix them rather than copy them.
 
 - The `iaenlasurnas.es` zone sits on Cloudflare **as DNS only** and is added to the external-dns
   `domainFilters` and to the `gateway-public` certificate SANs.
-- `elecciones.pauseai.es` is already covered by the `*.pauseai.es` wildcard certificate.
+- Amended (PLAN R134): no `elecciones.pauseai.es` alias; `iaenlasurnas.es` is the site's only hostname.
 - A tenant hostname gets its route and certificate SAN only after it is verified in the database (ADR-0002).
 - Retired hostnames are **never** removed from DNS, routes or the certificate, because shared images carry them.
 

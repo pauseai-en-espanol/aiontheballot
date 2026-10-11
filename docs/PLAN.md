@@ -155,8 +155,7 @@ Backups are not part of M1: they come from the cluster's backup plan (D2) and mu
 
 ### Preview
 
-**Ships:** real parties and criteria, every cell _pending_, live on `iaenlasurnas.es` with the
-`elecciones.pauseai.es` alias redirecting to it.
+**Ships:** real parties and criteria, every cell _pending_, live on `iaenlasurnas.es` (its only address: R134).
 
 **Before it:**
 
@@ -1244,6 +1243,12 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   C1.2. The e2e test leaves the seeded cell's content as it found it, though its version moves on and its trail
   names the test's account. Changed after an adversarial review: the state checks, the `cellChanged` key, the
   draft form's version, names, the match's limits, announcements, and when Publish and Delete are offered.
+- **R134. No `elecciones.pauseai.es` alias** (Dani's decision; revisits the BRIEF's pilot hostnames):
+  `iaenlasurnas.es` is the site's only address. The alias was a fallback while the product's name was undecided; now
+  it would only add a second name to promote, and it would be permanent (a hostname used publicly keeps redirecting
+  for good), so the chapter could never use that name for anything else. One can still be added later if the chapter
+  wants it: a verified, non-canonical `tenant_hostnames` row and a hostname on the web route (the `*.pauseai.es`
+  wildcard certificate covers it).
 
 ## Open decisions for Dani
 
