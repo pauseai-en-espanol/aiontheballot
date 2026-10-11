@@ -104,6 +104,8 @@ _As an invited volunteer, I follow the link and end up with an account and my ro
 5. A new account goes straight to TOTP enrolment. The membership grants nothing until TOTP is done, because every
    policy helper requires `aal = 2`. [API; DB: `my_tenants`]
 
+_Built (PLAN R114): A2 on the members page, A3 on `/invitation`; a new account then signs in, which leads to TOTP._
+
 ### A4. Sign in
 
 _As a member, I sign in with a password and a second factor._

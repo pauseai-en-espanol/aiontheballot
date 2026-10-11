@@ -104,11 +104,13 @@ log makes it visible (T23).
 - Helper functions live in a `private` schema.
 - `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, the public-cache trigger
   `bump_public_version` (so no runtime role can write `public_versions`), `submit_report`, the signup list's
-  `sign_up`, `confirm_signup` and `unsubscribe` (amended, PLAN R119, R122), `accept_invitation`, the publish trigger
-  `publish_revision` and `anonymize_expired_reports` (worker only). All of them set `search_path = ''`.
+  `sign_up`, `confirm_signup` and `unsubscribe` (amended, PLAN R119, R122), the invitations' `pending_invitation` and
+  `accept_invitation` (amended, PLAN R114), the publish trigger `publish_revision` and `anonymize_expired_reports`
+  (worker only). All of them set `search_path = ''`.
 - The actor helpers (`private.current_user_id`, `private.current_aal`) and the policy helpers
   (`private.my_tenants`, `private.is_platform_admin`) are executable by `aiontheballot_admin`, whose policies and
   triggers call them.
+- `private.pending_invitation` and `private.accept_invitation` are executable by `aiontheballot_admin` only (§10).
 - `private.normalize_for_match` is executable by `aiontheballot_admin` (the match trigger) and
   `aiontheballot_worker` (the generated column on `source_texts`).
 - The worker may also execute `private.current_user_id`: it sets `app.user_id` to its job request's requester, so what
@@ -155,7 +157,19 @@ completed TOTP. A stolen password alone cannot read private data or publish.
 
 - Country admins (or platform admins) create rows in `app.invitations(tenant_id, email, role, token_hash,
 expires_at)`, under RLS.
-- `private.accept_invitation(token)` creates the membership for the current actor if the email matches.
+- Amended (PLAN R114, D10): two narrow `SECURITY DEFINER` functions, for `aiontheballot_admin` only, each taking the
+  token's SHA-256 (hex), never the token, which so stays out of the database's logs:
+  - `private.pending_invitation(token_hash)` returns the email and role of a pending, unexpired invitation, and
+    nothing for any other hash, so the acceptance page can say what is offered and the API can create the account
+    with that email. No runtime role reads `app.invitations` otherwise without being the tenant's country admin.
+  - `private.accept_invitation(token_hash)` accepts it for the current actor only if the actor's account
+    (`auth.users`, which no runtime role reads) has the invited email, verified; it adds the membership (holding the
+    role already is no refusal) and marks the invitation accepted through its transition trigger, at aal1 too: the
+    membership grants nothing until TOTP (§9). It answers whether it accepted.
+- The API makes an invited person's account itself, as `aiontheballot_auth`, with the invited email marked verified
+  (following the link proves it) and the password they chose, and accepts at once; signing in and enrolling TOTP
+  follow. An existing account accepts once signed in. The token is in the link's fragment, the acceptance endpoints
+  are rate-limited per visitor, and every token that names no pending invitation gets one answer.
 - Self sign-up is off.
 - Resetting a user's MFA is a platform-admin runbook.
 

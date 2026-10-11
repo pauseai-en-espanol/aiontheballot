@@ -75,7 +75,9 @@
     "signedOut": "Tu sesión ha terminado. Vuelve a iniciar sesión.",
     "draftExists": "Ya hay un borrador de este texto. Edita ese o bórralo antes.",
     "needsDefaultLanguage": "Para publicar hace falta el texto en el idioma principal del sitio.",
-    "noMethodology": "Escribe antes la metodología."
+    "noMethodology": "Escribe antes la metodología.",
+    "mailFailed": "No se ha podido enviar el correo, así que no se ha guardado nada. Inténtalo más tarde.",
+    "holdsRole": "Esta persona ya tiene ese rol aquí."
   },
   "auth": {
     "otherAccount": "Iniciar sesión con otra cuenta",
@@ -148,6 +150,30 @@
       "passwordTooLong": "Usa como mucho 128 caracteres.",
       "passwordsDiffer": "Las dos contraseñas no coinciden.",
       "unexpected": "Algo ha ido mal. Inténtalo de nuevo más tarde."
+    },
+    "invitation": {
+      "title": "Tu invitación",
+      "checking": "Comprobando la invitación…",
+      "missing": "Este enlace no lleva ninguna invitación. Vuelve a abrir el enlace del correo.",
+      "invalid": "Esta invitación no se puede usar: puede haber caducado, haberse revocado o haberse usado ya. Pide una nueva a quien te invitó.",
+      "offer": "Esta invitación es para {email}, con el rol de {role}.",
+      "newAccount": "Aún no tienes cuenta: elige tu nombre y una contraseña. Después entra y configura tu segundo factor.",
+      "name": "Tu nombre",
+      "nameHint": "Tal como lo verá tu equipo.",
+      "password": "Contraseña",
+      "passwordHint": "Al menos 12 caracteres.",
+      "confirm": "Repite la contraseña",
+      "mismatch": "Las dos contraseñas no coinciden.",
+      "create": "Crear la cuenta y aceptar",
+      "created": "Tu cuenta está lista y la invitación aceptada. Entra para configurar tu segundo factor.",
+      "signIn": "Entrar",
+      "existing": "Esta dirección ya tiene cuenta. Entra con ella y vuelve a abrir el enlace del correo para aceptar.",
+      "accept": "Aceptar la invitación",
+      "accepted": "Invitación aceptada.",
+      "toAdmin": "Ir al admin",
+      "otherAccount": "Has entrado con otra cuenta. Sal y vuelve a abrir el enlace.",
+      "failed": "No ha funcionado. Inténtalo de nuevo en un momento.",
+      "limit": "Demasiados intentos desde aquí. Espera unos minutos y vuelve a intentarlo."
     }
   },
   "admin": {
@@ -781,12 +807,50 @@
         "withdrawal": "Retirada"
       },
       "on": "{date, date, long}"
+    },
+    "invitations": {
+      "title": "Invitaciones",
+      "intro": "Solo se entra por invitación. El enlace sirve una vez, durante {days} días, y solo para la dirección invitada.",
+      "caption": "Invitaciones y su estado",
+      "email": "Correo",
+      "role": "Rol",
+      "state": "Estado",
+      "expires": "Caduca",
+      "states": {
+        "pending": "Pendiente",
+        "accepted": "Aceptada",
+        "revoked": "Revocada",
+        "expired": "Caducada"
+      },
+      "none": "No hay invitaciones.",
+      "invite": "Invitar a alguien",
+      "emailHint": "La dirección a la que va el enlace. Solo una cuenta con esta dirección puede aceptarla.",
+      "send": "Enviar invitación",
+      "sent": "Invitación enviada.",
+      "revoke": "Revocar",
+      "revoked": "Invitación revocada.",
+      "delete": "Borrar",
+      "deleteTitle": "¿Borrar esta invitación?",
+      "deleteBody": "Su registro, con el correo, se borra para siempre. Solo se puede borrar una invitación aceptada, revocada o caducada.",
+      "deleted": "Invitación borrada.",
+      "noMail": "Las invitaciones necesitan el correo de la plataforma, que no está configurado en este despliegue.",
+      "holdsRole": "Esta persona ya tiene ese rol aquí.",
+      "actions": "Acciones"
     }
   },
   "email": {
     "signupConfirm": {
       "subject": "Confirma que quieres saber cuándo estará listo {site}",
       "body": "Hola:\n\nAlguien, probablemente tú, ha pedido a {operator} que avise a esta dirección cuando el sitio {site} esté listo{future, select, true { y de futuras elecciones en él} other {}}.\n\nPara confirmarlo, abre este enlace y pulsa «Confirmar»:\n{confirmUrl}\n\nSi no has sido tú, ignora este mensaje: la dirección se borrará en un máximo de 7 días. O bórrala ahora:\n{unsubscribeUrl}\n\nCómo tratamos tu dirección: {privacyUrl}\n\n{operator}"
+    },
+    "invitation": {
+      "subject": "Te invitan a trabajar en {site} como {role}",
+      "body": "Hola:\n\n{inviter} ha invitado a esta dirección a trabajar en {site}, en {platform}, como {role}.\n\nPara aceptar, abre este enlace antes de {days} días. Si aún no tienes cuenta, ahí eliges tu nombre y una contraseña, y luego configuras un segundo factor para entrar:\n{link}\n\nSi no lo esperabas, ignora este correo: no pasa nada si no se abre el enlace.\n\n{platform}"
+    },
+    "roles": {
+      "country_admin": "administración del país",
+      "editor": "edición",
+      "reviewer": "revisión"
     }
   },
   "documents": {

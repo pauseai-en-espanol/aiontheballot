@@ -19,6 +19,8 @@ export const WRITE_ERRORS = [
   'draftExists',
   'needsDefaultLanguage',
   'noMethodology',
+  'holdsRole',
+  'mailFailed',
   'signedOut',
   'unexpected',
 ] as const;

@@ -75,7 +75,9 @@
     "signedOut": "Your session has ended. Sign in again.",
     "draftExists": "There is already a draft of this text. Edit that one, or delete it first.",
     "needsDefaultLanguage": "Publishing needs the text in the site's default language.",
-    "noMethodology": "Write the methodology first."
+    "noMethodology": "Write the methodology first.",
+    "mailFailed": "The email couldn't be sent, so nothing was kept. Try again later.",
+    "holdsRole": "This person already holds that role here."
   },
   "auth": {
     "otherAccount": "Sign in with another account",
@@ -148,6 +150,30 @@
       "passwordTooLong": "Use at most 128 characters.",
       "passwordsDiffer": "The two passwords are not the same.",
       "unexpected": "Something went wrong. Please try again later."
+    },
+    "invitation": {
+      "title": "Your invitation",
+      "checking": "Checking the invitation…",
+      "missing": "This link has no invitation in it. Open the link from the email again.",
+      "invalid": "This invitation can't be used: it may have expired, been revoked or been used already. Ask whoever invited you for a new one.",
+      "offer": "This invitation is for {email}, as {role}.",
+      "newAccount": "You have no account yet: choose your name and a password. Then sign in and set up your second factor.",
+      "name": "Your name",
+      "nameHint": "As your team will see it.",
+      "password": "Password",
+      "passwordHint": "At least 12 characters.",
+      "confirm": "Password again",
+      "mismatch": "The two passwords are different.",
+      "create": "Create account and accept",
+      "created": "Your account is ready and the invitation accepted. Sign in to set up your second factor.",
+      "signIn": "Sign in",
+      "existing": "This address already has an account. Sign in with it, then open the link from the email again to accept.",
+      "accept": "Accept invitation",
+      "accepted": "Invitation accepted.",
+      "toAdmin": "Go to the admin",
+      "otherAccount": "You are signed in with another account. Sign out, then open the link again.",
+      "failed": "That didn't work. Try again in a moment.",
+      "limit": "Too many attempts from here. Wait a few minutes and try again."
     }
   },
   "admin": {
@@ -781,12 +807,50 @@
         "withdrawal": "Withdrawal"
       },
       "on": "{date, date, long}"
+    },
+    "invitations": {
+      "title": "Invitations",
+      "intro": "People join by invitation only. The link works once, for {days} days, and only for the invited address.",
+      "caption": "Invitations and their state",
+      "email": "Email",
+      "role": "Role",
+      "state": "State",
+      "expires": "Expires",
+      "states": {
+        "pending": "Pending",
+        "accepted": "Accepted",
+        "revoked": "Revoked",
+        "expired": "Expired"
+      },
+      "none": "No invitations.",
+      "invite": "Invite someone",
+      "emailHint": "The address the link goes to. Only an account with this address can accept it.",
+      "send": "Send invitation",
+      "sent": "Invitation sent.",
+      "revoke": "Revoke",
+      "revoked": "Invitation revoked.",
+      "delete": "Delete",
+      "deleteTitle": "Delete this invitation?",
+      "deleteBody": "Its record, with the email, goes for good. Only an accepted, revoked or expired invitation can be deleted.",
+      "deleted": "Invitation deleted.",
+      "noMail": "Invitations need the platform's email, which isn't set up on this deployment.",
+      "holdsRole": "This person already holds that role here.",
+      "actions": "Actions"
     }
   },
   "email": {
     "signupConfirm": {
       "subject": "Confirm you want to hear when {site} is ready",
       "body": "Hello,\n\nSomeone, probably you, asked {operator} to tell this address when the site {site} is ready{future, select, true { and about future elections on it} other {}}.\n\nTo confirm, open this link and press “Confirm”:\n{confirmUrl}\n\nIf it wasn’t you, ignore this email: the address will be deleted within 7 days. Or delete it now:\n{unsubscribeUrl}\n\nHow we handle your address: {privacyUrl}\n\n{operator}"
+    },
+    "invitation": {
+      "subject": "You're invited to work on {site} as {role}",
+      "body": "Hello,\n\n{inviter} has invited this address to work on {site}, on {platform}, as {role}.\n\nTo accept, open this link within {days} days. If you have no account yet, you choose your name and a password there, and then set up a second factor for signing in:\n{link}\n\nIf you didn't expect this, ignore this email: nothing happens unless the link is opened.\n\n{platform}"
+    },
+    "roles": {
+      "country_admin": "country admin",
+      "editor": "editor",
+      "reviewer": "reviewer"
     }
   },
   "documents": {

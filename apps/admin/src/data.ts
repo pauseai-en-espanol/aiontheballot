@@ -97,6 +97,28 @@ export const getMembers = cache(async (slug: string): Promise<MemberList | undef
   return body === undefined ? undefined : expect(body, ['members', 'canManage'], 'the members');
 });
 
+/** An invitation, as its tenant's country admins and platform admins see it (editorial workflow A2). */
+export interface Invitation {
+  id: string;
+  email: string;
+  role: TenantRole;
+  createdAt: string;
+  expiresAt: string;
+  state: 'pending' | 'accepted' | 'revoked' | 'expired';
+}
+
+/** The tenant's invitations, whether the user may invite, and whether the deployment can send them. */
+export const getInvitations = cache(
+  async (
+    slug: string,
+  ): Promise<{ invitations: Invitation[]; canInvite: boolean; mailReady: boolean } | undefined> => {
+    const body = await readApi(`${tenantPath(slug)}/invitations`);
+    return body === undefined
+      ? undefined
+      : expect(body, ['invitations', 'canInvite', 'mailReady'], 'the invitations');
+  },
+);
+
 /** A site's signup list in numbers (PLAN R119): what country admins and platform admins see, never an address. */
 export interface SignupCounts {
   unconfirmed: number;

@@ -998,6 +998,19 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   password, signs it in, and `private.accept_invitation(token)` adds the membership at aal1 (W3; nothing until TOTP).
   The token travels in the link's fragment (as R93's), the acceptance endpoint is rate-limited, the token is never
   logged, and one generic message covers every refused link. An ADR-0002 amendment, written when it is built.
+  _Built:_ migration `invitation_acceptance`, ADR-0002 §6 and §10 amended. Both functions take the token's SHA-256,
+  not the token, so it never reaches the database. The acceptance page (`/invitation`, the token read from the
+  fragment and taken out of the address bar) says what is offered; for a new address it takes a name and a password
+  (12 characters at least, as Better Auth counts them), and the API makes the account and accepts at once, then sends
+  the person to sign in, where TOTP enrolment follows: it doesn't sign them in itself, which would mean relaying
+  Better Auth's cookies from a second endpoint. An address that has an account signs in first and accepts with a
+  button. Lookups and acceptances share a limit of 20 per visitor per 10 minutes; an unknown, spent, revoked or
+  expired token gets the same 404. Country admins and platform admins invite from the members page (A2): a pending
+  invitation for the same address and role is revoked by the new one, someone who holds the role already is refused,
+  and an email that can't be sent revokes the invitation again (502), so nothing is pending that nobody received.
+  They revoke pending invitations and delete decided ones. The email goes through the platform's sender (R115) in
+  the site's main language, from the platform's name. Mutation check: every rule killed but `accept_invitation`'s
+  early return for no actor, an equivalent mutant (the email check that follows refuses it too).
 - **R115. Email: one platform sender now, each organization's own later** (decided with Dani). Everything goes through
   the platform's Mailu account. Account mail (password resets) comes from the platform; mail on a site's behalf
   (invitations, later report answers) shows the operator's name as the sender and replies go to its contact email

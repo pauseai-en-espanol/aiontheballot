@@ -11,9 +11,11 @@ import { matchQuote } from '@aiontheballot/domain/quote-match';
 import { isLocale } from '@aiontheballot/i18n/messages';
 import { captureException } from '@sentry/node';
 
+import type { InvitedAccounts } from '../auth/invited-accounts.js';
 import type { ProfileSource } from './profiles.js';
 
 import { databaseRefusal } from '../database-errors.js';
+import { mailFailure } from '../mail/mailer.js';
 import { type Access, accessTo, holds, isPlatformAdmin, TENANT_ROLES } from './access.js';
 import { cellGrid } from './cell-grid.js';
 import {
@@ -45,6 +47,16 @@ import {
   listElections,
   updateElection,
 } from './elections.js';
+import {
+  createInvitation,
+  deleteInvitation,
+  hashInvitationToken,
+  holdsRole,
+  type InvitationSender,
+  listInvitations,
+  makeInvitationToken,
+  revokeInvitation,
+} from './invitations.js';
 import { localizedInput, localizedSchema } from './localized-input.js';
 import { addRole, listMemberships, removeRole } from './members.js';
 import {
@@ -107,6 +119,8 @@ export const API_REFUSAL_KEYS = [
   'draftExists',
   'needsDefaultLanguage',
   'noMethodology',
+  'holdsRole',
+  'mailFailed',
 ] as const;
 export type ApiRefusalKey = (typeof API_REFUSAL_KEYS)[number];
 
@@ -141,6 +155,11 @@ const MEMBER_PARAMS = {
   required: ['tenant', 'userId'],
 } as const;
 const ID_PARAMS = {
+  type: 'object',
+  properties: { tenant: SLUG, id: UUID },
+  required: ['tenant', 'id'],
+} as const;
+const INVITATION_PARAMS = {
   type: 'object',
   properties: { tenant: SLUG, id: UUID },
   required: ['tenant', 'id'],
@@ -198,6 +217,8 @@ export interface AdminDataOptions {
   admin?: Database;
   /** Names and emails, from Better Auth's tables; without it the members route answers 503. */
   profiles?: ProfileSource;
+  /** Invitations' accounts and email (A2); without them, inviting answers 503. */
+  invitations?: { accounts: InvitedAccounts; send: InvitationSender };
   /** The admin's origin: a write must come from a page on it. */
   adminOrigin: string;
   /** Who a request acts for: a signed-in actor at aal2, or nobody (auth/session.ts). */
@@ -674,7 +695,7 @@ const tenantFor = async (trx: Transaction<DB>, actor: Actor, slug: string): Prom
  * answer.
  */
 export const adminDataRoutes =
-  ({ admin, profiles, adminOrigin, actorFor }: AdminDataOptions) =>
+  ({ admin, profiles, invitations, adminOrigin, actorFor }: AdminDataOptions) =>
   async (scope: FastifyInstance): Promise<void> => {
     /**
      * Runs `run` for the signed-in actor. A write must come from a page on the admin's origin, which every browser
@@ -776,6 +797,118 @@ export const adminDataRoutes =
               (a.name ?? '').localeCompare(b.name ?? '') || a.userId.localeCompare(b.userId),
           );
           return { members, canManage: manager, emailsShown: manager };
+        }),
+    );
+
+    // The tenant's invitations (A2), for its country admins and platform admins: RLS shows nobody else any.
+    scope.get<{ Params: { tenant: string } }>(
+      '/t/:tenant/invitations',
+      { schema: { params: TENANT_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            return {
+              invitations: await listInvitations(trx, access.tenantId),
+              canInvite: holds(access, 'country_admin'),
+              mailReady: invitations !== undefined,
+            };
+          }),
+        ),
+    );
+
+    // Invites someone with a role (A2): stored as the token's hash, then the link goes out by email. If the email
+    // can't be sent, the invitation is revoked again and nothing is pending.
+    scope.post<{ Params: { tenant: string }; Body: { email: string; role: TenantRole } }>(
+      '/t/:tenant/invitations',
+      {
+        schema: {
+          params: TENANT_PARAMS,
+          body: {
+            type: 'object',
+            properties: { email: { type: 'string', maxLength: 254 }, role: ROLE },
+            required: ['email', 'role'],
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          if (!invitations) {
+            return reply.code(503).send({ error: 'Invitations need the platform email' });
+          }
+          const email = request.body.email.trim().toLowerCase();
+          const { role } = request.body;
+          const token = makeInvitationToken();
+          const existing = await invitations.accounts.accountId(email);
+          const made = await withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            if (existing !== undefined && (await holdsRole(trx, access.tenantId, existing, role))) {
+              throw new Refusal(409, 'holdsRole');
+            }
+            const id = await createInvitation(trx, access.tenantId, {
+              email,
+              role,
+              tokenHash: hashInvitationToken(token),
+            });
+            const overview = await tenantOverview(trx, access);
+            return { id, access, name: overview.tenant.name };
+          });
+          const locale = isLocale(made.access.defaultLocale) ? made.access.defaultLocale : 'es';
+          const inviter = profiles
+            ? ((await profiles([actor.userId], { emails: false })).get(actor.userId)?.name ?? '')
+            : '';
+          try {
+            await invitations.send({
+              email,
+              role,
+              locale,
+              site: made.name[locale] ?? Object.values(made.name)[0] ?? request.params.tenant,
+              inviter,
+              token,
+            });
+          } catch (error) {
+            // Never the address: only that sending failed, and the SMTP code (mailFailure).
+            request.log.error({ err: mailFailure(error) }, 'An invitation could not be sent');
+            captureException(mailFailure(error));
+            await withActor(db, actor, (trx) =>
+              revokeInvitation(trx, made.access.tenantId, made.id),
+            );
+            return reply.code(502).send({ error: 'mailFailed' });
+          }
+          return reply.code(201).send({ id: made.id });
+        }),
+    );
+
+    // Revokes a pending invitation (A2.6).
+    scope.post<{ Params: { tenant: string; id: string } }>(
+      '/t/:tenant/invitations/:id/revoke',
+      { schema: { params: INVITATION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            if (!(await revokeInvitation(trx, access.tenantId, request.params.id))) {
+              throw new Refusal(404, 'notFound');
+            }
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Deletes an accepted, revoked or expired invitation, so its email isn't kept (A2.6); a pending one is revoked first.
+    scope.delete<{ Params: { tenant: string; id: string } }>(
+      '/t/:tenant/invitations/:id',
+      { schema: { params: INVITATION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            if (!(await deleteInvitation(trx, access.tenantId, request.params.id))) {
+              throw new Refusal(403, 'forbidden');
+            }
+          });
+          return reply.code(204).send();
         }),
     );
 

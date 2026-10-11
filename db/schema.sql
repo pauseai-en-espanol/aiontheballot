@@ -553,6 +553,47 @@ CREATE FUNCTION app.unsubscribe(tenant uuid, token_hash text) RETURNS boolean
 ALTER FUNCTION app.unsubscribe(tenant uuid, token_hash text) OWNER TO aiontheballot_owner;
 
 --
+-- Name: accept_invitation(text); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.accept_invitation(token_hash text) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    actor uuid := private.current_user_id();
+    invitation app.invitations;
+  BEGIN
+    IF actor IS NULL OR accept_invitation.token_hash IS NULL THEN
+      RETURN false;
+    END IF;
+    SELECT i.* INTO invitation
+      FROM app.invitations i
+     WHERE i.token_hash = accept_invitation.token_hash
+       AND i.accepted_at IS NULL
+       AND i.revoked_at IS NULL
+       AND i.expires_at > now()
+       FOR UPDATE;
+    IF NOT FOUND THEN
+      RETURN false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM auth.users u
+                    WHERE u.id = actor AND u.email_verified AND lower(u.email) = invitation.email) THEN
+      RETURN false;
+    END IF;
+    -- Holding the role already is no reason to refuse: the invitation is still accepted, once.
+    INSERT INTO app.memberships (user_id, tenant_id, role)
+    VALUES (actor, invitation.tenant_id, invitation.role)
+    ON CONFLICT DO NOTHING;
+    UPDATE app.invitations i SET accepted_at = now(), accepted_by = actor WHERE i.id = invitation.id;
+    RETURN true;
+  END
+  $$;
+
+
+ALTER FUNCTION private.accept_invitation(token_hash text) OWNER TO aiontheballot_owner;
+
+--
 -- Name: active_tenant_has_operator(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1820,6 +1861,25 @@ CREATE FUNCTION private.party_logo_is_public_asset() RETURNS trigger
 
 
 ALTER FUNCTION private.party_logo_is_public_asset() OWNER TO aiontheballot_owner;
+
+--
+-- Name: pending_invitation(text); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.pending_invitation(token_hash text) RETURNS TABLE(email text, role app.tenant_role)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+    SELECT i.email, i.role
+      FROM app.invitations i
+     WHERE i.token_hash = pending_invitation.token_hash
+       AND i.accepted_at IS NULL
+       AND i.revoked_at IS NULL
+       AND i.expires_at > now()
+  $$;
+
+
+ALTER FUNCTION private.pending_invitation(token_hash text) OWNER TO aiontheballot_owner;
 
 --
 -- Name: platform_hostname_is_free(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -8659,6 +8719,14 @@ GRANT ALL ON FUNCTION app.unsubscribe(tenant uuid, token_hash text) TO aiontheba
 
 
 --
+-- Name: FUNCTION accept_invitation(token_hash text); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.accept_invitation(token_hash text) FROM PUBLIC;
+GRANT ALL ON FUNCTION private.accept_invitation(token_hash text) TO aiontheballot_admin;
+
+
+--
 -- Name: FUNCTION active_tenant_has_operator(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -8860,6 +8928,14 @@ GRANT ALL ON FUNCTION private.normalize_for_match(input text) TO aiontheballot_a
 --
 
 REVOKE ALL ON FUNCTION private.party_logo_is_public_asset() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION pending_invitation(token_hash text); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.pending_invitation(token_hash text) FROM PUBLIC;
+GRANT ALL ON FUNCTION private.pending_invitation(token_hash text) TO aiontheballot_admin;
 
 
 --

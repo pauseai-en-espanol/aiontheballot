@@ -3,9 +3,11 @@ import { createDatabase } from '@aiontheballot/db/client';
 import { createFileStore } from '@aiontheballot/db/file-store';
 import { captureException } from '@sentry/node';
 
+import { createInvitationSender } from './admin/invitations.js';
 import { createProfileSource } from './admin/profiles.js';
 import { buildApp } from './app.js';
 import { createAuth } from './auth/auth.js';
+import { createInvitedAccounts } from './auth/invited-accounts.js';
 import { loadConfig } from './config.js';
 import { createElectionSource } from './election-data.js';
 import { initErrorTracking } from './error-tracking.js';
@@ -80,6 +82,18 @@ const app = buildApp({
         : undefined,
     admin,
     profiles: authPool ? createProfileSource(authPool) : undefined,
+    // Invitations need sign-in's accounts and the platform's sender (PLAN R114, R115).
+    invitations:
+      config.auth && authPool && mailer
+        ? {
+            accounts: createInvitedAccounts({ ...config.auth, pool: authPool }),
+            send: createInvitationSender({
+              mailer,
+              adminOrigin: config.auth.adminOrigin,
+              platformName: config.auth.totpIssuer,
+            }),
+          }
+        : undefined,
   },
 });
 

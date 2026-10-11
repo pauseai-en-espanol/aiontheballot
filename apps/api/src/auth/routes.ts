@@ -1,10 +1,13 @@
 import type { Database } from '@aiontheballot/db/client';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 
+import type { InvitationSender } from '../admin/invitations.js';
 import type { ProfileSource } from '../admin/profiles.js';
+import type { InvitedAccounts } from './invited-accounts.js';
 
 import { adminDataRoutes } from '../admin/routes.js';
 import { type Auth, AUTH_BASE_PATH, TWO_FACTOR_COOKIE, VISITOR_ADDRESS_HEADER } from './auth.js';
+import { invitationRoutes } from './invitation-routes.js';
 import { actorOf, type FoundSession, stageOf } from './session.js';
 import { visitorAddress } from './visitor.js';
 
@@ -83,6 +86,8 @@ const hasCookie = (request: FastifyRequest, name: string): boolean =>
 export interface AdminRoutesOptions {
   /** Sign-in; without it every route here answers 503. */
   auth?: { auth: Auth; adminOrigin: string };
+  /** Invitations (A2, A3): the invited accounts, as Better Auth's role, and the email. Without them, none is sent. */
+  invitations?: { accounts: InvitedAccounts; send: InvitationSender };
   /** The aiontheballot_admin role's pool; without it the signed-in data routes answer 503. */
   admin?: Database;
   /** Members' names and emails, read as Better Auth's role; without it the members route answers 503. */
@@ -95,7 +100,7 @@ export interface AdminRoutesOptions {
  * mistake on a public host still reaches nothing. The admin's server-side calls name the admin host too.
  */
 export const adminRoutes =
-  ({ auth: signIn, admin, profiles }: AdminRoutesOptions) =>
+  ({ auth: signIn, admin, profiles, invitations }: AdminRoutesOptions) =>
   async (scope: FastifyInstance): Promise<void> => {
     if (!signIn) {
       scope.all('/*', async (_request, reply) =>
@@ -173,11 +178,17 @@ export const adminRoutes =
       return { stage, user: { id, name, email } };
     });
 
+    // Accepting an invitation, for whoever holds its link (invitation-routes.ts).
+    await scope.register(
+      invitationRoutes({ admin, accounts: invitations?.accounts, adminOrigin, findSession }),
+    );
+
     // Everything a signed-in user reads and writes (admin/routes.ts), always as an aal2 actor.
     await scope.register(
       adminDataRoutes({
         admin,
         profiles,
+        invitations,
         adminOrigin,
         actorFor: async (request) => actorOf(await findSession(request)),
       }),

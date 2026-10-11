@@ -165,3 +165,112 @@ describe('app.invitations retention', () => {
     expect(diffs[0]?.diff.new).toHaveProperty('token_hash');
   });
 });
+
+describe('accepting an invitation (editorial workflow A3; PLAN R114)', () => {
+  const INVITED = '0190f8c4-1a71-7000-8000-0000000000a1';
+  const STRANGER = '0190f8c4-1a71-7000-8000-0000000000a2';
+  const hashOf = (token: string) => `encode(sha256('${token}'), 'hex')`;
+
+  /** Accounts as Better Auth makes them, as the superuser: the invited email, verified or not, and another one. */
+  const accounts = async (client: pg.Client, { verified = true } = {}) => {
+    await client.query(
+      `INSERT INTO auth.users (id, name, email, email_verified)
+       VALUES ($1, 'Persona invitada', 'Persona-Invitada-A@example.org', $3),
+              ($2, 'Persona ajena', 'persona-ajena@example.org', true)`,
+      [INVITED, STRANGER, verified],
+    );
+  };
+
+  const pending = async (client: pg.Client, token: string) =>
+    (
+      await client.query<{ email: string; role: string }>(
+        `SELECT email, role FROM private.pending_invitation(${hashOf(token)})`,
+      )
+    ).rows;
+
+  const accept = async (client: pg.Client, token: string) =>
+    (
+      await client.query<{ done: boolean }>(
+        `SELECT private.accept_invitation(${hashOf(token)}) AS done`,
+      )
+    ).rows[0]?.done;
+
+  it('names the email and role of a pending invitation, and nothing for any other token', async () => {
+    await inRolledBackTransaction(async (client) => {
+      await client.query('SET LOCAL ROLE aiontheballot_admin');
+      expect(await pending(client, INVITATION_TOKENS.A)).toEqual([
+        { email: 'persona-invitada-a@example.org', role: 'editor' },
+      ]);
+      expect(await pending(client, REVOKED_INVITATION_TOKEN)).toEqual([]);
+      expect(await pending(client, 'un-token-inventado')).toEqual([]);
+      await client.query('RESET ROLE');
+      await expire(client, PENDING_A);
+      await client.query('SET LOCAL ROLE aiontheballot_admin');
+      expect(await pending(client, INVITATION_TOKENS.A)).toEqual([]);
+    });
+  });
+
+  it('accepts it for the account with the invited email, verified: the membership, once, at aal1', async () => {
+    await inRolledBackTransaction(async (client) => {
+      await accounts(client);
+      await client.query('SET LOCAL ROLE aiontheballot_admin');
+      await client.query(
+        `SELECT set_config('app.user_id', $1, true), set_config('app.aal', '1', true)`,
+        [INVITED],
+      );
+      expect(await accept(client, INVITATION_TOKENS.A)).toBe(true);
+      expect(await accept(client, INVITATION_TOKENS.A)).toBe(false);
+      await client.query('RESET ROLE');
+      const { rows } = await client.query(
+        `SELECT m.role, i.accepted_by FROM app.memberships m
+           JOIN app.invitations i ON i.tenant_id = m.tenant_id AND i.${PENDING_A}
+          WHERE m.user_id = $1 AND m.tenant_id = $2`,
+        [INVITED, TENANT_A],
+      );
+      expect(rows).toEqual([{ role: 'editor', accepted_by: INVITED }]);
+    });
+  });
+
+  it.each([
+    ['another account', { actor: STRANGER, verified: true }],
+    ['an account whose email is not verified', { actor: INVITED, verified: false }],
+    ['nobody', { actor: '', verified: true }],
+  ])('accepts nothing for %s', async (_name, { actor, verified }) => {
+    await inRolledBackTransaction(async (client) => {
+      await accounts(client, { verified });
+      await client.query('SET LOCAL ROLE aiontheballot_admin');
+      await client.query(`SELECT set_config('app.user_id', $1, true)`, [actor]);
+      expect(await accept(client, INVITATION_TOKENS.A)).toBe(false);
+      expect(await pending(client, INVITATION_TOKENS.A)).toHaveLength(1);
+    });
+  });
+
+  it('accepts nothing once it is revoked or expired', async () => {
+    await inRolledBackTransaction(async (client) => {
+      await accounts(client);
+      await expire(client, PENDING_A);
+      await client.query('SET LOCAL ROLE aiontheballot_admin');
+      await client.query(`SELECT set_config('app.user_id', $1, true)`, [INVITED]);
+      expect(await accept(client, INVITATION_TOKENS.A)).toBe(false);
+      expect(await accept(client, REVOKED_INVITATION_TOKEN)).toBe(false);
+    });
+  });
+
+  it.each(['aiontheballot_web', 'aiontheballot_worker', 'aiontheballot_auth'])(
+    'is not open to %s',
+    async (role) => {
+      expect(
+        await inRolledBackTransaction(async (client) => {
+          await client.query(`SET LOCAL ROLE ${role}`);
+          return errorCode(client, `SELECT * FROM private.pending_invitation('x')`);
+        }),
+      ).toBe('42501');
+      expect(
+        await inRolledBackTransaction(async (client) => {
+          await client.query(`SET LOCAL ROLE ${role}`);
+          return errorCode(client, `SELECT private.accept_invitation('x')`);
+        }),
+      ).toBe('42501');
+    },
+  );
+});

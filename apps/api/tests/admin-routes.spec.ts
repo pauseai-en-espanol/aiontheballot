@@ -875,3 +875,155 @@ describe('cells (editorial workflow §8)', () => {
     expect(answer.statusCode).toBe(422);
   });
 });
+
+describe('invitations (editorial workflow A2)', () => {
+  const sent: { email: string; role: string; locale: string; token: string }[] = [];
+  let failing = false;
+  /** Accounts by email, for the "already holds the role" check. */
+  const known = new Map<string, string>();
+  const inviting = Fastify();
+  void inviting.register(
+    adminDataRoutes({
+      admin,
+      profiles,
+      adminOrigin: ORIGIN,
+      invitations: {
+        accounts: {
+          accountId: async (email) => known.get(email),
+          create: async () => '',
+          remove: async () => undefined,
+        },
+        send: async (invitation) => {
+          if (failing) {
+            throw Object.assign(new Error('550 refused'), { responseCode: 550 });
+          }
+          sent.push(invitation);
+        },
+      },
+      actorFor: async (request) => {
+        const user = request.headers['x-test-user'];
+        return typeof user === 'string' ? { userId: user, aal: 2 } : undefined;
+      },
+    }),
+    { prefix: '/api' },
+  );
+  const call = (method: 'GET' | 'POST' | 'DELETE', url: string, as: string, body?: unknown) =>
+    inviting.inject({
+      method,
+      url,
+      headers: {
+        'x-test-user': as,
+        ...(method === 'GET' ? {} : { origin: ORIGIN }),
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { payload: JSON.stringify(body) }),
+    });
+  const url = '/api/t/test-a/invitations';
+  const stateOf = async (email: string) =>
+    (
+      await sql<{ state: string }>`
+        SELECT CASE WHEN revoked_at IS NOT NULL THEN 'revoked' WHEN accepted_at IS NOT NULL THEN 'accepted'
+                    ELSE 'pending' END AS state
+          FROM app.invitations WHERE email = ${email} ORDER BY created_at`.execute(owner)
+    ).rows.map((r) => r.state);
+  const cleanUp = (email: string) =>
+    sql`DELETE FROM app.invitations WHERE email = ${email}`.execute(owner);
+
+  afterAll(async () => {
+    await inviting.close();
+  });
+
+  it("are listed to the tenant's country admins, and to nobody else", async () => {
+    const listed = await call('GET', url, USERS.countryAdminA);
+    expect(listed.json()).toMatchObject({ canInvite: true, mailReady: true });
+    expect(
+      listed.json<{ invitations: { email: string }[] }>().invitations.map((i) => i.email),
+    ).toContain('persona-invitada-a@example.org');
+    expect((await call('GET', url, USERS.editorA)).json()).toMatchObject({
+      invitations: [],
+      canInvite: false,
+    });
+  });
+
+  it('send a link with a fresh token, stored only as its hash, replacing a pending one', async () => {
+    const email = `invitada-${crypto.randomUUID()}@example.org`;
+    try {
+      sent.length = 0;
+      const first = await call('POST', url, USERS.countryAdminA, {
+        email: `  ${email.toUpperCase()} `,
+        role: 'editor',
+      });
+      expect(first.statusCode).toBe(201);
+      expect(sent).toEqual([
+        {
+          email,
+          role: 'editor',
+          locale: 'es',
+          site: expect.any(String),
+          inviter: expect.any(String),
+          token: expect.stringMatching(/^[\w-]{43}$/),
+        },
+      ]);
+      const { rows } = await sql<{ n: number }>`
+        SELECT count(*)::int AS n FROM app.invitations
+         WHERE email = ${email}
+           AND token_hash = encode(sha256(convert_to(${sent[0]?.token ?? ''}, 'UTF8')), 'hex')`.execute(
+        owner,
+      );
+      expect(rows[0]?.n).toBe(1);
+      await call('POST', url, USERS.countryAdminA, { email, role: 'editor' });
+      expect(await stateOf(email)).toEqual(['revoked', 'pending']);
+    } finally {
+      await cleanUp(email);
+    }
+  });
+
+  it("revoke the invitation again when its email can't be sent, so nothing is pending", async () => {
+    const email = `fallida-${crypto.randomUUID()}@example.org`;
+    try {
+      failing = true;
+      const answer = await call('POST', url, USERS.countryAdminA, { email, role: 'reviewer' });
+      expect(answer.statusCode).toBe(502);
+      expect(answer.json()).toEqual({ error: 'mailFailed' });
+      expect(await stateOf(email)).toEqual(['revoked']);
+    } finally {
+      failing = false;
+      await cleanUp(email);
+    }
+  });
+
+  it('refuse someone who already holds the role, and anyone but a country admin', async () => {
+    known.set('persona-editora@example.org', USERS.editorA);
+    const holds = await call('POST', url, USERS.countryAdminA, {
+      email: 'persona-editora@example.org',
+      role: 'editor',
+    });
+    expect(holds.statusCode).toBe(409);
+    expect(holds.json()).toEqual({ error: 'holdsRole' });
+    const email = `no-${crypto.randomUUID()}@example.org`;
+    try {
+      expect((await call('POST', url, USERS.editorA, { email, role: 'editor' })).statusCode).toBe(
+        403,
+      );
+    } finally {
+      await cleanUp(email);
+    }
+  });
+
+  it('are revoked while pending, and deleted only once decided', async () => {
+    const email = `borrar-${crypto.randomUUID()}@example.org`;
+    try {
+      await call('POST', url, USERS.countryAdminA, { email, role: 'reviewer' });
+      const { rows } = await sql<{ id: string }>`
+        SELECT id FROM app.invitations WHERE email = ${email}`.execute(owner);
+      const id = rows[0]?.id ?? '';
+      expect((await call('DELETE', `${url}/${id}`, USERS.countryAdminA)).statusCode).toBe(403);
+      expect((await call('POST', `${url}/${id}/revoke`, USERS.countryAdminA)).statusCode).toBe(204);
+      expect((await call('POST', `${url}/${id}/revoke`, USERS.countryAdminA)).statusCode).toBe(404);
+      expect((await call('DELETE', `${url}/${id}`, USERS.countryAdminA)).statusCode).toBe(204);
+      expect(await stateOf(email)).toEqual([]);
+    } finally {
+      await cleanUp(email);
+    }
+  });
+});
