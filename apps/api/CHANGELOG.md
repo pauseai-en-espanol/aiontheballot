@@ -1,5 +1,12 @@
 # @aiontheballot/api
 
+## 0.8.3
+
+### Patch Changes
+
+- Updated dependencies [94c11b3]
+  - @aiontheballot/observability@0.2.1
+
 ## 0.8.2
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@aiontheballot/admin",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "description": "Admin: editorial workflow on the central admin host",
   "type": "module",

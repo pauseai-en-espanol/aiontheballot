@@ -1,5 +1,13 @@
 # @aiontheballot/observability
 
+## 0.2.1
+
+### Patch Changes
+
+- 94c11b3: The public site loads each tenant's Plausible script from its own host and relays the script's events
+  (`/_relay/views.js`, `/_relay/views`; PLAN R83): every Plausible feature, no request to another host, no cookie. It
+  counts nothing until the deployment sets `PLAUSIBLE_URL` and `PLAUSIBLE_SITES`.
+
 ## 0.2.0
 
 ### Minor Changes

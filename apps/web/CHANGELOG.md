@@ -1,5 +1,24 @@
 # @aiontheballot/web
 
+## 0.9.0
+
+### Minor Changes
+
+- 94c11b3: The public site loads each tenant's Plausible script from its own host and relays the script's events
+  (`/_relay/views.js`, `/_relay/views`; PLAN R83): every Plausible feature, no request to another host, no cookie. It
+  counts nothing until the deployment sets `PLAUSIBLE_URL` and `PLAUSIBLE_SITES`.
+
+### Patch Changes
+
+- 874daf8: The coming-soon page gives the next election's date in full on a line of its own ("Domingo, 29 de noviembre de 2026"),
+  says "Una iniciativa de" once, in the footer, and no longer offers the operator's newsletter as "Avísame cuando se
+  publique" (PLAN R82). The translator formats dates in UTC, so an election's date never moves a day with the server's
+  time zone.
+- Updated dependencies [94c11b3]
+- Updated dependencies [874daf8]
+  - @aiontheballot/observability@0.2.1
+  - @aiontheballot/i18n@0.5.1
+
 ## 0.8.2
 
 ### Patch Changes

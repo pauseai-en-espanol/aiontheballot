@@ -1,5 +1,14 @@
 # @aiontheballot/admin
 
+## 0.2.8
+
+### Patch Changes
+
+- Updated dependencies [94c11b3]
+- Updated dependencies [874daf8]
+  - @aiontheballot/observability@0.2.1
+  - @aiontheballot/i18n@0.5.1
+
 ## 0.2.7
 
 ### Patch Changes
