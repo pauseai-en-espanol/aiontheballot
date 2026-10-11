@@ -493,6 +493,7 @@
       "archiveFrozen": "Clear the freeze window first: an archived election can't change it, and corrections would stay frozen with it.",
       "endBeforeStart": "The end must be after the start.",
       "slugMismatch": "That isn't the election's slug. Type it exactly."
-    }
+    },
+    "language": "Language"
   }
 }

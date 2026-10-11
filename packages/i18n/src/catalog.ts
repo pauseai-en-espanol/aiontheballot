@@ -15,5 +15,8 @@ export type Locale = (typeof LOCALES)[number];
 
 export const messages: Record<Locale, Messages> = { en, es };
 
+/** Each UI language named in itself, as a language switch offers it, whatever the page's language. */
+export const LOCALE_NAMES: Readonly<Record<Locale, string>> = { en: 'English', es: 'Español' };
+
 export const isLocale = (value: unknown): value is Locale =>
   typeof value === 'string' && (LOCALES as readonly string[]).includes(value);

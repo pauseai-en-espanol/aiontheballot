@@ -601,3 +601,21 @@ export const checkItem = css({
   fontWeight: 'bold',
   '&[data-done]': { fontWeight: 'normal', color: 'fg.muted' },
 });
+
+/** The end of every page: the language switch. */
+export const footer = css({
+  maxWidth: '72rem',
+  marginInline: 'auto',
+  paddingInline: { base: '4', md: '6' },
+  paddingBlock: '6',
+  borderBlockStartWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'border.subtle',
+});
+
+export const languageSwitch = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+  gap: '3',
+});

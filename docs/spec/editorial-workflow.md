@@ -52,7 +52,7 @@ member policy returns nothing (ADR-0002 §9).
    never used to show a rating. [UI]
 6. **Accessibility:** WCAG 2.2 AA, axe in CI, keyboard-complete forms and dialogs (Ark UI). [UI]
 7. **UI language:** the admin is in Spanish or English (the browser's choice, with a switch). Content is entered per
-   locale regardless of the UI language. [UI]
+   locale regardless of the UI language. [UI] _Built (PLAN R108)._
 
 ## 3. Access
 
@@ -117,7 +117,8 @@ _As a member, I sign in with a password and a second factor._
    sign-out. [API]
 5. Failed attempts are rate limited. [API: Better Auth's limiter, PLAN R88]
 6. The session cookie is host-only (`__Host-`), `Secure`, `HttpOnly` and `SameSite=Lax`, on the admin host only. The
-   public site never sets a cookie. [API; ADR-0002 §15]
+   public site never sets a cookie. [API; ADR-0002 §15] The admin's only other cookie, the language chosen with the
+   switch (§2.7), has the same attributes and grants nothing (PLAN R108).
 
 ### A5. Passwords and lost factors
 

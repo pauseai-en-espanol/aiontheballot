@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import type { PropsWithChildren } from 'react';
 
+import { getTranslator, LOCALE_NAMES, LOCALES } from '@aiontheballot/i18n/messages';
 import { connection } from 'next/server';
 
 import { getLocale } from '@/locale';
+import { LanguageSwitch } from '@/ui/LanguageSwitch';
 
 import './globals.css';
 
@@ -25,11 +27,27 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-// The language the browser asks for (editorial workflow §2.7), so screen readers read the page in it.
-const RootLayout = async ({ children }: Readonly<PropsWithChildren>) => (
-  <html lang={await getLocale()}>
-    <body>{children}</body>
-  </html>
-);
+// The language chosen with the switch, else the browser's (editorial workflow §2.7), so screen readers read the page in
+// it. The switch sits at the end of every page but enrolment, whose secret and backup codes a reload would lose.
+const NO_SWITCH = ['/two-factor/enrol'];
+
+const RootLayout = async ({ children }: Readonly<PropsWithChildren>) => {
+  const locale = await getLocale();
+  const t = getTranslator(locale);
+  return (
+    <html lang={locale}>
+      <body>
+        {children}
+        <LanguageSwitch
+          label={t('admin.language')}
+          currentLabel={t('admin.shell.current')}
+          current={locale}
+          languages={LOCALES.map((code) => ({ code, name: LOCALE_NAMES[code] }))}
+          hiddenOn={NO_SWITCH}
+        />
+      </body>
+    </html>
+  );
+};
 
 export default RootLayout;

@@ -493,6 +493,7 @@
       "archiveFrozen": "Quita antes el periodo de congelación: una elección archivada no puede cambiarlo, y las correcciones quedarían congeladas con él.",
       "endBeforeStart": "El final debe ser posterior al comienzo.",
       "slugMismatch": "Ese no es el identificador de la elección. Escríbelo exactamente."
-    }
+    },
+    "language": "Idioma"
   }
 }

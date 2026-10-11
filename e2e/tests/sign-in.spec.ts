@@ -128,6 +128,8 @@ test.describe('admin sign-in (editorial workflow A4)', () => {
     await expect(page).toHaveURL(`${ADMIN_URL}/two-factor/enrol`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(en.enrol.title);
     await expectAccessible(page);
+    // No language switch here: a reload would lose the secret and the backup codes, which are shown once.
+    await expect(page.getByRole('form', { name: messages.en.admin.language })).toHaveCount(0);
 
     await page.getByLabel(en.enrol.password, { exact: true }).fill(PASSWORD);
     await page.getByRole('button', { name: en.enrol.begin }).click();
@@ -325,6 +327,20 @@ test.describe('admin sign-in (editorial workflow A4)', () => {
     await expect(page.getByLabel(en.setPassword.password, { exact: true })).toBeVisible();
     await expect.poll(() => page.url()).toBe(`${ADMIN_URL}/set-password`);
     await expectAccessible(page);
+    // Its language can change on the way: the page redraws in place, so the token, which only the page holds, and what
+    // was typed stay.
+    await page.getByLabel(en.setPassword.password, { exact: true }).fill(PASSWORD);
+    await page
+      .getByRole('form', { name: messages.en.admin.language })
+      .getByRole('button', { name: 'Español' })
+      .click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(es.setPassword.title);
+    await expect(page.getByLabel(es.setPassword.password, { exact: true })).toHaveValue(PASSWORD);
+    await page
+      .getByRole('form', { name: messages.es.admin.language })
+      .getByRole('button', { name: 'English' })
+      .click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(en.setPassword.title);
     const password = page.getByLabel(en.setPassword.password, { exact: true });
     const confirm = page.getByLabel(en.setPassword.confirm, { exact: true });
     await password.fill(PASSWORD);

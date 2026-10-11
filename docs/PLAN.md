@@ -943,6 +943,26 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   it is D11). A freeze is taken only as an ISO 8601 instant with its offset, never `infinity` or a year JavaScript can't
   read back. The status only moves forward, as the database allows.
 
+**M2 admin: its language (Dani's request: English by default, Spanish too):**
+
+- **R108. A language switch at the foot of every admin page,** over the browser's language that the admin already
+  followed (R92; every screen's words come from `packages/i18n`, English as the source and Spanish required by the type
+  check). The choice is a cookie on the admin host only, `__Host-locale` (Secure, `Path=/`, no `Domain`, HttpOnly,
+  `SameSite=Lax`, a year; outside Better Auth's `__Host-admin.*` names), set by a plain form posting to the admin's own
+  `/locale`. That works before scripts load and goes back to the page it came from; with scripts, the form posts in the
+  background and the page redraws in place (`router.refresh`), so what was typed stays, including the set-password
+  link's token, which only the page holds (R93), and focus moves to the language now in use; if that post fails, the
+  plain form posts after all, so the browser shows what went wrong. The switch, and its footer, are left off
+  enrolment, where a reload would lose the secret and the backup codes shown once (R92). Each language is named in
+  itself and marked as written in it, and the one in use is also said in words. Without a choice, the browser's
+  language decides, and English when it asks for neither. Another language is a new messages file plus its name in
+  `LOCALE_NAMES`.
+  - `/locale` takes posts from the admin's own pages only (`Sec-Fetch-Site: same-origin`, or, from a browser without
+    Fetch Metadata, an `Origin` that is this host), as a URL-encoded form of at most 4 KB, read with a cap. The page to
+    go back to must be a path made of a path's own characters and well-formed escapes, at most 2 KB: a browser drops
+    tabs and newlines from a `Location` and reads `\` as `/`, so a looser check could send someone to
+    `//another-host`. The cookie is a preference that grants nothing; the public site still sets no cookie.
+
 ## Open decisions for Dani
 
 D1–D5 are decided (see [Answered](#answered)). D7 and D8 came with the file volume (ADR-0004), D9 with the live
