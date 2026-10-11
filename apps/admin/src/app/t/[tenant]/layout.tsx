@@ -11,6 +11,7 @@ import { siteName } from '@/localized';
 import { requireStage } from '@/session';
 import { SectionNav } from '@/shell/SectionNav';
 import { SiteSwitcher } from '@/shell/SiteSwitcher';
+import { Announcer } from '@/ui/Announcer';
 import { Lang } from '@/ui/Lang';
 import * as styles from '@/ui/styles';
 
@@ -78,11 +79,13 @@ const TenantLayout = async ({
         label={t('admin.shell.nav')}
         sections={[
           { href: base, label: t('admin.shell.dashboard') },
+          { href: `${base}/elections`, label: t('admin.shell.elections'), also: [`${base}/e/`] },
           { href: `${base}/members`, label: t('admin.shell.members') },
           { href: `${base}/settings`, label: t('admin.shell.settings') },
         ]}
       />
       <main id="main" tabIndex={-1} className={styles.main}>
+        <Announcer />
         {children}
       </main>
     </>

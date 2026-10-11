@@ -68,6 +68,25 @@ describe('app.slug', () => {
       expect(await castErrors('app.slug', [value])).toEqual([CHECK_VIOLATION]);
     },
   );
+
+  // A DNS label's length (PLAN R101): a slug is a path segment of every public and share-image address.
+  it('takes at most 63 characters', async () => {
+    const longest = `${'a'.repeat(30)}-${'b'.repeat(32)}`;
+    expect(longest).toHaveLength(63);
+    expect(await castErrors('app.slug', [longest, `${longest}c`])).toEqual([null, CHECK_VIOLATION]);
+  });
+
+  it('names its length limit when it refuses a slug for it', async () => {
+    const constraint = await inRolledBackTransaction(async (client) => {
+      try {
+        await client.query(`SELECT '${'a'.repeat(64)}'::app.slug`);
+        return null;
+      } catch (error) {
+        return (error as { constraint?: string }).constraint ?? null;
+      }
+    });
+    expect(constraint).toBe('slug_length');
+  });
 });
 
 describe('app.locale', () => {

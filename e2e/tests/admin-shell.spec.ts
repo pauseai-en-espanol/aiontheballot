@@ -136,7 +136,12 @@ test.describe('choosing a site (editorial workflow A6)', () => {
       await expect(page.getByText('Tus roles aquí: coordinación.')).toBeVisible();
       await expect(
         page.getByRole('navigation', { name: es.admin.shell.nav }).getByRole('link'),
-      ).toHaveText([es.admin.shell.dashboard, es.admin.shell.members, es.admin.shell.settings]);
+      ).toHaveText([
+        es.admin.shell.dashboard,
+        es.admin.shell.elections,
+        es.admin.shell.members,
+        es.admin.shell.settings,
+      ]);
       await expectAccessible(page);
     });
   });

@@ -57,10 +57,11 @@ lives. Any example data here is fictional.
     whose values are non-blank strings.
   - The tenant's default locale must be present before anything goes public: at publish time, when an election goes
     live, and when a change request is approved.
-- **Slugs:** the domain `app.slug`, lowercase, matching `^[a-z0-9]+(-[a-z0-9]+)*$`. Election, party and criterion
-  slugs are fixed once the election leaves `draft`, because share images carry their URLs. An election slug is never
-  locale-shaped (`^[a-z]{2}(-[a-z]{2})?$`), since `/ca/…` is a locale prefix, and never one of the paths the public
-  site serves itself (`brand`, `healthz`, `og`: `RESERVED_ELECTION_SLUGS` in `packages/domain`).
+- **Slugs:** the domain `app.slug`, lowercase, matching `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 63 characters (PLAN
+  R101). Election, party and criterion slugs are fixed once the election leaves `draft`, because share images carry
+  their URLs. An election slug is never locale-shaped (`^[a-z]{2}(-[a-z]{2})?$`), since `/ca/…` is a locale prefix,
+  and never one of the paths the public site serves itself (`brand`, `healthz`, `og`: `RESERVED_ELECTION_SLUGS` in
+  `packages/domain`).
 - **Domains** (`app.localized`, `app.slug`, `app.locale`) check with built-in functions only, so writing them needs
   no `EXECUTE` grant to a runtime role. The illustrative SQL below writes their base types, `jsonb` and `text`.
 - **Emails:** stored lowercased (`check (email = lower(email))`).
@@ -130,7 +131,7 @@ create table app.tenants (
   methodology_kind   app.methodology_kind not null,       -- BRIEF §3 invariant 6: platform_admin only
   active             boolean not null default false,
   live_edits_need_second_approver  boolean not null default false,  -- platform_admin only (ADR-0002 §12)
-  report_retention_days  int not null check (report_retention_days > 0),  -- the value is the operator's (PLAN Q7)
+  report_retention_days  int not null check (report_retention_days between 1 and 36500),  -- the operator's (Q7, R102)
   llm_monthly_cap_usd    numeric(10, 2) not null default 0,               -- 0 means LLM assistance is off
   created_at         timestamptz not null default now(),
   check (default_locale = any (enabled_locales))

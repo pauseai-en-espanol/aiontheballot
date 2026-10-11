@@ -50,6 +50,19 @@ describe('app.tenants', () => {
     expect(await tenantErrors([{ theme: literal(theme) }])).toEqual([CHECK_VIOLATION]);
   });
 
+  // A century at most (PLAN R102): submit_report adds it to the day a report arrives, which must stay a date.
+  it('keeps reports between one day and a century', async () => {
+    expect(
+      await tenantErrors([
+        { report_retention_days: '1' },
+        { report_retention_days: '36500' },
+        { report_retention_days: '0' },
+        { report_retention_days: '36501' },
+        { report_retention_days: '2147483647' },
+      ]),
+    ).toEqual([null, null, CHECK_VIOLATION, CHECK_VIOLATION, CHECK_VIOLATION]);
+  });
+
   it('requires the default locale to be enabled, and every locale to be well formed', async () => {
     expect(
       await tenantErrors([

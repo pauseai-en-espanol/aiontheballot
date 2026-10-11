@@ -114,7 +114,12 @@ test.describe('public routing (ADR-0002), against the fictional seeds', () => {
     const { tenants } = (await response.json()) as {
       tenants: { tenant: { slug: string }; hostnames: { hostname: string }[] }[];
     };
-    expect(tenants.map((t) => t.tenant.slug)).toEqual(['ejemplo-a', 'ejemplo-b']);
+    // A site another test makes for itself (e2e-…, purged after it) may be active meanwhile; the seeds' are exact, and
+    // the hostnames below are checked across every tenant listed.
+    expect(tenants.map((t) => t.tenant.slug).filter((slug) => !slug.startsWith('e2e-'))).toEqual([
+      'ejemplo-a',
+      'ejemplo-b',
+    ]);
     expect(tenants.flatMap((t) => t.hostnames.map((h) => h.hostname)).sort()).toEqual(
       [SEED_HOSTS.alias, SEED_HOSTS.canonical].sort(),
     );

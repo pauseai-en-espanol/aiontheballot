@@ -31,3 +31,27 @@ export const LIVE_A = {
 } as const;
 export const DRAFT_A = { slug: 'autonomicas-de-ejemplo' } as const;
 export const LIVE_B = { id: fixture(7, 5) } as const;
+
+/** A's elections of every kind, each with a methodology, a reviewer, two parties and two criteria, but the empty one. */
+const election = (n: number, slug: string) => ({
+  id: fixture(7, n),
+  slug,
+  methodology: fixture(8, n),
+  reviewer: fixture(9, n),
+  parties: [fixture(7, 20 + n), fixture(7, 40 + n)],
+  criteria: [fixture(8, 20 + n), fixture(8, 40 + n)],
+});
+export const ELECTIONS_A = {
+  live: election(1, 'generales-de-ejemplo'),
+  /** Regional (XA-01) and announced. */
+  draft: election(2, 'autonomicas-de-ejemplo'),
+  archived: election(3, 'europeas-de-ejemplo'),
+  /** A municipal draft with no structure at all. */
+  empty: election(4, 'municipales-de-ejemplo'),
+} as const;
+
+/** A's operator, which its demands methodologies name. */
+export const OPERATOR_A = fixture(3, 1);
+
+/** A fictional brand asset every tenant may select. */
+export const SHARED_BRAND_ASSET = fixture(4, 1);

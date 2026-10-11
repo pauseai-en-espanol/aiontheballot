@@ -71,34 +71,64 @@ export const asOwner = async (sql: string, values: unknown[] = []): Promise<numb
 
 /**
  * A tenant of the test's own, so what it changes (members, settings, elections) touches nothing another test reads:
- * fictional, inactive (it needs no operator then), in Spanish and English, its name in both unless `english` is
- * false. Remove it with `purgeTenant`.
+ * fictional, in Spanish and English, its name in both unless `english` is false; inactive unless `active`, with a
+ * fictional operator when asked or when active. Remove it with `purgeTenant`.
  */
-export const createTenant = async ({ english = true }: { english?: boolean } = {}) => {
+export const createTenant = async ({
+  english = true,
+  operator = false,
+  active = false,
+}: { english?: boolean; operator?: boolean; active?: boolean } = {}) => {
   const owner = pool('DATABASE_URL');
+  const client = await owner.connect();
   try {
     const slug = `e2e-${crypto.randomUUID().slice(0, 8)}`;
     const name = {
       es: `Sitio de prueba ${slug}`,
       ...(english ? { en: `Test site ${slug}` } : {}),
     };
-    const { rows } = await owner.query<{ id: string }>(
+    // One transaction: an active tenant needs its operator by the time it commits (a deferred check).
+    await client.query('BEGIN');
+    const { rows } = await client.query<{ id: string }>(
       `INSERT INTO app.tenants (slug, country_code, default_locale, enabled_locales, display_name,
-                                methodology_kind, report_retention_days)
-       VALUES ($1, 'XE', 'es', '{es,en}', $2, 'demands', 365) RETURNING id`,
-      [slug, name],
+                                methodology_kind, report_retention_days, active)
+       VALUES ($1, 'XE', 'es', '{es,en}', $2, 'demands', 365, $3) RETURNING id`,
+      [slug, name, active],
     );
-    return { id: rows[0]?.id ?? '', slug, name };
+    const id = rows[0]?.id ?? '';
+    // A fictional operator, for what names one (a demands methodology, an active tenant). The purge leaves
+    // organizations: purgeTenant removes this one after it.
+    let operatorId: string | undefined;
+    if (operator || active) {
+      const org = await client.query<{ id: string }>(
+        `INSERT INTO app.organizations (display_name, legal_name) VALUES ($1, $2) RETURNING id`,
+        [{ es: `Organización de prueba ${slug}` }, `Organización de prueba ${slug}`],
+      );
+      operatorId = org.rows[0]?.id;
+      await client.query(
+        `INSERT INTO app.tenant_organizations (tenant_id, organization_id, role) VALUES ($1, $2, 'operator')`,
+        [id, operatorId],
+      );
+    }
+    await client.query('COMMIT');
+    return { id, slug, name, operatorId };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
   } finally {
+    client.release();
     await owner.end();
   }
 };
 
 /** Removes a test's tenant and everything in it, as the owner removes a tenant (ADR-0002 §14). */
-export const purgeTenant = async (id: string) => {
+export const purgeTenant = async (id: string, operatorId?: string) => {
   const owner = pool('DATABASE_URL');
   try {
     await owner.query('SELECT private.purge_tenant($1)', [id]);
+    if (operatorId) {
+      await owner.query('DELETE FROM app.organizations WHERE id = $1', [operatorId]);
+    }
   } finally {
     await owner.end();
   }

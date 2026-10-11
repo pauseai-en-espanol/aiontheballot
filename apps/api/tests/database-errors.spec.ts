@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { databaseRefusal } from '../src/database-errors.js';
 import { inRolledBackTransaction } from './db.js';
-import { DRAFT_A, LIVE_A, USERS } from './fixtures.js';
+import { DRAFT_A, LIVE_A, SHARED_BRAND_ASSET, TENANT_A, USERS } from './fixtures.js';
 
 /** As `userId` through `role`, the way withActor sets it. */
 const actAs = async (trx: Transaction<DB>, role: string, userId: string = USERS.noMembership) => {
@@ -72,11 +72,14 @@ describe('a database refusal, as Postgres raises it', () => {
   it("reports a limit of Postgres's own, such as an index entry too large, as a fault", async () => {
     const error = await inRolledBackTransaction(async (trx) => {
       await actAs(trx, 'aiontheballot_admin', USERS.countryAdminA);
-      // A slug long and varied enough that its unique index can't hold it, even compressed.
-      const slug = Array.from({ length: 1500 }, (_, i) =>
-        ((i * 7919) % 1296).toString(36).padStart(2, '0'),
-      ).join('-');
-      return sql`UPDATE app.elections SET slug = ${slug} WHERE slug = ${DRAFT_A.slug}`
+      // A brand slot's name long and varied enough that its index can't hold it, even compressed. (Slugs, which this
+      // used to take, now stop at 63 characters: migration slug_length.)
+      const slot = Array.from({ length: 1500 }, (_, i) => {
+        const n = (i * 7919) % 676;
+        return String.fromCharCode(97 + Math.floor(n / 26), 97 + (n % 26));
+      }).join('_');
+      return sql`INSERT INTO app.tenant_brand_selections (tenant_id, slot, brand_asset_id)
+                 VALUES (${TENANT_A}, ${slot}, ${SHARED_BRAND_ASSET})`
         .execute(trx)
         .then(
           () => undefined,

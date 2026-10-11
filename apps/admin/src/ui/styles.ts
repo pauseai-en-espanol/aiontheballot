@@ -517,3 +517,87 @@ export const prefixed = css({
   gap: '1',
   fontFamily: 'mono',
 });
+
+/** An election's sections: a row of links inside the page, the current one marked as in the site's bar. */
+export const subNav = css({
+  marginBlock: '4',
+  borderBlockEndWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'border.subtle',
+});
+
+export const section = css({ marginBlockStart: '2' });
+
+/** A short label above a heading: where the page sits. */
+export const eyebrow = css({
+  color: 'fg.muted',
+  fontSize: 'sm',
+  fontWeight: 'bold',
+  marginBlockEnd: '1',
+});
+
+export const confirm = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2',
+  alignItems: 'flex-start',
+});
+
+/** A consequence to notice: bold and marked with a sign, never by colour alone. */
+export const warning = css({ fontWeight: 'bold', fontSize: 'sm', color: 'fg.default' });
+
+export const colourInput = css({
+  width: '16',
+  height: '11',
+  padding: '1',
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'border.default',
+  borderRadius: 'md',
+  bg: 'bg.canvas',
+  cursor: 'pointer',
+  _focusVisible: focusRing,
+});
+
+/** The short title's field is no wider than the public table's column it heads (W22). */
+export const shortTitle = css({ maxWidth: '14rem' });
+
+export const ordered = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2',
+  listStyle: 'none',
+  marginBlockEnd: '4',
+});
+
+export const orderedItem = css({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '3',
+  padding: '3',
+  borderWidth: '1px',
+  borderStyle: 'solid',
+  borderColor: 'border.subtle',
+  borderRadius: 'md',
+});
+
+export const orderedName = css({ display: 'flex', flexDirection: 'column', gap: '1' });
+
+export const checklist = css({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '2',
+  listStyle: 'none',
+  marginBlockEnd: '2',
+});
+
+/** A checklist item: its sign and its words say whether it is done; the missing ones are bold too. */
+export const checkItem = css({
+  display: 'flex',
+  gap: '2',
+  alignItems: 'baseline',
+  fontWeight: 'bold',
+  '&[data-done]': { fontWeight: 'normal', color: 'fg.muted' },
+});

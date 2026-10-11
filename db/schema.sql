@@ -334,7 +334,8 @@ ALTER TYPE app.review_event_kind OWNER TO aiontheballot_owner;
 --
 
 CREATE DOMAIN app.slug AS text
-	CONSTRAINT slug_check CHECK ((VALUE ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text));
+	CONSTRAINT slug_check CHECK ((VALUE ~ '^[a-z0-9]+(-[a-z0-9]+)*$'::text))
+	CONSTRAINT slug_length CHECK ((char_length(VALUE) <= 63));
 
 
 ALTER DOMAIN app.slug OWNER TO aiontheballot_owner;
@@ -3608,6 +3609,7 @@ CREATE TABLE app.tenants (
     CONSTRAINT tenants_country_code_check CHECK ((country_code ~ '^[A-Z]{2}$'::text)),
     CONSTRAINT tenants_llm_monthly_cap_usd_check CHECK ((llm_monthly_cap_usd >= (0)::numeric)),
     CONSTRAINT tenants_report_retention_days_check CHECK ((report_retention_days > 0)),
+    CONSTRAINT tenants_report_retention_days_max CHECK ((report_retention_days <= 36500)),
     CONSTRAINT theme_is_colours CHECK (
 CASE
     WHEN (jsonb_typeof(theme) = 'object'::text) THEN (NOT jsonb_path_exists(theme, '$.keyvalue()?((!(@."key" like_regex "^[a-z]+(_[a-z]+)*$") || @."value".type() != "string") || !(@."value" like_regex "^#[0-9a-f]{6}$"))'::jsonpath))

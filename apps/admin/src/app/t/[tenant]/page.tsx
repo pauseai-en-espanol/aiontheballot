@@ -57,6 +57,12 @@ const Dashboard = async ({ params }: Params) => {
       <h2 className={styles.h2}>{t('admin.dashboard.sections')}</h2>
       <ul className={styles.cards}>
         <li className={styles.card}>
+          <Link className={styles.cardLink} href={`${base}/elections`}>
+            {t('admin.shell.elections')}
+          </Link>
+          <span className={styles.muted}>{t('admin.dashboard.electionsIntro')}</span>
+        </li>
+        <li className={styles.card}>
           <Link className={styles.cardLink} href={`${base}/members`}>
             {t('admin.shell.members')}
           </Link>

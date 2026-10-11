@@ -300,6 +300,8 @@ _As a country admin, I make the election public. Every cell without a published 
    by editors and country admins. [DB: RLS]
 2. Anything that still references the row (cells, sources) must go first. The screen lists what blocks the delete.
    [DB: foreign keys; UI]
+3. _Built (PLAN R101–R107):_ E1–E8, with P1's four-eyes setting; the delete screen says what to delete first rather
+   than listing it; drag-and-drop ordering waits (keyboard buttons instead, R104).
 
 ## 7. Sources
 

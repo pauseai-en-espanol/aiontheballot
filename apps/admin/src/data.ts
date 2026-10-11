@@ -57,7 +57,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
  * no tenant or election can have). A session that ended since the page began signs in again; anything else is a
  * fault.
  */
-const read = async (path: string): Promise<unknown> => {
+export const readApi = async (path: string): Promise<unknown> => {
   const { status, body } = await getFromApi(path, await forwardedRequest());
   if (status === 200) {
     return body;
@@ -81,19 +81,19 @@ const expect = <T>(value: unknown, keys: readonly string[], what: string): T => 
 /** The tenants the user may open (A6), and whether they are a platform admin. */
 export const getTenants = cache(
   async (): Promise<{ tenants: TenantSummary[]; platformAdmin: boolean }> =>
-    expect(await read('/api/tenants'), ['tenants', 'platformAdmin'], 'the tenants'),
+    expect(await readApi('/api/tenants'), ['tenants', 'platformAdmin'], 'the tenants'),
 );
 
-const tenantPath = (slug: string) => `/api/t/${encodeURIComponent(slug)}`;
+export const tenantPath = (slug: string) => `/api/t/${encodeURIComponent(slug)}`;
 
 /** A tenant the user may open, or undefined (a 404 page). */
 export const getTenant = cache(async (slug: string): Promise<TenantOverview | undefined> => {
-  const body = await read(tenantPath(slug));
+  const body = await readApi(tenantPath(slug));
   return body === undefined ? undefined : expect(body, ['tenant', 'roles'], 'a tenant');
 });
 
 export const getMembers = cache(async (slug: string): Promise<MemberList | undefined> => {
-  const body = await read(`${tenantPath(slug)}/members`);
+  const body = await readApi(`${tenantPath(slug)}/members`);
   return body === undefined ? undefined : expect(body, ['members', 'canManage'], 'the members');
 });
 
@@ -122,7 +122,7 @@ export interface DocumentVersion {
 /** Every version of the tenant's texts, newest first in each kind, and whether the user may write them. */
 export const getDocuments = cache(
   async (slug: string): Promise<{ documents: DocumentVersion[]; canEdit: boolean } | undefined> => {
-    const body = await read(`${tenantPath(slug)}/documents`);
+    const body = await readApi(`${tenantPath(slug)}/documents`);
     return body === undefined ? undefined : expect(body, ['documents', 'canEdit'], 'the texts');
   },
 );

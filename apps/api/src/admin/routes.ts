@@ -12,8 +12,32 @@ import type { ProfileSource } from './profiles.js';
 
 import { databaseRefusal } from '../database-errors.js';
 import { type Access, accessTo, holds, isPlatformAdmin, TENANT_ROLES } from './access.js';
+import { goLiveChecklist } from './checklist.js';
+import {
+  createElection,
+  deleteElection,
+  type Election,
+  ELECTION_TYPES,
+  type ElectionType,
+  getElection,
+  listElections,
+  updateElection,
+} from './elections.js';
 import { localizedInput, localizedSchema } from './localized-input.js';
 import { addRole, listMemberships, removeRole } from './members.js';
+import {
+  addReviewer,
+  deleteMethodology,
+  deleteReviewer,
+  getMethodology,
+  listDemandsOwners,
+  methodologyIdOf,
+  type ReviewerFields,
+  saveMethodology,
+  SOURCE_KINDS,
+  type SourceKind,
+  updateReviewer,
+} from './methodology.js';
 import {
   type ChangeResult,
   createDocument,
@@ -24,6 +48,19 @@ import {
   updateDocument,
   updateSettings,
 } from './settings.js';
+import {
+  createCriterion,
+  createParty,
+  type CriterionFields,
+  deleteFrom,
+  listCoreCriteria,
+  listCriteria,
+  listParties,
+  type PartyFields,
+  reorder,
+  updateCriterion,
+  updateParty,
+} from './structure.js';
 import { listTenants, tenantOverview } from './tenants.js';
 
 /**
@@ -36,6 +73,7 @@ export const API_REFUSAL_KEYS = [
   'notMember',
   'draftExists',
   'needsDefaultLanguage',
+  'noMethodology',
 ] as const;
 export type ApiRefusalKey = (typeof API_REFUSAL_KEYS)[number];
 
@@ -93,6 +131,197 @@ export interface AdminDataOptions {
   actorFor: (request: FastifyRequest) => Promise<Actor | undefined>;
 }
 
+const ELECTION_PARAMS = {
+  type: 'object',
+  properties: { tenant: SLUG, election: SLUG },
+  required: ['tenant', 'election'],
+} as const;
+const ELECTION_ID_PARAMS = {
+  type: 'object',
+  properties: { tenant: SLUG, election: SLUG, id: UUID },
+  required: ['tenant', 'election', 'id'],
+} as const;
+
+/**
+ * Slugs and territory codes in bodies are checked by the database, whose constraint names the field (R78); the schemas
+ * only bound their size. A date is a day.
+ */
+const BODY_SLUG = { type: 'string', maxLength: 200 } as const;
+const DAY = { type: ['string', 'null'], pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' } as const;
+
+interface ElectionBody {
+  slug?: string;
+  type?: ElectionType;
+  territoryCode?: string | null;
+  name?: Record<string, string>;
+  date?: string | null;
+  announced?: boolean;
+  requireSecondReviewer?: boolean;
+  status?: 'live' | 'archived';
+  frozenFrom?: string | null;
+  frozenUntil?: string | null;
+}
+/**
+ * An instant, as ISO 8601 with its offset and a four-digit year: never `infinity` or a year JavaScript's dates can't
+ * hold, which the database would take and the API could then never read back.
+ */
+const INSTANT = {
+  type: ['string', 'null'],
+  pattern:
+    '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\\.[0-9]{1,6})?)?(Z|[+-][0-9]{2}:[0-9]{2})$',
+} as const;
+const ELECTION_BODY = {
+  type: 'object',
+  properties: {
+    slug: BODY_SLUG,
+    type: { type: 'string', enum: ELECTION_TYPES },
+    territoryCode: { type: ['string', 'null'], maxLength: 10 },
+    name: localizedSchema(200),
+    date: DAY,
+    announced: { type: 'boolean' },
+    requireSecondReviewer: { type: 'boolean' },
+    status: { type: 'string', enum: ['live', 'archived'] },
+    frozenFrom: INSTANT,
+    frozenUntil: INSTANT,
+  },
+  additionalProperties: false,
+} as const;
+
+interface MethodologyBody {
+  demandsOwnerId: string | null;
+  body: Record<string, string>;
+  admissibleSourceKinds: SourceKind[];
+  notMentionedSourceKinds: SourceKind[];
+}
+const SOURCE_KINDS_SCHEMA = {
+  type: 'array',
+  items: { type: 'string', enum: SOURCE_KINDS },
+  uniqueItems: true,
+  maxItems: SOURCE_KINDS.length,
+} as const;
+const METHODOLOGY_BODY = {
+  type: 'object',
+  properties: {
+    demandsOwnerId: { anyOf: [UUID, { type: 'null' }] },
+    body: localizedSchema(100_000),
+    admissibleSourceKinds: SOURCE_KINDS_SCHEMA,
+    notMentionedSourceKinds: SOURCE_KINDS_SCHEMA,
+  },
+  required: ['demandsOwnerId', 'body', 'admissibleSourceKinds', 'notMentionedSourceKinds'],
+  additionalProperties: false,
+} as const;
+
+interface ReviewerBody {
+  name: string;
+  affiliation: string;
+  displayOrder: number;
+}
+const REVIEWER_BODY = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', maxLength: 200 },
+    affiliation: { type: 'string', maxLength: 300 },
+    displayOrder: { type: 'integer', minimum: 0, maximum: 10_000 },
+  },
+  required: ['name', 'affiliation', 'displayOrder'],
+  additionalProperties: false,
+} as const;
+
+interface PartyBody {
+  slug: string;
+  name: Record<string, string>;
+  shortName: Record<string, string>;
+  colour: string | null;
+  website: string | null;
+  territoryCodes: string[] | null;
+}
+const PARTY_BODY = {
+  type: 'object',
+  properties: {
+    slug: BODY_SLUG,
+    name: localizedSchema(200),
+    shortName: localizedSchema(60),
+    colour: { type: ['string', 'null'], maxLength: 7 },
+    website: { type: ['string', 'null'], maxLength: 500 },
+    territoryCodes: {
+      type: ['array', 'null'],
+      items: { type: 'string', maxLength: 10 },
+      maxItems: 100,
+    },
+  },
+  required: ['slug', 'name', 'shortName', 'colour', 'website', 'territoryCodes'],
+  additionalProperties: false,
+} as const;
+
+interface CriterionBody {
+  slug: string;
+  title: Record<string, string>;
+  shortTitle: Record<string, string>;
+  description: Record<string, string>;
+  coreCriterionId: string | null;
+}
+const CRITERION_BODY = {
+  type: 'object',
+  properties: {
+    slug: BODY_SLUG,
+    title: localizedSchema(300),
+    shortTitle: localizedSchema(40),
+    description: localizedSchema(5_000),
+    coreCriterionId: { anyOf: [UUID, { type: 'null' }] },
+  },
+  required: ['slug', 'title', 'shortTitle', 'description', 'coreCriterionId'],
+  additionalProperties: false,
+} as const;
+
+/** Localized text a column may leave empty: in the tenant's languages only, and null when there is none. */
+const optionalLocalized = (value: Record<string, string>, access: Access): Localized | null => {
+  const input = localizedInput(value, access.enabledLocales);
+  if (input === 'invalid') {
+    throw new Refusal(400, 'invalid');
+  }
+  return input === 'empty' ? null : input;
+};
+
+/** A reviewer as the form sends it: names as typed but trimmed, and refused blank (they will be public). */
+const reviewerFields = (body: ReviewerBody): ReviewerFields => {
+  const name = body.name.trim();
+  if (name === '') {
+    throw new Refusal(422, 'incomplete');
+  }
+  return { name, affiliation: body.affiliation.trim(), displayOrder: body.displayOrder };
+};
+
+/** A party as the form sends it, normalized to how its columns store it: empty strings and lists are none. */
+const partyFields = (body: PartyBody, access: Access): PartyFields => {
+  const territories = (body.territoryCodes ?? [])
+    .map((code) => code.trim().toUpperCase())
+    .filter((code) => code !== '');
+  return {
+    slug: body.slug.trim(),
+    name: requiredLocalized(body.name, access),
+    shortName: requiredLocalized(body.shortName, access),
+    colour:
+      body.colour === null || body.colour.trim() === '' ? null : body.colour.trim().toLowerCase(),
+    website: body.website === null || body.website.trim() === '' ? null : body.website.trim(),
+    territoryCodes: territories.length > 0 ? [...new Set(territories)] : null,
+  };
+};
+
+const criterionFields = (body: CriterionBody, access: Access): CriterionFields => ({
+  slug: body.slug.trim(),
+  title: requiredLocalized(body.title, access),
+  shortTitle: optionalLocalized(body.shortTitle, access),
+  description: requiredLocalized(body.description, access),
+  coreCriterionId: body.coreCriterionId,
+});
+
+/** What the actor may do in an election's tenant, for the admin to offer; the database decides again. */
+const capabilities = (access: Access) => ({
+  canEdit: holds(access, 'country_admin', 'editor'),
+  canAdminister: holds(access, 'country_admin'),
+  platformAdmin: access.platformAdmin,
+});
+
 /** A policy text's length in one language at most: long enough for a privacy policy. */
 const DOCUMENT_MAX_LENGTH = 100_000;
 
@@ -130,6 +359,20 @@ const publishable = (body: Localized, access: Access, publish: boolean): Localiz
     throw new Refusal(422, 'needsDefaultLanguage');
   }
   return body;
+};
+
+/** The tenant and election the path names, or a 404 for either if RLS hides it (editorial workflow §2.1). */
+const electionFor = async (
+  trx: Transaction<DB>,
+  actor: Actor,
+  params: { tenant: string; election: string },
+): Promise<{ access: Access; election: Election }> => {
+  const access = await tenantFor(trx, actor, params.tenant);
+  const election = await getElection(trx, access.tenantId, params.election);
+  if (!election) {
+    throw new Refusal(404, 'notFound');
+  }
+  return { access, election };
 };
 
 /** The tenant the path names, or a 404 for one RLS hides (editorial workflow §2.1). */
@@ -467,4 +710,366 @@ export const adminDataRoutes =
           return reply.code(204).send();
         }),
     );
+
+    // The tenant's elections (§6).
+    scope.get<{ Params: { tenant: string } }>(
+      '/t/:tenant/elections',
+      { schema: { params: TENANT_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            return {
+              elections: await listElections(trx, access.tenantId),
+              canCreate: holds(access, 'country_admin', 'editor'),
+            };
+          }),
+        ),
+    );
+
+    // Creates an election (E1.1): always a draft.
+    scope.post<{ Params: { tenant: string }; Body: ElectionBody }>(
+      '/t/:tenant/elections',
+      {
+        schema: {
+          params: TENANT_PARAMS,
+          body: { ...ELECTION_BODY, required: ['slug', 'type', 'name'] },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          const created = await withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            const { slug, type, name } = request.body;
+            if (slug === undefined || type === undefined || name === undefined) {
+              throw new Refusal(400, 'invalid');
+            }
+            return createElection(trx, access.tenantId, {
+              slug,
+              type,
+              territoryCode: request.body.territoryCode ?? null,
+              name: requiredLocalized(name, access),
+              date: request.body.date ?? null,
+            });
+          });
+          return reply.code(201).send({ slug: created.slug });
+        }),
+    );
+
+    // An election's overview (§13.6).
+    scope.get<{ Params: { tenant: string; election: string } }>(
+      '/t/:tenant/e/:election',
+      { schema: { params: ELECTION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            return { election, ...capabilities(access) };
+          }),
+        ),
+    );
+
+    // Changes an election's fields, announcement or four-eyes (E1.3, P1).
+    scope.patch<{ Params: { tenant: string; election: string }; Body: ElectionBody }>(
+      '/t/:tenant/e/:election',
+      { schema: { params: ELECTION_PARAMS, body: { ...ELECTION_BODY, minProperties: 1 } } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          const slug = await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            // The fields, the announcement, four-eyes, the status and the freeze window, each as the database allows.
+            // Fastify drops properties the schema doesn't name, so a body of only those arrives empty.
+            if (Object.keys(request.body).length === 0) {
+              throw new Refusal(400, 'invalid');
+            }
+            const { name, territoryCode, ...rest } = request.body;
+            refuseUnless(
+              await updateElection(trx, access.tenantId, election.id, {
+                ...rest,
+                ...(territoryCode === undefined ? {} : { territoryCode }),
+                ...(name === undefined ? {} : { name: requiredLocalized(name, access) }),
+              }),
+            );
+            return request.body.slug ?? election.slug;
+          });
+          return { slug };
+        }),
+    );
+
+    // What going live needs, and what it only warns about (E5.2, E5.3).
+    scope.get<{ Params: { tenant: string; election: string } }>(
+      '/t/:tenant/e/:election/checklist',
+      { schema: { params: ELECTION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            return goLiveChecklist(trx, access, election.id);
+          }),
+        ),
+    );
+
+    // Deletes a draft election (E8).
+    scope.delete<{ Params: { tenant: string; election: string } }>(
+      '/t/:tenant/e/:election',
+      { schema: { params: ELECTION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            refuseUnless(await deleteElection(trx, access.tenantId, election.id));
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // An election's methodology and its named external reviewers (E2, E3), with what a demands methodology may name.
+    scope.get<{ Params: { tenant: string; election: string } }>(
+      '/t/:tenant/e/:election/methodology',
+      { schema: { params: ELECTION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            return {
+              methodology: await getMethodology(trx, election.id),
+              demandsOwners: await listDemandsOwners(trx, access.tenantId),
+              kind: access.methodologyKind,
+              canEdit: holds(access, 'country_admin'),
+            };
+          }),
+        ),
+    );
+
+    // Writes the methodology: created the first time, changed afterwards.
+    scope.put<{ Params: { tenant: string; election: string }; Body: MethodologyBody }>(
+      '/t/:tenant/e/:election/methodology',
+      { schema: { params: ELECTION_PARAMS, body: METHODOLOGY_BODY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            refuseUnless(
+              await saveMethodology(
+                trx,
+                { id: access.tenantId, methodologyKind: access.methodologyKind },
+                election.id,
+                {
+                  demandsOwnerId: request.body.demandsOwnerId,
+                  body: requiredLocalized(request.body.body, access),
+                  admissibleSourceKinds: request.body.admissibleSourceKinds,
+                  notMentionedSourceKinds: request.body.notMentionedSourceKinds,
+                },
+              ),
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    scope.delete<{ Params: { tenant: string; election: string } }>(
+      '/t/:tenant/e/:election/methodology',
+      { schema: { params: ELECTION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            refuseUnless(await deleteMethodology(trx, election.id));
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    scope.post<{ Params: { tenant: string; election: string }; Body: ReviewerBody }>(
+      '/t/:tenant/e/:election/methodology/reviewers',
+      { schema: { params: ELECTION_PARAMS, body: REVIEWER_BODY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          const created = await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            const methodologyId = await methodologyIdOf(trx, election.id);
+            if (!methodologyId) {
+              throw new Refusal(409, 'noMethodology');
+            }
+            return addReviewer(trx, access.tenantId, methodologyId, reviewerFields(request.body));
+          });
+          return reply.code(201).send(created);
+        }),
+    );
+
+    scope.patch<{ Params: { tenant: string; election: string; id: string }; Body: ReviewerBody }>(
+      '/t/:tenant/e/:election/methodology/reviewers/:id',
+      { schema: { params: ELECTION_ID_PARAMS, body: REVIEWER_BODY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            const methodologyId = await methodologyIdOf(trx, election.id);
+            refuseUnless(
+              methodologyId
+                ? await updateReviewer(
+                    trx,
+                    methodologyId,
+                    request.params.id,
+                    reviewerFields(request.body),
+                  )
+                : 'not-found',
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    scope.delete<{ Params: { tenant: string; election: string; id: string } }>(
+      '/t/:tenant/e/:election/methodology/reviewers/:id',
+      { schema: { params: ELECTION_ID_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            const methodologyId = await methodologyIdOf(trx, election.id);
+            refuseUnless(
+              methodologyId
+                ? await deleteReviewer(trx, methodologyId, request.params.id)
+                : 'not-found',
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Parties and criteria (E4): the same five routes for each list.
+    for (const list of ['parties', 'criteria'] as const) {
+      const table = list === 'parties' ? 'app.parties' : 'app.criteria';
+      scope.get<{ Params: { tenant: string; election: string } }>(
+        `/t/:tenant/e/:election/${list}`,
+        { schema: { params: ELECTION_PARAMS } },
+        async (request, reply) =>
+          signedIn(request, reply, (db, actor) =>
+            withActor(db, actor, async (trx) => {
+              const { access, election } = await electionFor(trx, actor, request.params);
+              return list === 'parties'
+                ? {
+                    parties: await listParties(trx, election.id),
+                    canEdit: holds(access, 'country_admin', 'editor'),
+                  }
+                : {
+                    criteria: await listCriteria(trx, election.id),
+                    coreCriteria: await listCoreCriteria(trx),
+                    canEdit: holds(access, 'country_admin', 'editor'),
+                  };
+            }),
+          ),
+      );
+
+      scope.post<{ Params: { tenant: string; election: string }; Body: unknown }>(
+        `/t/:tenant/e/:election/${list}`,
+        {
+          schema: {
+            params: ELECTION_PARAMS,
+            body: list === 'parties' ? PARTY_BODY : CRITERION_BODY,
+          },
+        },
+        async (request, reply) =>
+          signedIn(request, reply, async (db, actor) => {
+            const created = await withActor(db, actor, async (trx) => {
+              const { access, election } = await electionFor(trx, actor, request.params);
+              return list === 'parties'
+                ? createParty(
+                    trx,
+                    access.tenantId,
+                    election.id,
+                    partyFields(request.body as PartyBody, access),
+                  )
+                : createCriterion(
+                    trx,
+                    access.tenantId,
+                    election.id,
+                    criterionFields(request.body as CriterionBody, access),
+                  );
+            });
+            return reply.code(201).send(created);
+          }),
+      );
+
+      scope.put<{
+        Params: { tenant: string; election: string; id: string };
+        Body: unknown;
+      }>(
+        `/t/:tenant/e/:election/${list}/:id`,
+        {
+          schema: {
+            params: ELECTION_ID_PARAMS,
+            body: list === 'parties' ? PARTY_BODY : CRITERION_BODY,
+          },
+        },
+        async (request, reply) =>
+          signedIn(request, reply, async (db, actor) => {
+            await withActor(db, actor, async (trx) => {
+              const { access, election } = await electionFor(trx, actor, request.params);
+              refuseUnless(
+                list === 'parties'
+                  ? await updateParty(
+                      trx,
+                      election.id,
+                      request.params.id,
+                      partyFields(request.body as PartyBody, access),
+                    )
+                  : await updateCriterion(
+                      trx,
+                      election.id,
+                      request.params.id,
+                      criterionFields(request.body as CriterionBody, access),
+                    ),
+              );
+            });
+            return reply.code(204).send();
+          }),
+      );
+
+      scope.delete<{ Params: { tenant: string; election: string; id: string } }>(
+        `/t/:tenant/e/:election/${list}/:id`,
+        { schema: { params: ELECTION_ID_PARAMS } },
+        async (request, reply) =>
+          signedIn(request, reply, async (db, actor) => {
+            await withActor(db, actor, async (trx) => {
+              const { election } = await electionFor(trx, actor, request.params);
+              refuseUnless(await deleteFrom(trx, table, election.id, request.params.id));
+            });
+            return reply.code(204).send();
+          }),
+      );
+
+      // Puts the list in the order given (E4.5).
+      scope.put<{
+        Params: { tenant: string; election: string };
+        Body: { shown: string[]; ids: string[] };
+      }>(
+        `/t/:tenant/e/:election/${list}/order`,
+        {
+          schema: {
+            params: ELECTION_PARAMS,
+            body: {
+              type: 'object',
+              properties: {
+                shown: { type: 'array', items: UUID, maxItems: 500 },
+                ids: { type: 'array', items: UUID, maxItems: 500 },
+              },
+              required: ['shown', 'ids'],
+              additionalProperties: false,
+            },
+          },
+        },
+        async (request, reply) =>
+          signedIn(request, reply, async (db, actor) => {
+            await withActor(db, actor, async (trx) => {
+              const { election } = await electionFor(trx, actor, request.params);
+              refuseUnless(
+                await reorder(trx, table, election.id, request.body.shown, request.body.ids),
+              );
+            });
+            return reply.code(204).send();
+          }),
+      );
+    }
   };
