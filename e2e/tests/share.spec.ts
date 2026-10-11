@@ -126,19 +126,19 @@ test.describe('link previews (fictional seeds)', () => {
 });
 
 test.describe("tenants' own logos (fictional seeds)", () => {
-  test("show on each surface, served once from the tenant's address and cached as immutable", async ({
+  test("show in the footer, served once from the tenant's address and cached as immutable", async ({
     page,
   }) => {
     await page.goto(TENANT_URL);
 
-    const header = page.locator('header img');
+    // The operator line is the footer's alone (PLAN R82); the logo for the orange shows on the share cards.
+    await expect(page.locator('header img')).toHaveCount(0);
     const footer = page.locator('footer img');
-    await expect(header).toHaveAttribute('alt', 'Organización de ejemplo A');
-    const src = (await header.getAttribute('src')) ?? '';
+    await expect(footer).toHaveAttribute('alt', 'Organización de ejemplo A');
+    const src = (await footer.getAttribute('src')) ?? '';
     expect(src).toMatch(/^\/brand\/[0-9a-f]{64}\.png$/);
-    expect(await footer.getAttribute('src')).toBe(src);
     // The seeds' fictional logo is 240×64.
-    await expect(header).toHaveJSProperty('naturalWidth', 240);
+    await expect(footer).toHaveJSProperty('naturalWidth', 240);
 
     const image = await get(`${CANONICAL_A}${src}`);
     expect(image.status).toBe(200);

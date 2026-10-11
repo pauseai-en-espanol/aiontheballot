@@ -316,7 +316,7 @@ export const seed = async (
        VALUES ($1, $2, $3, $4)`,
       [CELLS.draft, A.id, ELECTION, SOURCE],
     );
-    // A's operator logo, uploaded by its country admin and shown on the orange and on the white surfaces.
+    // A's operator logo, uploaded by its country admin: on the orange share cards and in the white footer.
     await as(SEED_USERS.countryAdminA);
     await client.query(
       `INSERT INTO app.files (id, tenant_id, bucket, content_type, byte_size, sha256)

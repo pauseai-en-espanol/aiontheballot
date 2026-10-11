@@ -117,10 +117,7 @@ const TenantHome = async (props: TenantPageProps) => {
     <ComingSoon
       home={home}
       locale={locale}
-      logos={{
-        onAccent: logo(BRAND_SLOTS.operatorLogoOnAccent),
-        onCanvas: logo(BRAND_SLOTS.operatorLogoOnCanvas),
-      }}
+      logos={{ onCanvas: logo(BRAND_SLOTS.operatorLogoOnCanvas) }}
     />
   );
 };

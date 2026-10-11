@@ -446,7 +446,7 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   uses. The content carries `lang`; `<html lang>` stays `es` until M3 renders it per locale.
 - **R49. Seeds:** `ejemplo-a`'s operator now has a website, a contact address and a newsletter, on the reserved
   `.example` TLD; `ejemplo-b`'s has none, so the e2e tests cover both.
-- **R50. "Avísame cuando se publique" links to the operator's own newsletter** (migration
+- **R50. "Avísame cuando se publique" links to the operator's own newsletter** (button removed by R82; migration
   `organization_newsletter`: `organizations.newsletter_url`, https only, written by platform admins like the rest of
   the row). The platform collects no email addresses, so there is no form, no personal data and no consent to
   manage. For Spain, `~/update-spain-operator.sql` sets the website, contact address and newsletter from pauseai.es
@@ -689,6 +689,16 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   rows itself; a daily job for expired sessions it never meets again comes with sign-in (M2). The connections
   (`createAuthPool`) set `search_path=auth`, so Better Auth's unqualified names find its tables (the role can't create
   in `public`, so a changed path fails closed), and read `bigint` as a number, which the limiter's arithmetic needs.
+
+**Coming-soon page, after Dani's review:**
+
+- **R82. The election's date in full on its own line, the operator line once, and no newsletter button** (Dani's
+  choices). A name like "Elecciones generales del 29N" already holds the date in short, so the date follows it as
+  "Domingo, 29 de noviembre de 2026" in a `<time>`, capitalised to start the line. "Una iniciativa de" stays only in
+  the footer, where M3's shared layout puts it; the page names the operator above the fold anyway. The "Avísame cuando
+  se publique" button (R50) is gone: signing up to the operator's general newsletter is not being told when the site
+  is out. `organizations.newsletter_url` stays, unused, for M3. A real notify list stores addresses, so it waits for
+  the privacy policy (M3) and email sending. The share cards keep "name · date" on one line.
 
 ## Open decisions for Dani
 

@@ -18,7 +18,7 @@ export interface PublicHome {
     displayName: Localized;
     url: string | null;
     contactEmail: string | null;
-    /** Where people sign up to hear when the site is published: the operator's own list, never ours. */
+    /** The operator's own newsletter, never a list of ours. Not shown until there is a real notify list (PLAN R82). */
     newsletterUrl: string | null;
   };
   /** The next election the public may see: the soonest one not archived whose date hasn't passed, if any. */

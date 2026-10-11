@@ -8,8 +8,8 @@ import { css, cx } from '@styled-system/css';
 interface ComingSoonProps {
   home: PublicHome;
   locale: Locale;
-  /** The operator's logo for each surface, as image URLs, when the tenant has uploaded them. */
-  logos: { onAccent?: string; onCanvas?: string };
+  /** The operator's logo for the footer, as an image URL, when the tenant has uploaded it. */
+  logos: { onCanvas?: string };
 }
 
 interface OperatorLineProps {
@@ -78,11 +78,6 @@ const buttonBase = cx(
 const button = cx(
   buttonBase,
   css({ bg: 'bg.inverse', color: 'fg.inverse', _hover: { color: 'fg.accentOnInverse' } }),
-);
-
-const buttonOutline = cx(
-  buttonBase,
-  css({ color: 'fg.onAccent', _hover: { bg: 'bg.inverse', color: 'fg.inverse' } }),
 );
 
 /** The pause sign: two bars, as in PauseAI's mark. Decorative. */
@@ -165,6 +160,10 @@ const nameSize = (name: string): string => {
 
 const PROMISES = ['quotes', 'history', 'corrections'] as const;
 
+/** Capitalised to start a line: Spanish writes "domingo, 29 de noviembre" in lowercase mid-sentence. */
+const startOfLine = (text: string, locale: Locale): string =>
+  text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
+
 /**
  * A tenant's home until its site goes public (PLAN M3, coming soon): the tenant's name, what the site will do, the
  * next public election if there is one, and how the operator works. Every name, link and date comes from the data.
@@ -176,7 +175,6 @@ export const ComingSoon = ({ home, locale, logos }: ComingSoonProps) => {
   const name = local(home.tenant.displayName);
   const operator = local(home.operator.displayName);
   const operatorUrl = home.operator.url;
-  const { newsletterUrl } = home.operator;
   const { election } = home;
   const electionName = election ? local(election.name) : '';
 
@@ -195,11 +193,6 @@ export const ComingSoon = ({ home, locale, logos }: ComingSoonProps) => {
         className={cx(
           wrap,
           css({
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px 24px',
             paddingBlock: '28px',
           }),
         )}
@@ -218,16 +211,6 @@ export const ComingSoon = ({ home, locale, logos }: ComingSoonProps) => {
         >
           <PauseBars />
           {t('home.comingSoon')}
-        </p>
-        <p className={css({ fontSize: '16px' })}>
-          <OperatorLine
-            logo={logos.onAccent}
-            logoClass={css({ display: 'block', height: '32px', width: 'auto' })}
-            lead={t('layout.initiativeLead')}
-            line={t('layout.initiativeOf', { operator })}
-            operator={operator}
-            url={logos.onAccent ? operatorUrl : null}
-          />
         </p>
       </header>
 
@@ -285,7 +268,7 @@ export const ComingSoon = ({ home, locale, logos }: ComingSoonProps) => {
               </p>
             </div>
 
-            {(election !== null || operatorUrl !== null || newsletterUrl !== null) && (
+            {(election !== null || operatorUrl !== null) && (
               <div
                 className={css({
                   display: 'flex',
@@ -295,49 +278,38 @@ export const ComingSoon = ({ home, locale, logos }: ComingSoonProps) => {
                 })}
               >
                 {election && (
-                  <p
-                    className={cx(
-                      display,
-                      css({
-                        fontSize: '22px',
-                        letterSpacing: '0.04em',
-                        borderTop: '3px solid',
-                        borderColor: 'border.default',
-                        paddingTop: '14px',
-                      }),
-                    )}
-                  >
-                    {election.date
-                      ? t('home.election', {
-                          name: electionName,
-                          date: new Date(`${election.date}T12:00:00Z`),
-                        })
-                      : electionName}
-                  </p>
-                )}
-                {(newsletterUrl ?? operatorUrl) && (
                   <div
                     className={css({
                       display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: '12px',
-                      width: { base: '100%', sm: 'auto' },
+                      flexDirection: 'column',
+                      gap: '6px',
+                      borderTop: '3px solid',
+                      borderColor: 'border.default',
+                      paddingTop: '14px',
                     })}
                   >
-                    {newsletterUrl && (
-                      <a className={button} href={newsletterUrl}>
-                        {t('home.notify')}
-                      </a>
-                    )}
-                    {operatorUrl && (
-                      <a className={newsletterUrl ? buttonOutline : button} href={operatorUrl}>
-                        {t('home.learnMore', { operator })}
-                      </a>
+                    <p className={cx(display, css({ fontSize: '22px', letterSpacing: '0.04em' }))}>
+                      {electionName}
+                    </p>
+                    {/* The date in full on a line of its own: names like "del 29N" already hold it in short. */}
+                    {election.date && (
+                      <p className={css({ fontSize: '18px' })}>
+                        <time dateTime={election.date}>
+                          {startOfLine(
+                            t('home.electionDate', {
+                              date: new Date(`${election.date}T12:00:00Z`),
+                            }),
+                            locale,
+                          )}
+                        </time>
+                      </p>
                     )}
                   </div>
                 )}
-                {newsletterUrl && (
-                  <p className={css({ fontSize: '15px' })}>{t('home.notifyNote', { operator })}</p>
+                {operatorUrl && (
+                  <a className={button} href={operatorUrl}>
+                    {t('home.learnMore', { operator })}
+                  </a>
                 )}
               </div>
             )}
