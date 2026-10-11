@@ -290,7 +290,8 @@ _As a country admin, I make the election public. Every cell without a published 
 ### E7. Archive
 
 1. Country admins archive a live election after the results. It can't be undone, and the dialog says what stays
-   possible. [DB: transitions; UI]
+   possible. Not while a freeze window is set and not over: archived, the window could never be cleared, and it would
+   hold back corrections for good (PLAN R109). [DB: transitions, `election_rules`; UI]
 2. Afterwards the election and its structure are read-only. Corrections and withdrawals of published cells, new
    sources for them, and report handling continue (PLAN P16). [DB: `election_rules`, `structure_rules`,
    `assessment_trail`]
@@ -634,7 +635,8 @@ Taken while drafting; each can be changed before M2 starts.
 - **W5. Passwords** of at least 12 characters; a reset keeps TOTP and revokes other sessions.
 - **W6. Platform-admin screens in M2** cover review settings, organizations, brand assets and grants, and members in
   any tenant. Tenants, hostnames, operator changes, core criteria and platform admins stay runbooks: rare for the
-  pilot, and hostnames need a gitops change anyway.
+  pilot, and hostnames need a gitops change anyway. Creating tenants gets a screen later, demo tenants included
+  (PLAN R111).
 - **W7. The last country admin** can't be removed in the admin (an API check, not a database rule).
 - **W8. Structure forms in a draft election are last-write-wins:** those tables have no version column, and the
   audit log records every change. Cells use `content_version`.

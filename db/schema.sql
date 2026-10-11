@@ -1207,6 +1207,11 @@ CREATE FUNCTION private.election_rules() RETURNS trigger
       RAISE EXCEPTION 'election % cannot go from % to %', OLD.id, OLD.status, NEW.status
         USING ERRCODE = 'restrict_violation';
     END IF;
+    IF OLD.status = 'live' AND NEW.status = 'archived' AND NEW.frozen_from IS NOT NULL
+       AND (NEW.frozen_until IS NULL OR NEW.frozen_until > now()) THEN
+      RAISE EXCEPTION 'election % cannot be archived while its freeze window is set and not over', OLD.id
+        USING ERRCODE = 'restrict_violation';
+    END IF;
     IF OLD.status <> 'draft'
        AND (NEW.slug, NEW.type, NEW.territory_code) IS DISTINCT FROM (OLD.slug, OLD.type, OLD.territory_code) THEN
       RAISE EXCEPTION 'election %: the slug, type and territory are fixed once it leaves draft', OLD.id

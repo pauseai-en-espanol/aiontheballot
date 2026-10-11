@@ -298,4 +298,17 @@ describe('the freeze window and archiving (editorial workflow E6, E7)', () => {
       ),
     ).toBe('23001');
   });
+
+  it("doesn't archive inside a freeze window: reload, and the admin says to clear it first", async () => {
+    expect(
+      await refusal(
+        as(USERS.countryAdminA, async (trx) => {
+          await updateElection(trx, TENANT_A, ELECTIONS_A.live.id, {
+            frozenFrom: '2030-01-01T09:00:00Z',
+          });
+          return updateElection(trx, TENANT_A, ELECTIONS_A.live.id, { status: 'archived' });
+        }),
+      ),
+    ).toBe('23001');
+  });
 });

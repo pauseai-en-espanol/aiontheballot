@@ -48,6 +48,74 @@ describe('election status', () => {
   });
 });
 
+// Archived, an election can't change its freeze window, and the window holds back corrections whatever the status:
+// archived inside one, its corrections would stay frozen for good (PLAN D11).
+describe('archiving and the freeze window', () => {
+  const archiveWithin = (window: string) =>
+    asCountryAdminA(async (client) => {
+      await client.query(`UPDATE app.elections SET ${window} WHERE id = $1`, [ELECTIONS.liveA.id]);
+      return errorCode(client, status(ELECTIONS.liveA.id, 'archived'));
+    });
+
+  it.each([
+    ['open-ended', `frozen_from = now() - interval '1 day'`],
+    [
+      'not over yet',
+      `frozen_from = now() - interval '1 day', frozen_until = now() + interval '1 day'`,
+    ],
+    ['not started yet', `frozen_from = now() + interval '1 day'`],
+  ])('is refused while a window is set and %s', async (_name, window) => {
+    expect(await archiveWithin(window)).toBe(RESTRICT_VIOLATION);
+  });
+
+  it.each([
+    ['over', `frozen_from = now() - interval '2 days', frozen_until = now() - interval '1 day'`],
+    ['ending as it archives', `frozen_from = now() - interval '1 day', frozen_until = now()`],
+    ['cleared', 'frozen_from = NULL, frozen_until = NULL'],
+  ])('goes ahead once the window is %s', async (_name, window) => {
+    expect(await archiveWithin(window)).toBeNull();
+  });
+
+  // The statement that archives may change the window too: what counts is the window it leaves.
+  const archiveChanging = (before: string, change: string) =>
+    asCountryAdminA(async (client) => {
+      await client.query(`UPDATE app.elections SET ${before} WHERE id = $1`, [ELECTIONS.liveA.id]);
+      return errorCode(
+        client,
+        `UPDATE app.elections SET status = 'archived', ${change} WHERE id = '${ELECTIONS.liveA.id}'`,
+      );
+    });
+
+  it('is refused when the same statement reopens a window that was over', async () => {
+    expect(
+      await archiveChanging(
+        `frozen_from = now() - interval '2 days', frozen_until = now() - interval '1 day'`,
+        `frozen_until = now() + interval '1 day'`,
+      ),
+    ).toBe(RESTRICT_VIOLATION);
+  });
+
+  it('goes ahead when the same statement ends an open-ended window', async () => {
+    expect(
+      await archiveChanging(`frozen_from = now() - interval '1 day'`, 'frozen_until = now()'),
+    ).toBeNull();
+  });
+
+  it('goes ahead when the same statement clears the window', async () => {
+    expect(
+      await asCountryAdminA(async (client) => {
+        await client.query(`UPDATE app.elections SET frozen_from = now() WHERE id = $1`, [
+          ELECTIONS.liveA.id,
+        ]);
+        return errorCode(
+          client,
+          `UPDATE app.elections SET status = 'archived', frozen_from = NULL WHERE id = '${ELECTIONS.liveA.id}'`,
+        );
+      }),
+    ).toBeNull();
+  });
+});
+
 describe('going live', () => {
   it.each([
     ['without a methodology', [], ELECTIONS.emptyA.id],
