@@ -2,7 +2,7 @@ import { createAuthPool } from '@aiontheballot/db/auth-pool';
 import { createDatabase } from '@aiontheballot/db/client';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import type { ProfileSource } from '../src/admin/profiles.js';
 
@@ -701,5 +701,116 @@ describe('organizations (editorial workflow P2)', () => {
     } finally {
       await owner.deleteFrom('app.organizations').where('id', '=', id).execute();
     }
+  });
+});
+
+describe('sites (PLAN R129)', () => {
+  // Writes here commit: whatever site a test made goes, as the tables' owner, the only role purge_tenant may delete
+  // immutable rows as (ADR-0002 §14).
+  afterEach(async () => {
+    const { rows } = await sql<{ id: string }>`
+      SELECT id FROM app.tenants WHERE slug = ${BODY.slug}`.execute(owner);
+    for (const { id } of rows) {
+      await owner.transaction().execute(async (trx) => {
+        await sql`SET LOCAL ROLE aiontheballot_owner`.execute(trx);
+        await sql`SELECT private.purge_tenant(${id})`.execute(trx);
+      });
+    }
+  });
+
+  const BODY = {
+    slug: 'sitio-de-rutas',
+    name: { es: 'Sitio de rutas', en: 'Routes site' },
+    countryCode: ' xd ',
+    defaultLocale: 'es',
+    enabledLocales: ['en'],
+    methodologyKind: 'descriptive',
+    operatorId: UNLINKED_ORGANIZATION,
+    reportRetentionDays: 30,
+  };
+
+  it("are for platform admins only: anyone else gets a 404, as for a page they can't open", async () => {
+    for (const user of [USERS.countryAdminA, USERS.editorA, USERS.noMembership]) {
+      expect((await send('GET', '/api/sites', user)).statusCode).toBe(404);
+      expect((await send('GET', '/api/sites/test-a', user)).statusCode).toBe(404);
+      expect((await send('POST', '/api/sites', user, { body: BODY })).statusCode).toBe(404);
+      expect(
+        (await send('PUT', '/api/sites/test-a/active', user, { body: { active: false } }))
+          .statusCode,
+      ).toBe(404);
+      expect(
+        (
+          await send('POST', '/api/sites/test-a/hostnames', user, {
+            body: { hostname: 'otra.example.test', canonical: false },
+          })
+        ).statusCode,
+      ).toBe(404);
+    }
+    const listed = await send('GET', '/api/sites', USERS.platformAdmin);
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json<{ sites: { slug: string }[] }>().sites.map(({ slug }) => slug)).toContain(
+      'test-a',
+    );
+    expect((await send('GET', '/api/sites/no-existe', USERS.platformAdmin)).statusCode).toBe(404);
+  });
+
+  it.each([
+    [
+      'a language the platform has no messages for',
+      { enabledLocales: ['fr'], name: { es: 'Sitio de rutas' } },
+      400,
+      'invalid',
+    ],
+    ['a name in a language the site lacks', { name: { de: 'Seite' } }, 400, 'invalid'],
+    ['no name at all', { name: { es: '  ' } }, 422, 'incomplete'],
+    ['a malformed short name', { slug: 'Sitio Malo' }, 422, 'incomplete'],
+    ['a malformed country code', { countryCode: 'España' }, 422, 'incomplete'],
+  ])('refuse %s', async (_name, change, status, error) => {
+    const answer = await send('POST', '/api/sites', USERS.platformAdmin, {
+      body: { ...BODY, ...change },
+    });
+    expect(answer.statusCode).toBe(status);
+    expect(answer.json()).toMatchObject({ error });
+  });
+
+  it('are created off, turned on, and given a main address by a platform admin', async () => {
+    const hostname = `rutas-${Date.now()}.example.test`;
+    const created = await send('POST', '/api/sites', USERS.platformAdmin, { body: BODY });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toEqual({ slug: BODY.slug });
+    const on = await send('PUT', `/api/sites/${BODY.slug}/active`, USERS.platformAdmin, {
+      body: { active: true },
+    });
+    expect(on.statusCode).toBe(204);
+    const added = await send('POST', `/api/sites/${BODY.slug}/hostnames`, USERS.platformAdmin, {
+      body: { hostname: ` ${hostname.toUpperCase()} `, canonical: true },
+    });
+    expect(added.statusCode).toBe(201);
+    const site = await send('GET', `/api/sites/${BODY.slug}`, USERS.platformAdmin);
+    expect(site.json()).toEqual({
+      site: {
+        slug: BODY.slug,
+        name: BODY.name,
+        defaultLocale: 'es',
+        enabledLocales: ['es', 'en'],
+        countryCode: 'XD',
+        active: true,
+        methodologyKind: 'descriptive',
+        reportRetentionDays: 30,
+        operator: {
+          id: UNLINKED_ORGANIZATION,
+          name: expect.any(Object),
+          legalName: expect.any(String),
+        },
+        hostnames: [{ hostname, canonical: true, verified: true, retired: false }],
+      },
+    });
+    const taken = await send('POST', '/api/sites/test-a/hostnames', USERS.platformAdmin, {
+      body: { hostname, canonical: false },
+    });
+    expect(taken.statusCode).toBe(409);
+    expect(taken.json()).toEqual({ error: 'taken', constraint: 'tenant_hostnames_pkey' });
+    const again = await send('POST', '/api/sites', USERS.platformAdmin, { body: BODY });
+    expect(again.json()).toEqual({ error: 'taken', constraint: 'tenants_slug_key' });
   });
 });

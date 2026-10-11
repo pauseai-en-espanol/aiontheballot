@@ -185,3 +185,46 @@ export const getOrganization = cache(
       : expect(body, ['organization', 'languages'], 'an organization');
   },
 );
+
+export interface SiteHostname {
+  hostname: string;
+  canonical: boolean;
+  verified: boolean;
+  retired: boolean;
+}
+
+export interface SiteSummary {
+  slug: string;
+  name: Localized;
+  defaultLocale: string;
+  countryCode: string;
+  active: boolean;
+  hostnames: SiteHostname[];
+}
+
+export interface Site extends SiteSummary {
+  enabledLocales: string[];
+  methodologyKind: 'demands' | 'descriptive';
+  reportRetentionDays: number;
+  operator: { id: string; name: Localized; legalName: string } | null;
+}
+
+/** Every site, for platform admins (PLAN R129), and the organizations that could run a new one. */
+export const getSites = cache(
+  async (): Promise<
+    | {
+        sites: SiteSummary[];
+        organizations: { id: string; displayName: Localized; legalName: string }[];
+      }
+    | undefined
+  > => {
+    const body = await readApi('/api/sites');
+    return body === undefined ? undefined : expect(body, ['sites', 'organizations'], 'the sites');
+  },
+);
+
+/** One site, for platform admins. */
+export const getSite = cache(async (slug: string): Promise<{ site: Site } | undefined> => {
+  const body = await readApi(`/api/sites/${encodeURIComponent(slug)}`);
+  return body === undefined ? undefined : expect(body, ['site'], 'a site');
+});

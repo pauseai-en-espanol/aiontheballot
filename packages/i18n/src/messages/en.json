@@ -579,6 +579,76 @@
         "displayName": "Enter its name in at least one language.",
         "pauseai": "A site this organization serves uses PauseAI's restricted brand assets, so it has to stay a PauseAI chapter."
       }
+    },
+    "platformSites": {
+      "title": "Sites",
+      "intro": "Every site on the platform, on or off. A site's public address also needs its DNS, route and certificate, which are a change in gitops.",
+      "caption": "Sites and their addresses",
+      "name": "Name",
+      "country": "Country",
+      "state": "State",
+      "on": "On",
+      "off": "Off",
+      "hostnames": "Addresses",
+      "noHostnames": "None yet",
+      "canonical": "main",
+      "retired": "retired",
+      "none": "There are no sites yet.",
+      "new": "New site",
+      "newIntro": "A new site starts off: nobody outside the admin sees it until you turn it on. Its operator is the organization that runs it and answers for it in the legal notice.",
+      "form": {
+        "slug": "Short name",
+        "slugHint": "Lowercase letters, digits and hyphens, such as demo. It names the site in the admin's and the platform's addresses, and doesn't change.",
+        "name": "Name",
+        "nameHint": "As the public sees it, in the site's languages. At least one.",
+        "countryCode": "Country code",
+        "countryCodeHint": "Two letters, ISO 3166-1, such as ES. A demo site takes one of XA to XZ, which no country has.",
+        "defaultLocale": "Main language",
+        "enabledLocales": "Other languages",
+        "methodologyKind": "Kind of methodology",
+        "methodologyKindHint": "The same for all the site's elections, and fixed once one has a methodology.",
+        "operator": "Operator",
+        "operatorHint": "The organization that runs the site. Create it first under Organizations if it isn't listed.",
+        "chooseOperator": "Choose an organization",
+        "reportRetentionDays": "Days a report is kept before its personal data is removed",
+        "create": "Create site",
+        "created": "Site created. It is off."
+      },
+      "details": "Details",
+      "operator": "Operator",
+      "noOperator": "None",
+      "languages": "Languages",
+      "methodologyKind": "Methodology",
+      "reportRetention": "Reports kept",
+      "active": {
+        "title": "Public site",
+        "on": "On: its addresses serve it. It shows the coming-soon page until the deployment's OPEN_SITES lists it.",
+        "off": "Off: nobody outside the admin sees it.",
+        "turnOn": "Turn the site on",
+        "turnOff": "Turn the site off",
+        "turnedOn": "The site is on.",
+        "turnedOff": "The site is off."
+      },
+      "hostname": {
+        "title": "Addresses",
+        "intro": "An address you add here is the site's from now on, and can't be taken back, only retired. It serves only once its DNS, route and certificate are in place in gitops.",
+        "label": "Address",
+        "hint": "A hostname without https://, such as demo.example.org.",
+        "canonical": "Make it the main address",
+        "canonicalHint": "The address the site's links, sitemaps and share images use; any other address redirects to it.",
+        "add": "Add address",
+        "added": "Address added."
+      },
+      "constraints": {
+        "slug": "Use lowercase letters, digits and single hyphens, up to 63 characters.",
+        "slugTaken": "Another site has this short name.",
+        "countryCode": "Enter two letters, such as ES.",
+        "retention": "Enter a number of days from 1 to 36500.",
+        "name": "Enter its name in at least one of its languages.",
+        "hostname": "Enter a hostname, such as demo.example.org.",
+        "hostnameTaken": "This address is taken, or reserved.",
+        "operator": "A site that is on needs an operator."
+      }
     }
   },
   "email": {

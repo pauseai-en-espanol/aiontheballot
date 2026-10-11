@@ -50,6 +50,7 @@ const PlatformLayout = async ({ children }: { children: ReactNode }) => {
         sections={[
           { href: '/platform', label: t('admin.platform.title') },
           { href: '/platform/organizations', label: t('admin.organizations.title') },
+          { href: '/platform/sites', label: t('admin.platformSites.title') },
         ]}
       />
       <main id="main" tabIndex={-1} className={styles.main}>

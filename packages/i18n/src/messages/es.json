@@ -579,6 +579,76 @@
         "displayName": "Escribe su nombre en al menos un idioma.",
         "pauseai": "Un sitio al que sirve esta organización usa recursos de marca restringidos de PauseAI, así que tiene que seguir siendo un grupo de PauseAI."
       }
+    },
+    "platformSites": {
+      "title": "Sitios",
+      "intro": "Todos los sitios de la plataforma, activos o no. La dirección pública de un sitio necesita además su DNS, su ruta y su certificado, que son un cambio en gitops.",
+      "caption": "Sitios y sus direcciones",
+      "name": "Nombre",
+      "country": "País",
+      "state": "Estado",
+      "on": "Activo",
+      "off": "Inactivo",
+      "hostnames": "Direcciones",
+      "noHostnames": "Ninguna aún",
+      "canonical": "principal",
+      "retired": "retirada",
+      "none": "Aún no hay sitios.",
+      "new": "Nuevo sitio",
+      "newIntro": "Un sitio nuevo empieza inactivo: nadie fuera del admin lo ve hasta que lo actives. Su operador es la organización que lo gestiona y responde de él en el aviso legal.",
+      "form": {
+        "slug": "Nombre corto",
+        "slugHint": "Minúsculas, cifras y guiones, como demo. Nombra el sitio en las direcciones del admin y de la plataforma, y no cambia.",
+        "name": "Nombre",
+        "nameHint": "Tal como lo ve el público, en los idiomas del sitio. Al menos uno.",
+        "countryCode": "Código de país",
+        "countryCodeHint": "Dos letras, ISO 3166-1, como ES. Un sitio de demostración lleva uno de XA a XZ, que no tiene ningún país.",
+        "defaultLocale": "Idioma principal",
+        "enabledLocales": "Otros idiomas",
+        "methodologyKind": "Tipo de metodología",
+        "methodologyKindHint": "El mismo para todas las elecciones del sitio, y fijo en cuanto una tiene metodología.",
+        "operator": "Operador",
+        "operatorHint": "La organización que gestiona el sitio. Créala antes en Organizaciones si no aparece.",
+        "chooseOperator": "Elige una organización",
+        "reportRetentionDays": "Días que se guarda un aviso antes de borrar sus datos personales",
+        "create": "Crear sitio",
+        "created": "Sitio creado. Está inactivo."
+      },
+      "details": "Datos",
+      "operator": "Operador",
+      "noOperator": "Ninguno",
+      "languages": "Idiomas",
+      "methodologyKind": "Metodología",
+      "reportRetention": "Avisos guardados",
+      "active": {
+        "title": "Sitio público",
+        "on": "Activo: sus direcciones lo sirven. Muestra la página de «próximamente» hasta que OPEN_SITES, en el despliegue, lo incluya.",
+        "off": "Inactivo: nadie fuera del admin lo ve.",
+        "turnOn": "Activar el sitio",
+        "turnOff": "Desactivar el sitio",
+        "turnedOn": "El sitio está activo.",
+        "turnedOff": "El sitio está inactivo."
+      },
+      "hostname": {
+        "title": "Direcciones",
+        "intro": "Una dirección que añadas aquí es del sitio desde ese momento, y no se puede deshacer, solo retirar. Solo sirve el sitio cuando su DNS, su ruta y su certificado están en gitops.",
+        "label": "Dirección",
+        "hint": "Un nombre de host sin https://, como demo.example.org.",
+        "canonical": "Hacerla la dirección principal",
+        "canonicalHint": "La dirección que usan los enlaces, los sitemaps y las imágenes para compartir del sitio; cualquier otra redirige a ella.",
+        "add": "Añadir dirección",
+        "added": "Dirección añadida."
+      },
+      "constraints": {
+        "slug": "Usa minúsculas, cifras y guiones sueltos, hasta 63 caracteres.",
+        "slugTaken": "Otro sitio tiene este nombre corto.",
+        "countryCode": "Escribe dos letras, como ES.",
+        "retention": "Escribe un número de días de 1 a 36500.",
+        "name": "Escribe su nombre en al menos uno de sus idiomas.",
+        "hostname": "Escribe un nombre de host, como demo.example.org.",
+        "hostnameTaken": "Esta dirección está ocupada o reservada.",
+        "operator": "Un sitio activo necesita un operador."
+      }
     }
   },
   "email": {

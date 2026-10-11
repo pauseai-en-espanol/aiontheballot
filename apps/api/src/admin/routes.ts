@@ -6,6 +6,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Transaction } from 'kysely';
 
 import { withActor } from '@aiontheballot/db/actor';
+import { isLocale } from '@aiontheballot/i18n/messages';
 import { captureException } from '@sentry/node';
 
 import type { ProfileSource } from './profiles.js';
@@ -57,6 +58,14 @@ import {
   updateSettings,
 } from './settings.js';
 import { signupCounts } from './signups.js';
+import {
+  addHostname,
+  createSite,
+  getSite,
+  listSites,
+  setSiteActive,
+  type SiteFields,
+} from './sites.js';
 import {
   createCriterion,
   createParty,
@@ -198,6 +207,50 @@ const ELECTION_ID_PARAMS = {
  */
 const BODY_SLUG = { type: 'string', maxLength: 200 } as const;
 const DAY = { type: ['string', 'null'], pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' } as const;
+
+const SITE_PARAMS = {
+  type: 'object',
+  properties: { site: SLUG },
+  required: ['site'],
+} as const;
+/** A new site's fields (R129): the database checks the slug, the country code and the retention's bounds. */
+const SITE_BODY = {
+  type: 'object',
+  properties: {
+    slug: BODY_SLUG,
+    name: localizedSchema(200),
+    countryCode: { type: 'string', maxLength: 10 },
+    defaultLocale: { type: 'string', maxLength: 10 },
+    enabledLocales: { type: 'array', items: { type: 'string', maxLength: 10 }, maxItems: 20 },
+    methodologyKind: { type: 'string', enum: ['demands', 'descriptive'] },
+    operatorId: UUID,
+    reportRetentionDays: { type: 'integer' },
+  },
+  required: [
+    'slug',
+    'name',
+    'countryCode',
+    'defaultLocale',
+    'enabledLocales',
+    'methodologyKind',
+    'operatorId',
+    'reportRetentionDays',
+  ],
+  additionalProperties: false,
+} as const;
+type SiteBody = Omit<SiteFields, 'name'> & { name: Record<string, string> };
+const SITE_ACTIVE_BODY = {
+  type: 'object',
+  properties: { active: { type: 'boolean' } },
+  required: ['active'],
+  additionalProperties: false,
+} as const;
+const HOSTNAME_BODY = {
+  type: 'object',
+  properties: { hostname: { type: 'string', maxLength: 300 }, canonical: { type: 'boolean' } },
+  required: ['hostname', 'canonical'],
+  additionalProperties: false,
+} as const;
 
 interface ElectionBody {
   slug?: string;
@@ -445,6 +498,41 @@ const organizationFields = (
     newsletterUrl: optionalText(body.newsletterUrl),
     isPauseaiChapter: body.isPauseaiChapter,
   };
+};
+
+/**
+ * A new site's fields as the database takes them (R129): its languages are the platform's (the messages it has), the
+ * default among them, and its name is in those languages, with text in at least one. The country code is uppercased;
+ * its shape, the slug's and the retention's bounds stay the database's to check.
+ */
+const siteFields = (body: SiteBody): SiteFields => {
+  const enabledLocales = [...new Set([body.defaultLocale, ...body.enabledLocales])];
+  if (!enabledLocales.every(isLocale)) {
+    throw new Refusal(400, 'invalid');
+  }
+  const name = localizedInput(body.name, enabledLocales);
+  if (name === 'invalid') {
+    throw new Refusal(400, 'invalid');
+  }
+  if (name === 'empty') {
+    throw new Refusal(422, 'incomplete');
+  }
+  return {
+    ...body,
+    slug: body.slug.trim(),
+    name,
+    countryCode: body.countryCode.trim().toUpperCase(),
+    enabledLocales,
+  };
+};
+
+/** The site the path names, or a 404 if there is none. */
+const siteFor = async (trx: Transaction<DB>, slug: string) => {
+  const site = await getSite(trx, slug);
+  if (!site) {
+    throw new Refusal(404, 'notFound');
+  }
+  return site;
 };
 
 /**
@@ -901,6 +989,88 @@ export const adminDataRoutes =
             );
           });
           return reply.code(204).send();
+        }),
+    );
+
+    // Every site, with its hostnames (PLAN R129), and the organizations that could run a new one.
+    scope.get('/sites', async (request, reply) =>
+      signedIn(request, reply, (db, actor) =>
+        withActor(db, actor, async (trx) => {
+          await platformOnly(trx, actor);
+          return {
+            sites: await listSites(trx),
+            organizations: (await listOrganizations(trx)).map(({ id, displayName, legalName }) => ({
+              id,
+              displayName,
+              legalName,
+            })),
+          };
+        }),
+      ),
+    );
+
+    // A new site, off until a platform admin turns it on (R129).
+    scope.post<{ Body: SiteBody }>(
+      '/sites',
+      { schema: { body: SITE_BODY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            await platformOnly(trx, actor);
+            await createSite(trx, siteFields(request.body));
+          });
+          return reply.code(201).send({ slug: request.body.slug });
+        }),
+    );
+
+    // One site, with its operator and hostnames.
+    scope.get<{ Params: { site: string } }>(
+      '/sites/:site',
+      { schema: { params: SITE_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            await platformOnly(trx, actor);
+            const { id: _id, ...site } = await siteFor(trx, request.params.site);
+            return { site };
+          }),
+        ),
+    );
+
+    // Turns a site on or off; the database refuses it on without an operator.
+    scope.put<{ Params: { site: string }; Body: { active: boolean } }>(
+      '/sites/:site/active',
+      { schema: { params: SITE_PARAMS, body: SITE_ACTIVE_BODY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            await platformOnly(trx, actor);
+            const site = await siteFor(trx, request.params.site);
+            refuseUnless(
+              (await setSiteActive(trx, site.id, request.body.active)) ? 'changed' : 'not-found',
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Gives a site a hostname: its DNS, route and certificate are a gitops change (R129).
+    scope.post<{ Params: { site: string }; Body: { hostname: string; canonical: boolean } }>(
+      '/sites/:site/hostnames',
+      { schema: { params: SITE_PARAMS, body: HOSTNAME_BODY } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            await platformOnly(trx, actor);
+            const site = await siteFor(trx, request.params.site);
+            await addHostname(
+              trx,
+              site.id,
+              request.body.hostname.trim().toLowerCase(),
+              request.body.canonical,
+            );
+          });
+          return reply.code(201).send();
         }),
     );
 

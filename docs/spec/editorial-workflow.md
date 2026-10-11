@@ -184,6 +184,19 @@ _Built: the fields of P2.1 but the logo, on `/platform/organizations` (PLAN R112
    operator is a PauseAI chapter and it holds a grant. [DB: deferred eligibility trigger]
 3. A grant can't be revoked while the tenant uses the asset: the tenant's selection changes first. [DB: same]
 
+### P4. Sites
+
+1. Only platform admins create a site, turn it on or off, and give it addresses. [DB: RLS on `tenants`,
+   `tenant_organizations`, `tenant_hostnames`]
+2. A new site starts off, with its operator, in the platform's languages, the default among them. [API, DB: checks]
+3. A site is on only with an operator. [DB: `active_tenant_has_operator`]
+4. An address is verified when a platform admin adds it, since its DNS, route and certificate are a gitops change; it
+   is the site's for good, never one that is taken, reserved or retired. Made the main one, it takes over from the old,
+   which redirects to it. [DB: `tenant_hostname_rules`, the one-canonical index]
+
+_Built (PLAN R129): `/platform/sites`, its new-site form and each site's page. Changing a site's name, languages or
+operator, and retiring an address, stay runbooks._
+
 ## 5. Tenant settings
 
 _As a country admin, I set up how my tenant looks and what it says about us._
@@ -594,13 +607,14 @@ _As a member, I triage what the public reports, and link the corrections it lead
 12. **History:** cell history, corrections log.
 13. **Reports:** queue and detail.
 14. **Audit log.**
-15. **Platform:** organizations, brand assets and grants (review settings live on the election and tenant screens).
+15. **Platform:** organizations, sites (P4), brand assets and grants (review settings live on the election and tenant
+    screens).
 
 ## 14. Not in M2
 
 - LLM suggestions (M4) and the MCP server (later). Evidence written in M2 is `manual`.
-- Creating tenants, hostnames and their DNS verification, changing a tenant's operator, core criteria and platform
-  admins in the admin: runbooks for the pilot (W6).
+- Hostnames' DNS verification, changing a tenant's operator, core criteria and platform admins in the admin:
+  runbooks for the pilot (W6). Creating tenants and giving them hostnames came later (P4, PLAN R129).
 - Bulk editing and theming beyond logo and colours (PLAN, cut list 5).
 - Notification emails (W17), passkeys (ADR-0003 §2) and changing a user's email.
 
@@ -637,8 +651,8 @@ Taken while drafting; each can be changed before M2 starts.
 - **W5. Passwords** of at least 12 characters; a reset keeps TOTP and revokes other sessions.
 - **W6. Platform-admin screens in M2** cover review settings, organizations, brand assets and grants, and members in
   any tenant. Tenants, hostnames, operator changes, core criteria and platform admins stay runbooks: rare for the
-  pilot, and hostnames need a gitops change anyway. Creating tenants gets a screen later, demo tenants included
-  (PLAN R111).
+  pilot, and hostnames need a gitops change anyway. Creating tenants got a screen later, demo tenants included
+  (P4, PLAN R111, R129).
 - **W7. The last country admin** can't be removed in the admin (an API check, not a database rule).
 - **W8. Structure forms in a draft election are last-write-wins:** those tables have no version column, and the
   audit log records every change. Cells use `content_version`.

@@ -10,7 +10,7 @@ export const generateMetadata = async (): Promise<Metadata> => ({
   title: getTranslator(await getLocale())('admin.platform.title'),
 });
 
-/** The platform's sections (§13.15): organizations for now; brand assets and sites come later (PLAN R111). */
+/** The platform's sections (§13.15): organizations and sites (PLAN R129); brand assets come later. */
 const PlatformPage = async () => {
   const t = getTranslator(await getLocale());
   return (
@@ -21,6 +21,11 @@ const PlatformPage = async () => {
         <li>
           <Link className={styles.link} href="/platform/organizations">
             {t('admin.organizations.title')}
+          </Link>
+        </li>
+        <li>
+          <Link className={styles.link} href="/platform/sites">
+            {t('admin.platformSites.title')}
           </Link>
         </li>
       </ul>

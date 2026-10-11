@@ -975,7 +975,7 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   with no new role, grant or function.
 - **R111. Creating a site gets a screen later** (revisits W6). Dani wants to create sites without a runbook, a demo
   site with fictional data among them. Planned for platform admins after the organizations screens; the hostname
-  stays a gitops change. Not scheduled yet.
+  stays a gitops change. Built: R129, with the demo content as R130.
 - **R113. The two quote normalisers follow the same Unicode rules** (D9). One forward migration puts the database's
   quote-matching regexes under `COLLATE "pg_c_utf8"` (Postgres's own Unicode classes, no longer the OS's glibc, which an
   image update could change silently); the live match (R77) uses `\p{Alphabetic}` and `\p{White_Space}` to match; both
@@ -1163,6 +1163,26 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   a freeze window). The database still lets a retired party's status change, which no public page shows. The party
   list in the admin and the public pages read the status and its date; the public sees a new check within the web
   app's minute.
+
+- **R129. Sites, on the platform's own screens** (R111, revisits W6; editorial workflow P4): `/platform/sites` lists
+  every site, on or off, with its addresses; `/platform/sites/new` creates one (short name, name in its languages,
+  country code, main and other languages from those the platform has messages for, methodology kind, operator, report
+  retention), always off, its operator linked in the same transaction; a site's page turns it on or off and gives it
+  addresses, verified on entry (the platform sets up their DNS, route and certificate in gitops, so a platform admin
+  vouches for them) and, if asked, made the main one, the old main one then redirecting to it. Everything goes
+  through the policies and triggers that already exist: platform admins alone insert tenants, their operator links
+  and hostnames; the database refuses a site on without an operator, a taken or reserved address, a malformed short
+  name or country code. No new grant, function or policy. Not here: changing a site's name, languages or operator,
+  and retiring an address, which stay runbooks; a short name that system paths shadow on the platform host
+  (`healthz`) isn't refused, since such a site is still reachable on its own address.
+- **R130. Demo content as SQL that Dani runs, never a seed** (task 5): `node packages/db/demo/print.ts sql <slug>`
+  prints one `DO` block that fills an empty, active site whose country code is user-assigned (XA–XZ, never a real
+  country) with an obviously fictional election: three "Partido Ejemplo" parties, four "Criterio de ejemplo" criteria,
+  two invented programmes as plain-text sources, four published cells (one of each rating, on the site's scale) and
+  the rest pending. It goes in through the real triggers (four-eyes, verbatim match, evidence), acting as three
+  fictional members it removes at the end; the programmes' bytes go on the volume first with put-file
+  (`print.ts file a|b`). It refuses a real country's site, an inactive one, one with elections or none at all, and
+  takes only a slug, so it can't put fictional content into iaenlasurnas.es's tenant.
 
 ## Open decisions for Dani
 
