@@ -142,7 +142,7 @@ Backups are not part of M1: they come from the cluster's backup plan (D2) and mu
 - **Share images** in four sizes, and link previews for every view (see Social sharing).
 - **SEO:** canonical URLs, sitemaps and `hreflang` groundwork.
 - **Security and traffic:** CSP and security headers; the Envoy rate-limit policy.
-- **Analytics:** Plausible.
+- **Analytics:** Plausible. Brought forward to the coming-soon page (R83).
 - **Coming soon:** a branded _próximamente_ page on the public hosts until the preview. The real site is visible
   only on a preview host on `gateway-private`, reachable over the VPN, so skipping the page needs no cookie or login
   on the public site.
@@ -699,6 +699,32 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   se publique" button (R50) is gone: signing up to the operator's general newsletter is not being told when the site
   is out. `organizations.newsletter_url` stays, unused, for M3. A real notify list stores addresses, so it waits for
   the privacy policy (M3) and email sending. The share cards keep "name · date" on one line.
+- **R83. Plausible, every feature, behind the site's own host** (Dani's choice: now, not at M3; the full feature set).
+  The site serves each tenant's Plausible script at `/_relay/views.js`, fetched from Plausible and kept five minutes
+  (a failure is retried after a minute, the last copy served meanwhile), and our bundle runs Plausible's installation
+  snippet with `endpoint: '/_relay/views'`, the proxy Plausible documents. So the browser talks to no other host (the
+  e2e test that no request leaves the site still holds), there is no inline script for M3's CSP to allow, blockers
+  that look for Plausible's host miss it, and time on page, scroll depth, outbound links, downloads and forms all
+  work, switched in Plausible's site settings. The relay forwards an event only for a host with a site, only that
+  site's (`d`) and about a page of that host (`u`, written as a browser writes it, so the odd address a browser writes
+  differently isn't counted), written out again as parsed so a repeated key can't mean something else to Plausible. It
+  refuses a browser's event from another site, caps the body, and passes on the browser and the visitor's public
+  address: the last `X-Forwarded-For` entry, the one the gateway adds after dropping any the client sent. Private,
+  loopback and VPN addresses are not visitors: Next fills in the socket's when nothing set the header, and every such
+  view would be one visitor, so those are not sent (preview visitors over the VPN aren't counted). Plausible hashes
+  the address and browser with a daily salt, stores neither, and derives countries from the address; the privacy
+  policy (M3) must say so. ADR-0003 §7 describes this relay beside the error relay. The tenant page loads the script,
+  not the root layout, so a 404 is not a page view; once M3 navigates client-side, the script's own capture would
+  count a soft navigation to a missing page, so M3 should turn `autoCapturePageviews` off and send page views from its
+  pages. Configuration: `PLAUSIBLE_URL`, Plausible's service inside the cluster, not its public host (the public
+  gateway drops `X-Forwarded-For`, so every visitor would be one), and `PLAUSIBLE_SITES`, a JSON object from each
+  tenant host to its site's `pa-….js` script; the Plausible site must be named after the host (the platform host would
+  put every tenant served by path into one site). A malformed configuration, or events naming another site, count
+  nothing and say so in the log, at most once a minute, as do Plausible's failures (5xx, 429, no answer), with nothing
+  of the visitor's. The script runs on our origin, so it is Plausible's code, from our own server, with the page's
+  privileges; the public site has no session or cookie to reach. Unit tests cover the configuration, the relay and the
+  script's caching, an e2e test follows a stand-in script's view to a fake Plausible, and Plausible's real script was
+  checked once to send to the relay with our loader.
 
 ## Open decisions for Dani
 

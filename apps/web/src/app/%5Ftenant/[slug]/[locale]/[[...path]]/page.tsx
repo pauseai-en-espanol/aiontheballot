@@ -4,10 +4,13 @@ import { pickLocalized } from '@aiontheballot/domain/localized';
 import { BRAND_SLOTS } from '@aiontheballot/domain/public-home';
 import { getTranslator, isLocale } from '@aiontheballot/i18n/messages';
 import { LINK_PREVIEW, SHARE_SIZES } from '@aiontheballot/og/sizes';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
 
+import { hostnameOf, readAnalytics } from '@/analytics';
 import { brandImagePath } from '@/brand-images';
+import { Analytics } from '@/components/analytics';
 import { ComingSoon } from '@/components/coming-soon';
 import { warmHomeImage } from '@/home-image';
 import { homeCardContent, homeCardHash, imagePath, ogLocale, pageUrl } from '@/share';
@@ -113,12 +116,20 @@ const TenantHome = async (props: TenantPageProps) => {
     const path = image && brandImagePath(image);
     return path ? `${root}${path}` : undefined;
   };
+  // Plausible, on a host the deployment gives a Plausible site (PLAN R83). Here, not in the root layout, which a 404
+  // renders in too: a missing page isn't a page view. The host picks the site and grants nothing.
+  const hostname = hostnameOf((await headers()).get('host'));
+  const counted =
+    hostname !== undefined && readAnalytics(process.env)?.sites.has(hostname) === true;
   return (
-    <ComingSoon
-      home={home}
-      locale={locale}
-      logos={{ onCanvas: logo(BRAND_SLOTS.operatorLogoOnCanvas) }}
-    />
+    <>
+      <ComingSoon
+        home={home}
+        locale={locale}
+        logos={{ onCanvas: logo(BRAND_SLOTS.operatorLogoOnCanvas) }}
+      />
+      {counted && <Analytics />}
+    </>
   );
 };
 

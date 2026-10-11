@@ -215,6 +215,13 @@ cross-country views and an open-data export.
     doesn't apply under Turbopack. Next's `compiler.define` sets `__SENTRY_TRACING__` and `__SENTRY_DEBUG__` to
     `false` instead.
   - Because the SDKs speak the Sentry protocol, switching backend later is a DSN change.
+- **Analytics:** Plausible (ADR-0001), behind each tenant host the same way (PLAN R83). The public site serves the
+  tenant's Plausible script at `/_relay/views.js` and relays its events from `/_relay/views` to Plausible's
+  in-cluster Service, so the browser talks to no other host and the CSP stays `'self'`. Unlike the error relay, it
+  forwards two client headers, because Plausible needs them to tell visitors apart and place them: the browser's
+  User-Agent and the visitor's public address (the last `X-Forwarded-For` entry, the gateway's; no public one, nothing sent).
+  Plausible hashes them with a daily salt and stores neither. It forwards only events of the requesting host's own
+  Plausible site, about its own pages, and sets no cookie.
 - **Observability:** the API, the worker and both Next apps are instrumented with OpenTelemetry from day one
   (traces, metrics, logs), independent of any backend.
   - Until a backend exists, OTLP export stays off and logs go to stdout.

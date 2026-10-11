@@ -388,7 +388,7 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
 - Paths whose first segment starts with `_` are reserved and get 404, percent-encoded or not, so no request can
   target the internal prefix. Slugs can never start with `_`.
 - System paths are served as they are on any host, without the rewrite: build assets (`/_next/`), the health probe
-  (`/healthz`, which the kubelet calls with the pod IP as host) and the error relay (`/_relay/`).
+  (`/healthz`, which the kubelet calls with the pod IP as host) and the relays (`/_relay/`: errors, analytics).
 - `www.` gets no special treatment: it is an ordinary alias, and 404 unless registered.
 - `resolve()`, `canonicalBase()` and the routing table live in `packages/domain`. The table is built from public
   hostname data and re-checks the hostname invariants above.

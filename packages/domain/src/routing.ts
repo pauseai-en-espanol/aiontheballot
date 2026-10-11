@@ -39,7 +39,7 @@ export interface RoutingRequest {
 }
 
 export type Resolution =
-  /** Build assets, the health probe and the error relay: served as they are, on any host. */
+  /** Build assets, the health probe and the relays (errors, analytics): served as they are, on any host. */
   | { kind: 'system' }
   | { kind: 'not-found' }
   /** Always a 301, to an absolute URL on the tenant's canonical base. */
@@ -188,7 +188,7 @@ const serve = (
 /**
  * Resolves a public request (ADR-0002, Routing):
  *
- * 1. Build assets, the health probe and the error relay pass through on any host; other `_` paths are 404.
+ * 1. Build assets, the health probe and the relays pass through on any host; other `_` paths are 404.
  * 2. On the platform host, `/{slug}/…` is served, or 301s to the tenant's canonical host when it has one.
  * 3. A verified alias 301s to the tenant's canonical base, same path and query.
  * 4. The canonical hostname serves.

@@ -215,8 +215,8 @@ Amended: bytes first lived in Postgres (`app.file_blobs`); the owner moved them 
 - `Cache-Control` with `stale-while-revalidate` for browsers. Images use content-hash URLs marked `immutable`.
 - The public web and the API each run at least 2 replicas (`pauseai-es` precedent), with explicit resource
   requests and limits. Background jobs run in the separate worker (ADR-0003).
-- An Envoy Gateway `BackendTrafficPolicy` applies a per-IP rate limit to the report, image and error-relay
-  endpoints. Client IPs reach the gateway intact through Cilium.
+- An Envoy Gateway `BackendTrafficPolicy` applies a per-IP rate limit to the report, image, error-relay and
+  analytics-relay endpoints. Client IPs reach the gateway intact through Cilium.
 - An M5 load test measures requests per second for HTML and for images, and how much uplink headroom is left.
   Where it runs is open (PLAN.md, D6).
 
@@ -227,7 +227,8 @@ Cloudflare's proxy in front. The dashboard toggle alone is not enough, because:
   annotation on the HTTPRoute instead.
 - **SSL mode must be Full (strict).** The origin's Let's Encrypt certificate satisfies it.
 - **Proxying doesn't cache pages.** HTML caching needs a Cache Rule.
-- **Per-IP rate limits degrade.** The gateway strips `CF-Connecting-IP`.
+- **Per-IP rate limits and Plausible's visitor counts degrade.** The gateway strips `CF-Connecting-IP`, so both see
+  Cloudflare's addresses.
 - **The origin stays reachable** directly, so an attacker could bypass Cloudflare.
 
 ### Operations

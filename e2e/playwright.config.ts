@@ -9,7 +9,9 @@ import {
   GLITCHTIP_URL,
   PLATFORM_HOST,
   PLATFORM_NAME,
+  PLAUSIBLE_URL,
   PORTS,
+  SEED_HOSTS,
   WEB_URL,
 } from './servers.js';
 
@@ -43,13 +45,27 @@ export default defineConfig({
       env: { PORT: String(PORTS.glitchtip) },
     },
     {
+      name: 'plausible',
+      command: 'node fake-plausible.ts',
+      url: `${PLAUSIBLE_URL}/healthz`,
+      env: { PORT: String(PORTS.plausible) },
+    },
+    {
       name: 'web',
       // Bound like the production image (HOSTNAME=0.0.0.0): with 127.0.0.1, Next renames the host to localhost in the
       // proxy's URLs but not in its own, so it takes every tenant rewrite for an external one.
       command: `pnpm exec next start --port ${PORTS.web} --hostname 0.0.0.0`,
       cwd: '../apps/web',
       url: `${WEB_URL}/healthz`,
-      env: { PLATFORM_NAME, SENTRY_DSN: DSNS.web, API_URL, PLATFORM_HOST },
+      env: {
+        PLATFORM_NAME,
+        SENTRY_DSN: DSNS.web,
+        API_URL,
+        PLATFORM_HOST,
+        // Only ejemplo-a's canonical host has a Plausible site, so the other hosts show it loads nowhere else.
+        PLAUSIBLE_URL,
+        PLAUSIBLE_SITES: JSON.stringify({ [SEED_HOSTS.canonical]: 'pa-e2e.js' }),
+      },
     },
     {
       name: 'api',

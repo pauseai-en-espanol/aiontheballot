@@ -18,8 +18,8 @@ const FORWARDED_RESPONSE_HEADERS = ['retry-after', 'x-sentry-rate-limits'];
 const reply = (status: number, headers: Record<string, string> = {}): Response =>
   new Response(null, { status, headers: { 'cache-control': 'no-store', ...headers } });
 
-/** Reads the body up to `limit` bytes; undefined if it is larger. */
-const readLimited = async (body: ReadableStream<Uint8Array> | null, limit: number) => {
+/** Reads the body up to `limit` bytes; undefined if it is larger. Also used by the web app's analytics relay. */
+export const readLimited = async (body: ReadableStream<Uint8Array> | null, limit: number) => {
   if (!body) {
     return new Uint8Array();
   }

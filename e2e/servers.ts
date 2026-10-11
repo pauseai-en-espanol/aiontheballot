@@ -1,7 +1,13 @@
 /**
  * Where the e2e run serves each app's production build. The ports stay clear of `pnpm dev` (3000-3002).
  */
-export const PORTS = { web: 4100, api: 4101, admin: 4102, glitchtip: 4103 } as const;
+export const PORTS = {
+  web: 4100,
+  api: 4101,
+  admin: 4102,
+  glitchtip: 4103,
+  plausible: 4104,
+} as const;
 
 export const WEB_URL = `http://127.0.0.1:${PORTS.web}`;
 export const API_URL = `http://127.0.0.1:${PORTS.api}`;
@@ -17,6 +23,9 @@ export const DSNS = {
   admin: `http://e2e-admin@127.0.0.1:${PORTS.glitchtip}/2`,
   api: `http://e2e-api@127.0.0.1:${PORTS.glitchtip}/3`,
 } as const;
+
+/** A stand-in for Plausible (fake-plausible.ts): the site script the web app serves, and the events API it relays to. */
+export const PLAUSIBLE_URL = `http://127.0.0.1:${PORTS.plausible}`;
 
 /**
  * The fictional seeds' public addresses (packages/db/seeds/seed.ts): browsers resolve `.localhost` names to this
