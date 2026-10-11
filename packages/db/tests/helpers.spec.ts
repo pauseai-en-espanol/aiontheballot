@@ -18,6 +18,13 @@ describe('private.normalize_for_match', () => {
     '“agencia” — ‘supervisión’ – «control»',
     '  una frase \n\n de   ejemplo ',
     'Partido Ejemplo A propone una “moratoria” en la pág. 12…',
+    // Unicode's rules on both sides (PLAN R113): a byte-order mark goes; spaces are White_Space, letters Alphabetic.
+    '\uFEFFinicio con\uFEFF marca',
+    'línea\u0085siguiente, sin\u00A0romper, párrafo\u2028nuevo, ancho\u3000ideográfico',
+    'cero\u200Bancho y separador\u180Emongol',
+    'tabulador\tvertical\u000Bpágina\f',
+    'ab\u0345-\ncd',
+    'inteli-\u0085gencia',
   ];
 
   it.each(fixtures)('matches the TypeScript port for %j', async (input) => {

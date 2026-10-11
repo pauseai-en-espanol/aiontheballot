@@ -280,10 +280,12 @@ document, stays private.
   `private.normalize_for_match()`.
 - That normalization only affects matching; the quote is always displayed exactly as stored. It:
   - applies Unicode NFKC, which expands ligatures such as "ﬁ";
-  - removes soft hyphens;
+  - removes soft hyphens and byte-order marks (U+FEFF);
   - re-joins words hyphenated across line breaks;
   - folds typographic quotes and dashes;
   - collapses whitespace.
+- Letters and spaces are Unicode's Alphabetic and White_Space on both sides: the database's regexes run under the
+  builtin `pg_c_utf8` collation, never the OS's C library, which an image update could change silently (PLAN R113).
 - A TypeScript port of the function is tested against the same fixture file, so the UI and the database agree.
 - Matching runs across a document's pages, so a quote spanning a page break matches; the public sees the matched
   pages, never a page someone typed.

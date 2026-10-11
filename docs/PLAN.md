@@ -640,7 +640,7 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   matching part is given normalised; the editor will need it mapped back onto the quote as typed. Text Postgres can't
   hold at all (a NUL character) is refused on save as invalid. The API route that serves it, which should keep each
   source's normalised pages rather than redo them per keystroke, waits for sign-in (editorial workflow spec §18, O2).
-  The two normalisers still differ on rare characters: D9.
+  The two normalisers still differed on rare characters: D9, fixed by R113.
 - **R78. Database refusals become HTTP answers by SQLSTATE** (editorial workflow §2.3): 42501 → 403, 23001, 40001
   and 40P01 → 409 ("reload"), 23514 → 422, 23505 → 409, 23503 → 409 ("linked"), 54000 → 429, invalid values → 400,
   each with a message key in `packages/i18n` (English and Spanish), plus the constraint's name for unique, foreign key
@@ -981,6 +981,11 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   image update could change silently); the live match (R77) uses `\p{Alphabetic}` and `\p{White_Space}` to match; both
   drop U+FEFF (which copying from a PDF or Word brings in); the parity test covers these characters on both sides; and
   a check confirms no stored match would change. To build before the cell editor's UI.
+  _Built:_ migration `quote_normaliser_unicode` and `normalizeForMatch` (`\p{Alphabetic}`, `\p{White_Space}`: JS's
+  `\s` took U+FEFF and missed U+0085). The migration first normalises every stored source text and quote both ways and
+  stops if any would change, since a generated column keeps what it stored; a guard test proves it stops. The parity
+  test adds U+FEFF, U+0085, U+00A0, U+2028, U+3000, U+200B, U+180E, tabs and form feeds, and a letter that is
+  Alphabetic but no `\p{L}` (U+0345) before a broken word.
 - **R114. Invitations for people without an account use one narrow lookup** (D10). `private.pending_invitation(token)`,
   a `SECURITY DEFINER` function executable by `aiontheballot_admin` only, with an empty `search_path`, returns the email
   and role of a pending, unexpired invitation whose `token_hash` is the token's SHA-256, and nothing otherwise. The API

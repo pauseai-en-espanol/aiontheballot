@@ -1787,10 +1787,10 @@ CREATE FUNCTION private.normalize_for_match(input text) RETURNS text
       regexp_replace(
         regexp_replace(
           translate(
-            replace(normalize(input, NFKC), U&'\00AD', ''),
+            replace(replace(normalize(input, NFKC), U&'\00AD', ''), U&'\FEFF', ''),
             U&'\2018\2019\201A\201B\2032\201C\201D\201E\201F\2033\00AB\00BB\2010\2011\2012\2013\2014\2015\2212',
             $map$'''''"""""""-------$map$
-          ),
+          ) COLLATE "pg_c_utf8",
           '([[:alpha:]])-[[:space:]]*\n[[:space:]]*([[:alpha:]])', '\1\2', 'g'
         ),
         '[[:space:]]+', ' ', 'g'

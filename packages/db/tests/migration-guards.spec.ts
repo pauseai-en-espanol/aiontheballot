@@ -129,3 +129,60 @@ describe('files_on_volume', () => {
     expect(await migrate(dir)).toBeUndefined();
   }, 120_000);
 });
+
+describe('quote_normaliser_unicode', () => {
+  let dir: string;
+  let migration: string;
+  const TENANT = '0190f8c4-5eed-7000-8000-0000000000ba';
+  const ELECTION = '0190f8c4-5eed-7000-8000-0000000000bb';
+  const SOURCE = '0190f8c4-5eed-7000-8000-0000000000bc';
+
+  beforeAll(async () => {
+    await superuser(`DROP DATABASE IF EXISTS ${SCRATCH} WITH (FORCE)`);
+    await superuser(`CREATE DATABASE ${SCRATCH} OWNER aiontheballot_owner`);
+    dir = await mkdtemp(join(tmpdir(), 'migration-guards-'));
+    migration = await migrationsBefore(dir, 'quote_normaliser_unicode');
+    expect(await migrate(dir)).toBeUndefined();
+    await copyFile(join(migrationsDir, migration), join(dir, migration));
+    await asOwner(`
+      INSERT INTO app.tenants (id, slug, country_code, default_locale, enabled_locales, display_name,
+                               methodology_kind, report_retention_days)
+      VALUES ('${TENANT}', 'ejemplo-guarda', 'XA', 'es', '{es}', '{"es": "Inquilino de ejemplo"}', 'demands', 30);
+      INSERT INTO app.elections (id, tenant_id, slug, type, name)
+      VALUES ('${ELECTION}', '${TENANT}', 'generales-de-ejemplo', 'general', '{"es": "Generales de ejemplo"}');
+      INSERT INTO app.source_documents (id, tenant_id, election_id, kind, title, url)
+      VALUES ('${SOURCE}', '${TENANT}', '${ELECTION}', 'web_page', 'Fuente de ejemplo',
+              'https://example.org/fuente-de-ejemplo')`);
+  }, 120_000);
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+    await superuser(`DROP DATABASE IF EXISTS ${SCRATCH} WITH (FORCE)`);
+  });
+
+  it('refuses while a stored source text would normalise differently, its stored form then stale', async () => {
+    // A byte-order mark, which the old normaliser kept. Put straight in, past extraction's rules: only the stored
+    // text matters here.
+    await asOwner(`
+      ALTER TABLE app.source_texts DISABLE TRIGGER USER;
+      INSERT INTO app.source_texts (source_document_id, tenant_id, unit_index, label, body)
+      VALUES ('${SOURCE}', '${TENANT}', 1, '§ 1', U&'Texto\\FEFF de ejemplo');
+      ALTER TABLE app.source_texts ENABLE TRIGGER USER`);
+    expect(await migrate(dir)).toContain(
+      '1 stored source texts or quotes would normalise differently',
+    );
+    await asOwner(`
+      ALTER TABLE app.source_texts DISABLE TRIGGER USER;
+      DELETE FROM app.source_texts WHERE source_document_id = '${SOURCE}';
+      ALTER TABLE app.source_texts ENABLE TRIGGER USER`);
+  }, 120_000);
+
+  it('runs once every stored text normalises the same', async () => {
+    await asOwner(`
+      ALTER TABLE app.source_texts DISABLE TRIGGER USER;
+      INSERT INTO app.source_texts (source_document_id, tenant_id, unit_index, label, body)
+      VALUES ('${SOURCE}', '${TENANT}', 1, '§ 1', 'Texto de ejemplo');
+      ALTER TABLE app.source_texts ENABLE TRIGGER USER`);
+    expect(await migrate(dir)).toBeUndefined();
+  }, 120_000);
+});

@@ -1270,9 +1270,10 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
    which province belongs to which region. When municipal coverage or containment checks are needed, a later
    migration adds a reference table `app.territories (code, parent_code, kind)` (INE codes for municipalities) and
    turns the territory columns into foreign keys to it. Existing ISO codes stay valid.
-8. **Normalization drift.** `normalize_for_match` relies on Postgres's Unicode tables, which a major upgrade can
-   change; stored `normalized` columns are not recomputed. The parity tests run against each new Postgres version,
-   and a migration recomputes the column if they differ.
+8. **Normalization drift.** `normalize_for_match` relies on Postgres's own Unicode tables (`pg_c_utf8`, PLAN R113),
+   which a major upgrade can change; stored `normalized` columns are not recomputed. The parity tests run against each
+   new Postgres version, and a migration recomputes the column if they differ; one that changes the function checks
+   first that no stored text would normalise differently.
 9. **Later, not blocked:** translation-only revisions (`change_kind = 'translation'`, kept out of the corrections
    log) when a second locale arrives; publishing party responses (not in the brief); per-election endorsers and
    dated reviewer attributions; whether marking a report as spam needs a reviewer (editorial workflow spec).
