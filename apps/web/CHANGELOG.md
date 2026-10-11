@@ -1,5 +1,12 @@
 # @aiontheballot/web
 
+## 0.9.4
+
+### Patch Changes
+
+- Updated dependencies [ed8f815]
+  - @aiontheballot/i18n@0.9.0
+
 ## 0.9.3
 
 ### Patch Changes
