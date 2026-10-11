@@ -1,5 +1,27 @@
 # @aiontheballot/domain
 
+## 0.8.0
+
+### Minor Changes
+
+- b869a83: The public site's election pages (PLAN R125): the scorecard, with a table on desktops and cards per party or per
+  criterion on phones, and the party, criterion, cell and methodology pages, every cell able to show "pending", from a
+  new public election route in the API. The fixed rating visuals. Security headers on every response (R126); per-site
+  sitemaps and robots, and the page's language in `<html lang>` (R127).
+- 7bd93a4: The site's own signup list (PLAN R119, R122): double opt-in through three narrow database functions, a confirmation
+  email through the platform's one sender (R115, R123), one-click unsubscribe, unconfirmed addresses deleted after 7
+  days, and counts for country admins. The legal notice, privacy policy and page about the operator, served before the
+  site opens (R124). Site modes (coming soon, open, preview) and a site's own words in its paths (R121).
+
+### Patch Changes
+
+- 59950f5: The cell editor and the review workflow (PLAN R131): the election's cell grid, and each cell's page to draft a rating
+  with quotes checked against their source as they are typed, record checked documents, submit, recall, publish, send
+  back with a note, comment, clear a recheck flag and delete a cell never published, at the version loaded.
+- 4fc2f00: The quote normalisers follow Unicode's rules on both sides (PLAN R113): letters and spaces are Unicode's Alphabetic
+  and White_Space, the database's under `pg_c_utf8`, and a byte-order mark is dropped. The migration stops if any stored
+  text would normalise differently.
+
 ## 0.7.1
 
 ### Patch Changes

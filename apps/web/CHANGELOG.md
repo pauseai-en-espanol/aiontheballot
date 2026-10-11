@@ -1,5 +1,31 @@
 # @aiontheballot/web
 
+## 0.10.0
+
+### Minor Changes
+
+- b869a83: The public site's election pages (PLAN R125): the scorecard, with a table on desktops and cards per party or per
+  criterion on phones, and the party, criterion, cell and methodology pages, every cell able to show "pending", from a
+  new public election route in the API. The fixed rating visuals. Security headers on every response (R126); per-site
+  sitemaps and robots, and the page's language in `<html lang>` (R127).
+- 7bd93a4: The site's own signup list (PLAN R119, R122): double opt-in through three narrow database functions, a confirmation
+  email through the platform's one sender (R115, R123), one-click unsubscribe, unconfirmed addresses deleted after 7
+  days, and counts for country admins. The legal notice, privacy policy and page about the operator, served before the
+  site opens (R124). Site modes (coming soon, open, preview) and a site's own words in its paths (R121).
+
+### Patch Changes
+
+- Updated dependencies [59950f5]
+- Updated dependencies [5c4e6b8]
+- Updated dependencies [91cfb5a]
+- Updated dependencies [b869a83]
+- Updated dependencies [4fc2f00]
+- Updated dependencies [7bd93a4]
+- Updated dependencies [5896c16]
+  - @aiontheballot/i18n@0.13.0
+  - @aiontheballot/domain@0.8.0
+  - @aiontheballot/og@0.3.3
+
 ## 0.9.8
 
 ### Patch Changes

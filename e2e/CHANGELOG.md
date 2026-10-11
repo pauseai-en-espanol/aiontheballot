@@ -1,5 +1,31 @@
 # @aiontheballot/e2e
 
+## 0.15.1
+
+### Patch Changes
+
+- 59950f5: The cell editor and the review workflow (PLAN R131): the election's cell grid, and each cell's page to draft a rating
+  with quotes checked against their source as they are typed, record checked documents, submit, recall, publish, send
+  back with a note, comment, clear a recheck flag and delete a cell never published, at the version loaded.
+- b39e27a: Reach the fictional sites' hostnames through the by-host helper in every request a test makes itself, since Node
+  doesn't resolve `*.localhost` on the self-hosted runner (browsers do).
+- 5c4e6b8: Invitations (PLAN R114): country admins invite someone by email with a role from the members page, revoke and delete
+  invitations; the invited person follows the link, chooses a name and a password if they have no account, and the
+  membership is theirs once they have set up their second factor.
+- 91cfb5a: A party's programme status on the admin's party page (editorial workflow PS1, PLAN R128): a check records the status
+  and its date, which the scorecard shows, in a live election too; "published" needs a source marked as the programme.
+- b869a83: The public site's election pages (PLAN R125): the scorecard, with a table on desktops and cards per party or per
+  criterion on phones, and the party, criterion, cell and methodology pages, every cell able to show "pending", from a
+  new public election route in the API. The fixed rating visuals. Security headers on every response (R126); per-site
+  sitemaps and robots, and the page's language in `<html lang>` (R127).
+- 7bd93a4: The site's own signup list (PLAN R119, R122): double opt-in through three narrow database functions, a confirmation
+  email through the platform's one sender (R115, R123), one-click unsubscribe, unconfirmed addresses deleted after 7
+  days, and counts for country admins. The legal notice, privacy policy and page about the operator, served before the
+  site opens (R124). Site modes (coming soon, open, preview) and a site's own words in its paths (R121).
+- 5896c16: Sites on the platform's own screens (PLAN R129): platform admins list every site with its addresses, create one
+  (off, with its operator) and turn it on or off. Demo content for a demo site (PLAN R130): a script prints the SQL
+  that fills an empty, active site in a user-assigned country with an obviously fictional election.
+
 ## 0.15.0
 
 ### Minor Changes

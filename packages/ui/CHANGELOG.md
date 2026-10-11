@@ -1,5 +1,14 @@
 # @aiontheballot/ui
 
+## 0.3.0
+
+### Minor Changes
+
+- b869a83: The public site's election pages (PLAN R125): the scorecard, with a table on desktops and cards per party or per
+  criterion on phones, and the party, criterion, cell and methodology pages, every cell able to show "pending", from a
+  new public election route in the API. The fixed rating visuals. Security headers on every response (R126); per-site
+  sitemaps and robots, and the page's language in `<html lang>` (R127).
+
 ## 0.2.1
 
 ### Patch Changes
