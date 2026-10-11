@@ -1014,6 +1014,17 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   dump job; the shared Postgres runs only itself and its metrics exporter. ADR-0001's nightly `pg_dump -Fc` and
   off-node copies are still to do, in gitops (Dani's side), before the preview at the latest. Until then no migration
   can be undone by a restore, and R118 has nothing to rehearse on; a manual dump is the stopgap.
+- **R119. "Let me know when it's ready": the site's own signup list, not an outside newsletter service** (decided with
+  Dani). On the coming-soon page, per site: an email field, a consent line linking to the privacy policy, and an
+  optional, unticked box "also tell me about future elections on this site". The form says that a confirmation email
+  follows (double opt-in, the AEPD's recommended proof of consent) and what happens to the address. Unconfirmed
+  addresses are deleted after 7 days. At launch, one email goes out in the operator's name (R115) with a one-click
+  unsubscribe; then every address without the future-elections box is deleted (storage limitation: the purpose is
+  done), and the others stay until they unsubscribe, for the next election's announcement. The public site gets three
+  narrow `SECURITY DEFINER` functions, to sign up, confirm and unsubscribe (tokens stored as SHA-256, rate-limited),
+  like `submit_report`: an ADR-0002 amendment, approved, written when built. Country admins see only counts and a
+  "send the announcement" action, never the addresses. The form appears only once the site has a published privacy
+  policy, which says the same (the operator's text, written in the admin).
 
 **M2 platform screens:**
 
@@ -1123,6 +1134,7 @@ My default is in brackets.
 | R94: members' names                                   | The in-place amendment of ADR-0002 §2 stands (R110)                                                                                                                                                                                                                                                                                                                                |
 | Creating sites                                        | A platform-admin screen later, demo sites included; the hostname stays a gitops change (R111)                                                                                                                                                                                                                                                                                      |
 | D6: pre-production checks                             | Migrations rehearsed on a copy of a backup, launch tests on production at a quiet hour (R118)                                                                                                                                                                                                                                                                                      |
+| Signup list                                           | The site's own double opt-in list: one launch email, an optional future-elections list, the rest deleted (R119)                                                                                                                                                                                                                                                                    |
 | D7: orphaned bytes                                    | A scheduled sweep with its own role and one narrow function, built with uploads (R117)                                                                                                                                                                                                                                                                                             |
 | D8: the worker and files                              | Only the job's file, handed over by the API, in a boxed-in sandbox (R116)                                                                                                                                                                                                                                                                                                          |
 | D9: quote normalisers                                 | The same Unicode rules on both sides, `pg_c_utf8` in the database, U+FEFF dropped (R113)                                                                                                                                                                                                                                                                                           |
