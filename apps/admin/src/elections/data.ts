@@ -81,6 +81,10 @@ export interface Party {
   website: string | null;
   territoryCodes: string[] | null;
   programmeStatus: 'pending' | 'published';
+  /** When someone last checked the programme (PS1), an ISO 8601 instant; null if never. */
+  programmeCheckedAt: string | null;
+  /** Whether a source of the party is marked as its programme, which "published" needs. */
+  hasProgrammeSource: boolean;
   retired: boolean;
 }
 

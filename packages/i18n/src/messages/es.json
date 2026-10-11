@@ -438,7 +438,21 @@
       "territoriesInvalid": "Usa códigos ISO 3166-2, como XX-AN, separados por comas.",
       "delete": "Borrar partido",
       "deleteTitle": "¿Borrar este partido?",
-      "deleteBody": "El partido se borra de esta elección en borrador. Antes hay que quitar sus celdas y sus fuentes."
+      "deleteBody": "El partido se borra de esta elección en borrador. Antes hay que quitar sus celdas y sus fuentes.",
+      "programme": {
+        "title": "Programa",
+        "intro": "Si el partido ha publicado su programa electoral y cuándo lo comprobamos por última vez. El público ve ambas cosas, también en elecciones en curso.",
+        "pending": "Aún no publicado",
+        "published": "Publicado",
+        "checkedOn": "Comprobado por última vez el {date, date, long}.",
+        "neverChecked": "Sin comprobar: el público no ve nada sobre él.",
+        "status": "Estado: {status}.",
+        "checkPending": "Comprobado: aún no publicado",
+        "checkPublished": "Comprobado: publicado",
+        "needsSource": "«Publicado» necesita una fuente del partido marcada como su programa. Añádela antes en sus fuentes.",
+        "saved": "Comprobación registrada.",
+        "readOnly": "Esta elección está archivada: el estado de sus programas ya no cambia."
+      }
     },
     "criteria": {
       "intro": "Los criterios con los que se valora a los partidos, en el orden en que los muestra la tabla pública.",

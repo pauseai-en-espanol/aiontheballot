@@ -1159,6 +1159,14 @@ R118's note).
   (PDFs and web pages are matched automatically; the rest need a second person to attest them). Restricting to
   official documents is the most defensible. Separately: which kinds can back "No lo menciona", which may be given
   before a party's programme exists? The default is the party's programme and its website.
+- **R128. The programme status on the admin's party page** (editorial workflow PS1, the scorecard's "Programa aún no
+  publicado (comprobado el …)"): two buttons, "Checked: still not published" and "Checked: published", each a check
+  that sets the status, even to the same one, and that the database stamps with its date (R29), in a live election
+  too, as the spec allows; an archived election's is read-only. "Published" needs a source marked as the party's
+  programme (R30): without one its button says so and sends nothing, and the database would refuse it anyway. A new
+  route, `PUT /api/t/{tenant}/e/{election}/parties/{id}/programme`, runs it in the actor's transaction; RLS and the
+  programme trigger decide (editors and country admins, outside a freeze window). The party list in the admin and the
+  public pages read the status and its date; the public sees a new check within the web app's minute.
 
 ## Pushback and clarifications on the brief
 

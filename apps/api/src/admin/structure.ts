@@ -32,6 +32,10 @@ export interface Party {
   website: string | null;
   territoryCodes: string[] | null;
   programmeStatus: 'pending' | 'published';
+  /** When someone last checked (editorial workflow PS1), an ISO 8601 instant; null if never. */
+  programmeCheckedAt: string | null;
+  /** Whether a source of the party is marked as its programme, which "published" needs (PLAN R30). */
+  hasProgrammeSource: boolean;
   retired: boolean;
 }
 
@@ -58,6 +62,17 @@ export const listParties = async (trx: Transaction<DB>, electionId: string): Pro
         'website',
         'territory_codes',
         'programme_status',
+        sql<string | null>`to_json(programme_checked_at)#>>'{}'`.as('programme_checked_at'),
+        (eb) =>
+          eb
+            .exists(
+              eb
+                .selectFrom('app.source_documents as s')
+                .select('s.id')
+                .whereRef('s.party_id', '=', 'app.parties.id')
+                .where('s.is_programme', '=', true),
+            )
+            .as('has_programme_source'),
         'retired_at',
       ])
       .where('election_id', '=', electionId)
@@ -74,8 +89,31 @@ export const listParties = async (trx: Transaction<DB>, electionId: string): Pro
     website: row.website,
     territoryCodes: row.territory_codes,
     programmeStatus: row.programme_status,
+    programmeCheckedAt: row.programme_checked_at,
+    hasProgrammeSource: row.has_programme_source === true,
     retired: row.retired_at !== null,
   }));
+
+/**
+ * Records a check of a party's programme (editorial workflow PS1): sets its status, even to the same value, which the
+ * database stamps with the check's date. "Published" needs a source marked as the party's programme; an archived
+ * election or a freeze window refuses it (the database decides, and audits it).
+ */
+export const setProgrammeStatus = async (
+  trx: Transaction<DB>,
+  electionId: string,
+  partyId: string,
+  status: 'pending' | 'published',
+): Promise<ChangeResult> => {
+  const updated = await trx
+    .updateTable('app.parties')
+    .set({ programme_status: status })
+    .where('election_id', '=', electionId)
+    .where('id', '=', partyId)
+    .returning('id')
+    .executeTakeFirst();
+  return updated ? 'changed' : refusalFor(trx, 'app.parties', electionId, partyId);
+};
 
 /** The next display order in a list: after the last one. */
 const nextOrder = async (

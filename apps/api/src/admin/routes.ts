@@ -67,6 +67,7 @@ import {
   listParties,
   type PartyFields,
   reorder,
+  setProgrammeStatus,
   updateCriterion,
   updateParty,
 } from './structure.js';
@@ -1124,6 +1125,35 @@ export const adminDataRoutes =
               methodologyId
                 ? await deleteReviewer(trx, methodologyId, request.params.id)
                 : 'not-found',
+            );
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // A party's programme status (PS1): a check, even to the same status, stamps its date; live elections included.
+    scope.put<{
+      Params: { tenant: string; election: string; id: string };
+      Body: { status: 'pending' | 'published' };
+    }>(
+      '/t/:tenant/e/:election/parties/:id/programme',
+      {
+        schema: {
+          params: ELECTION_ID_PARAMS,
+          body: {
+            type: 'object',
+            properties: { status: { type: 'string', enum: ['pending', 'published'] } },
+            required: ['status'],
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            refuseUnless(
+              await setProgrammeStatus(trx, election.id, request.params.id, request.body.status),
             );
           });
           return reply.code(204).send();

@@ -438,7 +438,21 @@
       "territoriesInvalid": "Use ISO 3166-2 codes, such as XX-AN, separated by commas.",
       "delete": "Delete party",
       "deleteTitle": "Delete this party?",
-      "deleteBody": "The party is deleted from this draft election. Its cells and sources must go first."
+      "deleteBody": "The party is deleted from this draft election. Its cells and sources must go first.",
+      "programme": {
+        "title": "Programme",
+        "intro": "Whether the party has published its electoral programme, and when we last checked. The public sees both, live elections included.",
+        "pending": "Not published yet",
+        "published": "Published",
+        "checkedOn": "Last checked on {date, date, long}.",
+        "neverChecked": "Not checked yet: the public sees nothing about it.",
+        "status": "Status: {status}.",
+        "checkPending": "Checked: still not published",
+        "checkPublished": "Checked: published",
+        "needsSource": "“Published” needs a source of the party marked as its programme. Add one in its sources first.",
+        "saved": "Check recorded.",
+        "readOnly": "This election is archived: its programme statuses no longer change."
+      }
     },
     "criteria": {
       "intro": "The criteria the parties are assessed against, in the order the public table shows them.",
