@@ -29,6 +29,7 @@ const withDefaults = (home: PublicHome): PublicHome => {
     ...home,
     brand: older.brand ?? {},
     documents: older.documents ?? {},
+    elections: older.elections ?? [],
     signups: older.signups ?? false,
     operator: {
       ...home.operator,

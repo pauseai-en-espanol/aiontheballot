@@ -1116,6 +1116,31 @@ R118's note).
 
 ## Questions for the chapter
 
+- **R125. The public site's election pages (M3), as built** ([spec](spec/public-site.md) §5): the scorecard, with a
+  table on screens of 1,024 px and more (parties down the side, criteria across, the party column fixed and the table
+  scrolling sideways inside a focusable region) and cards on smaller ones, one per party or, through a plain link
+  (`?vista=criterios`), one per criterion; the party, criterion, cell and methodology pages. A cell is rated, pending
+  (no revision) or withdrawn (its latest revision withdrew the rating, worded "Valoración retirada", provisional), never
+  shown by colour alone: the rating visuals are fixed in `packages/ui` (a tick, a half, a cross, a slashed circle,
+  three dots in a dashed circle, each outlined in ink, its mark at 3:1 against its fill, each place on a scale with its
+  own shape and the same shape in both kinds of methodology, tests for all of it). Every scorecard, party, criterion
+  and cell page has the legend with the methodology link (BRIEF invariant 2); every page has the operator line, and an
+  e2e crawl checks both. A party's colour is an SVG fill beside its name, never a style attribute. Retired parties and
+  criteria aren't shown. An open site's home, and the preview host's, answers 307 to the current election (the soonest
+  live, else the latest archived); otherwise it is the coming-soon page. The data is a new public route,
+  `GET /public/tenants/{slug}/elections/{election}`, read as `aiontheballot_web` (live and archived elections only;
+  sources with their public columns only), cached by the web app for 60 seconds per election, at most 200 kept, a
+  missing one remembered too. Every page's link preview is the home's card until per-view cards come (M3).
+- **R126. Security headers on every response** (spec §7), from `next.config.js`: a CSP that loads nothing from another
+  host, frames nothing and posts only to the site; HSTS without `includeSubDomains`; `nosniff`; a referrer policy;
+  `Permissions-Policy`; COOP; `X-Frame-Options`. ADR-0003 keeps nonces off the public site, so the CSP allows inline
+  scripts, which Next needs for each page's data: a question for Dani in the brief, since pages now render per
+  request anyway. An e2e test checks the headers on a page, an icon and a route, and that the scorecard logs no CSP
+  violation.
+- **R127. Sitemaps, robots and the page's language** (spec §8): `/sitemap.xml` at a site's root lists what it serves
+  in its mode, every language with its `hreflang` alternates, on the canonical base; `/robots.txt` allows everything
+  and names it, except on the preview host, which disallows everything (and sends `X-Robots-Tag: noindex` and the
+  robots meta tag). `<html lang>` now follows the page (R48's follow-up), from a header the proxy sets.
 - **Q5. Content.** Please supply the criteria list, methodology text, external reviewers, and the **rule for which
   parties are included**. The rule must be stated in the methodology. Can the party list still change after
   candidacies are proclaimed, for example through appeals?

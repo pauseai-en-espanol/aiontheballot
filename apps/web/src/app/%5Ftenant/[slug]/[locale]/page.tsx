@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { pickLocalized } from '@aiontheballot/domain/localized';
 import { getTranslator } from '@aiontheballot/i18n/messages';
 import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 import { hostnameOf, readAnalytics } from '@/analytics';
 import { Analytics } from '@/components/analytics';
@@ -43,6 +44,12 @@ const TenantHome = async (props: HomeProps) => {
   const loaded = await loadSitePage(props);
   const { locale, href, page } = loaded;
   const { home } = page;
+  // An open site's home, and the preview host's, lead to the current election (public-site spec §3.2): 307, since the
+  // current election changes. Coming soon, or with no public election yet, the home is the coming-soon page.
+  const [current] = home.elections;
+  if (loaded.site.mode !== 'coming-soon' && current) {
+    redirect(href({ page: 'election', election: current.slug }));
+  }
   const aviso = (await props.searchParams).aviso;
   // Plausible, on a host the deployment gives a Plausible site (PLAN R83). Here, not in the root layout, which a 404
   // renders in too: a missing page isn't a page view. The host picks the site and grants nothing.

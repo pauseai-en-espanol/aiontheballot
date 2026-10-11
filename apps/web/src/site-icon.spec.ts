@@ -35,6 +35,7 @@ const home = (brand: PublicHome['brand'] = {}): PublicHome => ({
     privacyEmail: null,
   },
   documents: {},
+  elections: [],
   signups: false,
   election: null,
   brand: {

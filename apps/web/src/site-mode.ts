@@ -10,6 +10,8 @@ export type SiteMode = 'coming-soon' | 'open' | 'preview';
 export const SITE_MODE_HEADER = 'x-aiontheballot-site';
 /** Where the tenant's root is on the host served, for links between its pages: `` or `/{slug}`. */
 export const SITE_ROOT_HEADER = 'x-aiontheballot-root';
+/** The page's language, for `<html lang>`. */
+export const SITE_LOCALE_HEADER = 'x-aiontheballot-locale';
 
 /** `OPEN_SITES`: the tenant slugs whose sites are open, comma-separated. Anything else stays coming soon. */
 export const readOpenSites = (value: string | undefined): ReadonlySet<string> =>

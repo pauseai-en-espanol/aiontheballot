@@ -8,6 +8,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 import {
   servedWhileComingSoon,
+  SITE_LOCALE_HEADER,
   SITE_MODE_HEADER,
   SITE_ROOT_HEADER,
   type SiteMode,
@@ -67,6 +68,7 @@ export const createRoutingProxy =
         const headers = new Headers(request.headers);
         headers.set(SITE_MODE_HEADER, mode);
         headers.set(SITE_ROOT_HEADER, root);
+        headers.set(SITE_LOCALE_HEADER, locale);
         // Resolved against the request's own URL, so Next rewrites internally (another origin would make it fetch
         // that URL over the network).
         const response = NextResponse.rewrite(

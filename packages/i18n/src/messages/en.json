@@ -23,7 +23,8 @@
     "not_mentioned": "Not mentioned"
   },
   "cell": {
-    "pending": "Pending assessment"
+    "pending": "Pending assessment",
+    "withdrawn": "Rating withdrawn"
   },
   "party": {
     "programmePending": "Programme not yet published (checked on {checkedAt, date, long})"
@@ -617,5 +618,67 @@
     "done": "Done: your address has been deleted.",
     "invalid": "This link isn’t valid any more: the address may already be deleted.",
     "missing": "This page needs the link from your email."
+  },
+  "election": {
+    "question": {
+      "demands": "Does each party meet {owner}’s demands?",
+      "descriptive": "What does each party propose on advanced AI?"
+    },
+    "legend": "What each rating means",
+    "methodologyLink": "How we rate: the methodology",
+    "date": "{date, date, full}",
+    "updated": "Updated {date, date, long}",
+    "lastChange": "Latest change: {date, date, long}",
+    "noRatingsYet": "No rating has been published yet: every cell is pending.",
+    "tableCaption": "{election}: each party’s rating on each criterion",
+    "tableRegion": "The scorecard, which scrolls sideways",
+    "party": "Party",
+    "byParty": "By party",
+    "byCriterion": "By criterion",
+    "view": "Show the ratings",
+    "noParties": "No parties yet.",
+    "noCriteria": "No criteria yet.",
+    "breadcrumb": "You are here"
+  },
+  "partyPage": {
+    "website": "Website",
+    "ratings": "Its rating on each criterion",
+    "territories": "Stands in: {territories}"
+  },
+  "criterionPage": {
+    "ratings": "Each party’s rating"
+  },
+  "cellPage": {
+    "title": "{party} · {criterion}",
+    "summary": "Why",
+    "evidence": "What the sources say",
+    "source": "Source",
+    "location": "Where: {location}",
+    "retrieved": "Retrieved on {date, date, long}",
+    "archived": "Archived copy",
+    "hash": "SHA-256 of our copy: {hash}",
+    "checked": "Documents checked",
+    "checkedOn": "checked on {date, date, long}",
+    "history": "History",
+    "revision": "Revision {number}, {date, date, long}",
+    "note": "Note: {note}",
+    "pendingLead": "This cell hasn’t been rated yet. Pending is not a rating: it doesn’t mean the party says nothing.",
+    "withdrawnLead": "This rating was withdrawn. Its history says why.",
+    "change": {
+      "initial": "First rating",
+      "update": "Update",
+      "correction": "Correction",
+      "withdrawal": "Withdrawn"
+    }
+  },
+  "methodologyPage": {
+    "title": "Methodology",
+    "scale": "The ratings",
+    "demands": "Each rating says how far a party meets the demands of {owner}.",
+    "descriptive": "Each rating describes what a party proposes on advanced AI.",
+    "pending": "Pending means not rated yet, which is not the same as “not mentioned”.",
+    "reviewers": "External review",
+    "reviewersLead": "These people reviewed the methodology:",
+    "reviewer": "{name}, {affiliation}"
   }
 }

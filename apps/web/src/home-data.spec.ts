@@ -25,6 +25,7 @@ const home = (name: string): PublicHome => ({
     privacyEmail: null,
   },
   documents: {},
+  elections: [],
   signups: false,
   election: null,
   brand: {},
@@ -68,7 +69,13 @@ describe('the home data loader', () => {
   });
 
   it("fills in fields an older API doesn't send yet, so a rollout can't break pages", async () => {
-    const { brand: _brand, documents: _documents, signups: _signups, ...older } = home('Ejemplo');
+    const {
+      brand: _brand,
+      documents: _documents,
+      signups: _signups,
+      elections: _elections,
+      ...older
+    } = home('Ejemplo');
     const { legalName: _legal, taxId: _tax, ...olderOperator } = older.operator;
     const load = createHomeLoader({
       apiUrl: API,

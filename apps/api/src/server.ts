@@ -7,6 +7,7 @@ import { createProfileSource } from './admin/profiles.js';
 import { buildApp } from './app.js';
 import { createAuth } from './auth/auth.js';
 import { loadConfig } from './config.js';
+import { createElectionSource } from './election-data.js';
 import { initErrorTracking } from './error-tracking.js';
 import { createBrandImageSource, createHomeSource } from './home-data.js';
 import { createMailer, mailFailure } from './mail/mailer.js';
@@ -60,6 +61,7 @@ const app = buildApp({
     ? createHomeSource(web, { mail: signups !== undefined, platformHost: config.platformHost })
     : undefined,
   brandImages: web && files ? createBrandImageSource(web, files) : undefined,
+  elections: web ? createElectionSource(web) : undefined,
   signups,
   admin: {
     auth:

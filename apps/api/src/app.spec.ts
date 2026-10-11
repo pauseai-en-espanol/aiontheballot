@@ -1,3 +1,4 @@
+import type { PublicElection } from '@aiontheballot/domain/public-election';
 import type { PublicHome } from '@aiontheballot/domain/public-home';
 import type { FastifyInstance } from 'fastify';
 
@@ -68,6 +69,7 @@ describe('api', () => {
       election: { name: { es: 'Elecciones de ejemplo' }, date: '2030-01-15' },
       brand: {},
       documents: {},
+      elections: [],
       signups: false,
     };
     const withHome = () =>
@@ -157,6 +159,56 @@ describe('api', () => {
       await served.close();
       expect(unknown.statusCode).toBe(404);
       expect([400, 404]).toContain(malformed.statusCode);
+    });
+  });
+
+  describe("a tenant's public election", () => {
+    const data: PublicElection = {
+      election: {
+        slug: 'generales',
+        name: { es: 'Generales de ejemplo' },
+        date: null,
+        status: 'live',
+      },
+      methodology: null,
+      parties: [],
+      criteria: [],
+      cells: [],
+    };
+    const withElections = () =>
+      buildApp({
+        elections: async (slug, election) =>
+          slug === 'ejemplo' && election === 'generales' ? data : undefined,
+      });
+
+    it('answers 503 while no public database is configured', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/public/tenants/ejemplo/elections/generales',
+      });
+      expect(response.statusCode).toBe(503);
+    });
+
+    it('serves it, never cached on the way, and 404 or 400 for anything else', async () => {
+      const served = withElections();
+      const found = await served.inject({
+        method: 'GET',
+        url: '/public/tenants/ejemplo/elections/generales',
+      });
+      const missing = await served.inject({
+        method: 'GET',
+        url: '/public/tenants/ejemplo/elections/otras',
+      });
+      const malformed = await served.inject({
+        method: 'GET',
+        url: '/public/tenants/ejemplo/elections/Otras_',
+      });
+      await served.close();
+      expect(found.statusCode).toBe(200);
+      expect(found.headers['cache-control']).toBe('no-store');
+      expect(found.json()).toEqual(data);
+      expect(missing.statusCode).toBe(404);
+      expect(malformed.statusCode).toBe(400);
     });
   });
 

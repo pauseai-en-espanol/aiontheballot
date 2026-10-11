@@ -32,6 +32,7 @@ const home: PublicHome = {
     privacyEmail: null,
   },
   documents: {},
+  elections: [],
   signups: false,
   election: { name: { es: 'Elecciones de ejemplo' }, date: '2030-01-15' },
   brand: {},

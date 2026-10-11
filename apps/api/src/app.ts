@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
+import type { ElectionSource } from './election-data.js';
 import type { BrandImageSource, HomeSource } from './home-data.js';
 import type { RoutingSource } from './routing-data.js';
 import type { Signups } from './signups.js';
@@ -15,6 +16,8 @@ export interface AppOptions {
   home?: HomeSource;
   /** A tenant's public brand images; without it the route answers 503. */
   brandImages?: BrandImageSource;
+  /** A tenant's public elections, read as aiontheballot_web; without it the route answers 503. */
+  elections?: ElectionSource;
   /** The signup list's public actions (PLAN R119); without mail they answer 503. */
   signups?: Signups;
   /** Signups a visitor may send per 10 minutes, per API replica, before 429 (the database caps each site too). */
@@ -47,6 +50,7 @@ export const buildApp = ({
   routing,
   home,
   brandImages,
+  elections,
   signups,
   signupsPerVisitor = 5,
   admin = {},
@@ -114,6 +118,31 @@ export const buildApp = ({
         return reply.code(404).send({ error: 'Not found' });
       }
       return reply.type(image.contentType).send(Buffer.from(image.content));
+    },
+  );
+
+  // A public election: the scorecard's and its pages' data (public-site spec §5). Not cached on the way either: the web
+  // app caches it and serves its copy if the API fails.
+  app.get<{ Params: { slug: string; election: string } }>(
+    '/public/tenants/:slug/elections/:election',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          properties: { slug: SLUG_PARAMS.properties.slug, election: SLUG_PARAMS.properties.slug },
+        },
+      },
+    },
+    async (request, reply) => {
+      void reply.header('cache-control', 'no-store');
+      if (!elections) {
+        return reply.code(503).send({ error: 'Public data is not configured' });
+      }
+      const data = await elections(request.params.slug, request.params.election);
+      if (!data) {
+        return reply.code(404).send({ error: 'Not found' });
+      }
+      return data;
     },
   );
 

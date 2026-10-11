@@ -23,7 +23,8 @@
     "not_mentioned": "No lo menciona"
   },
   "cell": {
-    "pending": "Pendiente de evaluar"
+    "pending": "Pendiente de evaluar",
+    "withdrawn": "Valoración retirada"
   },
   "party": {
     "programmePending": "Programa aún no publicado (comprobado el {checkedAt, date, long})"
@@ -617,5 +618,67 @@
     "done": "Hecho: hemos borrado tu dirección.",
     "invalid": "Este enlace ya no es válido: puede que la dirección ya esté borrada.",
     "missing": "Esta página necesita el enlace de tu correo."
+  },
+  "election": {
+    "question": {
+      "demands": "¿Cumple cada partido las demandas de {owner}?",
+      "descriptive": "¿Qué propone cada partido sobre la IA avanzada?"
+    },
+    "legend": "Qué significa cada valoración",
+    "methodologyLink": "Cómo valoramos: la metodología",
+    "date": "{date, date, full}",
+    "updated": "Actualizado el {date, date, long}",
+    "lastChange": "Último cambio: {date, date, long}",
+    "noRatingsYet": "Aún no se ha publicado ninguna valoración: todas las celdas están pendientes.",
+    "tableCaption": "{election}: la valoración de cada partido en cada criterio",
+    "tableRegion": "La tabla, que se desplaza en horizontal",
+    "party": "Partido",
+    "byParty": "Por partido",
+    "byCriterion": "Por criterio",
+    "view": "Ver las valoraciones",
+    "noParties": "Aún no hay partidos.",
+    "noCriteria": "Aún no hay criterios.",
+    "breadcrumb": "Estás aquí"
+  },
+  "partyPage": {
+    "website": "Sitio web",
+    "ratings": "Su valoración en cada criterio",
+    "territories": "Se presenta en: {territories}"
+  },
+  "criterionPage": {
+    "ratings": "La valoración de cada partido"
+  },
+  "cellPage": {
+    "title": "{party} · {criterion}",
+    "summary": "Por qué",
+    "evidence": "Lo que dicen las fuentes",
+    "source": "Fuente",
+    "location": "Dónde: {location}",
+    "retrieved": "Consultado el {date, date, long}",
+    "archived": "Copia archivada",
+    "hash": "SHA-256 de nuestra copia: {hash}",
+    "checked": "Documentos revisados",
+    "checkedOn": "revisado el {date, date, long}",
+    "history": "Historial",
+    "revision": "Revisión {number}, {date, date, long}",
+    "note": "Nota: {note}",
+    "pendingLead": "Esta celda aún no se ha valorado. Pendiente no es una valoración: no significa que el partido no diga nada.",
+    "withdrawnLead": "Esta valoración se retiró. Su historial explica por qué.",
+    "change": {
+      "initial": "Primera valoración",
+      "update": "Actualización",
+      "correction": "Corrección",
+      "withdrawal": "Retirada"
+    }
+  },
+  "methodologyPage": {
+    "title": "Metodología",
+    "scale": "Las valoraciones",
+    "demands": "Cada valoración dice hasta qué punto un partido cumple las demandas de {owner}.",
+    "descriptive": "Cada valoración describe lo que propone un partido sobre la IA avanzada.",
+    "pending": "Pendiente significa que aún no se ha valorado, que no es lo mismo que «No lo menciona».",
+    "reviewers": "Revisión externa",
+    "reviewersLead": "Estas personas revisaron la metodología:",
+    "reviewer": "{name}, {affiliation}"
   }
 }

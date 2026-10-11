@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import type { PropsWithChildren } from 'react';
 
+import { isLocale } from '@aiontheballot/i18n/messages';
+import { headers } from 'next/headers';
 import { connection } from 'next/server';
+
+import { SITE_LOCALE_HEADER } from '@/site-mode';
 
 import { montserrat, robotoSlab, sairaCondensed } from './fonts';
 import './globals.css';
@@ -19,13 +23,17 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-const RootLayout = ({ children }: Readonly<PropsWithChildren>) => (
-  <html
-    lang="es"
-    className={`${sairaCondensed.variable} ${robotoSlab.variable} ${montserrat.variable}`}
-  >
-    <body>{children}</body>
-  </html>
-);
+/** The page's language, which the routing proxy sets for every page it serves; else English, the source language. */
+const RootLayout = async ({ children }: Readonly<PropsWithChildren>) => {
+  const locale = (await headers()).get(SITE_LOCALE_HEADER);
+  return (
+    <html
+      lang={isLocale(locale) ? locale : 'en'}
+      className={`${sairaCondensed.variable} ${robotoSlab.variable} ${montserrat.variable}`}
+    >
+      <body>{children}</body>
+    </html>
+  );
+};
 
 export default RootLayout;

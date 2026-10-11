@@ -62,5 +62,9 @@ export const SEED_HOSTS = {
   /** The canonical hostname of an inactive tenant. */
   inactive: 'ejemplo-inactivo.localhost',
 } as const;
+/** The preview host (public-site spec §2): every site by path, as if open, never indexed. */
+export const PREVIEW_HOST = 'vista-previa.localhost';
+export const PREVIEW_URL = `http://${PREVIEW_HOST}:${PORTS.web}`;
+
 /** Tenant ejemplo-a's home page. */
 export const TENANT_URL = `http://${SEED_HOSTS.canonical}:${PORTS.web}`;

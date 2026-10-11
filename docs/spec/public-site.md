@@ -5,7 +5,7 @@ What the public web app (`apps/web`) shows, at which addresses, and when. It bui
 (routing and the public-visibility rule) and [ADR-0003](../adr/0003-application-stack.md) §6. Wording marked
 _provisional_ waits for the chapter (PLAN P7); every word is a UI string in `packages/i18n`, never content.
 
-- **Status:** drafted for M3 (PLAN R121–R124); awaits Dani's review.
+- **Status:** drafted for M3 (PLAN R121–R127); awaits Dani's review.
 
 ## 1. Principles
 
@@ -116,8 +116,10 @@ Shared by all of them:
   Icons come from `packages/ui` (fixed rating visuals); colours pass the contrast test against their background.
 - **A cell's display states,** from the public data (data model §3.6, ADR-0002 "Pending is not not mentioned"):
   - _rated_: its current revision has a rating;
-  - _pending_ (provisional "Pendiente de evaluar"): no published revision, or a withdrawn one that hasn't been
-    re-rated; shown with its own neutral icon, never as "No lo menciona";
+  - _pending_ (provisional "Pendiente de evaluar"): no published revision; shown with its own neutral icon (three
+    dots in a dashed circle), never as "No lo menciona";
+  - _withdrawn_ (provisional "Valoración retirada"): its latest revision withdrew the rating; the pending icon, its
+    own words, and its history, which says why;
   - "No lo menciona" is a rating like the others, with the documents checked and when.
 - **"Actualizado el {date}"** wherever a cell's rating shows, from its current revision.
 - **A party's programme status:** "Programa aún no publicado (comprobado el {date})" while pending, with the date of
@@ -125,7 +127,7 @@ Shared by all of them:
 
 ### 5.1 Scorecard
 
-- **Desktop (≥ 960 px):** a table, parties down the side and criteria across the top, always (PLAN, Answered:
+- **Desktop (≥ 1024 px, Panda's `lg`):** a table, parties down the side and criteria across the top, always (PLAN, Answered:
   scorecard orientation). Criteria headers use the short title and link to the criterion page; party headers show the
   logo or colour swatch, the short name (the full name in an `abbr` title and for screen readers) and the programme
   status, and link to the party page. Each cell is a link to the cell page with the rating's icon and words. Past
@@ -176,17 +178,21 @@ external reviewers with their affiliations.
 
 ## 7. Security headers
 
-On every response of the web app, set by the proxy (pages) and the route handlers:
+On every response of the web app, pages, images, routes and build assets alike (`headers` in `next.config.js`):
 
-- `Content-Security-Policy`: `default-src 'self'`; `script-src 'self' 'nonce-{per request}' 'strict-dynamic'`;
-  `style-src 'self' 'unsafe-inline'` (style attributes); `img-src 'self' data:`; `font-src 'self'`;
-  `connect-src 'self'`; `form-action 'self'`; `frame-ancestors 'none'`; `base-uri 'none'`; `object-src 'none'`.
-  Next applies the nonce to its own scripts. Images and routes that render no HTML send `default-src 'none'`.
+- `Content-Security-Policy`: `default-src 'self'`; `script-src 'self' 'unsafe-inline'`; `style-src 'self'
+'unsafe-inline'`; `img-src 'self' data:`; `font-src 'self'`; `connect-src 'self'`; `manifest-src 'self'`;
+  `form-action 'self'`; `frame-ancestors 'none'`; `base-uri 'none'`; `object-src 'none'`. No nonces, as ADR-0003
+  sets for the public site, so scripts allow inline code: Next writes each page's data into inline scripts. Nothing
+  loads from another host. Whether to move to nonces, now that pages render per request anyway, is a question for
+  Dani (PLAN R126). Colours that come from data (a party's) are SVG fills, never style attributes.
 - `Strict-Transport-Security: max-age=31536000` on https (no `includeSubDomains`: a tenant's hostname may be a
   subdomain of a domain it doesn't control alone, such as `elecciones.pauseai.es`).
-- `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
-  `Permissions-Policy` denying camera, microphone, geolocation and the like, `Cross-Origin-Opener-Policy: same-origin`.
-- The internal rewrite target never leaks: `x-middleware-rewrite` is stripped.
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` (the token pages send no
+  referrer at all), `Permissions-Policy` denying camera, microphone, geolocation and the like,
+  `Cross-Origin-Opener-Policy: same-origin`, `X-Frame-Options: DENY`.
+- Not done: Next sends `x-middleware-rewrite` with the internal path, which its client router reads; it names nothing
+  private.
 
 An e2e test checks the headers on a page, an image and a route handler, and that no page logs a CSP violation.
 
@@ -194,10 +200,12 @@ An e2e test checks the headers on a page, an image and a route handler, and that
 
 - `rel=canonical`, `og:url` and `hreflang` alternates (every enabled locale plus `x-default`) on every page, from the
   routing table.
-- `/sitemap.xml` per tenant, on its canonical base: every page an open site serves, each with its `hreflang`
-  alternates and the date of its latest change. A coming-soon site lists its home and its always-on pages.
+- `/sitemap.xml` per tenant, at its root in its default locale, on its canonical base: every page the site serves
+  in its mode, in each language, with its `hreflang` alternates and, where known, the date of its latest change. A
+  coming-soon site lists its home and its always-on pages.
 - `/robots.txt` per host: on a canonical host, allow everything and name the sitemap; on an alias it isn't served
   (aliases redirect); on the preview host, disallow everything.
+- `<html lang>` is the page's language, from a header the proxy sets with the mode.
 
 ## 9. Performance and caching
 
@@ -208,5 +216,8 @@ An e2e test checks the headers on a page, an image and a route handler, and that
 
 ## 10. Not yet
 
-Share images for every view (the overview, parties, criteria and cells) and their download dialog; the corrections
-log; the contact and report form; structured data. They follow in M3, after the preview's pages.
+Share images for every view (the overview, parties, criteria and cells) and their download dialog: until then every
+page's link preview is the home's card. When they come, `/og/` serves more than the home's card, so the image route
+must refuse an election's cards while the site is coming soon, as the proxy refuses its pages. Also the corrections
+log, the contact and report form, structured data and party logos (uploads come with M2). They follow in M3, after
+the preview's pages.

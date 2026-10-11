@@ -15,6 +15,7 @@ import {
   PLATFORM_NAME,
   PLAUSIBLE_URL,
   PORTS,
+  PREVIEW_HOST,
   SEED_HOSTS,
   SMTP_URL,
   WEB_URL,
@@ -80,6 +81,7 @@ export default defineConfig({
         SENTRY_DSN: DSNS.web,
         API_URL,
         PLATFORM_HOST,
+        PREVIEW_HOST,
         // Only ejemplo-a's canonical host has a Plausible site, so the other hosts show it loads nowhere else.
         PLAUSIBLE_URL,
         PLAUSIBLE_SITES: JSON.stringify({ [SEED_HOSTS.canonical]: 'pa-e2e.js' }),

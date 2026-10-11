@@ -68,7 +68,7 @@ export const createHomeSource =
     if (!tenant) {
       return undefined;
     }
-    const [operator, election, brand, documents] = await Promise.all([
+    const [operator, election, brand, documents, elections] = await Promise.all([
       db
         .selectFrom('app.tenant_organizations as link')
         .innerJoin('app.organizations as o', 'o.id', 'link.organization_id')
@@ -129,6 +129,17 @@ export const createHomeSource =
         .orderBy('kind')
         .orderBy('version', 'desc')
         .execute(),
+      // The public ones, the current first: live before archived, the soonest live, the latest archived.
+      db
+        .selectFrom('app.elections')
+        .select(['slug', 'name', 'status', sql<string | null>`election_date::text`.as('date')])
+        .where('tenant_id', '=', tenant.id)
+        .where('status', 'in', ['live', 'archived'])
+        .orderBy(sql`status = 'live'`, 'desc')
+        .orderBy(sql`CASE WHEN status = 'live' THEN election_date END`, sql`asc nulls last`)
+        .orderBy('election_date', sql`desc nulls last`)
+        .orderBy('created_at', 'desc')
+        .execute(),
     ]);
     const published: Partial<Record<TenantDocumentKind, PublicDocument>> = {};
     for (const doc of documents) {
@@ -159,6 +170,11 @@ export const createHomeSource =
         privacyEmail: operator.privacy_email,
       },
       documents: published,
+      elections: elections.flatMap(({ slug, name, status, date }) =>
+        status === 'live' || status === 'archived'
+          ? [{ slug, name: localized(name, 'elections.name'), date, status }]
+          : [],
+      ),
       signups:
         mail &&
         published.privacy_policy !== undefined &&
