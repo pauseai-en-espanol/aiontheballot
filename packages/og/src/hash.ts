@@ -9,7 +9,7 @@ import { ROBOTO_SLAB_400, SAIRA_CONDENSED_700 } from './fonts.generated.js';
  * Bump when a template's look changes (layout, or a renderer upgrade that draws differently): every image then gets
  * a new URL, so crawlers and apps that cache by URL fetch it again. A test pins the SVG each version draws.
  */
-export const TEMPLATE_VERSION = 1;
+export const TEMPLATE_VERSION = 2;
 
 /** What the pictures depend on besides their template and data, folded into every hash: the colours and the fonts. */
 const RENDER_INPUTS = createHash('sha256')

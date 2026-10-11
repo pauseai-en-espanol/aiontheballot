@@ -2,7 +2,7 @@
   "name": "@aiontheballot/og",
   "version": "0.3.0",
   "private": true,
-  "description": "Share-image templates and their renderer (satori, then resvg): ADR-0003 \u00a78",
+  "description": "Share-image templates and their renderer (satori, then resvg): ADR-0003 §8",
   "type": "module",
   "exports": {
     "./*": {
@@ -25,7 +25,7 @@
     "@slango.configs/lint-staged": "2.0.8",
     "@slango.configs/oxlint": "0.1.12",
     "@slango.configs/typescript": "3.0.0",
-    "@slango.configs/vitest": "2.1.0",
+    "@slango.configs/vitest": "2.1.1",
     "@types/react": "19.3.0",
     "@vitest/coverage-v8": "5.0.3",
     "@vitest/ui": "5.0.3",
@@ -37,6 +37,6 @@
   "dependencies": {
     "@aiontheballot/ui": "workspace:*",
     "@resvg/resvg-js": "2.6.2",
-    "satori": "0.35.1"
+    "satori": "0.38.2"
   }
 }
