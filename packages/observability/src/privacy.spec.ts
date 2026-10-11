@@ -28,6 +28,44 @@ describe('redactText', () => {
 const event = (overrides: Partial<ErrorEvent>): ErrorEvent => ({ type: undefined, ...overrides });
 
 describe('scrubEvent', () => {
+  it("strips queries and fragments from contexts, tags and frames, such as Next's request path", () => {
+    const scrubbed = scrubEvent(
+      event({
+        transaction: 'GET /set-password?token=secret-token',
+        contexts: {
+          nextjs: { request_path: '/set-password?token=secret-token', router_kind: 'App Router' },
+          page: { url: 'https://admin.example.test/set-password#token=secret-token' },
+        },
+        tags: { url: '/x?token=secret-token', release: 'admin@1.0.0' },
+        exception: {
+          values: [
+            {
+              stacktrace: {
+                frames: [
+                  {
+                    filename: 'https://admin.example.test/set-password#token=secret-token',
+                    abs_path: 'https://admin.example.test/set-password?token=secret-token',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      }),
+    );
+    expect(JSON.stringify(scrubbed)).not.toContain('secret-token');
+    expect(scrubbed.contexts?.nextjs).toEqual({
+      request_path: '/set-password',
+      router_kind: 'App Router',
+    });
+    expect(scrubbed.tags).toEqual({ url: '/x', release: 'admin@1.0.0' });
+    expect(scrubbed.transaction).toBe('GET /set-password');
+    expect(scrubbed.exception?.values?.[0]?.stacktrace?.frames?.[0]).toEqual({
+      filename: 'https://admin.example.test/set-password',
+      abs_path: 'https://admin.example.test/set-password',
+    });
+  });
+
   it('drops the user and reduces the request to URL, method and user agent', () => {
     const scrubbed = scrubEvent(
       event({

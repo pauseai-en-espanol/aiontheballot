@@ -15,6 +15,9 @@ export const MIN_PASSWORD_LENGTH = 12;
 /** Where Better Auth's endpoints live on the admin host (ADR-0003 §2). */
 export const AUTH_BASE_PATH = '/api/auth';
 
+/** How long a link to set a password works, once (editorial workflow A1.1, A5.2). */
+export const SET_PASSWORD_LINK_SECONDS = 60 * 60;
+
 /**
  * Every cookie Better Auth sets is host-only and sent only over https (`__Host-`: `Secure`, `Path=/`, no `Domain`),
  * `HttpOnly` and `SameSite=Lax` (ADR-0002 §15): the session, and the short-lived one that holds a sign-in between the
@@ -84,6 +87,19 @@ export const authOptions = ({
       // Accounts come only from invitations and the owner's command (editorial workflow A1, A3).
       disableSignUp: true,
       minPasswordLength: MIN_PASSWORD_LENGTH,
+      // A link to set a password: single use, an hour. Setting one ends all the account's sessions (A5.3), and every
+      // other link or pending sign-in the account still has (verification values name their user), so an older link
+      // can't set a password over the new one.
+      resetPasswordTokenExpiresIn: SET_PASSWORD_LINK_SECONDS,
+      revokeSessionsOnPasswordReset: true,
+      onPasswordReset: async ({ user }) => {
+        await pool.query('DELETE FROM verifications WHERE value = $1', [user.id]);
+      },
+    },
+    // A link's token is kept only as its SHA-256, so whoever reads the table (or a backup) can't use one.
+    verification: {
+      ...AUTH_MODELS.verification,
+      storeIdentifier: { default: 'plain', overrides: { 'reset-password:': 'hashed' } },
     },
     session: {
       // The models themselves rather than the schema options' copy, whose wider type loses the `aal` field's.

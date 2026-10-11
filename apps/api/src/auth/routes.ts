@@ -10,9 +10,9 @@ import { visitorAddress } from './visitor.js';
 
 /**
  * The Better Auth endpoints the admin uses, each with the only body fields passed on; every other endpoint answers 404
- * (sign-up, password changes, account linking, and whatever a Better Auth upgrade adds). Fields left out on purpose:
- * `rememberMe` (false makes a 24-hour session, A4.4), `trustDevice` (skips TOTP for 30 days, A4.4), `callbackURL`,
- * and the enrolment's `method` and `issuer` (TOTP only, its issuer from configuration).
+ * (sign-up, password changes, asking for a reset link, account linking, and whatever a Better Auth upgrade adds).
+ * Fields left out on purpose: `rememberMe` (false makes a 24-hour session, A4.4), `trustDevice` (skips TOTP for 30
+ * days, A4.4), `callbackURL`, and the enrolment's `method` and `issuer` (TOTP only, its issuer from configuration).
  */
 const ENDPOINTS: Readonly<Record<string, readonly string[]>> = {
   '/sign-in/email': ['email', 'password'],
@@ -20,9 +20,12 @@ const ENDPOINTS: Readonly<Record<string, readonly string[]>> = {
   '/two-factor/enable': ['password'],
   '/two-factor/verify-totp': ['code'],
   '/two-factor/verify-backup-code': ['code'],
+  // Sets a password with a single-use link's token (the owner's create-account command; A1). Nothing reachable
+  // here asks for such a link: sending them waits for email.
+  '/reset-password': ['token', 'newPassword'],
 };
 
-/** The browser headers Better Auth reads: the session, its CSRF checks (Origin, Fetch Metadata) and the session's record. */
+/** The headers Better Auth reads: the session, its CSRF checks (Origin, Fetch Metadata), the session's record. */
 const PASSED_HEADERS = [
   'cookie',
   'origin',

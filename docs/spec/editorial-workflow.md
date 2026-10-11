@@ -64,10 +64,13 @@ _As the owner, I create the first platform admin without an invitation, because 
    verified and no password, adds the `app.platform_admins` row, and prints a single-use link to set a password,
    valid for one hour. [API]
 2. The command needs the owner's database connection. Under any runtime role it fails, because no runtime role can
-   write `app.platform_admins`. [DB: no grant]
-3. The link is printed once and never logged. Its token travels in the query string (ADR-0003 §7). [API]
+   write `app.platform_admins`. [DB: no grant] _Built differently (PLAN R93):_ the command, `create-account.js`, creates
+   the account as Better Auth's role and prints the one line of SQL the owner runs to add the row, once the person has
+   enrolled TOTP; its link carries the token in the fragment, not the query string.
+3. The link is printed once and never logged. Its token travels in the query string (ADR-0003 §7). [API] _Built
+   differently (PLAN R93):_ in the fragment, which no server receives.
 4. Adding further platform admins and removing them is the same owner-only command. Each change is audited. [DB:
-   audit trigger on `platform_admins`]
+   audit trigger on `platform_admins`] _For now (PLAN R93):_ the owner's SQL, as for the first.
 5. In the admin, a platform admin sees the list of platform admins and can't change it. [DB: RLS, no write grant]
 
 ### A2. Invite a member
@@ -123,7 +126,7 @@ _As a member, I sign in with a password and a second factor._
    email has an account. [API]
 3. A reset changes only the password: TOTP stays, and the user's other sessions are revoked. [API]
 4. A lost authenticator with no backup codes is reset with the owner-run command of A1 (ADR-0002 §10). It removes the
-   user's TOTP and sessions, and they enrol again at their next sign-in. [API]
+   user's TOTP and sessions, and they enrol again at their next sign-in. [API] _Not built yet (PLAN R93)._
 
 ### A6. Choose a tenant
 

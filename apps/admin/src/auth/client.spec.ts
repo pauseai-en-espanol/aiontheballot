@@ -18,6 +18,9 @@ describe('authError', () => {
     expect(authError(answer(429, 'ACCOUNT_TEMPORARILY_LOCKED'))).toBe('locked');
     expect(authError(answer(401, 'INVALID_TWO_FACTOR_COOKIE'))).toBe('expired');
     expect(authError(answer(400, 'TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE'))).toBe('tooManyCodes');
+    expect(authError(answer(400, 'INVALID_TOKEN'))).toBe('invalidLink');
+    expect(authError(answer(400, 'PASSWORD_TOO_SHORT'))).toBe('passwordTooShort');
+    expect(authError(answer(400, 'PASSWORD_TOO_LONG'))).toBe('passwordTooLong');
   });
 
   it('answers a rate limit as such, and anything unknown as unexpected', () => {

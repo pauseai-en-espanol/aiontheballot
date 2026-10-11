@@ -155,6 +155,11 @@ describe('/api (admin host)', () => {
       method: 'otp',
     });
     await post(app, '/api/auth/sign-out', { anything: 1 });
+    await post(app, '/api/auth/reset-password', {
+      token: 't',
+      newPassword: 'una contraseña de ejemplo',
+      callbackURL: 'https://evil.test',
+    });
     expect(seen.map(({ request, body }) => [new URL(request.url).pathname, body])).toEqual([
       [
         '/api/auth/sign-in/email',
@@ -164,6 +169,7 @@ describe('/api (admin host)', () => {
       ['/api/auth/two-factor/verify-backup-code', { code: 'abcde-fghij' }],
       ['/api/auth/two-factor/enable', { password: 'x' }],
       ['/api/auth/sign-out', {}],
+      ['/api/auth/reset-password', { token: 't', newPassword: 'una contraseña de ejemplo' }],
     ]);
   });
 

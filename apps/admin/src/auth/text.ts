@@ -13,5 +13,9 @@ export const authErrors = (t: Translator): Record<AuthError, string> => ({
   locked: t('auth.errors.locked'),
   tooManyCodes: t('auth.errors.tooManyCodes'),
   expired: t('auth.errors.expired'),
+  invalidLink: t('auth.errors.invalidLink'),
+  passwordTooShort: t('auth.errors.passwordTooShort'),
+  passwordTooLong: t('auth.errors.passwordTooLong'),
+  passwordsDiffer: t('auth.errors.passwordsDiffer'),
   unexpected: t('auth.errors.unexpected'),
 });

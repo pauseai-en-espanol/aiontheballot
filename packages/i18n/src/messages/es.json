@@ -100,6 +100,18 @@
       "backupList": "Códigos de recuperación",
       "done": "Ya los he guardado, continuar"
     },
+    "setPassword": {
+      "title": "Elige tu contraseña",
+      "intro": "Elige la contraseña de tu cuenta. Este enlace sirve una sola vez, durante una hora.",
+      "password": "Nueva contraseña",
+      "passwordHint": "Al menos 12 caracteres. Unas cuantas palabras sin relación entre sí dan una contraseña fuerte y fácil de recordar.",
+      "confirm": "Repite la contraseña",
+      "submit": "Guardar la contraseña",
+      "doneTitle": "Contraseña guardada",
+      "done": "Inicia sesión con ella. Después configurarás la verificación en dos pasos.",
+      "signIn": "Iniciar sesión",
+      "missing": "Esta página necesita el enlace que te dieron. Abre ese enlace."
+    },
     "home": {
       "title": "Tus sitios",
       "signedInAs": "Sesión iniciada como {name}",
@@ -114,6 +126,10 @@
       "locked": "Demasiados códigos incorrectos. Espera unos minutos y vuelve a iniciar sesión.",
       "tooManyCodes": "Demasiados códigos incorrectos para este inicio de sesión. Vuelve a iniciar sesión.",
       "expired": "Este inicio de sesión ha caducado. Vuelve a iniciar sesión.",
+      "invalidLink": "Este enlace ya no sirve: funciona una sola vez, durante una hora. Pide uno nuevo.",
+      "passwordTooShort": "Usa al menos 12 caracteres.",
+      "passwordTooLong": "Usa como mucho 128 caracteres.",
+      "passwordsDiffer": "Las dos contraseñas no coinciden.",
       "unexpected": "Algo ha ido mal. Inténtalo de nuevo más tarde."
     }
   }

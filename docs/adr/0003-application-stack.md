@@ -214,7 +214,8 @@ cross-country views and an open-data export.
       switched off; the user agent is the only header kept.
     - `beforeSend` drops the user, strips query strings and fragments, and redacts email addresses everywhere.
     - Free text can't be recognised, so code must never put request bodies into errors, and tokens travel in query
-      strings, never in paths.
+      strings, never in paths. A link whose token opens an account carries it in the fragment, which no server
+      receives (PLAN R93).
   - **No `withSentryConfig`:** source maps aren't uploaded yet (GlitchTip is VPN-only), and its bundle trimming
     doesn't apply under Turbopack. Next's `compiler.define` sets `__SENTRY_TRACING__` and `__SENTRY_DEBUG__` to
     `false` instead.

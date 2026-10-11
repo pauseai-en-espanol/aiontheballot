@@ -69,6 +69,18 @@ export const scrubBreadcrumb = (breadcrumb: Breadcrumb): Breadcrumb => {
   return scrubbed;
 };
 
+/** A field that may hold a URL or a path: its query string and fragment can carry a token. */
+const URL_FIELD = /(?:url|path)$/i;
+
+/** Strips the query and fragment from the URL- and path-like fields of an object, in place. */
+const stripUrlFields = (fields: Record<string, unknown>): void => {
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value === 'string' && URL_FIELD.test(key)) {
+      fields[key] = stripQuery(value);
+    }
+  }
+};
+
 type EventRequest = NonNullable<Event['request']>;
 
 /** Keeps the URL without its query, the method and the user agent. Bodies, cookies and other headers go. */
@@ -109,12 +121,31 @@ export const scrubEvent = <T extends Event>(event: T): T => {
   for (const exception of scrubbed.exception?.values ?? []) {
     for (const frame of exception.stacktrace?.frames ?? []) {
       delete frame.vars;
+      // An inline script's frame names the page, query and fragment included.
+      if (frame.filename !== undefined) {
+        frame.filename = stripQuery(frame.filename);
+      }
+      if (frame.abs_path !== undefined) {
+        frame.abs_path = stripQuery(frame.abs_path);
+      }
     }
   }
   const response = scrubbed.contexts?.response;
   if (response) {
     delete response.headers;
     delete response.cookies;
+  }
+  // Contexts and tags the SDKs add, such as Next's request path (contexts.nextjs.request_path), which keeps the query.
+  for (const context of Object.values(scrubbed.contexts ?? {})) {
+    if (context) {
+      stripUrlFields(context);
+    }
+  }
+  if (scrubbed.tags) {
+    stripUrlFields(scrubbed.tags);
+  }
+  if (scrubbed.transaction !== undefined) {
+    scrubbed.transaction = stripQuery(scrubbed.transaction);
   }
   if (sdkProcessingMetadata !== undefined) {
     scrubbed.sdkProcessingMetadata = sdkProcessingMetadata;

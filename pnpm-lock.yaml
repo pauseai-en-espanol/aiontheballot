@@ -315,6 +315,9 @@ importers:
       kysely:
         specifier: 0.29.6
         version: 0.29.6
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
     devDependencies:
       '@sentry/core':
         specifier: 11.4.0

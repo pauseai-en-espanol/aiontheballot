@@ -51,10 +51,21 @@ export const deleteAccounts = async (ids: string[]) => {
   const auth = pool('AUTH_DATABASE_URL');
   try {
     await owner.query('DELETE FROM app.memberships WHERE user_id = ANY($1)', [ids]);
+    await owner.query('DELETE FROM app.platform_admins WHERE user_id = ANY($1)', [ids]);
     await auth.query('DELETE FROM auth.verifications WHERE value = ANY($1)', [ids]);
     await auth.query('DELETE FROM auth.users WHERE id = ANY($1)', [ids]);
   } finally {
     await Promise.all([owner.end(), auth.end()]);
+  }
+};
+
+/** Runs SQL as the database owner, as the owner runs what a command prints; returns the rows it changed. */
+export const asOwner = async (sql: string): Promise<number> => {
+  const owner = pool('DATABASE_URL');
+  try {
+    return (await owner.query(sql)).rowCount ?? 0;
+  } finally {
+    await owner.end();
   }
 };
 

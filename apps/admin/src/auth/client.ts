@@ -13,6 +13,10 @@ export type AuthError =
   | 'locked'
   | 'tooManyCodes'
   | 'expired'
+  | 'invalidLink'
+  | 'passwordTooShort'
+  | 'passwordTooLong'
+  | 'passwordsDiffer'
   | 'unexpected';
 
 export interface AuthAnswer {
@@ -34,6 +38,11 @@ const ERRORS: Readonly<Record<string, AuthError>> = {
   TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE: 'tooManyCodes',
   // The sign-in awaiting a code, or the enrolling session, is gone.
   INVALID_TWO_FACTOR_COOKIE: 'expired',
+  // A link to set a password that was used, expired or never made.
+  INVALID_TOKEN: 'invalidLink',
+  USER_NOT_FOUND: 'invalidLink',
+  PASSWORD_TOO_SHORT: 'passwordTooShort',
+  PASSWORD_TOO_LONG: 'passwordTooLong',
 };
 
 /** The errors after which only signing in again helps. */

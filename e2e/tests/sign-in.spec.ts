@@ -1,15 +1,18 @@
 import { messages } from '@aiontheballot/i18n/messages';
 import { AxeBuilder } from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import {
   addMembership,
+  asOwner,
   createAccount as createTestAccount,
   deleteAccounts,
   PASSWORD,
   visitorAddress,
 } from '../accounts.js';
-import { ADMIN_URL, PLATFORM_NAME, TENANT_URL } from '../servers.js';
+import { ADMIN_URL, AUTH, PLATFORM_NAME, TENANT_URL } from '../servers.js';
 import { totpCode } from '../totp.js';
 
 const en = messages.en.auth;
@@ -286,5 +289,93 @@ test.describe('admin sign-in (editorial workflow A4)', () => {
     });
     expect(answer).toBe(404);
     expect(await page.context().cookies()).toEqual([]);
+  });
+
+  test("signs the owner's first account in: the command's link sets its password, once", async ({
+    page,
+  }) => {
+    const email = `persona-${crypto.randomUUID()}@example.org`;
+    // The command as the owner runs it in an API pod, with the API's sign-in settings, answering its two questions.
+    const stdout = execFileSync(
+      'node',
+      [fileURLToPath(new URL('../../apps/api/dist/create-account.js', import.meta.url))],
+      {
+        input: `${email}\nPersona de ejemplo\n`,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          BETTER_AUTH_SECRET: AUTH.secret,
+          ADMIN_ORIGIN: ADMIN_URL,
+          PLATFORM_NAME,
+        },
+      },
+    );
+    const id = /Account created: (\S+)/.exec(stdout)?.[1] ?? '';
+    created.push(id);
+    // The SQL that makes it a platform admin adds nothing until the account has enrolled TOTP.
+    const makeAdmin = /^\s*(INSERT INTO app\.platform_admins .*)$/m.exec(stdout)?.[1] ?? '';
+    expect(makeAdmin).toContain(`'${id}'`);
+    expect(await asOwner(makeAdmin)).toBe(0);
+    expect(stdout).not.toContain(email);
+    const link = /(\S+\/set-password#token=\S+)/.exec(stdout)?.[1] ?? '';
+    const token = new URLSearchParams(new URL(link).hash.slice(1)).get('token') ?? '';
+    expect(token).not.toBe('');
+
+    // The token is in the fragment: no request the page makes carries it, and the page takes it out of the address bar.
+    const requests: string[] = [];
+    page.on('request', (request) => {
+      requests.push(`${request.url()} ${JSON.stringify(request.headers())}`);
+    });
+    // Opened first without its token (cut off when pasted, say), then pasted whole into the same tab: only the
+    // fragment changes, and the page reads it as it arrives.
+    await page.goto(`${ADMIN_URL}/set-password`);
+    await expect(page.getByText(en.setPassword.missing)).toBeVisible();
+    await page.goto(link);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(en.setPassword.title);
+    await expect(page.getByLabel(en.setPassword.password, { exact: true })).toBeVisible();
+    await expect.poll(() => page.url()).toBe(`${ADMIN_URL}/set-password`);
+    await expectAccessible(page);
+    const password = page.getByLabel(en.setPassword.password, { exact: true });
+    const confirm = page.getByLabel(en.setPassword.confirm, { exact: true });
+    await password.fill(PASSWORD);
+    await confirm.fill(`${PASSWORD}!`);
+    await page.getByRole('button', { name: en.setPassword.submit }).click();
+    await expect(formAlert(page)).toHaveText(`⚠ ${en.errors.passwordsDiffer}`);
+    await expect(confirm).toBeFocused();
+    // The same slip again is announced again: the alert's text is put back, not left in place.
+    const announced = formAlert(page).locator('p');
+    await page.evaluate(
+      `document.querySelector('#set-password-error p').setAttribute('data-seen', '')`,
+    );
+    await page.getByRole('button', { name: en.setPassword.submit }).click();
+    await expect(announced).toHaveText(`⚠ ${en.errors.passwordsDiffer}`);
+    await expect(announced).not.toHaveAttribute('data-seen');
+    await confirm.fill(PASSWORD);
+    await page.getByRole('button', { name: en.setPassword.submit }).click();
+    await expect(page.getByRole('heading', { name: en.setPassword.doneTitle })).toBeFocused();
+    await expectAccessible(page);
+    // Only the API's own call carries it, in its JSON body, which this list doesn't hold.
+    expect(requests.filter((line) => line.includes(token))).toEqual([]);
+
+    // The link works once. Followed from another page, as a link is (from this one, only its fragment would change).
+    await page.goto(`${ADMIN_URL}/sign-in`);
+    await page.goto(link);
+    await page.getByLabel(en.setPassword.password, { exact: true }).fill(PASSWORD);
+    await page.getByLabel(en.setPassword.confirm, { exact: true }).fill(PASSWORD);
+    await page.getByRole('button', { name: en.setPassword.submit }).click();
+    await expect(formAlert(page)).toHaveText(`⚠ ${en.errors.invalidLink}`);
+
+    await signIn(page, email);
+    await enrol(page);
+    expect(await asOwner(makeAdmin)).toBe(1);
+    // A platform admin sees every tenant.
+    await page.reload();
+    await expect(page.getByRole('listitem').filter({ hasText: 'Example tenant A' })).toBeVisible();
+  });
+
+  test('asks for the link on the set-password page without one', async ({ page }) => {
+    await page.goto(`${ADMIN_URL}/set-password`);
+    await expect(page.getByText(en.setPassword.missing)).toBeVisible();
+    await expect(page.getByLabel(en.setPassword.password, { exact: true })).toHaveCount(0);
   });
 });

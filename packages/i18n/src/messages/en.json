@@ -100,6 +100,18 @@
       "backupList": "Backup codes",
       "done": "I've saved them, continue"
     },
+    "setPassword": {
+      "title": "Set your password",
+      "intro": "Choose the password for your account. This link works once, for an hour.",
+      "password": "New password",
+      "passwordHint": "At least 12 characters. A few unrelated words make a strong one that is easy to remember.",
+      "confirm": "Repeat the password",
+      "submit": "Set password",
+      "doneTitle": "Your password is set",
+      "done": "Sign in with it now. You will then set up two-step verification.",
+      "signIn": "Sign in",
+      "missing": "This page needs the link you were given. Open that link instead."
+    },
     "home": {
       "title": "Your sites",
       "signedInAs": "Signed in as {name}",
@@ -114,6 +126,10 @@
       "locked": "Too many wrong codes. Wait a few minutes, then sign in again.",
       "tooManyCodes": "Too many wrong codes for this sign-in. Please sign in again.",
       "expired": "This sign-in has expired. Please sign in again.",
+      "invalidLink": "This link no longer works: it works once, for an hour. Ask for a new one.",
+      "passwordTooShort": "Use at least 12 characters.",
+      "passwordTooLong": "Use at most 128 characters.",
+      "passwordsDiffer": "The two passwords are not the same.",
       "unexpected": "Something went wrong. Please try again later."
     }
   }

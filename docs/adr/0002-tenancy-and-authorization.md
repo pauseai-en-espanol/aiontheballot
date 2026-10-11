@@ -35,13 +35,13 @@ The UI repeats some checks, but only for user experience.
 
 ### 2. Database roles
 
-| Role                   | Used by                                                                | Notes                                                                                                   |
-| ---------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `aiontheballot_owner`  | The migration Job only                                                 | Owns the schemas; never used by the running apps                                                        |
-| `aiontheballot_admin`  | API admin routes and the worker                                        | Runtime role                                                                                            |
-| `aiontheballot_web`    | API public routes (read-only)                                          | Runtime role                                                                                            |
-| `aiontheballot_worker` | Background worker                                                      | Runtime role; only job tables, scoped to the one open `job_requests` row it runs (`app.job_request_id`) |
-| `aiontheballot_auth`   | Better Auth, inside the API, and the daily sign-in clean-up (PLAN R90) | Runtime role; only Better Auth's tables in the `auth` schema, nothing in `app` or `private`             |
+| Role                   | Used by                                                                                              | Notes                                                                                                   |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `aiontheballot_owner`  | The migration Job only                                                                               | Owns the schemas; never used by the running apps                                                        |
+| `aiontheballot_admin`  | API admin routes and the worker                                                                      | Runtime role                                                                                            |
+| `aiontheballot_web`    | API public routes (read-only)                                                                        | Runtime role                                                                                            |
+| `aiontheballot_worker` | Background worker                                                                                    | Runtime role; only job tables, scoped to the one open `job_requests` row it runs (`app.job_request_id`) |
+| `aiontheballot_auth`   | Better Auth, inside the API; the daily sign-in clean-up; the owner's account command (PLAN R90, R93) | Runtime role; only Better Auth's tables in the `auth` schema, nothing in `app` or `private`             |
 
 All runtime roles are `LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB` and own nothing. A catalog
 meta-test fails if this ever changes.
