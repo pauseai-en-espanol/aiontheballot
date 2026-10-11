@@ -1,5 +1,20 @@
 # @aiontheballot/migrations
 
+## 0.14.0
+
+### Minor Changes
+
+- 83e9248: Sign in to the admin with a password and a TOTP code (PLAN R84–R92). The API mounts Better Auth's sign-in,
+  enrolment and challenge endpoints under /api/auth on the admin host only, records per session whether a second factor
+  opened it (migration auth_session_aal), acts at aal2 only for those sessions, and lists a signed-in user's tenants. A
+  daily CronJob deletes expired sessions. The admin gets its sign-in, TOTP enrolment and challenge screens in English and
+  Spanish.
+
+### Patch Changes
+
+- 1756b0e: CI passes the sign-in tests' database URLs through Turbo (TEST_ADMIN_DATABASE_URL for the API's database tests; the
+  auth, admin and owner URLs for the end-to-end tests), which locally came from .env.
+
 ## 0.13.0
 
 ### Minor Changes
