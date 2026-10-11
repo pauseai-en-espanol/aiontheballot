@@ -1,5 +1,18 @@
 # @aiontheballot/web
 
+## 0.9.7
+
+### Patch Changes
+
+- 7ba5873: Dependencies bump
+- 285b124: Dependencies bump
+- Updated dependencies [7ba5873]
+- Updated dependencies [4572be4]
+  - @aiontheballot/domain@0.7.1
+  - @aiontheballot/i18n@0.12.0
+  - @aiontheballot/observability@0.2.3
+  - @aiontheballot/og@0.3.1
+
 ## 0.9.6
 
 ### Patch Changes

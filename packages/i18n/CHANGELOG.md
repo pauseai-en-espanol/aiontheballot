@@ -1,5 +1,17 @@
 # @aiontheballot/i18n
 
+## 0.12.0
+
+### Minor Changes
+
+- 4572be4: Organizations on the platform's own screens (editorial workflow P2, PLAN R112): platform admins list every
+  organization with the sites it serves, create one, and change its name, legal details, contact and privacy emails,
+  links and whether it is a PauseAI chapter. Anyone else gets a 404.
+
+### Patch Changes
+
+- 7ba5873: Dependencies bump
+
 ## 0.11.0
 
 ### Minor Changes

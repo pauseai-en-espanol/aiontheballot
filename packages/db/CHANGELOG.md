@@ -1,5 +1,13 @@
 # @aiontheballot/db
 
+## 0.11.2
+
+### Patch Changes
+
+- 74222eb: No archiving inside a freeze window (PLAN R109, D11): an election goes from live to archived only once its freeze
+  window is over or cleared, so an archived election's corrections can't stay frozen for good.
+- 7ba5873: Dependencies bump
+
 ## 0.11.1
 
 ### Patch Changes

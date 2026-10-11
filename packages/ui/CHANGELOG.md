@@ -1,5 +1,11 @@
 # @aiontheballot/ui
 
+## 0.2.1
+
+### Patch Changes
+
+- 7ba5873: Dependencies bump
+
 ## 0.2.0
 
 ### Minor Changes
