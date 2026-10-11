@@ -97,6 +97,20 @@ export const getMembers = cache(async (slug: string): Promise<MemberList | undef
   return body === undefined ? undefined : expect(body, ['members', 'canManage'], 'the members');
 });
 
+/** A site's signup list in numbers (PLAN R119): what country admins and platform admins see, never an address. */
+export interface SignupCounts {
+  unconfirmed: number;
+  confirmed: number;
+  futureElections: number;
+}
+
+export const getSignupCounts = cache(async (slug: string): Promise<SignupCounts | undefined> => {
+  const body = await readApi(`${tenantPath(slug)}/signups`);
+  return body === undefined
+    ? undefined
+    : expect(body, ['unconfirmed', 'confirmed', 'futureElections'], 'the signup counts');
+});
+
 /** Whether the user may do what any of `roles` may in the tenant (platform admins may do all): for what to offer. */
 export const mayAct = (overview: TenantOverview, ...roles: TenantRole[]): boolean =>
   overview.platformAdmin || overview.roles.some((role) => roles.includes(role));

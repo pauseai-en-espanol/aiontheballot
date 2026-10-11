@@ -22,10 +22,24 @@ export interface HomeLoaderOptions {
  * Fields newer than the API: web and API roll out together, so a new web pod can read an old API pod for a while.
  * Missing ones get their empty value rather than failing the page.
  */
-const withDefaults = (home: PublicHome): PublicHome => ({
-  ...home,
-  brand: (home as Partial<PublicHome>).brand ?? {},
-});
+const withDefaults = (home: PublicHome): PublicHome => {
+  const older = home as Partial<PublicHome>;
+  const olderOperator = home.operator as Partial<PublicHome['operator']>;
+  return {
+    ...home,
+    brand: older.brand ?? {},
+    documents: older.documents ?? {},
+    signups: older.signups ?? false,
+    operator: {
+      ...home.operator,
+      legalName: olderOperator.legalName ?? '',
+      taxId: olderOperator.taxId ?? null,
+      address: olderOperator.address ?? null,
+      registryEntry: olderOperator.registryEntry ?? null,
+      privacyEmail: olderOperator.privacyEmail ?? null,
+    },
+  };
+};
 
 interface Entry {
   result: Exclude<HomeResult, { kind: 'unavailable' }>;

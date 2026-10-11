@@ -56,6 +56,7 @@ import {
   updateDocument,
   updateSettings,
 } from './settings.js';
+import { signupCounts } from './signups.js';
 import {
   createCriterion,
   createParty,
@@ -683,6 +684,22 @@ export const adminDataRoutes =
           });
           return reply.code(204).send();
         }),
+    );
+
+    // The signup list's counts (PLAN R119), for country admins and platform admins only, never an address.
+    scope.get<{ Params: { tenant: string } }>(
+      '/t/:tenant/signups',
+      { schema: { params: TENANT_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const access = await tenantFor(trx, actor, request.params.tenant);
+            if (!holds(access, 'country_admin')) {
+              throw new Refusal(403, 'forbidden');
+            }
+            return signupCounts(trx, access.tenantId);
+          }),
+        ),
     );
 
     // The operator's texts (T2): every version, for every member.

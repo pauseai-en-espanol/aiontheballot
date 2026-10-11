@@ -466,6 +466,7 @@ const NOT_AUDITED: Readonly<Record<string, string>> = {
     "extracted text, written by the extraction job; the source's status change is audited",
   public_versions: 'a counter moved only by triggers, whose writes are audited themselves',
   report_daily_counts: 'a counter moved only by app.submit_report, whose reports are audited',
+  signup_daily_counts: 'a counter moved only by app.sign_up, whose signups are audited',
   purge_log: "the record of a purge, which removes the tenant's audit rows with it",
 };
 
@@ -503,6 +504,9 @@ const PERSONAL_DATA: readonly string[] = [
   'reports.name',
   'reports.organization',
   'reports.resolution_note',
+  'signups.email',
+  'signups.mailbox',
+  'signups.token_hash',
   'change_requests.previous_value',
   'change_requests.proposed_value',
   'structural_changes.new_value',

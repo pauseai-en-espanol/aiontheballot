@@ -2,7 +2,16 @@
   "layout": {
     "initiativeOf": "Una iniciativa de {operator}",
     "initiativeLead": "Una iniciativa de",
-    "methodology": "Metodología"
+    "methodology": "Metodología",
+    "skipToContent": "Saltar al contenido",
+    "home": "Inicio",
+    "legalNotice": "Aviso legal",
+    "privacy": "Política de privacidad",
+    "about": "Quiénes somos",
+    "contact": "Contacto",
+    "language": "Idioma",
+    "currentLanguage": "(actual)",
+    "siteLinks": "Sobre este sitio"
   },
   "rating": {
     "meets": "Cumple",
@@ -169,7 +178,14 @@
       "membersIntro": "Quién tiene acceso a este sitio y con qué roles.",
       "queuesLater": "Aquí verás tus tareas pendientes (borradores, revisiones, avisos) cuando se puedan editar las celdas.",
       "settingsIntro": "La revisión, el plazo de conservación de los avisos y los textos legales.",
-      "electionsIntro": "Los datos, la metodología, los partidos y los criterios de cada elección."
+      "electionsIntro": "Los datos, la metodología, los partidos y los criterios de cada elección.",
+      "signups": {
+        "title": "Lista de avisos",
+        "intro": "Personas que esperan saber cuándo estará listo el sitio. Sus direcciones nunca se muestran aquí.",
+        "unconfirmed": "{count, plural, one {# dirección pendiente de confirmar} other {# direcciones pendientes de confirmar}} (se borran a los 7 días)",
+        "confirmed": "{count, plural, one {# dirección confirmada} other {# direcciones confirmadas}}",
+        "futureElections": "{count, plural, one {# de ellas quiere} other {# de ellas quieren}} saber también de futuras elecciones"
+      }
     },
     "members": {
       "title": "Miembros",
@@ -548,5 +564,58 @@
         "pauseai": "Un sitio al que sirve esta organización usa recursos de marca restringidos de PauseAI, así que tiene que seguir siendo un grupo de PauseAI."
       }
     }
+  },
+  "email": {
+    "signupConfirm": {
+      "subject": "Confirma que quieres saber cuándo estará listo {site}",
+      "body": "Hola:\n\nAlguien, probablemente tú, ha pedido a {operator} que avise a esta dirección cuando el sitio {site} esté listo{future, select, true { y de futuras elecciones en él} other {}}.\n\nPara confirmarlo, abre este enlace y pulsa «Confirmar»:\n{confirmUrl}\n\nSi no has sido tú, ignora este mensaje: la dirección se borrará en un máximo de 7 días. O bórrala ahora:\n{unsubscribeUrl}\n\nCómo tratamos tu dirección: {privacyUrl}\n\n{operator}"
+    }
+  },
+  "documents": {
+    "version": "Versión {version}, publicada el {date, date, long}"
+  },
+  "legal": {
+    "title": "Aviso legal",
+    "intro": "Este sitio web lo gestiona {operator}, que responde de él.",
+    "holder": "Titular",
+    "taxId": "NIF",
+    "address": "Domicilio",
+    "registry": "Datos registrales",
+    "contact": "Contacto",
+    "privacyContact": "Contacto para privacidad",
+    "website": "Sitio web"
+  },
+  "signup": {
+    "title": "Avísame cuando esté listo",
+    "email": "Tu correo electrónico",
+    "future": "Avísame también de futuras elecciones en este sitio",
+    "consent": "Al apuntarte aceptas nuestra {privacy}.",
+    "privacyLink": "política de privacidad",
+    "how": "Te enviaremos un correo para confirmar. Solo usaremos tu dirección para avisarte cuando el sitio esté listo y, si marcas la casilla, de futuras elecciones aquí. Las direcciones sin confirmar se borran a los 7 días; las demás, después de avisarte, salvo que pidas el aviso de futuras elecciones.",
+    "submit": "Avísame",
+    "outcome": {
+      "accepted": "Revisa tu correo: si la dirección es correcta, te llegará un enlace para confirmar.",
+      "invalid": "Esa dirección no parece correcta. Revísala y vuelve a intentarlo.",
+      "limit": "Demasiadas solicitudes ahora mismo. Vuelve a intentarlo más tarde.",
+      "failed": "No hemos podido enviar el correo. Vuelve a intentarlo más tarde.",
+      "unavailable": "Ahora mismo no es posible apuntarse."
+    }
+  },
+  "confirm": {
+    "title": "Confirma tu suscripción",
+    "lead": "Pulsa el botón para confirmar que quieres saber cuándo estará listo {site}.",
+    "button": "Confirmar",
+    "done": "Hecho: te avisaremos cuando {site} esté listo.",
+    "invalid": "Este enlace ya no es válido. Puedes volver a apuntarte en la portada.",
+    "missing": "Esta página necesita el enlace de tu correo.",
+    "undo": "¿Has cambiado de idea? Puedes darte de baja con el enlace del correo."
+  },
+  "unsubscribe": {
+    "title": "Darse de baja",
+    "lead": "Pulsa el botón para borrar tu dirección de la lista de {site}.",
+    "button": "Borrar mi dirección",
+    "done": "Hecho: hemos borrado tu dirección.",
+    "invalid": "Este enlace ya no es válido: puede que la dirección ya esté borrada.",
+    "missing": "Esta página necesita el enlace de tu correo."
   }
 }

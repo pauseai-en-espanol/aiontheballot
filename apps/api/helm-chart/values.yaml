@@ -68,6 +68,18 @@ auth:
         cpu: 200m
         memory: 256Mi
 
+# The platform's one mail sender (PLAN R115): Mailu's SMTP submission, with the platform account's credentials. Set both
+# or neither: with neither, nothing sends mail and no site offers its signup list (PLAN R119); with one, the chart
+# refuses to render (and the API to start).
+mail:
+  # The SMTP URL, credentials included, from a secret sealed in gitops: smtps://user:password@host:465, or smtp://…:587
+  # for STARTTLS. Through the in-cluster service, add ?tls.servername=<the name on Mailu's certificate>.
+  smtpUrlSecret:
+    name: ''
+    key: SMTP_URL
+  # The sending address, for the envelope and From, e.g. avisos@example.org; a site's mail shows the operator's name.
+  from: ''
+
 # Stored files' bytes (ADR-0001, files; ADR-0004): a persistent volume every API pod mounts, holding each file under
 # its tenant, bucket and SHA-256 (FILES_ROOT). No database dump covers it, so it needs its own backup (gitops backup
 # plan), taken after the database dump.

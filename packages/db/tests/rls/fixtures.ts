@@ -16,6 +16,7 @@ import {
   PLATFORM_HOSTNAME,
   REVOKED_INVITATION_TOKEN,
   REVOKED_MEMBERSHIPS,
+  SIGNUP_TOKENS,
   SOURCES,
   TENANT_DOCUMENTS,
   type TenantKey,
@@ -411,6 +412,12 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
         CELLS[key].review,
         `persona-${key.toLowerCase()}@example.org`,
       ],
+    );
+    // And a signup to its list, through app.sign_up like the public site's.
+    await client.query(
+      `SELECT app.sign_up(tenant => $1, email => $2, locale => 'es', future_elections => false,
+                          token_hash => encode(sha256(convert_to($3, 'UTF8')), 'hex'))`,
+      [tenant.id, `suscripcion-${key.toLowerCase()}@example.org`, SIGNUP_TOKENS[key]],
     );
     await client.query('RESET ROLE');
     await client.query(

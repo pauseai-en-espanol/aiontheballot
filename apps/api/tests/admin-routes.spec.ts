@@ -487,6 +487,21 @@ describe('settings and policy texts (editorial workflow §5, P1)', () => {
   });
 });
 
+describe('the signup list (PLAN R119)', () => {
+  it('give country admins and platform admins counts, never addresses, and refuse anyone else', async () => {
+    const counts = { unconfirmed: 1, confirmed: 0, futureElections: 0 };
+    for (const user of [USERS.countryAdminA, USERS.platformAdmin]) {
+      const response = await send('GET', '/api/t/test-a/signups', user);
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(counts);
+    }
+    for (const user of [USERS.editorA, USERS.reviewerA]) {
+      expect((await send('GET', '/api/t/test-a/signups', user)).statusCode).toBe(403);
+    }
+    expect((await send('GET', '/api/t/test-b/signups', USERS.countryAdminA)).statusCode).toBe(404);
+  });
+});
+
 describe('organizations (editorial workflow P2)', () => {
   const BODY = {
     displayName: { es: 'Organización de ejemplo' },

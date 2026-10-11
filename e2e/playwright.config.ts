@@ -9,11 +9,14 @@ import {
   AUTH,
   DSNS,
   GLITCHTIP_URL,
+  MAIL_FROM,
+  MAILBOX_URL,
   PLATFORM_HOST,
   PLATFORM_NAME,
   PLAUSIBLE_URL,
   PORTS,
   SEED_HOSTS,
+  SMTP_URL,
   WEB_URL,
 } from './servers.js';
 
@@ -60,6 +63,12 @@ export default defineConfig({
       env: { PORT: String(PORTS.plausible) },
     },
     {
+      name: 'smtp',
+      command: 'node fake-smtp.ts',
+      url: `${MAILBOX_URL}/healthz`,
+      env: { PORT: String(PORTS.mailbox), SMTP_PORT: String(PORTS.smtp) },
+    },
+    {
       name: 'web',
       // Bound like the production image (HOSTNAME=0.0.0.0): with 127.0.0.1, Next renames the host to localhost in the
       // proxy's URLs but not in its own, so it takes every tenant rewrite for an external one.
@@ -92,6 +101,9 @@ export default defineConfig({
         BETTER_AUTH_SECRET: AUTH.secret,
         ADMIN_ORIGIN: ADMIN_URL,
         PLATFORM_NAME,
+        // The platform's sender (PLAN R115), a stand-in that keeps what it receives.
+        SMTP_URL,
+        MAIL_FROM,
         // Where `pnpm db:seed` put the seeds' file bytes (ADR-0004: the volume, here a folder).
         FILES_ROOT:
           process.env.FILES_ROOT || fileURLToPath(new URL('../.data/files', import.meta.url)),

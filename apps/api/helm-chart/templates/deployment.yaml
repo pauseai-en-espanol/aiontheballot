@@ -61,6 +61,16 @@ spec:
             - name: PLATFORM_NAME
               value: {{ .Values.platformName | quote }}
             {{- end }}
+            {{- if or .Values.mail.smtpUrlSecret.name .Values.mail.from }}
+            # Mail takes both or neither (apps/api/src/config.ts), so one without the other fails here.
+            - name: SMTP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "mail.smtpUrlSecret.name is required with mail.from" .Values.mail.smtpUrlSecret.name }}
+                  key: {{ .Values.mail.smtpUrlSecret.key }}
+            - name: MAIL_FROM
+              value: {{ required "mail.from is required with mail.smtpUrlSecret" .Values.mail.from | quote }}
+            {{- end }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

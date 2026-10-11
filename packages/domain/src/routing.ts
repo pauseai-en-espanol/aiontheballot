@@ -1,3 +1,5 @@
+import { TENANT_LEVEL_SEGMENTS, toInternalPath } from './site-paths.js';
+
 /**
  * Public-site routing (ADR-0002, Routing): which tenant, if any, a request is for. The Host header only selects
  * public content; it never grants access, and it is never echoed back: redirects are built from the routing table.
@@ -27,6 +29,11 @@ export interface RoutingTable {
 export interface RoutingConfig {
   /** The shared platform domain, which serves `/{tenant-slug}/…`. Optional: the Spain pilot runs without one. */
   platformHost?: string;
+  /**
+   * The preview host (public-site spec §2), reachable over the VPN only: `/{tenant-slug}/…` for every active tenant,
+   * as if its site were open, never redirected to a canonical host. Optional.
+   */
+  previewHost?: string;
 }
 
 export interface RoutingRequest {
@@ -44,7 +51,17 @@ export type Resolution =
   | { kind: 'not-found' }
   /** Always a 301, to an absolute URL on the tenant's canonical base. */
   | { kind: 'redirect'; location: string }
-  | { kind: 'serve'; tenant: TenantRoute; locale: string; path: string; internalPath: string };
+  | {
+      kind: 'serve';
+      tenant: TenantRoute;
+      locale: string;
+      path: string;
+      internalPath: string;
+      /** Where the tenant's root is on this host, for links between its pages: `` or `/{slug}`. */
+      root: string;
+      /** Served on the preview host. */
+      preview: boolean;
+    };
 
 /**
  * Served pages are rewritten under this prefix, with the tenant and locale in the path, so render caches can never
@@ -60,11 +77,17 @@ export const SYSTEM_PATHS: readonly string[] = ['/healthz'];
 /**
  * What an election's slug can never be. An election's pages live at `/{slug}` (ADR-0003 §6), and these first segments
  * are paths the public site serves itself on a tenant's address: brand images and site icons (`/brand/…`), share
- * images (`/og/…`) and the health probe (`/healthz`, answered on every host before routing). The database refuses
- * them (migration `reserved_election_slugs`); a web test checks every route and system path is here or can't be a
- * slug.
+ * images (`/og/…`), the health probe (`/healthz`, answered on every host before routing), and the site's own pages in
+ * every language's words (`/aviso-legal`, `/legal-notice`…, public-site spec §3). The database refuses them
+ * (migrations `reserved_election_slugs`, `reserved_site_paths`); a web test checks every route and system path is here
+ * or can't be a slug.
  */
-export const RESERVED_ELECTION_SLUGS = ['brand', 'healthz', 'og'] as const;
+export const RESERVED_ELECTION_SLUGS: readonly string[] = [
+  'brand',
+  'healthz',
+  'og',
+  ...TENANT_LEVEL_SEGMENTS,
+].sort();
 
 const NOT_FOUND: Resolution = { kind: 'not-found' };
 
@@ -110,7 +133,7 @@ export const buildRoutingTable = (
       if (normalizeHost(hostname) !== hostname) {
         throw new Error(`Hostname ${hostname} is not normalized`);
       }
-      if (hostname === config.platformHost) {
+      if (hostname === config.platformHost || hostname === config.previewHost) {
         throw new Error(`Hostname ${hostname} is reserved for the platform`);
       }
       if (hosts.has(hostname)) {
@@ -167,32 +190,40 @@ const serve = (
   path: string,
   search: string,
   config: RoutingConfig,
-) => {
+  on: { root: string; preview: boolean },
+): Resolution => {
   const [, first = ''] = path.split('/');
   let locale = tenant.defaultLocale;
   let rest = path;
   if (first !== '' && tenant.enabledLocales.includes(first)) {
     rest = path.slice(first.length + 1) || '/';
     if (first === tenant.defaultLocale) {
-      const base = canonicalBase(table, tenant, config);
-      return base
-        ? ({ kind: 'redirect', location: `${base}${rest}${search}` } as const)
-        : NOT_FOUND;
+      // On the preview host, to the same page there; elsewhere, to the canonical address.
+      const base = on.preview
+        ? `https://${config.previewHost}/${tenant.slug}`
+        : canonicalBase(table, tenant, config);
+      return base ? { kind: 'redirect', location: `${base}${rest}${search}` } : NOT_FOUND;
     }
     locale = first;
   }
-  const internalPath = `${INTERNAL_PREFIX}/${tenant.slug}/${locale}${rest === '/' ? '' : rest}`;
-  return { kind: 'serve', tenant, locale, path: rest, internalPath } as const;
+  // The site's words onto the app's routes; an app word the site doesn't use is no page (public-site spec §3).
+  const internal = toInternalPath(tenant.defaultLocale, rest);
+  if (internal === undefined) {
+    return NOT_FOUND;
+  }
+  const internalPath = `${INTERNAL_PREFIX}/${tenant.slug}/${locale}${internal === '/' ? '' : internal}`;
+  return { kind: 'serve', tenant, locale, path: rest, internalPath, ...on };
 };
 
 /**
  * Resolves a public request (ADR-0002, Routing):
  *
  * 1. Build assets, the health probe and the relays pass through on any host; other `_` paths are 404.
- * 2. On the platform host, `/{slug}/…` is served, or 301s to the tenant's canonical host when it has one.
- * 3. A verified alias 301s to the tenant's canonical base, same path and query.
- * 4. The canonical hostname serves.
- * 5. Anything else, unverified hostnames included, is 404. There is never a default tenant.
+ * 2. On the preview host, `/{slug}/…` is served for every tenant, never redirected to its canonical host.
+ * 3. On the platform host, `/{slug}/…` is served, or 301s to the tenant's canonical host when it has one.
+ * 4. A verified alias 301s to the tenant's canonical base, same path and query.
+ * 5. The canonical hostname serves.
+ * 6. Anything else, unverified hostnames included, is 404. There is never a default tenant.
  */
 export const resolve = (
   request: RoutingRequest,
@@ -219,18 +250,19 @@ export const resolve = (
     return NOT_FOUND;
   }
 
-  if (host === config.platformHost) {
+  if (host === config.previewHost || host === config.platformHost) {
     const [, slug = ''] = path.split('/');
     const tenant = table.tenantsBySlug.get(slug);
     if (!tenant) {
       return NOT_FOUND;
     }
     const rest = path.slice(slug.length + 1) || '/';
+    const preview = host === config.previewHost;
     const canonicalHost = table.canonicalHosts.get(tenant.id);
-    if (canonicalHost) {
+    if (canonicalHost && !preview) {
       return { kind: 'redirect', location: `https://${canonicalHost}${rest}${search}` };
     }
-    return serve(table, tenant, rest, search, config);
+    return serve(table, tenant, rest, search, config, { root: `/${slug}`, preview });
   }
 
   const entry = table.hosts.get(host);
@@ -238,7 +270,7 @@ export const resolve = (
     return NOT_FOUND;
   }
   if (table.canonicalHosts.get(entry.tenant.id) === host) {
-    return serve(table, entry.tenant, path, search, config);
+    return serve(table, entry.tenant, path, search, config, { root: '', preview: false });
   }
   const base = canonicalBase(table, entry.tenant, config);
   return base ? { kind: 'redirect', location: `${base}${path}${search}` } : NOT_FOUND;

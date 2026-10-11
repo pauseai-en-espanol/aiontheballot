@@ -927,6 +927,56 @@ is_party_representative)` is the public's only write and returns the report's id
   the transaction time and is set once. Country admins do it on request; the daily run does it as the table owner.
   Afterwards the report takes no personal data again, but its status can still change.
 
+### 3.8b The signup list (personal data: private, deleted)
+
+"Avísame cuando esté listo" (PLAN R119, R122; public-site spec §6): each site's own double opt-in list.
+
+```sql
+create table app.signups (
+  id                uuid primary key default uuidv7(),
+  tenant_id         uuid not null references app.tenants,
+  email             text not null,                   -- personal data; lowercase, at most 254 characters
+  mailbox           text not null generated always as (/* email without its +tag */) stored,  -- personal data
+  locale            app.locale not null,             -- the form's language: its emails are written in it
+  future_elections  boolean not null default false,  -- the optional, unticked box
+  token_hash        text not null unique,            -- hex SHA-256 of the newest token; kept out of the audit log
+  token_issued_at   timestamptz not null default now(),
+  tokens_issued     int not null default 1,          -- 1 to 5
+  created_at        timestamptz not null default now(),
+  confirmed_at      timestamptz,
+  unique (tenant_id, id),
+  unique (tenant_id, email)
+);
+
+-- Confirmation emails per site and UTC day: the daily cap's counter, written only by app.sign_up.
+create table app.signup_daily_counts (
+  tenant_id  uuid not null references app.tenants,
+  day        date not null,
+  count      int not null,
+  primary key (tenant_id, day)
+);
+```
+
+- **The only way in** is three `SECURITY DEFINER` functions that only `aiontheballot_web` executes (ADR-0002 §7):
+  - `app.sign_up(tenant, email, locale, future_elections, token_hash)` returns whether to send a confirmation email
+    with that token. It refuses (22023) an inactive or unknown tenant, a language it doesn't have, and a tenant without
+    a published privacy policy. Then it locks the day's counter and raises 54000 once the site has sent 1,000
+    confirmation emails that UTC day, for every address alike. A confirmed address changes nothing; otherwise a mailbox
+    (the address without its `+tag`) gets an email at most every 10 minutes and 5 times in all, the new token and the
+    newest choices replacing the old. Every email it says to send is counted. The counter's lock makes a site's
+    signups take turns, so two first signups of one address insert one row and send one email.
+  - `app.confirm_signup(tenant, token_hash)` confirms the tenant's unconfirmed signup holding the token, once
+    (`confirmed_at` is the transaction time and never changes again), and says whether the token now belongs to a
+    confirmed signup there.
+  - `app.unsubscribe(tenant, token_hash)` deletes the tenant's signup holding the token, confirmed or not.
+  - Each first deletes every signup still unconfirmed 7 days after it was made; `confirm_signup(NULL, NULL)` does
+    only that, and the API calls it hourly.
+- **After confirming, the same token unsubscribes.** Every email carries it until a later email replaces it.
+- **No runtime role reads an address, a mailbox or a token.** Country admins and platform admins read the other
+  columns (column grants; the counts in the admin), and the audit trigger copies none of the three. How the launch
+  email reads the addresses waits for a decision (PLAN R122; the brief).
+- `purge_tenant` deletes a tenant's signups and their counter with the rest.
+
 ### 3.9 LLM assistance (M4; the schema exists from M1)
 
 ```sql
@@ -1108,12 +1158,13 @@ Column-level grants restrict `aiontheballot_web` further: on `source_documents` 
 
 - `assessments`, `draft_*`, `assessment_contributors`, `review_events`, `revision_internal`, `change_requests`;
 - `source_texts` and the `sources` bucket (copyright);
-- `reports`, `report_daily_counts`;
+- `reports`, `report_daily_counts`, `signups`, `signup_daily_counts`;
 - `invitations`, `memberships`, `platform_admins`, `platform_hostnames`, `hostname_verifications`,
   `brand_asset_grants`;
 - `llm_*`, `job_requests`, `audit_log`, `purge_log`.
 
-The only write available to `aiontheballot_web` is calling `app.submit_report()`.
+The only writes available to `aiontheballot_web` are calling `app.submit_report()` and the signup list's three
+functions (§3.8b).
 
 These public-visibility policies are for `aiontheballot_web` only. `aiontheballot_admin` sees what memberships give it
 (platform admins: every tenant), and nothing of other tenants, published or not (PLAN, Answered: admin visibility).
@@ -1163,6 +1214,7 @@ Members also read the unrestricted brand-asset catalogue, to choose their tenant
 | Default-locale text is present when public                                                                     | Trigger on publish, on going live, on approval and on writing a public election's criteria                                 | `assessment_revisions`, `elections`, `change_requests`, `tenant_documents`, `criteria`                |
 | A programme marked published has a source; "not mentioned" gets rechecked                                      | Trigger                                                                                                                    | `parties`                                                                                             |
 | Report cap and status                                                                                          | `submit_report()`, using the daily counts                                                                                  | `reports`, `report_daily_counts`                                                                      |
+| Signup double opt-in, throttle and expiry                                                                      | `sign_up()`, `confirm_signup()`, `unsubscribe()`, `signup_rules()`                                                         | `signups`                                                                                             |
 | Reports are anonymized, never deleted                                                                          | `anonymize_expired_reports()`; trigger allows only nulling the personal-data columns                                       | `reports`                                                                                             |
 | The worker acts only within the job it runs                                                                    | RLS scoped to `app.job_request_id`, an open request; tenant and document read from the request                             | `job_requests` and the job tables                                                                     |
 | No personal data in the audit log                                                                              | Audit trigger skips columns commented `personal data`; catalog test                                                        | `audit_log`                                                                                           |

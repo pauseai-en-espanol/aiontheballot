@@ -25,11 +25,11 @@ If review falls behind, the cut list below is applied at the preview go/no-go.
 
 Each spec is reviewed by Dani before the milestone that builds it starts:
 
-| Spec                                                                                                 | Ready before | Status                                                  |
-| ---------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- |
-| [Data model](spec/data-model.md)                                                                     | M1           | Approved                                                |
-| [Editorial workflow](spec/editorial-workflow.md) (user stories and acceptance criteria per role)     | M2           | Drafted; awaits review                                  |
-| Public site (page content, mobile layouts, display states, share-image layouts, performance budgets) | M3           | Written during M2, with chapter input on public wording |
+| Spec                                                                                             | Ready before | Status                                                  |
+| ------------------------------------------------------------------------------------------------ | ------------ | ------------------------------------------------------- |
+| [Data model](spec/data-model.md)                                                                 | M1           | Approved                                                |
+| [Editorial workflow](spec/editorial-workflow.md) (user stories and acceptance criteria per role) | M2           | Drafted; awaits review                                  |
+| [Public site](spec/public-site.md) (modes, addresses, pages, layouts, display states, headers)   | M3           | Drafted (R121); awaits review and the chapter's wording |
 
 ## Milestones
 
@@ -1059,6 +1059,55 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   change, though for npm packages pnpm's own 3-day minimum (`pnpm-workspace.yaml`) may still refuse a fix younger
   than that in the lockfile. Lock-file maintenance keeps its own weekly PR (`config:best-practices`), since Renovate
   can't group it with other updates. From the adversarial review. To verify on the next Renovate PR's run.
+- **R121. The public site's spec, written where the plan left it open** ([spec/public-site.md](spec/public-site.md)).
+  A site is _coming soon_ until `OPEN_SITES` (the web app's environment, gitops) lists its slug, the Preview
+  go/no-go's switch, with no schema change; coming soon, it serves only its home and the always-on pages. The preview
+  host, `PREVIEW_HOST`, serves `/{slug}/…` for every tenant as if open, never redirected to a canonical host and never
+  indexed (`X-Robots-Tag` and the robots meta tag); its route belongs on `gateway-private` (a gitops step). The proxy
+  tells pages the mode and their root in request headers it always sets itself, over whatever a client sent. Only
+  live and archived elections are public, so going live shows an election's parties and criteria on the preview host
+  first, while the public addresses stay coming soon. Paths use the words of the tenant's default locale in every
+  locale (`/aviso-legal`, `/en/aviso-legal`), mapped in `resolve()` onto the app's English routes; an English word on
+  a Spanish site is a 404, so a page has one address. Every language's tenant-level words are reserved election slugs
+  (migration `reserved_site_paths`; `RESERVED_ELECTION_SLUGS` follows `SITE_WORDS`).
+- **R122. The signup list (R119), as built** (migration `signups`, ADR-0002 §6, §7 and the data model amended, threat
+  T27, then hardened after the adversarial review). `app.sign_up` checks the site's daily cap first, for every
+  address alike: 1,000 confirmation emails a UTC day, counted in a per-day counter whose lock also makes a site's
+  signups take turns; only then does it look at the address, so the cap's answer tells nobody who is listed. A
+  confirmed address changes nothing; otherwise a mailbox (the address without its `+tag`, so variants count as one)
+  gets an email at most every 10 minutes and 5 times in all. The API normalises an address first (trimmed, Unicode
+  NFC, lowercase, the domain in punycode, no control characters) and answers before the email goes out, so neither
+  the answer nor its timing says whether one was sent; no transaction waits on the mail server. A token acts only on
+  its own site's list. The token that confirms then unsubscribes, and unsubscribing deletes the row: there is no list
+  of refused addresses to keep, so someone who says "this wasn't me" can be signed up again by a stranger, up to the
+  same limits (accepted; the gateway's per-IP limit, M3, is the outer fence). The API counts each visitor's signups
+  too (5 per 10 minutes per replica, IPv6 by /64, the oldest windows dropped first when full). Unconfirmed signups
+  are deleted by each of the three functions and by an hourly `confirm_signup(NULL, NULL)` from the API process: one
+  statement, not a job (ADR-0003 guardrail 1), and no new function or grant. The email's links carry the token in
+  the query, which RFC 8058's one-click needs anyway; a GET never confirms or deletes: the page has a button that posts
+  the token back, and the answer redirects without it, sends no referrer and isn't indexed; the language switch keeps
+  the token. The form takes posts from the site's own pages only (`Sec-Fetch-Site`, else `Origin`); the one-click post
+  comes from anywhere, as RFC 8058 requires. The form shows only with mail configured, a published privacy policy
+  (which the database checks too) and an address for the links (the site's own hostname, or the platform's path).
+  Country admins and platform admins see three counts on the site's dashboard; the address, the mailbox and the token
+  are out of their column grants and of the audit log. A site taken offline keeps its list, and its links stop
+  working, until it is back or purged. **Not built: the launch email and the deletion after it.** Sending it needs
+  some role to read the addresses, which R119 doesn't settle: a question in the brief. Until then the form can open;
+  nobody can be sent the announcement.
+- **R123. One platform sender (R115), built:** nodemailer 10.0.16 (the newest past the 3-day rule) with `SMTP_URL`, a
+  gitops secret, and `MAIL_FROM`, both or neither (the chart and the API refuse one alone), with timeouts of seconds
+  (10 to connect and to greet, 20 idle) instead of nodemailer's minutes. A site's mail shows the operator's name with
+  the platform's address, replies to the operator's contact address, and is plain text in the form's language. The
+  confirmation goes out after the signup's transaction commits; if Mailu refuses it, the signup is deleted again with
+  its own token, so the person can try again at once. Failures are logged and reported with the SMTP code and command
+  only, never the message or the recipients, which quote the address. `packages/i18n` now takes its translator from
+  `use-intl/core`, the same `createTranslator` next-intl re-exported, so the API uses it without pulling in Next.
+- **R124. The legal notice, the privacy policy and the page about the operator are served from now on, coming soon
+  or not** (R44's missing links), each in the shared footer with the operator line and the contact address. The legal
+  notice is generated from the operator's row, every field the operator gave (Q6 still open); the policy texts are
+  the latest published version, with its number and date, in the page's language or else the default one, marked as
+  such. Markdown is rendered with markdown-it 15.0.2: raw HTML escaped, images off, links only to http(s) and mailto,
+  headings starting at h2. A text not published is a 404 and unlinked.
 
 ## Open decisions for Dani
 

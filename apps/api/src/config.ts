@@ -23,6 +23,23 @@ export interface ApiConfig {
    * Undefined leaves the signed-in data routes unavailable (503).
    */
   adminDatabaseUrl: string | undefined;
+  /** The platform's mail sender (PLAN R115). Undefined: nothing sends mail, and no site offers its signup form. */
+  mail: MailConfig | undefined;
+  /**
+   * The platform domain, as the web app's PLATFORM_HOST: links in emails of tenants without a hostname of their own
+   * point there (ADR-0002, canonical addresses).
+   */
+  platformHost: string | undefined;
+}
+
+export interface MailConfig {
+  /**
+   * Mailu's SMTP submission with the platform account's credentials: `smtps://user:password@host:465`, or `smtp://…`
+   * with STARTTLS. Never logged.
+   */
+  smtpUrl: string;
+  /** The sending address, for the envelope and the From header; the From name is the operator's for a site's mail. */
+  from: string;
 }
 
 export interface AuthConfig {
@@ -107,6 +124,34 @@ const readAuth = (env: NodeJS.ProcessEnv): AuthConfig | undefined => {
   return { adminOrigin: readOrigin(adminOrigin, 'ADMIN_ORIGIN'), databaseUrl, secret, totpIssuer };
 };
 
+/** A plain address, as the sender: no display name, no spaces, one `@`. */
+const ADDRESS = /^[^\s@<>"]+@[^\s@<>".]+(?:\.[^\s@<>".]+)+$/u;
+
+/** Mail needs both settings or neither. Errors never echo the URL, which holds a password. */
+const readMail = (env: NodeJS.ProcessEnv): MailConfig | undefined => {
+  const smtpUrl = env.SMTP_URL || undefined;
+  const from = env.MAIL_FROM || undefined;
+  if (!smtpUrl && !from) {
+    return undefined;
+  }
+  if (!smtpUrl || !from) {
+    throw new Error(`Mail is half configured: ${smtpUrl ? 'MAIL_FROM' : 'SMTP_URL'} not set`);
+  }
+  let protocol: string;
+  try {
+    ({ protocol } = new URL(smtpUrl));
+  } catch {
+    throw new Error('SMTP_URL must be a URL such as smtps://user:password@mail.example.org:465');
+  }
+  if (protocol !== 'smtp:' && protocol !== 'smtps:') {
+    throw new Error('SMTP_URL must start with smtp:// or smtps://');
+  }
+  if (!ADDRESS.test(from)) {
+    throw new Error('MAIL_FROM must be a plain address, such as avisos@example.org');
+  }
+  return { smtpUrl, from };
+};
+
 /** Reads the API configuration from the environment, failing fast on invalid values. */
 export const loadConfig = (env: NodeJS.ProcessEnv): ApiConfig => {
   const port = Number(env.PORT ?? 3001);
@@ -126,5 +171,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv): ApiConfig => {
     filesRoot: env.FILES_ROOT || undefined,
     auth: readAuth(env),
     adminDatabaseUrl: env.ADMIN_DATABASE_URL || undefined,
+    mail: readMail(env),
+    platformHost: env.PLATFORM_HOST || undefined,
   };
 };

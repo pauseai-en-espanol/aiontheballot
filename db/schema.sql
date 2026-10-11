@@ -396,6 +396,94 @@ CREATE TYPE app.tenant_role AS ENUM (
 ALTER TYPE app.tenant_role OWNER TO aiontheballot_owner;
 
 --
+-- Name: confirm_signup(uuid, text); Type: FUNCTION; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION app.confirm_signup(tenant uuid, token_hash text) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    PERFORM private.delete_expired_signups();
+    IF tenant IS NULL OR token_hash IS NULL THEN
+      RETURN false;
+    END IF;
+    UPDATE app.signups s SET confirmed_at = now()
+     WHERE s.tenant_id = tenant AND s.token_hash = confirm_signup.token_hash AND s.confirmed_at IS NULL;
+    RETURN EXISTS (SELECT 1 FROM app.signups s
+                    WHERE s.tenant_id = tenant AND s.token_hash = confirm_signup.token_hash
+                      AND s.confirmed_at IS NOT NULL);
+  END
+  $$;
+
+
+ALTER FUNCTION app.confirm_signup(tenant uuid, token_hash text) OWNER TO aiontheballot_owner;
+
+--
+-- Name: sign_up(uuid, text, text, boolean, text); Type: FUNCTION; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION app.sign_up(tenant uuid, email text, locale text, future_elections boolean, token_hash text) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    daily_cap constant int := 1000;  -- confirmation emails per site and UTC day; far above normal use
+    today date := (now() AT TIME ZONE 'UTC')::date;
+    address text := lower(btrim(email));
+    existing app.signups;
+    known boolean;
+    sent int;
+    box record;
+  BEGIN
+    PERFORM private.delete_expired_signups();
+    IF NOT EXISTS (SELECT 1 FROM app.tenants t
+                    WHERE t.id = tenant AND t.active AND sign_up.locale = ANY (t.enabled_locales))
+       OR NOT EXISTS (SELECT 1 FROM app.tenant_documents d
+                       WHERE d.tenant_id = tenant AND d.kind = 'privacy_policy' AND d.published_at IS NOT NULL) THEN
+      RAISE EXCEPTION 'this site takes no signups' USING ERRCODE = 'invalid_parameter_value';
+    END IF;
+
+    -- The cap first, for every address alike. Locking the day's counter also makes a site's signups take turns, so
+    -- two signups of one new address at once can't both insert it.
+    INSERT INTO app.signup_daily_counts AS c (tenant_id, day, count) VALUES (tenant, today, 0)
+      ON CONFLICT ON CONSTRAINT signup_daily_counts_pkey DO NOTHING;
+    SELECT c.count INTO sent FROM app.signup_daily_counts c WHERE c.tenant_id = tenant AND c.day = today FOR UPDATE;
+    IF sent >= daily_cap THEN
+      RAISE EXCEPTION 'this site sends no more confirmations today' USING ERRCODE = 'program_limit_exceeded';
+    END IF;
+
+    SELECT * INTO existing FROM app.signups s WHERE s.tenant_id = tenant AND s.email = address;
+    known := FOUND;
+    IF known AND existing.confirmed_at IS NOT NULL THEN
+      RETURN false;
+    END IF;
+    SELECT max(s.token_issued_at) AS last, coalesce(sum(s.tokens_issued), 0) AS issued INTO box
+      FROM app.signups s
+     WHERE s.tenant_id = tenant
+       AND s.mailbox = split_part(split_part(address, '@', 1), '+', 1) || '@' || split_part(address, '@', 2);
+    IF box.last > now() - interval '10 minutes' OR box.issued >= 5 THEN
+      RETURN false;
+    END IF;
+
+    IF known THEN
+      UPDATE app.signups s
+         SET locale = sign_up.locale, future_elections = coalesce(sign_up.future_elections, false),
+             token_hash = sign_up.token_hash, token_issued_at = now(), tokens_issued = s.tokens_issued + 1
+       WHERE s.id = existing.id;
+    ELSE
+      INSERT INTO app.signups (tenant_id, email, locale, future_elections, token_hash)
+      VALUES (tenant, address, sign_up.locale, coalesce(sign_up.future_elections, false), sign_up.token_hash);
+    END IF;
+    UPDATE app.signup_daily_counts c SET count = c.count + 1 WHERE c.tenant_id = tenant AND c.day = today;
+    RETURN true;
+  END
+  $$;
+
+
+ALTER FUNCTION app.sign_up(tenant uuid, email text, locale text, future_elections boolean, token_hash text) OWNER TO aiontheballot_owner;
+
+--
 -- Name: submit_report(uuid, app.report_kind, text, uuid, uuid, text, text, text, boolean); Type: FUNCTION; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -442,6 +530,24 @@ CREATE FUNCTION app.submit_report(tenant uuid, kind app.report_kind, message tex
 
 
 ALTER FUNCTION app.submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean) OWNER TO aiontheballot_owner;
+
+--
+-- Name: unsubscribe(uuid, text); Type: FUNCTION; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION app.unsubscribe(tenant uuid, token_hash text) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    PERFORM private.delete_expired_signups();
+    DELETE FROM app.signups s WHERE s.tenant_id = tenant AND s.token_hash = unsubscribe.token_hash;
+    RETURN FOUND;
+  END
+  $$;
+
+
+ALTER FUNCTION app.unsubscribe(tenant uuid, token_hash text) OWNER TO aiontheballot_owner;
 
 --
 -- Name: active_tenant_has_operator(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -1168,6 +1274,20 @@ CREATE FUNCTION private.current_user_id() RETURNS uuid
 
 
 ALTER FUNCTION private.current_user_id() OWNER TO aiontheballot_owner;
+
+--
+-- Name: delete_expired_signups(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.delete_expired_signups() RETURNS void
+    LANGUAGE sql
+    SET search_path TO ''
+    AS $$
+    DELETE FROM app.signups s WHERE s.confirmed_at IS NULL AND s.created_at <= now() - interval '7 days'
+  $$;
+
+
+ALTER FUNCTION private.delete_expired_signups() OWNER TO aiontheballot_owner;
 
 --
 -- Name: election_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -1940,7 +2060,8 @@ CREATE FUNCTION private.purge_tenant(tenant uuid) RETURNS bigint
     -- Children before parents. Cells take their drafts and contributors with them.
     tables text[] := ARRAY[
       'revision_internal', 'revision_evidence', 'revision_checked_documents', 'structural_changes', 'change_requests',
-      'assessment_revisions', 'review_events', 'reports', 'report_daily_counts', 'assessment_contributors',
+      'assessment_revisions', 'review_events', 'reports', 'report_daily_counts', 'signups', 'signup_daily_counts',
+      'assessment_contributors',
       'draft_checked_documents', 'draft_evidence', 'assessments', 'job_requests', 'llm_suggestions', 'llm_runs',
       'source_texts', 'source_documents', 'methodology_reviewers', 'methodologies', 'criteria', 'parties', 'elections',
       'tenant_brand_selections', 'files', 'tenant_documents', 'invitations', 'memberships',
@@ -2230,6 +2351,37 @@ CREATE FUNCTION private.short_title_rules() RETURNS trigger
 
 
 ALTER FUNCTION private.short_title_rules() OWNER TO aiontheballot_owner;
+
+--
+-- Name: signup_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.signup_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    IF TG_OP = 'INSERT' THEN
+      NEW.confirmed_at := NULL;
+      NEW.tokens_issued := 1;
+      NEW.token_issued_at := now();
+      RETURN NEW;
+    END IF;
+    IF NEW.email IS DISTINCT FROM OLD.email OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+      RAISE EXCEPTION 'signup %: its address and creation never change', OLD.id USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF OLD.confirmed_at IS NOT NULL AND NEW.confirmed_at IS DISTINCT FROM OLD.confirmed_at THEN
+      RAISE EXCEPTION 'signup % is confirmed for good', OLD.id USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF NEW.confirmed_at IS DISTINCT FROM OLD.confirmed_at THEN
+      NEW.confirmed_at := now();
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.signup_rules() OWNER TO aiontheballot_owner;
 
 --
 -- Name: source_document_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -2970,7 +3122,7 @@ CREATE TABLE app.elections (
     CONSTRAINT elections_check1 CHECK (((type <> 'regional'::app.election_type) OR (territory_code IS NOT NULL))),
     CONSTRAINT elections_check2 CHECK (((frozen_until IS NULL) OR ((frozen_from IS NOT NULL) AND (frozen_until > frozen_from)))),
     CONSTRAINT elections_slug_check CHECK (((slug)::text !~ '^[a-z]{2}(-[a-z]{2})?$'::text)),
-    CONSTRAINT elections_slug_not_reserved CHECK (((slug)::text <> ALL (ARRAY['brand'::text, 'healthz'::text, 'og'::text]))),
+    CONSTRAINT elections_slug_not_reserved CHECK (((slug)::text <> ALL (ARRAY['about'::text, 'aviso-legal'::text, 'avisos'::text, 'brand'::text, 'healthz'::text, 'legal-notice'::text, 'og'::text, 'privacidad'::text, 'privacy'::text, 'quienes-somos'::text, 'updates'::text]))),
     CONSTRAINT elections_territory_code_check CHECK ((territory_code ~ '^[A-Z]{2}-[A-Z0-9]{1,3}$'::text))
 );
 
@@ -3474,6 +3626,65 @@ CREATE TABLE app.revision_internal (
 
 
 ALTER TABLE app.revision_internal OWNER TO aiontheballot_owner;
+
+--
+-- Name: signup_daily_counts; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.signup_daily_counts (
+    tenant_id uuid NOT NULL,
+    day date NOT NULL,
+    count integer NOT NULL,
+    CONSTRAINT signup_daily_counts_count_check CHECK ((count >= 0))
+);
+
+
+ALTER TABLE app.signup_daily_counts OWNER TO aiontheballot_owner;
+
+--
+-- Name: signups; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.signups (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    email text NOT NULL,
+    mailbox text GENERATED ALWAYS AS (((split_part(split_part(email, '@'::text, 1), '+'::text, 1) || '@'::text) || split_part(email, '@'::text, 2))) STORED NOT NULL,
+    locale app.locale NOT NULL,
+    future_elections boolean DEFAULT false NOT NULL,
+    token_hash text NOT NULL,
+    token_issued_at timestamp with time zone DEFAULT now() NOT NULL,
+    tokens_issued integer DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    confirmed_at timestamp with time zone,
+    CONSTRAINT signups_email_check CHECK (((email = lower(email)) AND (char_length(email) <= 254) AND (email ~ '^[^@\s]+@[^@\s]+$'::text))),
+    CONSTRAINT signups_token_hash_check CHECK ((token_hash ~ '^[0-9a-f]{64}$'::text)),
+    CONSTRAINT signups_tokens_issued_check CHECK (((tokens_issued >= 1) AND (tokens_issued <= 5)))
+);
+
+
+ALTER TABLE app.signups OWNER TO aiontheballot_owner;
+
+--
+-- Name: COLUMN signups.email; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.signups.email IS 'personal data';
+
+
+--
+-- Name: COLUMN signups.mailbox; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.signups.mailbox IS 'personal data';
+
+
+--
+-- Name: COLUMN signups.token_hash; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.signups.token_hash IS 'personal data';
+
 
 --
 -- Name: source_documents; Type: TABLE; Schema: app; Owner: aiontheballot_owner
@@ -4321,6 +4532,46 @@ ALTER TABLE ONLY app.revision_internal
 
 
 --
+-- Name: signup_daily_counts signup_daily_counts_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.signup_daily_counts
+    ADD CONSTRAINT signup_daily_counts_pkey PRIMARY KEY (tenant_id, day);
+
+
+--
+-- Name: signups signups_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.signups
+    ADD CONSTRAINT signups_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: signups signups_tenant_id_email_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.signups
+    ADD CONSTRAINT signups_tenant_id_email_key UNIQUE (tenant_id, email);
+
+
+--
+-- Name: signups signups_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.signups
+    ADD CONSTRAINT signups_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
+-- Name: signups signups_token_hash_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.signups
+    ADD CONSTRAINT signups_token_hash_key UNIQUE (token_hash);
+
+
+--
 -- Name: source_documents source_documents_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -4731,6 +4982,20 @@ CREATE INDEX revision_internal_report_id_idx ON app.revision_internal USING btre
 
 
 --
+-- Name: signups_mailbox_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX signups_mailbox_idx ON app.signups USING btree (tenant_id, mailbox);
+
+
+--
+-- Name: signups_unconfirmed_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX signups_unconfirmed_idx ON app.signups USING btree (created_at) WHERE (confirmed_at IS NULL);
+
+
+--
 -- Name: source_documents_election_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5064,6 +5329,13 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.revision_evidence F
 --
 
 CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.revision_internal FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
+-- Name: signups audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.signups FOR EACH ROW EXECUTE FUNCTION private.audit();
 
 
 --
@@ -5585,6 +5857,20 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.revision_internal FOR E
 
 
 --
+-- Name: signup_daily_counts forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.signup_daily_counts FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: signups forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.signups FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: source_documents forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5921,6 +6207,13 @@ CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.reports FOR EACH ROW EXECUTE
 
 
 --
+-- Name: signups rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.signups FOR EACH ROW EXECUTE FUNCTION private.signup_rules();
+
+
+--
 -- Name: source_documents rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -6114,6 +6407,13 @@ CREATE TRIGGER stamp BEFORE INSERT ON app.reports FOR EACH ROW EXECUTE FUNCTION 
 --
 
 CREATE TRIGGER stamp BEFORE INSERT ON app.review_events FOR EACH ROW EXECUTE FUNCTION private.stamp('actor_id', 'created_at');
+
+
+--
+-- Name: signups stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT ON app.signups FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
 
 
 --
@@ -6557,6 +6857,22 @@ ALTER TABLE ONLY app.revision_internal
 
 
 --
+-- Name: signup_daily_counts signup_daily_counts_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.signup_daily_counts
+    ADD CONSTRAINT signup_daily_counts_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: signups signups_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.signups
+    ADD CONSTRAINT signups_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
 -- Name: source_documents source_documents_tenant_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -6847,6 +7163,13 @@ CREATE POLICY country_admin_read ON app.audit_log FOR SELECT TO aiontheballot_ad
 --
 
 CREATE POLICY country_admin_read ON app.invitations FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: signups country_admin_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY country_admin_read ON app.signups FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -7871,6 +8194,18 @@ CREATE POLICY self_insert ON app.assessment_contributors FOR INSERT TO aiontheba
 
 
 --
+-- Name: signup_daily_counts; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.signup_daily_counts ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: signups; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.signups ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: source_documents; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -8272,11 +8607,35 @@ REVOKE ALL ON TYPE app.tenant_role FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION confirm_signup(tenant uuid, token_hash text); Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION app.confirm_signup(tenant uuid, token_hash text) FROM PUBLIC;
+GRANT ALL ON FUNCTION app.confirm_signup(tenant uuid, token_hash text) TO aiontheballot_web;
+
+
+--
+-- Name: FUNCTION sign_up(tenant uuid, email text, locale text, future_elections boolean, token_hash text); Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION app.sign_up(tenant uuid, email text, locale text, future_elections boolean, token_hash text) FROM PUBLIC;
+GRANT ALL ON FUNCTION app.sign_up(tenant uuid, email text, locale text, future_elections boolean, token_hash text) TO aiontheballot_web;
+
+
+--
 -- Name: FUNCTION submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean); Type: ACL; Schema: app; Owner: aiontheballot_owner
 --
 
 REVOKE ALL ON FUNCTION app.submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION app.submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean) TO aiontheballot_web;
+
+
+--
+-- Name: FUNCTION unsubscribe(tenant uuid, token_hash text); Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION app.unsubscribe(tenant uuid, token_hash text) FROM PUBLIC;
+GRANT ALL ON FUNCTION app.unsubscribe(tenant uuid, token_hash text) TO aiontheballot_web;
 
 
 --
@@ -8379,6 +8738,13 @@ GRANT ALL ON FUNCTION private.current_aal() TO aiontheballot_admin;
 REVOKE ALL ON FUNCTION private.current_user_id() FROM PUBLIC;
 GRANT ALL ON FUNCTION private.current_user_id() TO aiontheballot_admin;
 GRANT ALL ON FUNCTION private.current_user_id() TO aiontheballot_worker;
+
+
+--
+-- Name: FUNCTION delete_expired_signups(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.delete_expired_signups() FROM PUBLIC;
 
 
 --
@@ -8551,6 +8917,13 @@ REVOKE ALL ON FUNCTION private.revision_contributors(cell uuid) FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.short_title_rules() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION signup_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.signup_rules() FROM PUBLIC;
 
 
 --
@@ -10172,6 +10545,48 @@ GRANT SELECT ON TABLE app.revision_evidence TO aiontheballot_admin;
 --
 
 GRANT SELECT ON TABLE app.revision_internal TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN signups.id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(id) ON TABLE app.signups TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN signups.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(tenant_id) ON TABLE app.signups TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN signups.locale; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(locale) ON TABLE app.signups TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN signups.future_elections; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(future_elections) ON TABLE app.signups TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN signups.created_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(created_at) ON TABLE app.signups TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN signups.confirmed_at; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(confirmed_at) ON TABLE app.signups TO aiontheballot_admin;
 
 
 --

@@ -9,7 +9,9 @@ import { createAuth } from './auth/auth.js';
 import { loadConfig } from './config.js';
 import { initErrorTracking } from './error-tracking.js';
 import { createBrandImageSource, createHomeSource } from './home-data.js';
+import { createMailer, mailFailure } from './mail/mailer.js';
 import { createRoutingSource } from './routing-data.js';
+import { createSignups } from './signups.js';
 
 const config = loadConfig(process.env);
 initErrorTracking(config.sentryDsn);
@@ -35,11 +37,30 @@ const admin = config.adminDatabaseUrl
       applicationName: 'aiontheballot-api-admin',
     })
   : undefined;
+// The platform's one sender (PLAN R115). Without it, nothing sends mail and no site offers its signup form.
+const mailer = config.mail ? createMailer(config.mail) : undefined;
+const signups =
+  web && mailer
+    ? createSignups({
+        db: web,
+        mailer,
+        platformHost: config.platformHost,
+        // Never the address or the message: only that sending failed, and the SMTP code (mailFailure).
+        onMailError: (error) => {
+          const failure = mailFailure(error);
+          console.error(failure.message);
+          captureException(failure);
+        },
+      })
+    : undefined;
 const app = buildApp({
   logger: { level: config.logLevel },
   routing: web ? createRoutingSource(web) : undefined,
-  home: web ? createHomeSource(web) : undefined,
+  home: web
+    ? createHomeSource(web, { mail: signups !== undefined, platformHost: config.platformHost })
+    : undefined,
   brandImages: web && files ? createBrandImageSource(web, files) : undefined,
+  signups,
   admin: {
     auth:
       config.auth && authPool
@@ -65,6 +86,19 @@ if (files) {
     app.log.error({ err: error, filesRoot: config.filesRoot }, 'File store is not writable');
     captureException(error);
   }
+}
+
+// Unconfirmed signups are deleted 7 days after they were made (PLAN R119): every signup call deletes those due, and
+// this hourly call does it on quiet days. Not a job: one DELETE through the database's own function.
+const deleteExpiredSignups = (): void => {
+  signups?.deleteExpired().catch((error: unknown) => {
+    app.log.error({ err: error }, 'Could not delete expired signups');
+    captureException(error);
+  });
+};
+if (signups) {
+  deleteExpiredSignups();
+  setInterval(deleteExpiredSignups, 60 * 60 * 1000).unref();
 }
 
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {

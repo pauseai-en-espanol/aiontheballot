@@ -58,6 +58,13 @@ export const INVITATION_TOKENS: Readonly<Record<TenantKey, string>> = {
 };
 export const REVOKED_INVITATION_TOKEN = 'token-de-prueba-revocado-a';
 
+/** The raw tokens of the fixture signups (only their SHA-256 is stored), one unconfirmed per tenant. */
+export const SIGNUP_TOKENS: Readonly<Record<TenantKey, string>> = {
+  A: 'token-de-suscripcion-a',
+  B: 'token-de-suscripcion-b',
+  inactive: 'token-de-suscripcion-inactivo',
+};
+
 /** Fictional hostnames (the .test TLD is reserved). */
 export const PLATFORM_HOSTNAME = 'admin.plataforma.test';
 export const TOMBSTONE_HOSTNAME = 'purgado.example.test';
@@ -1761,6 +1768,49 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       id: `count for ${key}`,
       tenant: key,
       sql: `INSERT INTO app.report_daily_counts (tenant_id, day, count)
+            VALUES ('${TENANTS[key].id}', current_date - 1, 1)`,
+    })),
+    set: 'count = count + 1',
+    select: NOBODY,
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
+  'app.signups': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `signup to ${key}`,
+      tenant: key,
+      public: false,
+      where: `tenant_id = '${TENANTS[key].id}'`,
+    })),
+    // Only app.sign_up() writes signups, as its owner.
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `signup into ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.signups (tenant_id, email, locale, token_hash)
+            VALUES ('${TENANTS[key].id}', 'otra-${key.toLowerCase()}@example.org', 'es', repeat('a', 64))`,
+    })),
+    set: 'future_elections = NOT future_elections',
+    // The counts: country admins and platform admins, never the address or the token.
+    select: COUNTRY_ADMINS,
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+    columnReads: { email: NOBODY, mailbox: NOBODY, token_hash: NOBODY, token_issued_at: NOBODY },
+  },
+
+  'app.signup_daily_counts': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `signup count of ${key}`,
+      tenant: key,
+      public: false,
+      where: `tenant_id = '${TENANTS[key].id}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `signup count for ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.signup_daily_counts (tenant_id, day, count)
             VALUES ('${TENANTS[key].id}', current_date - 1, 1)`,
     })),
     set: 'count = count + 1',

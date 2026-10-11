@@ -53,7 +53,10 @@ const tenants = [
   { tenant: tenantC, hostnames: [] },
 ];
 
-const platform: RoutingConfig = { platformHost: 'plataforma.test' };
+const platform: RoutingConfig = {
+  platformHost: 'plataforma.test',
+  previewHost: 'vista-previa.test',
+};
 const table = buildRoutingTable(tenants, platform);
 
 const request = (url: string, hostHeader?: string) => {
@@ -61,12 +64,19 @@ const request = (url: string, hostHeader?: string) => {
   return { host: hostHeader ?? urlHost, path: pathname, search };
 };
 
-const serve = (tenant: TenantRoute, locale: string, path: string): Resolution => ({
+const serve = (
+  tenant: TenantRoute,
+  locale: string,
+  path: string,
+  { root = '', preview = false, internal = path } = {},
+): Resolution => ({
   kind: 'serve',
   tenant,
   locale,
   path,
-  internalPath: `/_tenant/${tenant.slug}/${locale}${path === '/' ? '' : path}`,
+  internalPath: `/_tenant/${tenant.slug}/${locale}${internal === '/' ? '' : internal}`,
+  root,
+  preview,
 });
 const redirect = (location: string): Resolution => ({ kind: 'redirect', location });
 const notFound: Resolution = { kind: 'not-found' };
@@ -119,12 +129,59 @@ describe('resolve', () => {
     [
       'platform path served',
       request('plataforma.test/test-b/generales-2026'),
-      serve(tenantB, 'es', '/generales-2026'),
+      serve(tenantB, 'es', '/generales-2026', { root: '/test-b' }),
     ],
     [
       'platform tenant with no hostnames',
       request('plataforma.test/test-c/'),
-      serve(tenantC, 'en', '/'),
+      serve(tenantC, 'en', '/', { root: '/test-c' }),
+    ],
+    // Preview host
+    [
+      'preview of a tenant with a canonical host, not redirected',
+      request('vista-previa.test/test-a/generales-2026/partidos/x'),
+      serve(tenantA, 'es', '/generales-2026/partidos/x', {
+        root: '/test-a',
+        preview: true,
+        internal: '/generales-2026/parties/x',
+      }),
+    ],
+    [
+      'preview in another locale',
+      request('vista-previa.test/test-a/ca/aviso-legal'),
+      serve(tenantA, 'ca', '/aviso-legal', {
+        root: '/test-a',
+        preview: true,
+        internal: '/legal-notice',
+      }),
+    ],
+    [
+      'preview default locale prefix, to the same page on the preview host',
+      request('vista-previa.test/test-a/es/x?y=1'),
+      redirect('https://vista-previa.test/test-a/x?y=1'),
+    ],
+    ['preview unknown slug', request('vista-previa.test/test-z/'), notFound],
+    ['preview root', request('vista-previa.test/'), notFound],
+    // The site's own words (public-site spec §3)
+    [
+      "a site's words, mapped onto the app's routes",
+      request('ejemplo-a.test/avisos/confirmar?t=x'),
+      serve(tenantA, 'es', '/avisos/confirmar', { internal: '/updates/confirm' }),
+    ],
+    [
+      "an election's pages in the site's words",
+      request('ejemplo-a.test/generales-2026/criterios/c'),
+      serve(tenantA, 'es', '/generales-2026/criterios/c', {
+        internal: '/generales-2026/criteria/c',
+      }),
+    ],
+    ["the app's own words on a site that uses others", request('ejemplo-a.test/privacy'), notFound],
+    ["an app word after an election's slug", request('ejemplo-a.test/g/parties/x'), notFound],
+    ["an app word after the site's own", request('ejemplo-a.test/avisos/confirm'), notFound],
+    [
+      'English words on an English site',
+      request('plataforma.test/test-c/updates/unsubscribe'),
+      serve(tenantC, 'en', '/updates/unsubscribe', { root: '/test-c' }),
     ],
     ['platform unknown slug', request('plataforma.test/test-z/x'), notFound],
     ['platform root', request('plataforma.test/'), notFound],
@@ -245,6 +302,7 @@ describe('buildRoutingTable', () => {
     ['a hostname that is not normalized', [{ tenant: tenantA, hostnames: [host('Uno.test')] }]],
     ['a hostname with a trailing dot', [{ tenant: tenantA, hostnames: [host('uno.test.')] }]],
     ['the platform host', [{ tenant: tenantA, hostnames: [host('plataforma.test')] }]],
+    ['the preview host', [{ tenant: tenantA, hostnames: [host('vista-previa.test')] }]],
     [
       'a duplicate slug',
       [

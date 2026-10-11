@@ -4,7 +4,7 @@ import { getTranslator } from '@aiontheballot/i18n/messages';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { getTenant } from '@/data';
+import { getSignupCounts, getTenant, mayAct } from '@/data';
 import { getLocale } from '@/locale';
 import { siteName } from '@/localized';
 import { requireStage } from '@/session';
@@ -26,7 +26,8 @@ export const generateMetadata = async ({ params }: Params): Promise<Metadata> =>
 
 /**
  * A tenant's dashboard (editorial workflow A6.1, where a member of one site lands): the user's roles and the site's
- * sections. The work queues of C1.2 come with cell editing.
+ * sections, and for country admins and platform admins the signup list's counts. The work queues of C1.2 come with
+ * cell editing.
  */
 const Dashboard = async ({ params }: Params) => {
   await requireStage('signed-in');
@@ -37,6 +38,10 @@ const Dashboard = async ({ params }: Params) => {
   const locale = await getLocale();
   const t = getTranslator(locale);
   const { tenant, roles, platformAdmin } = overview;
+  // The signup list's counts (PLAN R119): for country admins and platform admins, as the API allows.
+  const signups = mayAct(overview, 'country_admin')
+    ? await getSignupCounts(tenant.slug)
+    : undefined;
   const base = `/t/${tenant.slug}`;
   return (
     <>
@@ -76,6 +81,21 @@ const Dashboard = async ({ params }: Params) => {
         </li>
       </ul>
       <p className={styles.text}>{t('admin.dashboard.queuesLater')}</p>
+      {signups && (
+        <section aria-labelledby="lista-de-avisos">
+          <h2 id="lista-de-avisos" className={styles.h2}>
+            {t('admin.dashboard.signups.title')}
+          </h2>
+          <p className={styles.text}>{t('admin.dashboard.signups.intro')}</p>
+          <ul className={styles.text}>
+            <li>{t('admin.dashboard.signups.confirmed', { count: signups.confirmed })}</li>
+            <li>
+              {t('admin.dashboard.signups.futureElections', { count: signups.futureElections })}
+            </li>
+            <li>{t('admin.dashboard.signups.unconfirmed', { count: signups.unconfirmed })}</li>
+          </ul>
+        </section>
+      )}
     </>
   );
 };

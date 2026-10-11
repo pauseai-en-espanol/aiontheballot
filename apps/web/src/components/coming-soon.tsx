@@ -5,42 +5,22 @@ import { pickLocalized } from '@aiontheballot/domain/localized';
 import { getTranslator } from '@aiontheballot/i18n/messages';
 import { css, cx } from '@styled-system/css';
 
+import type { SignupOutcome } from '../signup-outcomes';
+
+import { SignupForm } from './signup-form';
+import { type LanguageLink, SiteFooter, type SiteLinks } from './site-footer';
+
 interface ComingSoonProps {
   home: PublicHome;
   locale: Locale;
   /** The operator's logo for the footer, as an image URL, when the tenant has uploaded it. */
-  logos: { onCanvas?: string };
+  logos: { onCanvas?: string | undefined };
+  /** The footer's links and language switch (public-site spec §4). */
+  links: SiteLinks;
+  languages: readonly LanguageLink[];
+  /** The signup list's form, when the site offers it (PLAN R119), and how the last signup went. */
+  signup?: { action: string; privacyHref: string; outcome: SignupOutcome | undefined } | undefined;
 }
-
-interface OperatorLineProps {
-  logo: string | undefined;
-  logoClass: string;
-  lead: string;
-  line: string;
-  operator: string;
-  url: string | null;
-}
-
-/** "Una iniciativa de" and the operator's logo for this surface, or the line in words; a link when there's a site. */
-const OperatorLine = ({ logo, logoClass, lead, line, operator, url }: OperatorLineProps) => {
-  const content = logo ? (
-    <span className={css({ display: 'inline-flex', alignItems: 'center', gap: '12px' })}>
-      <span>{lead}</span>
-      {/* A plain img: a small logo the brand route serves once, cached for a year; nothing for next/image to do. */}
-      {/* oxlint-disable-next-line next/no-img-element */}
-      <img src={logo} alt={operator} className={logoClass} />
-    </span>
-  ) : (
-    line
-  );
-  return url ? (
-    <a className={focusRing} href={url}>
-      {content}
-    </a>
-  ) : (
-    content
-  );
-};
 
 const wrap = css({
   width: '100%',
@@ -50,10 +30,6 @@ const wrap = css({
 });
 
 const display = css({ fontFamily: 'display', fontWeight: '700', textTransform: 'uppercase' });
-
-const focusRing = css({
-  _focusVisible: { outline: '3px solid', outlineColor: 'currentColor', outlineOffset: '3px' },
-});
 
 const buttonBase = cx(
   display,
@@ -168,7 +144,7 @@ const startOfLine = (text: string, locale: Locale): string =>
  * A tenant's home until its site goes public (PLAN M3, coming soon): the tenant's name, what the site will do, the
  * next public election if there is one, and how the operator works. Every name, link and date comes from the data.
  */
-export const ComingSoon = ({ home, locale, logos }: ComingSoonProps) => {
+export const ComingSoon = ({ home, locale, logos, links, languages, signup }: ComingSoonProps) => {
   const t = getTranslator(locale);
   const local = (value: PublicHome['tenant']['displayName']) =>
     pickLocalized(value, locale, home.tenant.defaultLocale) ?? '';
@@ -387,44 +363,17 @@ export const ComingSoon = ({ home, locale, logos }: ComingSoonProps) => {
             </ol>
           </div>
         </section>
+        {/* After how the site works, which stays above the fold on a 1080p screen (PLAN R56). */}
+        {signup && <SignupForm locale={locale} {...signup} />}
       </main>
 
-      <footer className={css({ bg: 'bg.canvas', color: 'fg.default' })}>
-        <div
-          className={cx(
-            wrap,
-            css({
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '16px 48px',
-              paddingBlock: '40px',
-              fontSize: '16px',
-              '& a': { textDecoration: 'underline', textUnderlineOffset: '3px' },
-            }),
-          )}
-        >
-          <p>
-            <OperatorLine
-              logo={logos.onCanvas}
-              logoClass={css({ display: 'block', height: '40px', width: 'auto' })}
-              lead={t('layout.initiativeLead')}
-              line={t('layout.initiativeOf', { operator })}
-              operator={operator}
-              url={operatorUrl}
-            />
-          </p>
-          {home.operator.contactEmail && (
-            <p>
-              {t('home.contact')}:{' '}
-              <a className={focusRing} href={`mailto:${home.operator.contactEmail}`}>
-                {home.operator.contactEmail}
-              </a>
-            </p>
-          )}
-        </div>
-      </footer>
+      <SiteFooter
+        home={home}
+        locale={locale}
+        logo={logos.onCanvas}
+        links={links}
+        languages={languages}
+      />
     </div>
   );
 };

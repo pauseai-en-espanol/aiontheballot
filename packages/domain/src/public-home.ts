@@ -20,7 +20,20 @@ export interface PublicHome {
     contactEmail: string | null;
     /** The operator's own newsletter, never a list of ours. Not shown until there is a real notify list (PLAN R82). */
     newsletterUrl: string | null;
+    /** The legal notice's fields (BRIEF §3 invariant 3; LSSI art. 10), as the operator's row holds them. */
+    legalName: string;
+    taxId: string | null;
+    address: string | null;
+    registryEntry: string | null;
+    privacyEmail: string | null;
   };
+  /** The latest published version of each policy text the operator has published. */
+  documents: Readonly<Partial<Record<TenantDocumentKind, PublicDocument>>>;
+  /**
+   * Whether the coming-soon page offers the signup list (PLAN R119): the API can send mail and the site has a
+   * published privacy policy, which the form links to.
+   */
+  signups: boolean;
   /** The next election the public may see: the soonest one not archived whose date hasn't passed, if any. */
   election: { name: Localized; date: string | null } | null;
   /**
@@ -28,6 +41,16 @@ export interface PublicHome {
    * tenant's or a platform asset, named by the SHA-256 of its bytes.
    */
   brand: Readonly<Record<string, BrandImage>>;
+}
+
+export type TenantDocumentKind = 'privacy_policy' | 'right_of_reply_policy' | 'about_operator';
+
+export interface PublicDocument {
+  /** Markdown, rendered and sanitized by the public site. */
+  body: Localized;
+  version: number;
+  /** An ISO 8601 instant. */
+  publishedAt: string;
 }
 
 export interface BrandImage {

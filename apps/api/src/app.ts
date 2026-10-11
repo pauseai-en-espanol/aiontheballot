@@ -2,8 +2,10 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 
 import type { BrandImageSource, HomeSource } from './home-data.js';
 import type { RoutingSource } from './routing-data.js';
+import type { Signups } from './signups.js';
 
 import { adminRoutes, type AdminRoutesOptions } from './auth/routes.js';
+import { createRateLimiter, visitorKey } from './rate-limit.js';
 
 export interface AppOptions {
   logger?: FastifyServerOptions['logger'];
@@ -13,15 +15,40 @@ export interface AppOptions {
   home?: HomeSource;
   /** A tenant's public brand images; without it the route answers 503. */
   brandImages?: BrandImageSource;
+  /** The signup list's public actions (PLAN R119); without mail they answer 503. */
+  signups?: Signups;
+  /** Signups a visitor may send per 10 minutes, per API replica, before 429 (the database caps each site too). */
+  signupsPerVisitor?: number;
   /** Sign-in and the signed-in routes under /api, on the admin host only; without sign-in they answer 503. */
   admin?: AdminRoutesOptions;
 }
+
+const SLUG_PARAMS = {
+  type: 'object',
+  properties: { slug: { type: 'string', pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', maxLength: 63 } },
+} as const;
+
+const TOKEN_BODY = {
+  type: 'object',
+  required: ['token'],
+  additionalProperties: false,
+  properties: { token: { type: 'string', maxLength: 64 } },
+} as const;
+
+/**
+ * The visitor's address, as the web app passes it (the last `X-Forwarded-For` entry, the gateway's), only to count
+ * their requests. These routes are reached only from inside the cluster, by the web app.
+ */
+const visitorOf = (header: string | string[] | undefined): string =>
+  typeof header === 'string' ? visitorKey(header) : 'unknown';
 
 export const buildApp = ({
   logger = false,
   routing,
   home,
   brandImages,
+  signups,
+  signupsPerVisitor = 5,
   admin = {},
 }: AppOptions = {}): FastifyInstance => {
   const app = Fastify({
@@ -47,15 +74,8 @@ export const buildApp = ({
   app.get<{ Params: { slug: string } }>(
     '/public/tenants/:slug/home',
     {
-      schema: {
-        // The app.slug domain's rule: anything else can't be a tenant.
-        params: {
-          type: 'object',
-          properties: {
-            slug: { type: 'string', pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', maxLength: 63 },
-          },
-        },
-      },
+      // The app.slug domain's rule: anything else can't be a tenant.
+      schema: { params: SLUG_PARAMS },
     },
     async (request, reply) => {
       void reply.header('cache-control', 'no-store');
@@ -94,6 +114,75 @@ export const buildApp = ({
         return reply.code(404).send({ error: 'Not found' });
       }
       return reply.type(image.contentType).send(Buffer.from(image.content));
+    },
+  );
+
+  // The signup list (PLAN R119; public-site spec §6), through the web app's form. The answer is the same whatever was
+  // done, so whether an address is on a list never leaks; only the web app sees it, and it says only "check your email".
+  const allowSignup = createRateLimiter({ limit: signupsPerVisitor, windowMs: 10 * 60_000 });
+  app.post<{
+    Params: { slug: string };
+    Body: { email: string; locale: string; futureElections?: boolean };
+  }>(
+    '/public/tenants/:slug/signups',
+    {
+      schema: {
+        params: SLUG_PARAMS,
+        body: {
+          type: 'object',
+          required: ['email', 'locale'],
+          additionalProperties: false,
+          properties: {
+            email: { type: 'string', maxLength: 320 },
+            locale: { type: 'string', maxLength: 10 },
+            futureElections: { type: 'boolean' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      void reply.header('cache-control', 'no-store');
+      if (!signups) {
+        return reply.code(503).send({ error: 'unavailable' });
+      }
+      if (!allowSignup(visitorOf(request.headers['x-visitor-address']))) {
+        return reply.code(429).send({ error: 'limit' });
+      }
+      const { email, locale, futureElections = false } = request.body;
+      const outcome = await signups.signUp(request.params.slug, { email, locale, futureElections });
+      const status = {
+        accepted: 202,
+        'not-found': 404,
+        unavailable: 409,
+        invalid: 400,
+        limit: 429,
+      }[outcome];
+      return reply.code(status).send({ outcome });
+    },
+  );
+
+  // A token acts only on its own site's list (the site the link's page is on).
+  app.post<{ Params: { slug: string }; Body: { token: string } }>(
+    '/public/tenants/:slug/signups/confirm',
+    { schema: { params: SLUG_PARAMS, body: TOKEN_BODY } },
+    async (request, reply) => {
+      void reply.header('cache-control', 'no-store');
+      if (!signups) {
+        return reply.code(503).send({ error: 'unavailable' });
+      }
+      return { confirmed: await signups.confirm(request.params.slug, request.body.token) };
+    },
+  );
+
+  app.post<{ Params: { slug: string }; Body: { token: string } }>(
+    '/public/tenants/:slug/signups/unsubscribe',
+    { schema: { params: SLUG_PARAMS, body: TOKEN_BODY } },
+    async (request, reply) => {
+      void reply.header('cache-control', 'no-store');
+      if (!signups) {
+        return reply.code(503).send({ error: 'unavailable' });
+      }
+      return { unsubscribed: await signups.unsubscribe(request.params.slug, request.body.token) };
     },
   );
 

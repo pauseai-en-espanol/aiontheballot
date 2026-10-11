@@ -11,6 +11,9 @@ aiontheballot-api:
     betterAuthSecret: { name: aiontheballot-better-auth }
     cleanup:
       envFrom: [{ secretRef: { name: aiontheballot-api-glitchtip } }]
+  mail:
+    smtpUrlSecret: { name: aiontheballot-mail }
+    from: avisos@example-platform.test
 aiontheballot-web:
   image: { repository: registry.example/aiontheballot/web, tag: 0.1.0.abc1234 }
   route:

@@ -4,11 +4,17 @@ import { canonicalBase, type RoutingConfig, type TenantRoute } from '@aionthebal
 
 import { createHomeLoader } from './home-data';
 import { createRoutingTableLoader } from './routing-table';
+import { readOpenSites } from './site-mode';
 
 /** The platform domain is optional (ADR-0002, hostnames): without it, tenants are reachable only on their own hostnames. */
 export const routingConfig: RoutingConfig = {
   platformHost: process.env.PLATFORM_HOST || undefined,
+  // The preview host (public-site spec §2), on the private gateway only.
+  previewHost: process.env.PREVIEW_HOST || undefined,
 };
+
+/** The tenants whose sites are open (`OPEN_SITES`); every other site is coming soon. */
+export const openSites = readOpenSites(process.env.OPEN_SITES);
 
 export const loadRoutingTable = createRoutingTableLoader({
   apiUrl: process.env.API_URL,

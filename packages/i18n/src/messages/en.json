@@ -2,7 +2,16 @@
   "layout": {
     "initiativeOf": "An initiative of {operator}",
     "initiativeLead": "An initiative of",
-    "methodology": "Methodology"
+    "methodology": "Methodology",
+    "skipToContent": "Skip to content",
+    "home": "Home",
+    "legalNotice": "Legal notice",
+    "privacy": "Privacy policy",
+    "about": "About us",
+    "contact": "Contact",
+    "language": "Language",
+    "currentLanguage": "(current)",
+    "siteLinks": "About this site"
   },
   "rating": {
     "meets": "Meets",
@@ -169,7 +178,14 @@
       "membersIntro": "Who has access to this site, and with which roles.",
       "queuesLater": "Your work queues (drafts, reviews, reports) will show here once cells can be edited.",
       "settingsIntro": "Review settings, how long reports are kept, and the policy texts.",
-      "electionsIntro": "Each election's details, methodology, parties and criteria."
+      "electionsIntro": "Each election's details, methodology, parties and criteria.",
+      "signups": {
+        "title": "Signup list",
+        "intro": "People waiting to hear when the site is ready. Their addresses are never shown here.",
+        "unconfirmed": "{count, plural, one {# address waiting to be confirmed} other {# addresses waiting to be confirmed}} (deleted after 7 days)",
+        "confirmed": "{count, plural, one {# confirmed address} other {# confirmed addresses}}",
+        "futureElections": "{count, plural, one {# of them also wants} other {# of them also want}} to hear about future elections"
+      }
     },
     "members": {
       "title": "Members",
@@ -548,5 +564,58 @@
         "pauseai": "A site this organization serves uses PauseAI's restricted brand assets, so it has to stay a PauseAI chapter."
       }
     }
+  },
+  "email": {
+    "signupConfirm": {
+      "subject": "Confirm you want to hear when {site} is ready",
+      "body": "Hello,\n\nSomeone, probably you, asked {operator} to tell this address when the site {site} is ready{future, select, true { and about future elections on it} other {}}.\n\nTo confirm, open this link and press “Confirm”:\n{confirmUrl}\n\nIf it wasn’t you, ignore this email: the address will be deleted within 7 days. Or delete it now:\n{unsubscribeUrl}\n\nHow we handle your address: {privacyUrl}\n\n{operator}"
+    }
+  },
+  "documents": {
+    "version": "Version {version}, published on {date, date, long}"
+  },
+  "legal": {
+    "title": "Legal notice",
+    "intro": "This website is run by {operator}, which answers for it.",
+    "holder": "Holder",
+    "taxId": "Tax ID",
+    "address": "Address",
+    "registry": "Registry entry",
+    "contact": "Contact",
+    "privacyContact": "Privacy contact",
+    "website": "Website"
+  },
+  "signup": {
+    "title": "Let me know when it’s ready",
+    "email": "Your email address",
+    "future": "Also tell me about future elections on this site",
+    "consent": "By signing up you accept our {privacy}.",
+    "privacyLink": "privacy policy",
+    "how": "We’ll send you an email to confirm. We use your address only to tell you when the site is ready, and about future elections here if you tick the box. Unconfirmed addresses are deleted after 7 days; the rest once we’ve told you, unless you asked about future elections.",
+    "submit": "Let me know",
+    "outcome": {
+      "accepted": "Check your inbox: if the address is right, a link to confirm is on its way.",
+      "invalid": "That address doesn’t look right. Check it and try again.",
+      "limit": "Too many requests right now. Try again later.",
+      "failed": "We couldn’t send the email. Try again later.",
+      "unavailable": "Signing up isn’t available right now."
+    }
+  },
+  "confirm": {
+    "title": "Confirm your signup",
+    "lead": "Press the button to confirm that you want to hear when {site} is ready.",
+    "button": "Confirm",
+    "done": "Done: we’ll let you know when {site} is ready.",
+    "invalid": "This link isn’t valid any more. You can sign up again on the home page.",
+    "missing": "This page needs the link from your email.",
+    "undo": "Changed your mind? You can unsubscribe with the link in the email."
+  },
+  "unsubscribe": {
+    "title": "Unsubscribe",
+    "lead": "Press the button to delete your address from {site}’s list.",
+    "button": "Delete my address",
+    "done": "Done: your address has been deleted.",
+    "invalid": "This link isn’t valid any more: the address may already be deleted.",
+    "missing": "This page needs the link from your email."
   }
 }

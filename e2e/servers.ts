@@ -8,6 +8,8 @@ export const PORTS = {
   glitchtip: 4103,
   plausible: 4104,
   gateway: 4105,
+  smtp: 4106,
+  mailbox: 4107,
 } as const;
 
 export const WEB_URL = `http://127.0.0.1:${PORTS.web}`;
@@ -35,6 +37,12 @@ export const DSNS = {
   admin: `http://e2e-admin@127.0.0.1:${PORTS.glitchtip}/2`,
   api: `http://e2e-api@127.0.0.1:${PORTS.glitchtip}/3`,
 } as const;
+
+/** A stand-in for the platform's SMTP sender (fake-smtp.ts), and where tests read what it received. */
+export const SMTP_URL = `smtp://127.0.0.1:${PORTS.smtp}`;
+export const MAILBOX_URL = `http://127.0.0.1:${PORTS.mailbox}`;
+/** The platform's sending address, fictional. */
+export const MAIL_FROM = 'avisos@plataforma.example';
 
 /** A stand-in for Plausible (fake-plausible.ts): the site script the web app serves, and the events API it relays to. */
 export const PLAUSIBLE_URL = `http://127.0.0.1:${PORTS.plausible}`;

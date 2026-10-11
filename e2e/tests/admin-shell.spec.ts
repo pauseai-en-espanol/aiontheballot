@@ -34,6 +34,10 @@ test.describe('choosing a site (editorial workflow A6)', () => {
     );
     // One site and no platform role: nowhere to switch to.
     await expect(page.getByRole('button', { name: en.admin.shell.switchSite })).toHaveCount(0);
+    // The signup list's counts are for country admins and platform admins only (PLAN R119).
+    await expect(page.getByRole('heading', { name: en.admin.dashboard.signups.title })).toHaveCount(
+      0,
+    );
     await expectAccessible(page);
 
     // The skip link is the first stop and leads past the header.
@@ -134,6 +138,11 @@ test.describe('choosing a site (editorial workflow A6)', () => {
       await expect(page.locator('html')).toHaveAttribute('lang', 'es');
       await expect(page.getByRole('heading', { level: 1 })).toHaveText('Inquilino de ejemplo A');
       await expect(page.getByText('Tus roles aquí: coordinación.')).toBeVisible();
+      // The signup list in numbers, never an address (PLAN R119); how many depends on the other tests' signups.
+      const signups = page.getByRole('region', { name: es.admin.dashboard.signups.title });
+      await expect(signups.getByText(es.admin.dashboard.signups.intro)).toBeVisible();
+      await expect(signups.getByRole('listitem')).toHaveCount(3);
+      await expect(signups.getByText(/@/)).toHaveCount(0);
       await expect(
         page.getByRole('navigation', { name: es.admin.shell.nav }).getByRole('link'),
       ).toHaveText([

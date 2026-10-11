@@ -61,6 +61,74 @@ describe('the routing proxy', () => {
     ).toBe('1');
   });
 
+  describe("a site's mode", () => {
+    const modes = createRoutingProxy(
+      async () => table,
+      { previewHost: 'vista-previa.example.test' },
+      { openSites: new Set(['ejemplo-a']) },
+    );
+    /** What the proxy told the page, through Next's request-header override. */
+    const told = (response: Response) => ({
+      mode: response.headers.get('x-middleware-request-x-aiontheballot-site'),
+      root: response.headers.get('x-middleware-request-x-aiontheballot-root'),
+      rewrite: new URL(response.headers.get('x-middleware-rewrite') ?? 'http://x/').pathname,
+    });
+
+    it('is coming soon unless the site is open: the home and the always-on pages only', async () => {
+      for (const path of [
+        '/',
+        '/aviso-legal',
+        '/privacidad',
+        '/avisos/confirmar',
+        '/og/x.png',
+        '/favicon.ico',
+      ]) {
+        const response = await proxy(request('ejemplo-a.example.test', path));
+        expect(told(response), path).toMatchObject({ mode: 'coming-soon', root: '' });
+      }
+      for (const path of [
+        '/generales-2026',
+        '/generales-2026/partidos/x',
+        '/robots',
+        '//generales-2026',
+      ]) {
+        expect((await proxy(request('ejemplo-a.example.test', path))).status, path).toBe(404);
+      }
+    });
+
+    it('is open for a site OPEN_SITES lists: every page', async () => {
+      const response = await modes(request('ejemplo-a.example.test', '/generales-2026/partidos/x'));
+      expect(told(response)).toEqual({
+        mode: 'open',
+        root: '',
+        rewrite: '/_tenant/ejemplo-a/es/generales-2026/parties/x',
+      });
+      expect(response.headers.get('x-robots-tag')).toBeNull();
+    });
+
+    it('is preview on the preview host, by path, never indexed', async () => {
+      const response = await modes(
+        request('vista-previa.example.test', '/ejemplo-a/generales-2026'),
+      );
+      expect(told(response)).toEqual({
+        mode: 'preview',
+        root: '/ejemplo-a',
+        rewrite: '/_tenant/ejemplo-a/es/generales-2026',
+      });
+      expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+    });
+
+    it("is the proxy's to say, whatever a client sends", async () => {
+      const response = await proxy(
+        request('ejemplo-a.example.test', '/', {
+          'x-aiontheballot-site': 'preview',
+          'x-aiontheballot-root': '/otro',
+        }),
+      );
+      expect(told(response)).toMatchObject({ mode: 'coming-soon', root: '' });
+    });
+  });
+
   it('sets no cookie', async () => {
     for (const host of [
       'ejemplo-a.example.test',

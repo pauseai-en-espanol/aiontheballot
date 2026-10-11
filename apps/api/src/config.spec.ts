@@ -13,6 +13,8 @@ describe('loadConfig', () => {
       filesRoot: undefined,
       auth: undefined,
       adminDatabaseUrl: undefined,
+      mail: undefined,
+      platformHost: undefined,
     });
   });
 
@@ -34,6 +36,8 @@ describe('loadConfig', () => {
       filesRoot: '/data/files',
       auth: undefined,
       adminDatabaseUrl: undefined,
+      mail: undefined,
+      platformHost: undefined,
     });
   });
 
@@ -53,6 +57,39 @@ describe('loadConfig', () => {
   it('rejects an invalid port', () => {
     expect(() => loadConfig({ PORT: 'eighty' })).toThrow(/PORT/);
     expect(() => loadConfig({ PORT: '70000' })).toThrow(/PORT/);
+  });
+
+  it('reads the mail sender and the platform domain', () => {
+    expect(
+      loadConfig({
+        SMTP_URL: 'smtps://avisos:secreto@correo.example.test:465',
+        MAIL_FROM: 'avisos@example.test',
+        PLATFORM_HOST: 'plataforma.example.test',
+      }),
+    ).toMatchObject({
+      mail: {
+        smtpUrl: 'smtps://avisos:secreto@correo.example.test:465',
+        from: 'avisos@example.test',
+      },
+      platformHost: 'plataforma.example.test',
+    });
+  });
+
+  it.each([
+    [{ SMTP_URL: 'smtps://avisos:secreto@correo.example.test' }, /MAIL_FROM not set/],
+    [{ MAIL_FROM: 'avisos@example.test' }, /SMTP_URL not set/],
+    [
+      { SMTP_URL: 'https://avisos:secreto@correo.example.test', MAIL_FROM: 'a@example.test' },
+      /smtp/,
+    ],
+    [{ SMTP_URL: 'not a url secreto', MAIL_FROM: 'a@example.test' }, /SMTP_URL must be/],
+    [
+      { SMTP_URL: 'smtp://correo.example.test', MAIL_FROM: 'Avisos <a@example.test>' },
+      /MAIL_FROM must be a plain address/,
+    ],
+  ])('refuses mail settings %j, never echoing the URL', (env, message) => {
+    expect(() => loadConfig(env)).toThrow(message);
+    expect(() => loadConfig(env)).not.toThrow(/secreto/);
   });
 
   it('rejects an unknown log level', () => {

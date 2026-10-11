@@ -22,11 +22,13 @@
   "dependencies": {
     "@aiontheballot/db": "workspace:*",
     "@aiontheballot/domain": "workspace:*",
+    "@aiontheballot/i18n": "workspace:*",
     "@aiontheballot/observability": "workspace:*",
     "@sentry/node": "11.5.0",
     "better-auth": "1.7.7",
     "fastify": "5.12.5",
     "kysely": "0.29.6",
+    "nodemailer": "10.0.16",
     "zod": "4.6.5"
   },
   "devDependencies": {

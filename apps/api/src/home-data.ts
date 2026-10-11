@@ -1,6 +1,10 @@
 import type { Database } from '@aiontheballot/db/client';
 import type { FileSpace, FileStore } from '@aiontheballot/db/file-store';
-import type { PublicHome } from '@aiontheballot/domain/public-home';
+import type {
+  PublicDocument,
+  PublicHome,
+  TenantDocumentKind,
+} from '@aiontheballot/domain/public-home';
 
 import { isLocalized, type Localized } from '@aiontheballot/domain/localized';
 import { sql } from 'kysely';
@@ -21,26 +25,64 @@ const localized = (value: unknown, column: string): Localized => {
   return value;
 };
 
+const DOCUMENT_KINDS: readonly string[] = [
+  'privacy_policy',
+  'right_of_reply_policy',
+  'about_operator',
+] satisfies TenantDocumentKind[];
+
 /**
  * Reads a tenant's home data as aiontheballot_web, so RLS decides what is public: an inactive tenant doesn't exist,
- * and neither does an election that isn't public.
+ * and neither does an election that isn't public, nor a policy text that isn't published. The signup list is offered
+ * only when the API can send mail (`mail`) and the emails' links have an address: the tenant's own hostname, or the
+ * platform's path (`platformHost`).
  */
 export const createHomeSource =
-  (db: Database): HomeSource =>
+  (
+    db: Database,
+    { mail = false, platformHost }: { mail?: boolean; platformHost?: string | undefined } = {},
+  ): HomeSource =>
   async (slug) => {
     const tenant = await db
       .selectFrom('app.tenants')
-      .select(['id', 'display_name', 'default_locale', 'country_code', 'methodology_kind'])
+      .select([
+        'id',
+        'display_name',
+        'default_locale',
+        'country_code',
+        'methodology_kind',
+        // Whether its emails' links have an address to go to: its own hostname, or the platform's path.
+        (eb) =>
+          eb
+            .exists(
+              eb
+                .selectFrom('app.tenant_hostnames as h')
+                .select('h.hostname')
+                .whereRef('h.tenant_id', '=', 'app.tenants.id')
+                .where('h.is_canonical', '=', true),
+            )
+            .as('has_canonical_host'),
+      ])
       .where('slug', '=', slug)
       .executeTakeFirst();
     if (!tenant) {
       return undefined;
     }
-    const [operator, election, brand] = await Promise.all([
+    const [operator, election, brand, documents] = await Promise.all([
       db
         .selectFrom('app.tenant_organizations as link')
         .innerJoin('app.organizations as o', 'o.id', 'link.organization_id')
-        .select(['o.display_name', 'o.url', 'o.contact_email', 'o.newsletter_url'])
+        .select([
+          'o.display_name',
+          'o.url',
+          'o.contact_email',
+          'o.newsletter_url',
+          'o.legal_name',
+          'o.tax_id',
+          'o.address',
+          'o.registry_entry',
+          'o.privacy_email',
+        ])
         .where('link.tenant_id', '=', tenant.id)
         .where('link.role', '=', 'operator')
         .executeTakeFirstOrThrow(),
@@ -72,7 +114,32 @@ export const createHomeSource =
         ])
         .where('s.tenant_id', '=', tenant.id)
         .execute(),
+      // The latest published version of each kind.
+      db
+        .selectFrom('app.tenant_documents')
+        .select([
+          'kind',
+          'body',
+          'version',
+          sql<string>`to_json(published_at)#>>'{}'`.as('published_at'),
+        ])
+        .distinctOn('kind')
+        .where('tenant_id', '=', tenant.id)
+        .where('published_at', 'is not', null)
+        .orderBy('kind')
+        .orderBy('version', 'desc')
+        .execute(),
     ]);
+    const published: Partial<Record<TenantDocumentKind, PublicDocument>> = {};
+    for (const doc of documents) {
+      if (DOCUMENT_KINDS.includes(doc.kind)) {
+        published[doc.kind as TenantDocumentKind] = {
+          body: localized(doc.body, 'tenant_documents.body'),
+          version: doc.version,
+          publishedAt: doc.published_at,
+        };
+      }
+    }
     return {
       tenant: {
         displayName: localized(tenant.display_name, 'tenants.display_name'),
@@ -85,7 +152,17 @@ export const createHomeSource =
         url: operator.url,
         contactEmail: operator.contact_email,
         newsletterUrl: operator.newsletter_url,
+        legalName: operator.legal_name,
+        taxId: operator.tax_id,
+        address: operator.address,
+        registryEntry: operator.registry_entry,
+        privacyEmail: operator.privacy_email,
       },
+      documents: published,
+      signups:
+        mail &&
+        published.privacy_policy !== undefined &&
+        (tenant.has_canonical_host === true || platformHost !== undefined),
       election: election
         ? { name: localized(election.name, 'elections.name'), date: election.date }
         : null,

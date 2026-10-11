@@ -65,7 +65,11 @@ test.describe('the coming-soon home (fictional seeds)', () => {
     await expect(
       page.getByRole('link', { name: 'contacto@organizacion-ejemplo-a.example' }),
     ).toHaveAttribute('href', 'mailto:contacto@organizacion-ejemplo-a.example');
-    await expect(page.getByRole('heading', { level: 2 })).toHaveText(es.how.title);
+    // How the site works, then the signup list (PLAN R119), offered since A has a published privacy policy.
+    await expect(page.getByRole('heading', { level: 2 })).toHaveText([
+      es.how.title,
+      messages.es.signup.title,
+    ]);
     await expect(page.getByRole('heading', { level: 3 })).toHaveText([
       es.how.quotes.title,
       es.how.history.title,
@@ -90,8 +94,10 @@ test.describe('the coming-soon home (fictional seeds)', () => {
     await expect(page.locator('time')).toHaveText(await fullDate(page, 'en'));
     await expect(page.locator('time')).toHaveText(/^[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}$/);
     await expect(page.getByText('Example local election')).toHaveCount(0);
-    // B's operator has no website, contact address or newsletter.
-    await expect(page.getByRole('link')).toHaveCount(0);
+    // B's operator has no website, contact address or newsletter, and B no published policy texts: the only links are
+    // the legal notice, always there, and the language switch.
+    await expect(page.getByRole('link')).toHaveText([messages.en.layout.legalNotice, 'Español']);
+    await expect(page.locator('#avisos')).toHaveCount(0);
   });
 
   test('starts the full date with a capital in Spanish, where the weekday is written in lowercase', async ({

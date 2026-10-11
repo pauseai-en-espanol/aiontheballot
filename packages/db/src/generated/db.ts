@@ -535,6 +535,35 @@ export interface AppRevisionInternal {
   tenant_id: string;
 }
 
+export interface AppSignupDailyCounts {
+  count: number;
+  day: Timestamp;
+  tenant_id: string;
+}
+
+export interface AppSignups {
+  confirmed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  /**
+   * personal data
+   */
+  email: string;
+  future_elections: Generated<boolean>;
+  id: Generated<string>;
+  locale: string;
+  /**
+   * personal data
+   */
+  mailbox: Generated<string>;
+  tenant_id: string;
+  /**
+   * personal data
+   */
+  token_hash: string;
+  token_issued_at: Generated<Timestamp>;
+  tokens_issued: Generated<number>;
+}
+
 export interface AppSourceDocuments {
   archive_url: string | null;
   created_at: Generated<Timestamp>;
@@ -672,6 +701,8 @@ export interface DB {
   'app.revision_checked_documents': AppRevisionCheckedDocuments;
   'app.revision_evidence': AppRevisionEvidence;
   'app.revision_internal': AppRevisionInternal;
+  'app.signup_daily_counts': AppSignupDailyCounts;
+  'app.signups': AppSignups;
   'app.source_documents': AppSourceDocuments;
   'app.source_texts': AppSourceTexts;
   'app.structural_changes': AppStructuralChanges;

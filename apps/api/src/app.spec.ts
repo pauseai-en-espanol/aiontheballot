@@ -3,6 +3,8 @@ import type { FastifyInstance } from 'fastify';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import type { SignupInput, SignupOutcome, Signups } from './signups.js';
+
 import { buildApp } from './app.js';
 
 describe('api', () => {
@@ -57,9 +59,16 @@ describe('api', () => {
         url: null,
         contactEmail: null,
         newsletterUrl: null,
+        legalName: 'Organización de Ejemplo',
+        taxId: null,
+        address: null,
+        registryEntry: null,
+        privacyEmail: null,
       },
       election: { name: { es: 'Elecciones de ejemplo' }, date: '2030-01-15' },
       brand: {},
+      documents: {},
+      signups: false,
     };
     const withHome = () =>
       buildApp({ home: async (slug) => (slug === 'ejemplo' ? data : undefined) });
@@ -148,6 +157,119 @@ describe('api', () => {
       await served.close();
       expect(unknown.statusCode).toBe(404);
       expect([400, 404]).toContain(malformed.statusCode);
+    });
+  });
+
+  describe('the signup list', () => {
+    const calls: { slug: string; input: SignupInput }[] = [];
+    const signups = (outcome: SignupOutcome): Signups => ({
+      signUp: async (slug, input) => {
+        calls.push({ slug, input });
+        return outcome;
+      },
+      confirm: async (slug, token) => slug === 'ejemplo' && token === 'bueno',
+      unsubscribe: async (slug, token) => slug === 'ejemplo' && token === 'bueno',
+      deleteExpired: async () => undefined,
+    });
+    const post = (
+      target: FastifyInstance,
+      url: string,
+      payload: unknown,
+      visitor = '203.0.113.7',
+    ) =>
+      target.inject({
+        method: 'POST',
+        url,
+        payload: payload as object,
+        headers: { 'x-visitor-address': visitor },
+      });
+    const body = { email: 'persona@example.org', locale: 'es', futureElections: true };
+
+    it('answers 503 while the API cannot send mail', async () => {
+      for (const url of [
+        '/public/tenants/ejemplo/signups',
+        '/public/tenants/ejemplo/signups/confirm',
+        '/public/tenants/ejemplo/signups/unsubscribe',
+      ]) {
+        const response = await post(app, url, url.endsWith('signups') ? body : { token: 'x' });
+        expect(response.statusCode, url).toBe(503);
+      }
+    });
+
+    it.each<[SignupOutcome, number]>([
+      ['accepted', 202],
+      ['not-found', 404],
+      ['unavailable', 409],
+      ['invalid', 400],
+      ['limit', 429],
+    ])('answers %s with %i, never cached', async (outcome, status) => {
+      const listed = buildApp({ signups: signups(outcome) });
+      const response = await post(listed, '/public/tenants/ejemplo/signups', body);
+      await listed.close();
+      expect(response.statusCode).toBe(status);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.json()).toEqual({ outcome });
+    });
+
+    it('passes the form on, the box unticked unless sent', async () => {
+      calls.length = 0;
+      const listed = buildApp({ signups: signups('accepted') });
+      await post(listed, '/public/tenants/ejemplo/signups', {
+        email: 'a@example.org',
+        locale: 'es',
+      });
+      await listed.close();
+      expect(calls).toEqual([
+        {
+          slug: 'ejemplo',
+          input: { email: 'a@example.org', locale: 'es', futureElections: false },
+        },
+      ]);
+    });
+
+    it('passes on nothing else the body holds, and refuses a malformed slug or address', async () => {
+      calls.length = 0;
+      const listed = buildApp({ signups: signups('accepted') });
+      await post(listed, '/public/tenants/ejemplo/signups', { ...body, consent: 'yes' });
+      const slug = await post(listed, '/public/tenants/No_Valido/signups', body);
+      const long = await post(listed, '/public/tenants/ejemplo/signups', {
+        ...body,
+        email: 'a'.repeat(321),
+      });
+      await listed.close();
+      expect(calls.map((call) => Object.keys(call.input).sort())).toEqual([
+        ['email', 'futureElections', 'locale'],
+      ]);
+      expect(slug.statusCode).toBe(400);
+      expect(long.statusCode).toBe(400);
+    });
+
+    it('counts each visitor apart, and refuses one past the limit', async () => {
+      const listed = buildApp({ signups: signups('accepted'), signupsPerVisitor: 2 });
+      const statuses = [];
+      for (const visitor of ['203.0.113.7', '203.0.113.7', '203.0.113.7', '198.51.100.2']) {
+        statuses.push(
+          (await post(listed, '/public/tenants/ejemplo/signups', body, visitor)).statusCode,
+        );
+      }
+      await listed.close();
+      expect(statuses).toEqual([202, 202, 429, 202]);
+    });
+
+    it("confirms and unsubscribes by token, on the token's own site only", async () => {
+      const listed = buildApp({ signups: signups('accepted') });
+      const site = '/public/tenants/ejemplo/signups';
+      const confirmed = await post(listed, `${site}/confirm`, { token: 'bueno' });
+      const elsewhere = await post(listed, '/public/tenants/otro/signups/confirm', {
+        token: 'bueno',
+      });
+      const unknown = await post(listed, `${site}/unsubscribe`, { token: 'otro' });
+      const malformed = await post(listed, `${site}/confirm`, { token: 'x'.repeat(65) });
+      await listed.close();
+      expect(confirmed.json()).toEqual({ confirmed: true });
+      expect(elsewhere.json()).toEqual({ confirmed: false });
+      expect(unknown.json()).toEqual({ unsubscribed: false });
+      expect(malformed.statusCode).toBe(400);
     });
   });
 
