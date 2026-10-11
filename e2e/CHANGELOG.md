@@ -1,5 +1,13 @@
 # @aiontheballot/e2e
 
+## 0.14.0
+
+### Minor Changes
+
+- 88fbcfc: A language switch at the foot of every admin page (PLAN R108): English or Spanish, kept in a preference cookie on the
+  admin host, over the browser's language, which still decides until someone chooses. With scripts, the page redraws in
+  place and keeps what was typed. The accessibility check waits for a page redrawn after a save to get its title back.
+
 ## 0.13.0
 
 ### Minor Changes
