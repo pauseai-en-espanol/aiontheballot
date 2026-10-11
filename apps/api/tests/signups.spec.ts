@@ -1,5 +1,6 @@
 import type { DB } from '@aiontheballot/db/generated/db';
 
+import { createDatabase } from '@aiontheballot/db/client';
 import { sql, type Transaction } from 'kysely';
 import { describe, expect, it } from 'vitest';
 
@@ -7,6 +8,7 @@ import type { Mailer } from '../src/mail/mailer.js';
 
 import {
   confirmSignup,
+  createSignups,
   type PendingEmail,
   sendOrUndo,
   signUp,
@@ -185,4 +187,59 @@ describe('confirming and unsubscribing', () => {
       });
     },
   );
+});
+
+describe('the signup service, with its own transactions', () => {
+  /** The public role's own pool on the test database, as the API's is: what it commits stays, so tests clean up. */
+  const publicPool = () => {
+    const url = new URL(process.env.TEST_SUPERUSER_DATABASE_URL ?? '');
+    url.searchParams.set('options', '-c role=aiontheballot_web');
+    return createDatabase({ connectionString: url.toString(), maxConnections: 2 });
+  };
+  const owner = () =>
+    createDatabase({
+      connectionString: process.env.TEST_SUPERUSER_DATABASE_URL ?? '',
+      maxConnections: 1,
+    });
+
+  it('answers before the email goes out, and undoes the signup when it fails', async () => {
+    const db = publicPool();
+    const cleanup = owner();
+    const email = `servicio-${Date.now()}@example.org`;
+    const rowCount = async () =>
+      (
+        await sql<{
+          n: number;
+        }>`SELECT count(*)::int AS n FROM app.signups WHERE email = ${email}`.execute(cleanup)
+      ).rows[0]?.n;
+    try {
+      let release: (() => void) | undefined;
+      const slow: Mailer = { send: () => new Promise<void>((resolve) => (release = resolve)) };
+      const service = createSignups({ db, mailer: slow, platformHost: undefined });
+      // The answer comes while the mail server hasn't answered at all.
+      expect(await service.signUp('test-a', { ...INPUT, email })).toBe('accepted');
+      expect(release).toBeDefined();
+      expect(await rowCount()).toBe(1);
+      release?.();
+      await service.settle(1_000);
+      expect(await rowCount()).toBe(1);
+
+      await sql`DELETE FROM app.signups WHERE email = ${email}`.execute(cleanup);
+      const steps: string[] = [];
+      const failing = createSignups({
+        db,
+        mailer: { send: async () => Promise.reject(new Error('refused')) },
+        platformHost: undefined,
+        onMailError: (_error, step) => steps.push(step),
+      });
+      expect(await failing.signUp('test-a', { ...INPUT, email })).toBe('accepted');
+      await failing.settle(1_000);
+      expect(steps).toEqual(['send']);
+      expect(await rowCount()).toBe(0);
+    } finally {
+      await sql`DELETE FROM app.signups WHERE email = ${email}`.execute(cleanup);
+      await db.destroy();
+      await cleanup.destroy();
+    }
+  });
 });

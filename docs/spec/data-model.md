@@ -936,7 +936,7 @@ create table app.signups (
   id                uuid primary key default uuidv7(),
   tenant_id         uuid not null references app.tenants,
   email             text not null,                   -- personal data; lowercase, at most 254 characters
-  mailbox           text not null generated always as (/* email without its +tag */) stored,  -- personal data
+  mailbox           text not null generated always as (private.signup_mailbox(email)) stored,  -- personal data
   locale            app.locale not null,             -- the form's language: its emails are written in it
   future_elections  boolean not null default false,  -- the optional, unticked box
   token_hash        text not null unique,            -- hex SHA-256 of the newest token; kept out of the audit log
@@ -948,7 +948,7 @@ create table app.signups (
   unique (tenant_id, email)
 );
 
--- Confirmation emails per site and UTC day: the daily cap's counter, written only by app.sign_up.
+-- Signups taken per site and UTC day: the daily cap's counter, written only by app.sign_up.
 create table app.signup_daily_counts (
   tenant_id  uuid not null references app.tenants,
   day        date not null,
@@ -960,11 +960,12 @@ create table app.signup_daily_counts (
 - **The only way in** is three `SECURITY DEFINER` functions that only `aiontheballot_web` executes (ADR-0002 §7):
   - `app.sign_up(tenant, email, locale, future_elections, token_hash)` returns whether to send a confirmation email
     with that token. It refuses (22023) an inactive or unknown tenant, a language it doesn't have, and a tenant without
-    a published privacy policy. Then it locks the day's counter and raises 54000 once the site has sent 1,000
-    confirmation emails that UTC day, for every address alike. A confirmed address changes nothing; otherwise a mailbox
-    (the address without its `+tag`) gets an email at most every 10 minutes and 5 times in all, the new token and the
-    newest choices replacing the old. Every email it says to send is counted. The counter's lock makes a site's
-    signups take turns, so two first signups of one address insert one row and send one email.
+    a published privacy policy. Then it locks the day's counter, raises 54000 once the site has taken 1,000 signups
+    that UTC day, and counts this one, for every address alike. A confirmed address changes nothing; otherwise a
+    mailbox (`private.signup_mailbox`: the address without its `+tag`, and a Gmail one without its dots) gets an email
+    at most every 10 minutes and 5 times in all, the new token and the newest choices replacing the old. The counter's
+    lock makes a site's signups take turns, so two first signups of one address insert one row and send one email
+    (across midnight UTC, the insert gives way instead).
   - `app.confirm_signup(tenant, token_hash)` confirms the tenant's unconfirmed signup holding the token, once
     (`confirmed_at` is the transaction time and never changes again), and says whether the token now belongs to a
     confirmed signup there.

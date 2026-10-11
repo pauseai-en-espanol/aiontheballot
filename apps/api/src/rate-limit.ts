@@ -46,12 +46,27 @@ export const createRateLimiter = ({
 };
 
 /**
- * The key a visitor's address is counted under: an IPv4 address as it is, an IPv6 one by its /64, the network one
- * household or server gets, so cycling through its addresses buys nothing. Anything else is one shared key.
+ * The key a visitor's address is counted under: an IPv4 address as it is (also when written as IPv6), an IPv6 one by
+ * its /64, the network one household or server gets, so cycling through its addresses buys nothing. Anything else is
+ * one shared key.
  */
 export const visitorKey = (address: string): string => {
   if (isIPv4(address)) {
     return address;
+  }
+  // An IPv4 address written as IPv6 (`::ffff:203.0.113.7`, or in hex) is that IPv4 address.
+  const mapped = /^::ffff:(?:(\d+\.\d+\.\d+\.\d+)|([0-9a-f]{1,4}):([0-9a-f]{1,4}))$/iu.exec(
+    address,
+  );
+  if (mapped) {
+    const [, dotted, high, low] = mapped;
+    if (dotted && isIPv4(dotted)) {
+      return dotted;
+    }
+    if (high && low) {
+      const value = (Number.parseInt(high, 16) << 16) | Number.parseInt(low, 16);
+      return [24, 16, 8, 0].map((shift) => (value >>> shift) & 255).join('.');
+    }
   }
   if (!isIPv6(address)) {
     return 'unknown';

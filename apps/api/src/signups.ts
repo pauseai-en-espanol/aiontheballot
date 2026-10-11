@@ -18,8 +18,8 @@ import { databaseRefusal } from './database-errors.js';
 export interface Signups {
   /**
    * Signs an address up to a site's list and emails it a confirmation, or does nothing it would tell a stranger about
-   * (already confirmed, emailed too recently). The answer never says which, nor does how long it takes: the email
-   * goes out after the answer.
+   * (already confirmed, emailed too recently). The answer never says which, and never waits for the mail server: the
+   * email goes out after it.
    */
   signUp: (slug: string, input: SignupInput) => Promise<SignupOutcome>;
   /** Whether the token now belongs to a confirmed signup of the site. */
@@ -28,6 +28,8 @@ export interface Signups {
   unsubscribe: (slug: string, token: string) => Promise<boolean>;
   /** Deletes the signups unconfirmed for 7 days (the database's rule), as every call above also does. */
   deleteExpired: () => Promise<void>;
+  /** Waits, at most `timeoutMs`, for the emails still being sent: before the server shuts down. */
+  settle: (timeoutMs: number) => Promise<void>;
 }
 
 export interface SignupInput {
@@ -69,16 +71,29 @@ export const makeToken = (): string => randomBytes(32).toString('base64url');
 export const normaliseAddress = (email: string): string | undefined => {
   const trimmed = email.trim().normalize('NFC').toLowerCase();
   const at = trimmed.lastIndexOf('@');
-  if (at <= 0 || /[\s\p{Cc}/?#\\]/u.test(trimmed)) {
+  const local = trimmed.slice(0, at);
+  const given = trimmed.slice(at + 1);
+  // Nothing the URL parser would quietly rewrite (a port, an escape, a numeric host), no invisible formatting, and a
+  // mailbox before any +tag.
+  if (
+    at <= 0 ||
+    /[\s\p{Cc}\p{Cf}/?#\\]/u.test(trimmed) ||
+    /[:%]/u.test(given) ||
+    local.startsWith('+')
+  ) {
     return undefined;
   }
   let domain: string;
   try {
-    ({ hostname: domain } = new URL(`http://${trimmed.slice(at + 1)}`));
+    ({ hostname: domain } = new URL(`http://${given}`));
   } catch {
     return undefined;
   }
-  const address = `${trimmed.slice(0, at)}@${domain}`;
+  // A domain ends in a name, never a number (an IP address is no mail domain here).
+  if (!/[a-z]/u.test(domain.split('.').at(-1) ?? '')) {
+    return undefined;
+  }
+  const address = `${local}@${domain}`;
   return address.length <= 254 && ADDRESS.test(address) ? address : undefined;
 };
 
@@ -233,28 +248,35 @@ export const failedSignup = (error: unknown): SignupOutcome | undefined => {
   }
 };
 
+/** What went wrong after a signup committed: sending its email, or undoing the signup when that failed. */
+export type MailStep = 'send' | 'undo';
+
 /**
  * Sends a committed signup's email; if that fails, deletes the signup again (its token unsubscribes it), so the person
- * can try again at once, and reports the failure.
+ * can try again at once, and reports each failure with the step it happened at.
  */
 export const sendOrUndo = async (
   db: Kysely<DB>,
   mailer: Mailer,
   { tenantId, token, message }: PendingEmail,
-  onMailError: (error: unknown) => void,
+  onMailError: (error: unknown, step: MailStep) => void,
 ): Promise<void> => {
   try {
     await mailer.send(message);
   } catch (error) {
-    onMailError(error);
-    await unsubscribe(db, tenantId, token).catch(onMailError);
+    onMailError(error, 'send');
+    try {
+      await unsubscribe(db, tenantId, token);
+    } catch (undoError) {
+      onMailError(undoError, 'undo');
+    }
   }
 };
 
 /**
  * The public's three actions on `db`, the aiontheballot_web role's pool. A signup runs in a transaction of its own;
- * its email goes out after the transaction commits and after the answer, so neither the answer nor its timing depends
- * on whether an email was sent, and no transaction waits on the mail server.
+ * its email goes out after the transaction commits and after the answer, so the answer never says whether an email was
+ * sent, it never waits on the mail server, and no transaction does either.
  */
 export const createSignups = ({
   db,
@@ -265,34 +287,49 @@ export const createSignups = ({
   db: Database;
   mailer: Mailer;
   platformHost: string | undefined;
-  /** Told when an email couldn't be sent (reported by the server without the address). */
-  onMailError?: (error: unknown) => void;
-}): Signups => ({
-  signUp: async (slug, input) => {
-    let result: SignUpResult;
-    try {
-      result = await db.transaction().execute((trx) => signUp(trx, slug, input, { platformHost }));
-    } catch (error) {
-      const outcome = failedSignup(error);
-      if (!outcome) {
-        throw error;
+  /** Told when an email couldn't be sent, or its signup undone (reported by the server without the address). */
+  onMailError?: (error: unknown, step: MailStep) => void;
+}): Signups => {
+  // The emails on their way, so a shutdown can wait for them rather than drop a committed signup's email.
+  const sending = new Set<Promise<void>>();
+  return {
+    signUp: async (slug, input) => {
+      let result: SignUpResult;
+      try {
+        result = await db
+          .transaction()
+          .execute((trx) => signUp(trx, slug, input, { platformHost }));
+      } catch (error) {
+        const outcome = failedSignup(error);
+        if (!outcome) {
+          throw error;
+        }
+        return outcome;
       }
-      return outcome;
-    }
-    if (result.outcome === 'accepted' && result.email) {
-      void sendOrUndo(db, mailer, result.email, onMailError);
-    }
-    return result.outcome;
-  },
-  confirm: async (slug, token) => {
-    const tenantId = await tenantIdOf(db, slug);
-    return tenantId ? confirmSignup(db, tenantId, token) : false;
-  },
-  unsubscribe: async (slug, token) => {
-    const tenantId = await tenantIdOf(db, slug);
-    return tenantId ? unsubscribe(db, tenantId, token) : false;
-  },
-  deleteExpired: async () => {
-    await sql`SELECT app.confirm_signup(NULL, NULL)`.execute(db);
-  },
-});
+      if (result.outcome === 'accepted' && result.email) {
+        const sent = sendOrUndo(db, mailer, result.email, onMailError)
+          .catch(() => undefined)
+          .finally(() => sending.delete(sent));
+        sending.add(sent);
+      }
+      return result.outcome;
+    },
+    confirm: async (slug, token) => {
+      const tenantId = await tenantIdOf(db, slug);
+      return tenantId ? confirmSignup(db, tenantId, token) : false;
+    },
+    unsubscribe: async (slug, token) => {
+      const tenantId = await tenantIdOf(db, slug);
+      return tenantId ? unsubscribe(db, tenantId, token) : false;
+    },
+    deleteExpired: async () => {
+      await sql`SELECT app.confirm_signup(NULL, NULL)`.execute(db);
+    },
+    settle: async (timeoutMs) => {
+      await Promise.race([
+        Promise.allSettled(sending),
+        new Promise((resolve) => setTimeout(resolve, timeoutMs).unref()),
+      ]);
+    },
+  };
+};

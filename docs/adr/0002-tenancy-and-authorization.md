@@ -127,12 +127,13 @@ DEFINER`, on the allowlist above).
   `app.unsubscribe`, each `SECURITY DEFINER`, the only way to `app.signups`, which it can't read. They take a token's
   SHA-256, never the token, and act only on the site they name. `sign_up` takes an address only for an active tenant
   with a published privacy policy, in one of its languages, and returns whether to send a confirmation email: first it
-  checks the tenant's daily cap of emails, the same for every address, so the cap tells nobody who is listed; then
-  never for a confirmed address, nor more than once every 10 minutes or 5 times in all to one mailbox (its `+tag`
-  variants included). `confirm_signup` confirms the site's unconfirmed signup holding the token; `unsubscribe` deletes
-  the site's signup holding it, confirmed or not. Each first deletes the signups unconfirmed 7 days after they were
-  made. Country admins and platform admins read every column of `app.signups` but the address, the mailbox and the
-  token (column grants), so the admin shows counts and no runtime role reads an address.
+  counts the signup and checks the tenant's daily cap, the same for every address, so neither tells anyone who is
+  listed; then never for a confirmed address, nor more than once every 10 minutes or 5 times in all to one mailbox
+  (its `+tag` variants, and a Gmail address's dotted ones, included). `confirm_signup` confirms the site's
+  unconfirmed signup holding the token; `unsubscribe` deletes the site's signup holding it, confirmed or not. Each
+  first deletes the signups unconfirmed 7 days after they were made. Country admins and platform admins read every
+  column of `app.signups` but the address, the mailbox and the token (column grants), so the admin shows counts and no
+  runtime role reads an address.
 - It has no table write grants at all.
 
 ### 8. Authorization comes from memberships

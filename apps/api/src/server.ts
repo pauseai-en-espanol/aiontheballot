@@ -46,9 +46,16 @@ const signups =
         db: web,
         mailer,
         platformHost: config.platformHost,
-        // Never the address or the message: only that sending failed, and the SMTP code (mailFailure).
-        onMailError: (error) => {
-          const failure = mailFailure(error);
+        // Never the address or the message: only that sending failed, and the SMTP code (mailFailure); or that the
+        // signup whose email failed couldn't be undone, and the database's error class.
+        onMailError: (error, step) => {
+          const code = (error as { code?: unknown }).code;
+          const failure =
+            step === 'send'
+              ? mailFailure(error)
+              : new Error(
+                  `A signup whose email failed could not be undone: ${typeof code === 'string' ? code : 'unknown'}`,
+                );
           console.error(failure.message);
           captureException(failure);
         },
@@ -106,6 +113,8 @@ if (signups) {
 const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
   app.log.info({ signal }, 'Shutting down');
   await app.close();
+  // Emails still on their way go out (or their signups are undone) before the database pool closes.
+  await signups?.settle(10_000);
   await web?.destroy();
   await admin?.destroy();
   await authPool?.end();

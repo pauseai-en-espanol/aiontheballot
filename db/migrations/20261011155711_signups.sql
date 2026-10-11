@@ -7,9 +7,10 @@
 --   bits) and passes only its SHA-256, so no token is ever stored or seen by the database.
 -- - A site takes signups only while it is active and has a published privacy policy, which the form links to.
 -- - An address is on a site's list once. Signing up again while unconfirmed issues a new token, with the newest
---   choices; once confirmed, it changes nothing, so a stranger can't. Confirmation emails to one mailbox (its address
---   with any +tag left out, so variants count as one) go at most every 10 minutes and 5 times in all, and a site sends
---   at most 1,000 a day. The cap is checked first, for every address, so its answer says nothing about who is listed.
+--   choices; once confirmed, it changes nothing, so a stranger can't. Confirmation emails to one mailbox (the address
+--   without its +tag, and Gmail's without its dots, so variants count as one) go at most every 10 minutes and 5 times
+--   in all. A site takes at most 1,000 signups a UTC day, counted and checked before anything about the address, so
+--   the cap says nothing about who is listed.
 -- - Unconfirmed signups are deleted 7 days after the first: every call of the three functions deletes those due, and
 --   the API calls app.confirm_signup(NULL, NULL) hourly to do only that.
 -- - A token acts only on its own site's list. After confirming, the same token unsubscribes; unsubscribing deletes the
@@ -17,14 +18,26 @@
 -- - Country admins and platform admins count signups: every column but the address, the mailbox and the token (column
 --   grants). No runtime role reads the addresses: how the launch email reads them waits for a decision (PLAN R122).
 
+-- The mailbox an address reaches, for the throttle: without its +tag, and for Gmail (which ignores dots and answers
+-- googlemail.com too) without its dots, on one domain. Other providers' variants (subdomain addressing, catch-alls)
+-- aren't folded: the site's daily cap bounds them.
+CREATE FUNCTION private.signup_mailbox(address text) RETURNS text
+  LANGUAGE sql IMMUTABLE STRICT
+  SET search_path = ''
+  AS $$
+    SELECT CASE WHEN split_part(address, '@', 2) IN ('gmail.com', 'googlemail.com')
+                THEN replace(split_part(split_part(address, '@', 1), '+', 1), '.', '') || '@gmail.com'
+                ELSE split_part(split_part(address, '@', 1), '+', 1) || '@' || split_part(address, '@', 2)
+           END
+  $$;
+
 CREATE TABLE app.signups (
   id                uuid PRIMARY KEY DEFAULT uuidv7(),
   tenant_id         uuid NOT NULL REFERENCES app.tenants,
   email             text NOT NULL
                     CHECK (email = lower(email) AND char_length(email) <= 254 AND email ~ '^[^@\s]+@[^@\s]+$'),
-  -- The address without its +tag: the mailbox the throttle counts, whatever variant was typed.
-  mailbox           text NOT NULL GENERATED ALWAYS AS
-                    (split_part(split_part(email, '@', 1), '+', 1) || '@' || split_part(email, '@', 2)) STORED,
+  -- The mailbox the throttle counts, whatever variant was typed (private.signup_mailbox).
+  mailbox           text NOT NULL GENERATED ALWAYS AS (private.signup_mailbox(email)) STORED,
   locale            app.locale NOT NULL,              -- the form's language: its emails are written in it
   future_elections  boolean NOT NULL DEFAULT false,   -- the optional, unticked box
   token_hash        text NOT NULL UNIQUE CHECK (token_hash ~ '^[0-9a-f]{64}$'),  -- hex SHA-256 of the newest token
@@ -43,7 +56,7 @@ COMMENT ON COLUMN app.signups.mailbox IS 'personal data';
 -- Not an address, but tied to one: kept out of the audit log, which outlives the row.
 COMMENT ON COLUMN app.signups.token_hash IS 'personal data';
 
--- Confirmation emails sent per site and UTC day, written only by app.sign_up: the daily cap's counter.
+-- Signups taken per site and UTC day, written only by app.sign_up: the daily cap's counter.
 CREATE TABLE app.signup_daily_counts (
   tenant_id  uuid NOT NULL REFERENCES app.tenants,
   day        date NOT NULL,
@@ -68,7 +81,7 @@ CREATE FUNCTION app.sign_up(tenant uuid, email text, locale text, future_electio
   SET search_path = ''
   AS $$
   DECLARE
-    daily_cap constant int := 1000;  -- confirmation emails per site and UTC day; far above normal use
+    daily_cap constant int := 1000;  -- signups per site and UTC day, whatever comes of them; far above normal use
     today date := (now() AT TIME ZONE 'UTC')::date;
     address text := lower(btrim(email));
     existing app.signups;
@@ -84,14 +97,16 @@ CREATE FUNCTION app.sign_up(tenant uuid, email text, locale text, future_electio
       RAISE EXCEPTION 'this site takes no signups' USING ERRCODE = 'invalid_parameter_value';
     END IF;
 
-    -- The cap first, for every address alike. Locking the day's counter also makes a site's signups take turns, so
-    -- two signups of one new address at once can't both insert it.
+    -- The cap first, counting every signup alike, before anything about the address: neither its answer nor the count
+    -- depends on who is listed. Locking the day's counter also makes a site's signups take turns, so two signups of
+    -- one new address at once can't both insert it (and across midnight, the insert below gives way).
     INSERT INTO app.signup_daily_counts AS c (tenant_id, day, count) VALUES (tenant, today, 0)
       ON CONFLICT ON CONSTRAINT signup_daily_counts_pkey DO NOTHING;
     SELECT c.count INTO sent FROM app.signup_daily_counts c WHERE c.tenant_id = tenant AND c.day = today FOR UPDATE;
     IF sent >= daily_cap THEN
-      RAISE EXCEPTION 'this site sends no more confirmations today' USING ERRCODE = 'program_limit_exceeded';
+      RAISE EXCEPTION 'this site takes no more signups today' USING ERRCODE = 'program_limit_exceeded';
     END IF;
+    UPDATE app.signup_daily_counts c SET count = c.count + 1 WHERE c.tenant_id = tenant AND c.day = today;
 
     SELECT * INTO existing FROM app.signups s WHERE s.tenant_id = tenant AND s.email = address;
     known := FOUND;
@@ -101,7 +116,7 @@ CREATE FUNCTION app.sign_up(tenant uuid, email text, locale text, future_electio
     SELECT max(s.token_issued_at) AS last, coalesce(sum(s.tokens_issued), 0) AS issued INTO box
       FROM app.signups s
      WHERE s.tenant_id = tenant
-       AND s.mailbox = split_part(split_part(address, '@', 1), '+', 1) || '@' || split_part(address, '@', 2);
+       AND s.mailbox = private.signup_mailbox(address);
     IF box.last > now() - interval '10 minutes' OR box.issued >= 5 THEN
       RETURN false;
     END IF;
@@ -113,9 +128,10 @@ CREATE FUNCTION app.sign_up(tenant uuid, email text, locale text, future_electio
        WHERE s.id = existing.id;
     ELSE
       INSERT INTO app.signups (tenant_id, email, locale, future_elections, token_hash)
-      VALUES (tenant, address, sign_up.locale, coalesce(sign_up.future_elections, false), sign_up.token_hash);
+      VALUES (tenant, address, sign_up.locale, coalesce(sign_up.future_elections, false), sign_up.token_hash)
+      ON CONFLICT ON CONSTRAINT signups_tenant_id_email_key DO NOTHING;
+      RETURN FOUND;
     END IF;
-    UPDATE app.signup_daily_counts c SET count = c.count + 1 WHERE c.tenant_id = tenant AND c.day = today;
     RETURN true;
   END
   $$;

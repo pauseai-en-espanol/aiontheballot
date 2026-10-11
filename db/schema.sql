@@ -428,7 +428,7 @@ CREATE FUNCTION app.sign_up(tenant uuid, email text, locale text, future_electio
     SET search_path TO ''
     AS $$
   DECLARE
-    daily_cap constant int := 1000;  -- confirmation emails per site and UTC day; far above normal use
+    daily_cap constant int := 1000;  -- signups per site and UTC day, whatever comes of them; far above normal use
     today date := (now() AT TIME ZONE 'UTC')::date;
     address text := lower(btrim(email));
     existing app.signups;
@@ -444,14 +444,16 @@ CREATE FUNCTION app.sign_up(tenant uuid, email text, locale text, future_electio
       RAISE EXCEPTION 'this site takes no signups' USING ERRCODE = 'invalid_parameter_value';
     END IF;
 
-    -- The cap first, for every address alike. Locking the day's counter also makes a site's signups take turns, so
-    -- two signups of one new address at once can't both insert it.
+    -- The cap first, counting every signup alike, before anything about the address: neither its answer nor the count
+    -- depends on who is listed. Locking the day's counter also makes a site's signups take turns, so two signups of
+    -- one new address at once can't both insert it (and across midnight, the insert below gives way).
     INSERT INTO app.signup_daily_counts AS c (tenant_id, day, count) VALUES (tenant, today, 0)
       ON CONFLICT ON CONSTRAINT signup_daily_counts_pkey DO NOTHING;
     SELECT c.count INTO sent FROM app.signup_daily_counts c WHERE c.tenant_id = tenant AND c.day = today FOR UPDATE;
     IF sent >= daily_cap THEN
-      RAISE EXCEPTION 'this site sends no more confirmations today' USING ERRCODE = 'program_limit_exceeded';
+      RAISE EXCEPTION 'this site takes no more signups today' USING ERRCODE = 'program_limit_exceeded';
     END IF;
+    UPDATE app.signup_daily_counts c SET count = c.count + 1 WHERE c.tenant_id = tenant AND c.day = today;
 
     SELECT * INTO existing FROM app.signups s WHERE s.tenant_id = tenant AND s.email = address;
     known := FOUND;
@@ -461,7 +463,7 @@ CREATE FUNCTION app.sign_up(tenant uuid, email text, locale text, future_electio
     SELECT max(s.token_issued_at) AS last, coalesce(sum(s.tokens_issued), 0) AS issued INTO box
       FROM app.signups s
      WHERE s.tenant_id = tenant
-       AND s.mailbox = split_part(split_part(address, '@', 1), '+', 1) || '@' || split_part(address, '@', 2);
+       AND s.mailbox = private.signup_mailbox(address);
     IF box.last > now() - interval '10 minutes' OR box.issued >= 5 THEN
       RETURN false;
     END IF;
@@ -473,9 +475,10 @@ CREATE FUNCTION app.sign_up(tenant uuid, email text, locale text, future_electio
        WHERE s.id = existing.id;
     ELSE
       INSERT INTO app.signups (tenant_id, email, locale, future_elections, token_hash)
-      VALUES (tenant, address, sign_up.locale, coalesce(sign_up.future_elections, false), sign_up.token_hash);
+      VALUES (tenant, address, sign_up.locale, coalesce(sign_up.future_elections, false), sign_up.token_hash)
+      ON CONFLICT ON CONSTRAINT signups_tenant_id_email_key DO NOTHING;
+      RETURN FOUND;
     END IF;
-    UPDATE app.signup_daily_counts c SET count = c.count + 1 WHERE c.tenant_id = tenant AND c.day = today;
     RETURN true;
   END
   $$;
@@ -2353,6 +2356,23 @@ CREATE FUNCTION private.short_title_rules() RETURNS trigger
 ALTER FUNCTION private.short_title_rules() OWNER TO aiontheballot_owner;
 
 --
+-- Name: signup_mailbox(text); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.signup_mailbox(address text) RETURNS text
+    LANGUAGE sql IMMUTABLE STRICT
+    SET search_path TO ''
+    AS $$
+    SELECT CASE WHEN split_part(address, '@', 2) IN ('gmail.com', 'googlemail.com')
+                THEN replace(split_part(split_part(address, '@', 1), '+', 1), '.', '') || '@gmail.com'
+                ELSE split_part(split_part(address, '@', 1), '+', 1) || '@' || split_part(address, '@', 2)
+           END
+  $$;
+
+
+ALTER FUNCTION private.signup_mailbox(address text) OWNER TO aiontheballot_owner;
+
+--
 -- Name: signup_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -3649,7 +3669,7 @@ CREATE TABLE app.signups (
     id uuid DEFAULT uuidv7() NOT NULL,
     tenant_id uuid NOT NULL,
     email text NOT NULL,
-    mailbox text GENERATED ALWAYS AS (((split_part(split_part(email, '@'::text, 1), '+'::text, 1) || '@'::text) || split_part(email, '@'::text, 2))) STORED NOT NULL,
+    mailbox text GENERATED ALWAYS AS (private.signup_mailbox(email)) STORED NOT NULL,
     locale app.locale NOT NULL,
     future_elections boolean DEFAULT false NOT NULL,
     token_hash text NOT NULL,
@@ -8917,6 +8937,13 @@ REVOKE ALL ON FUNCTION private.revision_contributors(cell uuid) FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.short_title_rules() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION signup_mailbox(address text); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.signup_mailbox(address text) FROM PUBLIC;
 
 
 --

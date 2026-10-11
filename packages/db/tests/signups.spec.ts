@@ -183,7 +183,7 @@ describe('signing up', () => {
     });
   });
 
-  it("stops at the site's daily cap of confirmation emails, counting every email, re-issues too", async () => {
+  it("stops at the site's daily cap of signups, counting every one, whatever comes of it", async () => {
     await inRolledBackTransaction(async (client) => {
       const today = async () =>
         (
@@ -197,9 +197,9 @@ describe('signing up', () => {
       await asWeb(client, () => send(client, signUp()));
       await age(client, '11 minutes');
       await asWeb(client, () => send(client, signUp({ token: hash('token-de-ejemplo-2') })));
-      // A refusal sends nothing, and counts nothing.
+      // One that sends nothing (too soon) counts too: the count says nothing about who is listed.
       await asWeb(client, () => send(client, signUp({ token: hash('token-de-ejemplo-3') })));
-      expect(await today()).toBe(before + 2);
+      expect(await today()).toBe(before + 3);
       await client.query(
         `UPDATE app.signup_daily_counts SET count = 1000 WHERE tenant_id = $1 AND day = (now() AT TIME ZONE 'UTC')::date`,
         [TENANT_A],
@@ -232,6 +232,39 @@ describe('signing up', () => {
           ),
           email,
         ).toBe(PROGRAM_LIMIT_EXCEEDED);
+      }
+    });
+  });
+
+  it("counts Gmail's dotted and googlemail.com variants as one mailbox", async () => {
+    await inRolledBackTransaction(async (client) => {
+      expect(
+        await asWeb(client, () =>
+          send(client, signUp({ email: `'pers.ona+uno@gmail.com'`, token: hash('g1') })),
+        ),
+      ).toBe(true);
+      for (const [email, token] of [
+        ['persona@googlemail.com', 'g2'],
+        ['p.e.r.s.o.n.a@gmail.com', 'g3'],
+      ]) {
+        expect(
+          await asWeb(client, () =>
+            send(client, signUp({ email: `'${email}'`, token: hash(token) })),
+          ),
+          email,
+        ).toBe(false);
+      }
+      // Another provider's dots make another mailbox.
+      for (const [email, token] of [
+        ['pers.ona@example.org', 'g4'],
+        ['persona@example.org', 'g5'],
+      ]) {
+        expect(
+          await asWeb(client, () =>
+            send(client, signUp({ email: `'${email}'`, token: hash(token) })),
+          ),
+          email,
+        ).toBe(true);
       }
     });
   });
@@ -295,6 +328,20 @@ describe('signing up', () => {
 });
 
 describe('two signups of one new address at once', () => {
+  /** Waits until the backend `pid` waits on a lock: only then is it a race. */
+  const waitsOnLock = (pid: number | undefined) =>
+    expect
+      .poll(() =>
+        inRolledBackTransaction(async (watcher) => {
+          const { rows } = await watcher.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM pg_stat_activity WHERE pid = $1 AND wait_event_type = 'Lock'`,
+            [pid],
+          );
+          return rows[0]?.n;
+        }),
+      )
+      .toBe(1);
+
   it("send one confirmation email: the second waits for the first's turn, then finds the address", async () => {
     const email = `a-la-vez-${Date.now()}@example.org`;
     const first = new pg.Client({ connectionString: superuserUrl() });
@@ -310,19 +357,39 @@ describe('two signups of one new address at once', () => {
       await second.query('BEGIN');
       await second.query('SET LOCAL ROLE aiontheballot_web');
       const waiting = send(second, signUp({ email: `'${email}'`, token: hash('otro-token') }));
-      // Only once the second insert waits on the first's row is it a race: then the first commits.
-      await expect
-        .poll(() =>
-          inRolledBackTransaction(async (watcher) => {
-            const { rows } = await watcher.query<{ n: number }>(
-              `SELECT count(*)::int AS n FROM pg_stat_activity
-                WHERE pid = $1 AND wait_event_type = 'Lock'`,
-              [backend[0]?.pid],
-            );
-            return rows[0]?.n;
-          }),
-        )
-        .toBe(1);
+      // Only once the second waits on the first is it a race: then the first commits.
+      await waitsOnLock(backend[0]?.pid);
+      await first.query('COMMIT');
+      expect(await waiting).toBe(false);
+      await second.query('COMMIT');
+    } finally {
+      await first.query('ROLLBACK').catch(() => undefined);
+      await second.query('ROLLBACK').catch(() => undefined);
+      await first.query('DELETE FROM app.signups WHERE email = $1', [email]);
+      await Promise.all([first.end(), second.end()]);
+    }
+  });
+
+  it("across UTC midnight, each holding another day's counter, the second gives way instead of failing", async () => {
+    const email = `medianoche-${Date.now()}@example.org`;
+    const first = new pg.Client({ connectionString: superuserUrl() });
+    const second = new pg.Client({ connectionString: superuserUrl() });
+    await Promise.all([first.connect(), second.connect()]);
+    try {
+      // The first signup's insert, as the day before's would make it: today's counter stays free.
+      await first.query('BEGIN');
+      await first.query(
+        `INSERT INTO app.signups (tenant_id, email, locale, token_hash)
+         VALUES ($1, $2, 'es', ${hash('ayer')})`,
+        [TENANT_A, email],
+      );
+      const { rows: backend } = await second.query<{ pid: number }>(
+        'SELECT pg_backend_pid() AS pid',
+      );
+      await second.query('BEGIN');
+      await second.query('SET LOCAL ROLE aiontheballot_web');
+      const waiting = send(second, signUp({ email: `'${email}'`, token: hash('hoy') }));
+      await waitsOnLock(backend[0]?.pid);
       await first.query('COMMIT');
       expect(await waiting).toBe(false);
       await second.query('COMMIT');

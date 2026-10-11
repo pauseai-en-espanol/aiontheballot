@@ -1071,17 +1071,21 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   a Spanish site is a 404, so a page has one address. Every language's tenant-level words are reserved election slugs
   (migration `reserved_site_paths`; `RESERVED_ELECTION_SLUGS` follows `SITE_WORDS`).
 - **R122. The signup list (R119), as built** (migration `signups`, ADR-0002 §6, §7 and the data model amended, threat
-  T27, then hardened after the adversarial review). `app.sign_up` checks the site's daily cap first, for every
-  address alike: 1,000 confirmation emails a UTC day, counted in a per-day counter whose lock also makes a site's
-  signups take turns; only then does it look at the address, so the cap's answer tells nobody who is listed. A
-  confirmed address changes nothing; otherwise a mailbox (the address without its `+tag`, so variants count as one)
-  gets an email at most every 10 minutes and 5 times in all. The API normalises an address first (trimmed, Unicode
-  NFC, lowercase, the domain in punycode, no control characters) and answers before the email goes out, so neither
-  the answer nor its timing says whether one was sent; no transaction waits on the mail server. A token acts only on
+  T27, then hardened after two adversarial reviews). `app.sign_up` counts and checks the site's daily cap first, for
+  every signup alike: 1,000 a UTC day, whatever comes of them, in a per-day counter whose lock also makes a site's
+  signups take turns; only then does it look at the address, so neither the cap's answer nor the count tells anyone
+  who is listed. A confirmed address changes nothing; otherwise a mailbox (the address without its `+tag`, and a Gmail
+  one without its dots, on one domain, so variants count as one) gets an email at most every 10 minutes and 5 times in
+  all. Other providers' variants (subdomain addressing, catch-alls) aren't folded: the cap bounds them. The API
+  normalises an address first (trimmed, Unicode NFC, lowercase, the domain in punycode, no control or formatting
+  character, no port, escape or numeric domain) and answers before the email goes out, so the answer never says
+  whether one was sent and never waits on the mail server; a refused address answers a millisecond or so sooner than
+  a new one, which an attacker can sample once per address every 10 minutes. A token acts only on
   its own site's list. The token that confirms then unsubscribes, and unsubscribing deletes the row: there is no list
   of refused addresses to keep, so someone who says "this wasn't me" can be signed up again by a stranger, up to the
   same limits (accepted; the gateway's per-IP limit, M3, is the outer fence). The API counts each visitor's signups
-  too (5 per 10 minutes per replica, IPv6 by /64, the oldest windows dropped first when full). Unconfirmed signups
+  too (5 per 10 minutes per replica, IPv6 by /64, an IPv4 address written as IPv6 as itself, the oldest windows
+  dropped first when full). Unconfirmed signups
   are deleted by each of the three functions and by an hourly `confirm_signup(NULL, NULL)` from the API process: one
   statement, not a job (ADR-0003 guardrail 1), and no new function or grant. The email's links carry the token in
   the query, which RFC 8058's one-click needs anyway; a GET never confirms or deletes: the page has a button that posts
@@ -1099,9 +1103,11 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   (10 to connect and to greet, 20 idle) instead of nodemailer's minutes. A site's mail shows the operator's name with
   the platform's address, replies to the operator's contact address, and is plain text in the form's language. The
   confirmation goes out after the signup's transaction commits; if Mailu refuses it, the signup is deleted again with
-  its own token, so the person can try again at once. Failures are logged and reported with the SMTP code and command
-  only, never the message or the recipients, which quote the address. `packages/i18n` now takes its translator from
-  `use-intl/core`, the same `createTranslator` next-intl re-exported, so the API uses it without pulling in Next.
+  its own token, so the person can try again at once. A shutting-down API waits up to 10 seconds for emails on their
+  way. Failures are logged and reported with the SMTP code and command only, never the message or the recipients,
+  which quote the address; a signup that couldn't be undone is reported apart. `packages/i18n` now takes its
+  translator from `use-intl/core`, the same `createTranslator` next-intl re-exported, so the API uses it without
+  pulling in Next.
 - **R124. The legal notice, the privacy policy and the page about the operator are served from now on, coming soon
   or not** (R44's missing links), each in the shared footer with the operator line and the contact address. The legal
   notice is generated from the operator's row, every field the operator gave (Q6 still open); the policy texts are

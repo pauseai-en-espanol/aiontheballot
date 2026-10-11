@@ -4,8 +4,8 @@ import { isSignupOutcome, SIGNUP_ANCHOR, type SignupOutcome } from './signup-out
 
 /** An address and a box, or a token: anyone may post here, so nothing larger is read. */
 const MAX_BYTES = 4096;
-/** The API sends the confirmation email before it answers. */
-const API_TIMEOUT_MS = 15_000;
+/** The API answers before it sends any email, so a slow answer is a fault. */
+const API_TIMEOUT_MS = 5_000;
 
 export interface SignupTarget {
   slug: string;

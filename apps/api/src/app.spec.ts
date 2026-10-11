@@ -222,6 +222,7 @@ describe('api', () => {
       confirm: async (slug, token) => slug === 'ejemplo' && token === 'bueno',
       unsubscribe: async (slug, token) => slug === 'ejemplo' && token === 'bueno',
       deleteExpired: async () => undefined,
+      settle: async () => undefined,
     });
     const post = (
       target: FastifyInstance,
