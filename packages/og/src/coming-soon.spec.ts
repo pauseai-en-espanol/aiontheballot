@@ -129,10 +129,10 @@ describe('TEMPLATE_VERSION', () => {
 
   it('changes whenever the picture does', async () => {
     const svg = await renderSvg(comingSoonCard(card, '1200x630'), '1200x630');
-    expect({
-      version: TEMPLATE_VERSION,
-      svg: createHash('sha256').update(svg).digest('hex'),
-    }).toEqual(PINNED);
+    expect(
+      { version: TEMPLATE_VERSION, svg: createHash('sha256').update(svg).digest('hex') },
+      'The share image changed (a template, satori or a font): bump TEMPLATE_VERSION in hash.ts, then pin both here',
+    ).toEqual(PINNED);
   });
 });
 
