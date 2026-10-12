@@ -119,12 +119,14 @@ describe("the operator's logo", () => {
 });
 
 describe('TEMPLATE_VERSION', () => {
-  // The SVG version 2 draws for this card (version 1 was satori 0.35; 0.38 moves some edges by a fraction of a
-  // pixel). If a template, satori or a font changes the picture, this fails: bump TEMPLATE_VERSION (so every image
-  // gets a new URL instead of a different picture under a cached one) and pin the new digest here.
+  // The SVG version 3 draws for this card (version 1 was satori 0.35; 0.38 moved some edges by a fraction of a pixel;
+  // 0.44 follows CSS's content-box sizing, which the templates now override, and writes the same picture a little
+  // differently). If a template, satori or a font changes the picture, this fails: bump TEMPLATE_VERSION (so every
+  // image gets a new URL instead of a different picture under a cached one), look at the new picture, and pin its
+  // digest here.
   const PINNED = {
-    version: 2,
-    svg: 'b4a4921e8a1fd61280e68487c5397d89845fba2611827ab1d2ad9d8d50ba4d65',
+    version: 3,
+    svg: '0f2b4683decdac621c2bca40d230f4936a06b2f64ef769729b3b736baf359ef8',
   };
 
   it('changes whenever the picture does', async () => {
