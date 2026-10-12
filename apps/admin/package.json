@@ -22,7 +22,7 @@
     "@aiontheballot/i18n": "workspace:*",
     "@aiontheballot/observability": "workspace:*",
     "@ark-ui/react": "5.39.3",
-    "@sentry/nextjs": "11.5.0",
+    "@sentry/nextjs": "11.6.0",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"

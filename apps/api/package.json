@@ -24,7 +24,7 @@
     "@aiontheballot/domain": "workspace:*",
     "@aiontheballot/i18n": "workspace:*",
     "@aiontheballot/observability": "workspace:*",
-    "@sentry/node": "11.5.0",
+    "@sentry/node": "11.6.0",
     "better-auth": "1.7.7",
     "fastify": "5.12.5",
     "kysely": "0.29.6",
@@ -32,7 +32,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
-    "@sentry/core": "11.5.0",
+    "@sentry/core": "11.6.0",
     "@slango.configs/lint-staged": "2.0.8",
     "@slango.configs/oxlint": "0.1.12",
     "@slango.configs/typescript": "3.0.0",

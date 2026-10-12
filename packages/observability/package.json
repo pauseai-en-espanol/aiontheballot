@@ -21,7 +21,7 @@
     "test:coverage": "vitest --run --coverage"
   },
   "dependencies": {
-    "@sentry/core": "11.5.0"
+    "@sentry/core": "11.6.0"
   },
   "devDependencies": {
     "@slango.configs/lint-staged": "2.0.8",
