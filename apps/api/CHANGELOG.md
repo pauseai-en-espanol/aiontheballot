@@ -1,5 +1,21 @@
 # @aiontheballot/api
 
+## 0.16.0
+
+### Minor Changes
+
+- 658a870: A site's public settings are data (PLAN R135): whether it is open, whether search engines may index it, and its
+  Plausible script are switches on the site's admin page, for platform admins, instead of `OPEN_SITES` and
+  `PLAUSIBLE_SITES` in the web app's environment. A site kept out of search engines answers `noindex, nofollow`
+  everywhere, disallows everything in its robots.txt and has no sitemap, for a demo's fictional content.
+
+### Patch Changes
+
+- Updated dependencies [658a870]
+  - @aiontheballot/domain@0.9.0
+  - @aiontheballot/i18n@0.14.0
+  - @aiontheballot/db@0.12.0
+
 ## 0.15.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@aiontheballot/db",
-  "version": "0.11.3",
+  "version": "0.12.0",
   "private": true,
   "description": "Database access for the API and worker: Kysely, generated types and withActor",
   "type": "module",
