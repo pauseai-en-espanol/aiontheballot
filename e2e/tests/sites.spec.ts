@@ -4,11 +4,14 @@ import { expect, test } from '@playwright/test';
 import { addMembership, asOwner, createTenant, deleteAccounts, purgeTenant } from '../accounts.js';
 import { signedInAccount } from '../admin.js';
 import { expectAccessible } from '../axe.js';
-import { ADMIN_URL } from '../servers.js';
+import { get } from '../fetch-by-host.js';
+import { ADMIN_URL, PLATFORM_HOST, PORTS } from '../servers.js';
 
 const en = messages.en;
 const sites = en.admin.platformSites;
 const form = sites.form;
+/** The platform host, where a site without addresses is served by path. */
+const PLATFORM = `http://${PLATFORM_HOST}:${PORTS.web}`;
 
 const created: string[] = [];
 test.afterAll(async () => {
@@ -16,9 +19,11 @@ test.afterAll(async () => {
 });
 
 test.describe('sites (PLAN R129)', () => {
-  test('are created off by a platform admin, then turned on after a confirmation', async ({
+  test('are created off by a platform admin, then turned on, kept out of search engines and opened', async ({
     page,
   }) => {
+    // The public site may take a routing refresh (30 seconds) to follow.
+    test.setTimeout(90_000);
     // A fictional organization to run the new site: the operator of a test site of its own.
     const runner = await createTenant({ operator: true });
     const slug = `e2e-${crypto.randomUUID().slice(0, 8)}`;
@@ -56,13 +61,46 @@ test.describe('sites (PLAN R129)', () => {
       await expectAccessible(page);
       await dialog.getByRole('button', { name: sites.active.turnOn }).click();
       await expect(page.getByText(sites.active.on)).toBeVisible();
+      // Its public settings (PLAN R135): kept out of search engines, counted by Plausible, then opened, each a
+      // platform admin's, the switches behind a confirmation.
+      await expect(page.getByText(sites.indexing.on)).toBeVisible();
+      await page.getByRole('button', { name: sites.indexing.hide }).click();
+      await page
+        .getByRole('alertdialog')
+        .getByRole('button', { name: sites.indexing.hide })
+        .click();
+      await expect(page.getByText(sites.indexing.off)).toBeVisible();
+      await page.getByLabel(sites.analytics.script).fill('pa-Demo_e2e.js');
+      await page.getByRole('button', { name: sites.analytics.save }).click();
+      await expect(
+        page.getByRole('status').filter({ hasText: sites.analytics.saved }),
+      ).toBeVisible();
+      await expect(page.getByText(sites.open.off)).toBeVisible();
+      await page.getByRole('button', { name: sites.open.openSite }).click();
+      const opening = page.getByRole('alertdialog');
+      await expect(opening).toContainText(sites.open.openBody);
+      await opening.getByRole('button', { name: sites.open.openSite }).click();
+      await expect(page.getByText(sites.open.on)).toBeVisible();
+      await expectAccessible(page);
+      // The public site follows once it refreshes its routing data (every 30 seconds): never indexed, and open, so a
+      // page it doesn't have is the site's own 404 page rather than the coming-soon site's plain refusal.
+      await expect
+        .poll(
+          async () => {
+            const answer = await get(`${PLATFORM}/${slug}/no-existe`);
+            return [answer.headers['x-robots-tag'], answer.headers['content-type']?.split(';')[0]];
+          },
+          { timeout: 45_000 },
+        )
+        .toEqual(['noindex, nofollow', 'text/html']);
       // Addresses are shown, never added here: that is a runbook (ADR-0002, Hostnames).
       await expect(page.getByText(sites.hostname.intro)).toBeVisible();
       await expect(page.getByRole('textbox', { name: /address/i })).toHaveCount(0);
       expect(
         await asOwner(
           `SELECT 1 FROM app.tenants
-            WHERE slug = $1 AND active AND country_code = 'XD' AND default_locale = 'en'`,
+            WHERE slug = $1 AND active AND country_code = 'XD' AND default_locale = 'en'
+              AND site_open AND NOT search_indexing AND plausible_script = 'pa-Demo_e2e.js'`,
           [slug],
         ),
       ).toBe(1);

@@ -42,6 +42,17 @@ export interface SiteDetail extends SiteSummary {
   methodologyKind: 'demands' | 'descriptive';
   reportRetentionDays: number;
   operator: { id: string; name: Localized; legalName: string } | null;
+  /** Its public settings (PLAN R135): open or coming soon, indexed by search engines, its Plausible script. */
+  open: boolean;
+  indexed: boolean;
+  plausibleScript: string | null;
+}
+
+/** A site's public settings as the database names them, any of which a platform admin changes (PLAN R135). */
+export interface SiteSettings {
+  site_open?: boolean;
+  search_indexing?: boolean;
+  plausible_script?: string | null;
 }
 
 const localized = (value: unknown, column: string): Localized => {
@@ -112,6 +123,9 @@ export const getSite = async (
       sql<string[]>`t.enabled_locales::text[]`.as('enabled_locales'),
       't.methodology_kind',
       't.report_retention_days',
+      't.site_open',
+      't.search_indexing',
+      't.plausible_script',
       'o.id as operator_id',
       'o.display_name as operator_name',
       'o.legal_name as operator_legal_name',
@@ -131,6 +145,9 @@ export const getSite = async (
     enabledLocales: tenant.enabled_locales,
     methodologyKind: tenant.methodology_kind,
     reportRetentionDays: tenant.report_retention_days,
+    open: tenant.site_open,
+    indexed: tenant.search_indexing,
+    plausibleScript: tenant.plausible_script,
     operator:
       tenant.operator_id === null
         ? null
@@ -173,8 +190,8 @@ export const createSite = async (
 };
 
 /**
- * Turns a site on or off: on, its public addresses serve it (coming soon until OPEN_SITES lists it); the database
- * refuses it on without an operator.
+ * Turns a site on or off: on, its public addresses serve it (coming soon until it is opened); the database refuses it
+ * on without an operator.
  */
 export const setSiteActive = async (
   trx: Transaction<DB>,
@@ -184,6 +201,22 @@ export const setSiteActive = async (
   (await trx
     .updateTable('app.tenants')
     .set({ active })
+    .where('id', '=', tenantId)
+    .returning('id')
+    .executeTakeFirst()) !== undefined;
+
+/**
+ * Changes a site's public settings (PLAN R135): whether it is open, whether search engines may index it, its Plausible
+ * script. Only a platform admin may (members_may_change); the database checks the script's form.
+ */
+export const setSiteSettings = async (
+  trx: Transaction<DB>,
+  tenantId: string,
+  settings: SiteSettings,
+): Promise<boolean> =>
+  (await trx
+    .updateTable('app.tenants')
+    .set(settings)
     .where('id', '=', tenantId)
     .returning('id')
     .executeTakeFirst()) !== undefined;

@@ -45,8 +45,8 @@ export const ogLocale = (locale: string, countryCode: string): string => `${loca
 
 /**
  * The home card's content: every text from the tenant's data and the messages, the address from the base. While the
- * site is coming soon it says so, with the election it announces; once the site is open (`OPEN_SITES`, whatever host
- * asks) and has a public election, it names that election instead, as every page shares this card.
+ * site is coming soon it says so, with the election it announces; once the site is open (a platform admin's switch,
+ * whatever host asks) and has a public election, it names that election instead, as every page shares this card.
  */
 export const homeCardContent = (
   home: PublicHome,
@@ -93,9 +93,10 @@ export const homeCardHash = (card: ComingSoonCard, size: ShareSize): string =>
   cardHash('home', size, card);
 
 /**
- * The card an image request is answered with: this pod's, unless the other mode's is the one asked for. While a rollout
- * changes OPEN_SITES, pods disagree on whether a site is open; rendering the other's card, rather than redirecting to
- * this pod's, keeps two pods from sending a crawler back and forth.
+ * The card an image request is answered with: this pod's, unless the other mode's is the one asked for. Each pod
+ * refreshes its routing data on its own, so for a moment after a site is opened, pods disagree on whether it is open;
+ * rendering the other's card, rather than redirecting to this pod's, keeps two pods from sending a crawler back and
+ * forth.
  */
 export const requestedHomeCard = (
   home: PublicHome,

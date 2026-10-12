@@ -6,9 +6,17 @@ import {
   type TenantRoute,
 } from '@aiontheballot/domain/routing';
 
-/** What the API serves at GET /public/routing: active tenants and their verified hostnames. */
+type Setting = 'open' | 'indexed' | 'plausibleScript';
+
+/**
+ * What the API serves at GET /public/routing: active tenants with their public settings, and their verified hostnames.
+ * An API older than the settings (PLAN R135) leaves them out.
+ */
 export interface RoutingData {
-  tenants: { tenant: TenantRoute; hostnames: TenantHostname[] }[];
+  tenants: {
+    tenant: Omit<TenantRoute, Setting> & Partial<Pick<TenantRoute, Setting>>;
+    hostnames: TenantHostname[];
+  }[];
 }
 
 export interface RoutingTableLoaderOptions {
@@ -20,6 +28,23 @@ export interface RoutingTableLoaderOptions {
   fetch?: typeof fetch;
   now?: () => number;
 }
+
+/**
+ * The routing data's tenants with their public settings (PLAN R135), as the database's defaults where an API older
+ * than them (a rollout's old pod) leaves them out: coming soon, indexed, counted nowhere. Never hidden by mistake.
+ */
+export const withSettings = (
+  tenants: RoutingData['tenants'],
+): { tenant: TenantRoute; hostnames: TenantHostname[] }[] =>
+  tenants.map(({ tenant, hostnames }) => ({
+    tenant: {
+      ...tenant,
+      open: tenant.open ?? false,
+      indexed: tenant.indexed ?? true,
+      plausibleScript: tenant.plausibleScript ?? null,
+    },
+    hostnames,
+  }));
 
 /**
  * Loads the routing table from the API and keeps it for `maxAgeMs`. When a refresh fails (the API is down, or its
@@ -48,7 +73,7 @@ export const createRoutingTableLoader = ({
         throw new Error(`GET /public/routing answered ${response.status}`);
       }
       const data = (await response.json()) as RoutingData;
-      current = { table: buildRoutingTable(data.tenants, config), loadedAt: now() };
+      current = { table: buildRoutingTable(withSettings(data.tenants), config), loadedAt: now() };
     } catch (error) {
       console.error('Could not refresh the routing table; keeping the last one', error);
     }

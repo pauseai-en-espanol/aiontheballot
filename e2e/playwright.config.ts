@@ -16,7 +16,6 @@ import {
   PLAUSIBLE_URL,
   PORTS,
   PREVIEW_HOST,
-  SEED_HOSTS,
   SMTP_URL,
   WEB_URL,
 } from './servers.js';
@@ -82,9 +81,9 @@ export default defineConfig({
         API_URL,
         PLATFORM_HOST,
         PREVIEW_HOST,
-        // Only ejemplo-a's canonical host has a Plausible site, so the other hosts show it loads nowhere else.
+        // Only ejemplo-a has a Plausible script, in the seeds, counted on its canonical host: the other hosts show
+        // it loads nowhere else (PLAN R135).
         PLAUSIBLE_URL,
-        PLAUSIBLE_SITES: JSON.stringify({ [SEED_HOSTS.canonical]: 'pa-e2e.js' }),
       },
     },
     {

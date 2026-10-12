@@ -29,16 +29,17 @@ A tenant's site is in one of three modes, decided per request by the routing pro
 | _Open_        | The tenant's public addresses, once its site is open  | Every page in §3                                                   |
 | _Preview_     | The preview host, on `gateway-private` (VPN only)     | Every page in §3, as if open, never indexed                        |
 
-- **Opening a site is configuration:** `OPEN_SITES`, a comma-separated list of tenant slugs, in the web app's
-  environment (gitops). A site is open from the deployment that lists it. It is the Preview go/no-go's switch, so
-  it sits with whoever runs gitops, and needs no schema change. An unlisted tenant stays coming soon.
+- **Opening a site is a platform admin's switch** on the site's admin page (`tenants.site_open`; PLAN R135, which
+  replaced R121's `OPEN_SITES`). It is the Preview go/no-go; a site is open within a minute of it, as each web pod
+  refreshes its routing data. A site not opened stays coming soon.
 - **The preview host** is `PREVIEW_HOST` (unset: no preview). It serves `/{tenant-slug}/…` for every active tenant,
   like the platform host, but never redirects to a canonical host. Its pages say `noindex, nofollow` (meta tag and
   `X-Robots-Tag`), its `robots.txt` disallows everything, and Plausible never counts it (it has no Plausible site).
   Canonical, Open Graph and share URLs on it are the tenant's canonical ones, as everywhere; links between pages stay
   on the preview host.
 - The proxy tells pages the mode in a request header it always sets itself (`x-aiontheballot-site`), overwriting
-  whatever a client sent; a page reached without it is treated as coming soon.
+  whatever a client sent; a page reached without it is treated as coming soon. It says likewise whether the page may
+  be indexed (`x-aiontheballot-noindex`, `1` or `0`); anything but its `0` is not indexed.
 - **What a site shows depends on its elections too.** Only `live` and `archived` elections are public (RLS). An open
   site with no public election shows the coming-soon home, so opening early shows nothing new. Going live is what
   makes an election's parties and criteria public, to the preview host first while the site stays coming soon.
@@ -217,6 +218,12 @@ An e2e test checks the headers on a page, an image and a route handler, and that
   the platform host, allow everything and name the sitemap of each site whose canonical base it is. The proxy answers
   the last two itself, since no site is at their root.
 - `<html lang>` is the page's language, from a header the proxy sets with the mode.
+- A site a platform admin keeps out of search engines (`tenants.search_indexing`, a switch on its admin page; PLAN
+  R135) is never indexed, wherever it is served: every page and file it serves says `X-Robots-Tag: noindex, nofollow`,
+  its pages say so in the robots meta tag too, its `robots.txt` allows crawling but names no sitemap (crawlers must
+  fetch its pages to read their `noindex`), it has no sitemap on its own hosts, and the platform host's `robots.txt`
+  doesn't name it. For a demo site's fictional content. A change shows within a minute on pages; a cached robots.txt
+  or sitemap may take five.
 
 ## 9. Performance and caching
 

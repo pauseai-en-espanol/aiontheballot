@@ -5,7 +5,15 @@ import { createRoutingTableLoader, type RoutingData } from './routing-table';
 const data = (slug: string): RoutingData => ({
   tenants: [
     {
-      tenant: { id: `id-${slug}`, slug, defaultLocale: 'es', enabledLocales: ['es'] },
+      tenant: {
+        id: `id-${slug}`,
+        slug,
+        defaultLocale: 'es',
+        enabledLocales: ['es'],
+        open: false,
+        indexed: true,
+        plausibleScript: null,
+      },
       hostnames: [{ hostname: `${slug}.example.test`, isCanonical: true, verified: true }],
     },
   ],
@@ -32,6 +40,27 @@ describe('the routing table loader', () => {
     now = 1_000;
     await load();
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("reads an older API's data, without the public settings, as their defaults: never hidden by mistake", async () => {
+    const old = {
+      tenants: [
+        {
+          tenant: { id: 'id-a', slug: 'ejemplo-a', defaultLocale: 'es', enabledLocales: ['es'] },
+          hostnames: [{ hostname: 'ejemplo-a.example.test', isCanonical: true, verified: true }],
+        },
+      ],
+    };
+    const load = createRoutingTableLoader({
+      apiUrl: 'http://api.example.test:3001',
+      config: {},
+      fetch: async () => respond(old),
+    });
+    expect((await load())?.tenantsBySlug.get('ejemplo-a')).toMatchObject({
+      open: false,
+      indexed: true,
+      plausibleScript: null,
+    });
   });
 
   it('keeps the last good table when a refresh fails', async () => {

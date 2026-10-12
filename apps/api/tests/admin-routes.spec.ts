@@ -740,6 +740,17 @@ describe('sites (PLAN R129)', () => {
         (await send('PUT', '/api/sites/test-a/active', user, { body: { active: false } }))
           .statusCode,
       ).toBe(404);
+      // Nor its public settings (PLAN R135).
+      for (const [path, body] of [
+        ['open', { open: true }],
+        ['indexing', { indexed: false }],
+        ['analytics', { plausibleScript: 'pa-ajeno.js' }],
+      ] as const) {
+        expect(
+          (await send('PUT', `/api/sites/test-a/${path}`, user, { body })).statusCode,
+          path,
+        ).toBe(404);
+      }
       expect(
         (
           await send('POST', '/api/sites/test-a/hostnames', user, {
@@ -810,8 +821,48 @@ describe('sites (PLAN R129)', () => {
           legalName: expect.any(String),
         },
         hostnames: [],
+        // A new site is coming soon, indexed, and counted nowhere (PLAN R135).
+        open: false,
+        indexed: true,
+        plausibleScript: null,
       },
     });
+    // Its public settings, one route each: opened, kept out of search engines, counted by Plausible.
+    for (const [path, body] of [
+      ['open', { open: true }],
+      ['indexing', { indexed: false }],
+      ['analytics', { plausibleScript: 'pa-Demo_1.js' }],
+    ] as const) {
+      expect(
+        (await send('PUT', `/api/sites/${BODY.slug}/${path}`, USERS.platformAdmin, { body }))
+          .statusCode,
+        path,
+      ).toBe(204);
+    }
+    expect(
+      (await send('GET', `/api/sites/${BODY.slug}`, USERS.platformAdmin)).json(),
+    ).toMatchObject({ site: { open: true, indexed: false, plausibleScript: 'pa-Demo_1.js' } });
+    // Only a script's file name: not a path, not a URL; and null removes it.
+    for (const plausibleScript of ['../admin.js', 'https://plausible.io/js/script.js', 'pa-.js']) {
+      expect(
+        (
+          await send('PUT', `/api/sites/${BODY.slug}/analytics`, USERS.platformAdmin, {
+            body: { plausibleScript },
+          })
+        ).statusCode,
+        plausibleScript,
+      ).toBe(400);
+    }
+    expect(
+      (
+        await send('PUT', `/api/sites/${BODY.slug}/analytics`, USERS.platformAdmin, {
+          body: { plausibleScript: null },
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(
+      (await send('GET', `/api/sites/${BODY.slug}`, USERS.platformAdmin)).json(),
+    ).toMatchObject({ site: { plausibleScript: null } });
     // Hostnames are verified and routed by runbook (ADR-0002): the admin has no route to add one.
     const hostname = await send('POST', `/api/sites/${BODY.slug}/hostnames`, USERS.platformAdmin, {
       body: { hostname: 'otra.example.test', canonical: true },

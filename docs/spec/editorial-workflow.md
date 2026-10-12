@@ -193,6 +193,9 @@ _Built: the fields of P2.1 but the logo, on `/platform/organizations` (PLAN R112
 3. A site is on only with an operator. Turning it on or off asks first, since its addresses change within a minute.
    [DB: `active_tenant_has_operator`; UI]
 4. Its addresses are shown, not written: a hostname is verified and routed by runbook (ADR-0002, Hostnames). [UI]
+5. Only platform admins open a site or put it back to coming soon, keep it out of search engines or let them in, and
+   set its Plausible script; opening and indexing ask first. [DB: `members_may_change`, check; UI] _Built (PLAN
+   R135)._
 
 _Built (PLAN R129): `/platform/sites`, its new-site form and each site's page. Adding addresses, changing a site's
 name, languages or operator stay runbooks._

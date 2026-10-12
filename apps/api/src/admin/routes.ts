@@ -101,7 +101,15 @@ import {
   updateSettings,
 } from './settings.js';
 import { signupCounts } from './signups.js';
-import { createSite, getSite, listSites, setSiteActive, type SiteFields } from './sites.js';
+import {
+  createSite,
+  getSite,
+  listSites,
+  setSiteActive,
+  setSiteSettings,
+  type SiteFields,
+  type SiteSettings,
+} from './sites.js';
 import {
   createCriterion,
   createParty,
@@ -340,6 +348,28 @@ const SITE_ACTIVE_BODY = {
   type: 'object',
   properties: { active: { type: 'boolean' } },
   required: ['active'],
+  additionalProperties: false,
+} as const;
+/** A site's public settings (PLAN R135), one route each. */
+const SITE_OPEN_BODY = {
+  type: 'object',
+  properties: { open: { type: 'boolean' } },
+  required: ['open'],
+  additionalProperties: false,
+} as const;
+const SITE_INDEXING_BODY = {
+  type: 'object',
+  properties: { indexed: { type: 'boolean' } },
+  required: ['indexed'],
+  additionalProperties: false,
+} as const;
+const SITE_ANALYTICS_BODY = {
+  type: 'object',
+  properties: {
+    // A Plausible site's script file, from its installation snippet; the database checks it too.
+    plausibleScript: { type: ['string', 'null'], pattern: '^pa-[A-Za-z0-9_-]{1,100}\\.js$' },
+  },
+  required: ['plausibleScript'],
   additionalProperties: false,
 } as const;
 
@@ -1346,6 +1376,47 @@ export const adminDataRoutes =
           });
           return reply.code(204).send();
         }),
+    );
+
+    // A site's public settings (PLAN R135): open or coming soon, indexed or not, its Plausible script. A platform
+    // admin's, as the database insists too.
+    const siteSetting = <Body>(
+      path: string,
+      body: object,
+      settings: (body: Body) => SiteSettings,
+    ) =>
+      scope.put<{ Params: { site: string }; Body: Body }>(
+        path,
+        { schema: { params: SITE_PARAMS, body } },
+        async (request, reply) =>
+          signedIn(request, reply, async (db, actor) => {
+            await withActor(db, actor, async (trx) => {
+              await platformOnly(trx, actor);
+              const site = await siteFor(trx, request.params.site);
+              refuseUnless(
+                // Fastify's types lose the generic body; the schema has checked it is a Body.
+                (await setSiteSettings(trx, site.id, settings(request.body as Body)))
+                  ? 'changed'
+                  : 'not-found',
+              );
+            });
+            return reply.code(204).send();
+          }),
+      );
+    siteSetting<{ open: boolean }>('/sites/:site/open', SITE_OPEN_BODY, ({ open }) => ({
+      site_open: open,
+    }));
+    siteSetting<{ indexed: boolean }>(
+      '/sites/:site/indexing',
+      SITE_INDEXING_BODY,
+      ({ indexed }) => ({
+        search_indexing: indexed,
+      }),
+    );
+    siteSetting<{ plausibleScript: string | null }>(
+      '/sites/:site/analytics',
+      SITE_ANALYTICS_BODY,
+      ({ plausibleScript }) => ({ plausible_script: plausibleScript }),
     );
 
     // The election's cell grid (C1.1).

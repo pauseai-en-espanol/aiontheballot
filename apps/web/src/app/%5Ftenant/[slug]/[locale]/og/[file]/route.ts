@@ -12,7 +12,7 @@ import {
   requestedHomeCard,
   type ShareTemplate,
 } from '@/share';
-import { loadTenantPage, openSites, type TenantPage } from '@/tenant-data';
+import { loadTenantPage, type TenantPage } from '@/tenant-data';
 
 interface ImageContext {
   params: Promise<{ slug: string; locale: string; file: string }>;
@@ -29,7 +29,7 @@ const currentImage = (
     page.home,
     locale,
     page.base,
-    openSites.has(slug),
+    page.tenant.open,
     requested.size,
     requested.hash,
   );

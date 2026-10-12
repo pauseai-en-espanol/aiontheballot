@@ -743,6 +743,10 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       live_edits_need_second_approver: MEMBERS,
       report_retention_days: MEMBERS,
       llm_monthly_cap_usd: MEMBERS,
+      // The public site reads a site's public settings with its routing data (PLAN R135).
+      site_open: { public: true, ...MEMBERS },
+      search_indexing: { public: true, ...MEMBERS },
+      plausible_script: { public: true, ...MEMBERS },
     },
     columnUpdates: {
       report_retention_days: {
@@ -764,6 +768,10 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
         rule: PLATFORM_ADMIN,
       },
       slug: { set: `slug = slug || '-renamed'`, rule: PLATFORM_ADMIN },
+      // The site's public settings (PLAN R135): open, indexed and its Plausible script, a platform admin's.
+      site_open: { set: 'site_open = NOT site_open', rule: PLATFORM_ADMIN },
+      search_indexing: { set: 'search_indexing = NOT search_indexing', rule: PLATFORM_ADMIN },
+      plausible_script: { set: `plausible_script = 'pa-prueba.js'`, rule: PLATFORM_ADMIN },
       country_code: { set: `country_code = 'XZ'`, rule: PLATFORM_ADMIN },
       enabled_locales: {
         set: `enabled_locales = enabled_locales || '{ca}'::app.locale[]`,

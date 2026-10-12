@@ -231,6 +231,10 @@ export interface Site extends SiteSummary {
   methodologyKind: 'demands' | 'descriptive';
   reportRetentionDays: number;
   operator: { id: string; name: Localized; legalName: string } | null;
+  /** Its public settings (PLAN R135): open or coming soon, indexed by search engines, its Plausible script. */
+  open: boolean;
+  indexed: boolean;
+  plausibleScript: string | null;
 }
 
 /** Every site, for platform admins (PLAN R129), and the organizations that could run a new one. */

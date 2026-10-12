@@ -34,7 +34,15 @@ describe('api', () => {
     const data = {
       tenants: [
         {
-          tenant: { id: 't', slug: 'ejemplo', defaultLocale: 'es', enabledLocales: ['es'] },
+          tenant: {
+            id: 't',
+            slug: 'ejemplo',
+            defaultLocale: 'es',
+            enabledLocales: ['es'],
+            open: false,
+            indexed: true,
+            plausibleScript: null,
+          },
           hostnames: [{ hostname: 'ejemplo.example.test', isCanonical: true, verified: true }],
         },
       ],

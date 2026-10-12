@@ -659,7 +659,10 @@ export interface AppTenants {
   live_edits_need_second_approver: Generated<boolean>;
   llm_monthly_cap_usd: Generated<Numeric>;
   methodology_kind: AppMethodologyKind;
+  plausible_script: string | null;
   report_retention_days: number;
+  search_indexing: Generated<boolean>;
+  site_open: Generated<boolean>;
   slug: string;
   theme: Generated<Json>;
 }

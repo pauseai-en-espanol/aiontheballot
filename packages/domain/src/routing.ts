@@ -12,6 +12,12 @@ export interface TenantRoute {
   defaultLocale: string;
   /** Public locales, including the default one. */
   enabledLocales: readonly string[];
+  /** Open to the public, or still coming soon: a platform admin's switch (public-site spec §2; PLAN R135). */
+  open: boolean;
+  /** Whether search engines may index it, wherever it is served: a demo's fictional content may not be (PLAN R135). */
+  indexed: boolean;
+  /** Its Plausible script (`pa-….js`), counted on its canonical host only; null without one (PLAN R83, R135). */
+  plausibleScript: string | null;
 }
 
 export interface TenantHostname {
@@ -173,8 +179,8 @@ export const canonicalBase = (
 /**
  * The robots.txt of a host that serves tenants by path (public-site spec §8), which crawlers read only at a host's
  * root: on the preview host, nothing is to be crawled; on the platform host, everything, with the sitemap of each
- * tenant whose canonical base is there (undefined without routing data). Undefined for any other host, which serves its
- * own tenant's robots.txt.
+ * tenant whose canonical base is there but one never to be indexed (undefined without routing data). Undefined for any
+ * other host, which serves its own tenant's robots.txt.
  */
 export const pathHostRobots = (
   requestHost: string,
@@ -193,7 +199,7 @@ export const pathHostRobots = (
     return undefined;
   }
   const sitemaps = [...table.tenantsBySlug.values()]
-    .filter((tenant) => !table.canonicalHosts.has(tenant.id))
+    .filter((tenant) => !table.canonicalHosts.has(tenant.id) && tenant.indexed)
     .map((tenant) => `Sitemap: https://${host}/${tenant.slug}/sitemap.xml\n`)
     .sort();
   return `User-agent: *\nAllow: /\n${sitemaps.join('')}`;

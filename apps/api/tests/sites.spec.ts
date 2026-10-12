@@ -8,6 +8,7 @@ import {
   getSite,
   listSites,
   setSiteActive,
+  setSiteSettings,
   type SiteFields,
 } from '../src/admin/sites.js';
 import { inRolledBackTransaction } from './db.js';
@@ -78,6 +79,29 @@ describe('sites (PLAN R129)', () => {
       expect((await getSite(trx, FIELDS.slug))?.active).toBe(true);
       await expect(
         sql`DELETE FROM app.tenant_organizations WHERE tenant_id = ${id}`.execute(trx),
+      ).rejects.toMatchObject({ code: '23514' });
+    });
+  });
+
+  it("keep their public settings a platform admin's: a country admin may not open their own site (PLAN R135)", async () => {
+    for (const settings of [
+      { site_open: true },
+      { search_indexing: false },
+      { plausible_script: 'pa-propio.js' },
+    ]) {
+      await inRolledBackTransaction(async (trx) => {
+        await actAs(trx, USERS.countryAdminA);
+        const site = await getSite(trx, 'test-a');
+        await expect(setSiteSettings(trx, site?.id ?? '', settings)).rejects.toMatchObject({
+          code: '42501',
+        });
+      });
+    }
+    await inRolledBackTransaction(async (trx) => {
+      await actAs(trx, USERS.platformAdmin);
+      const site = await getSite(trx, 'test-a');
+      await expect(
+        setSiteSettings(trx, site?.id ?? '', { plausible_script: 'script.js' }),
       ).rejects.toMatchObject({ code: '23514' });
     });
   });

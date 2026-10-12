@@ -34,6 +34,9 @@ export interface SeedTenant {
   operator: string;
   /** hostname → [canonical, verified] */
   hostnames: Readonly<Record<string, readonly [boolean, boolean]>>;
+  /** Public settings (PLAN R135): left coming soon; kept out of search engines; its Plausible script. */
+  indexed: boolean;
+  plausibleScript: string | null;
 }
 
 export const SEED_TENANTS: Readonly<Record<'A' | 'B' | 'inactive', SeedTenant>> = {
@@ -50,6 +53,9 @@ export const SEED_TENANTS: Readonly<Record<'A' | 'B' | 'inactive', SeedTenant>> 
       'alias-a.localhost': [false, true],
       'pendiente-a.localhost': [false, false],
     },
+    indexed: true,
+    // Counted on its canonical host only, where the e2e tests check it.
+    plausibleScript: 'pa-e2e.js',
   },
   /** Reachable only by path on the platform host, in two locales. */
   B: {
@@ -60,6 +66,9 @@ export const SEED_TENANTS: Readonly<Record<'A' | 'B' | 'inactive', SeedTenant>> 
     active: true,
     operator: id(3, 2),
     hostnames: {},
+    // Stands in for a demo, which search engines never index.
+    indexed: false,
+    plausibleScript: null,
   },
   /** Inactive: its verified hostname must not be served. */
   inactive: {
@@ -70,6 +79,8 @@ export const SEED_TENANTS: Readonly<Record<'A' | 'B' | 'inactive', SeedTenant>> 
     active: false,
     operator: id(3, 3),
     hostnames: { 'ejemplo-inactivo.localhost': [true, true] },
+    indexed: true,
+    plausibleScript: null,
   },
 };
 
@@ -167,8 +178,9 @@ export const seed = async (
     for (const [key, t] of Object.entries(SEED_TENANTS)) {
       await client.query(
         `INSERT INTO app.tenants (id, slug, country_code, default_locale, enabled_locales, display_name,
-                                  methodology_kind, report_retention_days, active)
-         VALUES ($1, $2, $3, 'es', $4, $5, 'demands', 365, $6)`,
+                                  methodology_kind, report_retention_days, active, search_indexing,
+                                  plausible_script)
+         VALUES ($1, $2, $3, 'es', $4, $5, 'demands', 365, $6, $7, $8)`,
         [
           t.id,
           t.slug,
@@ -176,6 +188,8 @@ export const seed = async (
           t.locales,
           { es: `Inquilino de ejemplo ${key}`, en: `Example tenant ${key}` },
           t.active,
+          t.indexed,
+          t.plausibleScript,
         ],
       );
       // A's operator has a website, a contact address and a newsletter (on the reserved .example TLD); B's has none.

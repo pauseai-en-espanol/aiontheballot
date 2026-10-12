@@ -18,18 +18,27 @@ const tenantA: TenantRoute = {
   slug: 'test-a',
   defaultLocale: 'es',
   enabledLocales: ['es', 'ca'],
+  open: false,
+  indexed: true,
+  plausibleScript: null,
 };
 const tenantB: TenantRoute = {
   id: 'b',
   slug: 'test-b',
   defaultLocale: 'es',
   enabledLocales: ['es'],
+  open: false,
+  indexed: true,
+  plausibleScript: null,
 };
 const tenantC: TenantRoute = {
   id: 'c',
   slug: 'test-c',
   defaultLocale: 'en',
   enabledLocales: ['en'],
+  open: false,
+  indexed: true,
+  plausibleScript: null,
 };
 
 const host = (hostname: string, verified = true, isCanonical = false): TenantHostname => ({
@@ -271,6 +280,18 @@ describe('pathHostRobots', () => {
       'User-agent: *\nAllow: /\n' +
         'Sitemap: https://plataforma.test/test-b/sitemap.xml\n' +
         'Sitemap: https://plataforma.test/test-c/sitemap.xml\n',
+    );
+  });
+
+  it('leaves out the sitemap of a site never to be indexed', () => {
+    const hidden = buildRoutingTable(
+      tenants.map((entry) =>
+        entry.tenant === tenantC ? { ...entry, tenant: { ...tenantC, indexed: false } } : entry,
+      ),
+      platform,
+    );
+    expect(pathHostRobots('plataforma.test', hidden, platform)).toBe(
+      'User-agent: *\nAllow: /\nSitemap: https://plataforma.test/test-b/sitemap.xml\n',
     );
   });
 

@@ -3,7 +3,10 @@ import type { TenantHostname, TenantRoute } from '@aiontheballot/domain/routing'
 
 import { sql } from 'kysely';
 
-/** What the public site routes by (ADR-0002, routing): active tenants and their verified hostnames. */
+/**
+ * What the public site routes by (ADR-0002, routing): active tenants with their public settings (open, indexed, their
+ * Plausible script: PLAN R135), and their verified hostnames.
+ */
 export interface RoutingData {
   tenants: { tenant: TenantRoute; hostnames: TenantHostname[] }[];
 }
@@ -26,6 +29,9 @@ export const createRoutingSource =
           'slug',
           'default_locale',
           sql<string[]>`enabled_locales::text[]`.as('enabled_locales'),
+          'site_open',
+          'search_indexing',
+          'plausible_script',
         ])
         .orderBy('slug')
         .execute(),
@@ -42,6 +48,9 @@ export const createRoutingSource =
           slug: t.slug,
           defaultLocale: t.default_locale,
           enabledLocales: t.enabled_locales,
+          open: t.site_open,
+          indexed: t.search_indexing,
+          plausibleScript: t.plausible_script,
         },
         hostnames: hostnames
           .filter((h) => h.tenant_id === t.id)

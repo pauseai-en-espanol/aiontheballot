@@ -4,7 +4,15 @@ import { describe, expect, it } from 'vitest';
 
 import { createRoutingProxy } from './routing-proxy';
 
-const tenant = { id: 't-a', slug: 'ejemplo-a', defaultLocale: 'es', enabledLocales: ['es'] };
+const tenant = {
+  id: 't-a',
+  slug: 'ejemplo-a',
+  defaultLocale: 'es',
+  enabledLocales: ['es'],
+  open: false,
+  indexed: true,
+  plausibleScript: null,
+};
 const table = buildRoutingTable([
   {
     tenant,
@@ -62,14 +70,25 @@ describe('the routing proxy', () => {
   });
 
   describe("a site's mode", () => {
-    const modes = createRoutingProxy(
-      async () => table,
-      { previewHost: 'vista-previa.example.test' },
-      { openSites: new Set(['ejemplo-a']) },
-    );
+    /** The proxy over the same site with other settings, as a platform admin sets them (PLAN R135). */
+    const withSite = (settings: { open?: boolean; indexed?: boolean }) =>
+      createRoutingProxy(
+        async () =>
+          buildRoutingTable([
+            {
+              tenant: { ...tenant, ...settings },
+              hostnames: [
+                { hostname: 'ejemplo-a.example.test', isCanonical: true, verified: true },
+              ],
+            },
+          ]),
+        { previewHost: 'vista-previa.example.test' },
+      );
+    const modes = withSite({ open: true });
     /** What the proxy told the page, through Next's request-header override. */
     const told = (response: Response) => ({
       mode: response.headers.get('x-middleware-request-x-aiontheballot-site'),
+      noindex: response.headers.get('x-middleware-request-x-aiontheballot-noindex'),
       root: response.headers.get('x-middleware-request-x-aiontheballot-root'),
       locale: response.headers.get('x-middleware-request-x-aiontheballot-locale'),
       rewrite: new URL(response.headers.get('x-middleware-rewrite') ?? 'http://x/').pathname,
@@ -97,15 +116,27 @@ describe('the routing proxy', () => {
       }
     });
 
-    it('is open for a site OPEN_SITES lists: every page', async () => {
+    it('is open for a site a platform admin opened: every page', async () => {
       const response = await modes(request('ejemplo-a.example.test', '/generales-2026/partidos/x'));
       expect(told(response)).toEqual({
         mode: 'open',
+        noindex: '0',
         root: '',
         locale: 'es',
         rewrite: '/_tenant/ejemplo-a/es/generales-2026/parties/x',
       });
       expect(response.headers.get('x-robots-tag')).toBeNull();
+    });
+
+    it('is never indexed for a site kept out of search engines, open or coming soon, pages and images alike', async () => {
+      for (const open of [true, false]) {
+        const demo = withSite({ open, indexed: false });
+        for (const path of ['/', '/og/x.png']) {
+          const response = await demo(request('ejemplo-a.example.test', path));
+          expect(told(response).noindex, path).toBe('1');
+          expect(response.headers.get('x-robots-tag'), path).toBe('noindex, nofollow');
+        }
+      }
     });
 
     it('is preview on the preview host, by path, never indexed', async () => {
@@ -114,6 +145,7 @@ describe('the routing proxy', () => {
       );
       expect(told(response)).toEqual({
         mode: 'preview',
+        noindex: '1',
         root: '/ejemplo-a',
         locale: 'es',
         rewrite: '/_tenant/ejemplo-a/es/generales-2026',
@@ -127,9 +159,15 @@ describe('the routing proxy', () => {
           'x-aiontheballot-site': 'preview',
           'x-aiontheballot-root': '/otro',
           'x-aiontheballot-locale': 'en',
+          'x-aiontheballot-noindex': '1',
         }),
       );
-      expect(told(response)).toMatchObject({ mode: 'coming-soon', root: '', locale: 'es' });
+      expect(told(response)).toMatchObject({
+        mode: 'coming-soon',
+        noindex: '0',
+        root: '',
+        locale: 'es',
+      });
     });
   });
 

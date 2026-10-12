@@ -1,10 +1,11 @@
+import { buildRoutingTable } from '@aiontheballot/domain/routing';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ANALYTICS_EVENT_PATH, ANALYTICS_SCRIPT_PATH } from './analytics-paths.js';
 import {
   type Analytics,
+  analyticsFrom,
   EVENT_MAX_BYTES,
-  readAnalytics,
   relayEvent,
   SCRIPT_RETRY_MS,
   SCRIPT_TTL_MS,
@@ -72,55 +73,69 @@ const relay = (
   };
 };
 
-describe('readAnalytics', () => {
-  const env = (sites: unknown, url = 'http://plausible.plausible.svc.cluster.local') => ({
-    PLAUSIBLE_URL: url,
-    PLAUSIBLE_SITES: typeof sites === 'string' ? sites : JSON.stringify(sites),
+describe('analyticsFrom', () => {
+  const site = (slug: string, plausibleScript: string | null) => ({
+    id: `id-${slug}`,
+    slug,
+    defaultLocale: 'es',
+    enabledLocales: ['es'],
+    open: true,
+    indexed: true,
+    plausibleScript,
   });
+  const table = buildRoutingTable([
+    {
+      tenant: site('sitio-a', 'pa-Ejemplo-a_1.js'),
+      hostnames: [
+        { hostname: 'sitio-a.example', isCanonical: true, verified: true },
+        { hostname: 'alias-a.example', isCanonical: false, verified: true },
+      ],
+    },
+    // A script but no canonical host (by path on the platform host): nowhere counted.
+    { tenant: site('sitio-b', 'pa-b.js'), hostnames: [] },
+    // A canonical host but no script.
+    {
+      tenant: site('sitio-c', null),
+      hostnames: [{ hostname: 'sitio-c.example', isCanonical: true, verified: true }],
+    },
+  ]);
+  const env = (url = 'http://plausible.plausible.svc.cluster.local') => ({ PLAUSIBLE_URL: url });
 
-  it("reads the upstream and each host's script", () => {
+  it("counts each site with a script on its canonical host, and only there, from the deployment's upstream", () => {
     const warn = vi.fn();
-    expect(
-      readAnalytics(env({ 'sitio-a.example': 'pa-Ejemplo-a_1.js', 'b.example': 'pa-b.js' }), warn),
-    ).toEqual({
+    expect(analyticsFrom(env(), table, warn)).toEqual({
       url: 'http://plausible.plausible.svc.cluster.local',
-      sites: new Map([
-        ['sitio-a.example', 'pa-Ejemplo-a_1.js'],
-        ['b.example', 'pa-b.js'],
-      ]),
+      sites: new Map([['sitio-a.example', 'pa-Ejemplo-a_1.js']]),
     });
-    expect(
-      readAnalytics(env({ 'b.example': 'pa-b.js' }, 'http://plausible.test/'), warn)?.url,
-    ).toBe('http://plausible.test');
-    expect(readAnalytics({}, warn)).toBeUndefined();
+    expect(analyticsFrom(env('http://plausible.test/'), table, warn)?.url).toBe(
+      'http://plausible.test',
+    );
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it('counts nothing when anything is missing or malformed, rather than part of it, and says so', () => {
-    const broken: Record<string, string | undefined>[] = [
-      { PLAUSIBLE_URL: 'http://plausible.test' },
-      { PLAUSIBLE_SITES: '{"b.example":"pa-b.js"}' },
-      env('{'),
-      env([['b.example', 'pa-b.js']]),
-      env(['pa-b.js']),
-      env(null),
-      env({}),
-      env({ 'b.example': 'pa-b.js' }, 'not a url'),
-      env({ 'b.example': 'pa-b.js' }, 'file:///etc/passwd'),
-      env({ 'b.example': 'pa-b.js', 'c.example': '../admin.js' }),
-      env({ 'B.example': 'pa-b.js' }),
-      env({ 'b.example:443': 'pa-b.js' }),
-      env({ 'b.example': 'script.js' }),
-      env({ 'b.example': 'pa-b.js?x=1' }),
-      env({ 'b.example': 7 }),
-    ];
-    for (const value of broken) {
-      const warn = vi.fn();
-      expect(readAnalytics(value, warn), JSON.stringify(value)).toBeUndefined();
-      expect(warn, JSON.stringify(value)).toHaveBeenCalledWith(
-        'PLAUSIBLE_URL or PLAUSIBLE_SITES is missing or malformed: nothing is counted',
-      );
+  it('counts nothing without an upstream or routing data, and says so when a site has a script', () => {
+    const warn = vi.fn();
+    expect(analyticsFrom(env(), undefined, warn)).toBeUndefined();
+    expect(analyticsFrom({}, buildRoutingTable([]), warn)).toBeUndefined();
+    expect(warn).not.toHaveBeenCalled();
+    expect(analyticsFrom({}, table, warn)).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      'A site has a Plausible script but PLAUSIBLE_URL is not set: nothing is counted',
+    );
+    for (const url of ['not a url', 'file:///etc/passwd']) {
+      expect(analyticsFrom(env(url), table, warn), url).toBeUndefined();
     }
+    expect(warn).toHaveBeenCalledWith('PLAUSIBLE_URL is malformed: nothing is counted');
+  });
+
+  it("ignores a script that isn't one, whatever the data says", () => {
+    const odd = buildRoutingTable([
+      {
+        tenant: site('sitio-d', '../admin.js'),
+        hostnames: [{ hostname: 'sitio-d.example', isCanonical: true, verified: true }],
+      },
+    ]);
+    expect(analyticsFrom(env(), odd)?.sites.size).toBe(0);
   });
 });
 

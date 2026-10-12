@@ -15,7 +15,8 @@ const notFound = () =>
 
 /**
  * A site's sitemap (public-site spec §8), at its root only: the home and the always-on pages, and once the site shows
- * its elections, every page of each. Nothing the site doesn't serve in its mode.
+ * its elections, every page of each. Nothing the site doesn't serve in its mode, and none for a site kept out of
+ * search engines.
  */
 export const GET = async (_request: Request, { params }: Context): Promise<Response> => {
   await connection();
@@ -24,7 +25,10 @@ export const GET = async (_request: Request, { params }: Context): Promise<Respo
   if (!isLocale(locale) || page.kind !== 'found' || locale !== page.tenant.defaultLocale) {
     return notFound();
   }
-  const { mode } = await siteContext();
+  const { mode, indexed } = await siteContext();
+  if (!indexed && mode !== 'preview') {
+    return notFound();
+  }
   const { documents, elections } = page.home;
   // Once the site shows its elections, the home is a redirect to the current one, which a sitemap doesn't list.
   const showsElections = mode !== 'coming-soon';

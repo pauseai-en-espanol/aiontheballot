@@ -12,15 +12,8 @@ export const SITE_MODE_HEADER = 'x-aiontheballot-site';
 export const SITE_ROOT_HEADER = 'x-aiontheballot-root';
 /** The page's language, for `<html lang>`. */
 export const SITE_LOCALE_HEADER = 'x-aiontheballot-locale';
-
-/** `OPEN_SITES`: the tenant slugs whose sites are open, comma-separated. Anything else stays coming soon. */
-export const readOpenSites = (value: string | undefined): ReadonlySet<string> =>
-  new Set(
-    (value ?? '')
-      .split(',')
-      .map((slug) => slug.trim())
-      .filter((slug) => slug !== ''),
-  );
+/** `1` when the site's pages are never to be indexed (the preview host, or a site kept out of search engines), else `0`. */
+export const SITE_NOINDEX_HEADER = 'x-aiontheballot-noindex';
 
 /**
  * The app routes a coming-soon site serves, by first segment under its root: the home, the always-on pages (spec §3.3)

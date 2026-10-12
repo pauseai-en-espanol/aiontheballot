@@ -8,8 +8,9 @@ interface Context {
 }
 
 /**
- * A site's robots.txt (public-site spec §8): everything allowed, with its sitemap on the canonical base; on the
- * preview host, nothing, since its pages are never to be indexed.
+ * A site's robots.txt (public-site spec §8): everything allowed, with its sitemap on the canonical base; nothing on
+ * the preview host. A site kept out of search engines allows crawling but names no sitemap: crawlers must fetch its
+ * pages to read their `noindex`, which a disallow would hide from them, leaving indexed pages indexed.
  */
 export const GET = async (_request: Request, { params }: Context): Promise<Response> => {
   await connection();
@@ -18,11 +19,13 @@ export const GET = async (_request: Request, { params }: Context): Promise<Respo
   if (page.kind !== 'found' || locale !== page.tenant.defaultLocale) {
     return new Response('Not found', { status: 404, headers: { 'content-type': 'text/plain' } });
   }
-  const { mode } = await siteContext();
+  const { mode, indexed } = await siteContext();
   const body =
     mode === 'preview'
       ? 'User-agent: *\nDisallow: /\n'
-      : `User-agent: *\nAllow: /\nSitemap: ${page.base}/sitemap.xml\n`;
+      : indexed
+        ? `User-agent: *\nAllow: /\nSitemap: ${page.base}/sitemap.xml\n`
+        : 'User-agent: *\nAllow: /\n';
   return new Response(body, {
     headers: {
       'content-type': 'text/plain; charset=utf-8',

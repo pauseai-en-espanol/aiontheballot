@@ -104,7 +104,9 @@ log makes it visible (T23).
 
 - Migrations revoke everything on schemas, tables, **functions and types** from `PUBLIC`.
 - Default privileges are set so that new functions are not executable by `PUBLIC`, and new types not usable by it.
-- Every grant is explicit.
+- Every grant is explicit. Amended (PLAN R135): a site's public settings, `tenants.site_open`, `search_indexing` and
+  `plausible_script`, are readable by `aiontheballot_web` (with the routing data, for active sites only, as RLS has it)
+  and updatable by `aiontheballot_admin`, where `members_may_change` keeps them a platform admin's.
 - Helper functions live in a `private` schema.
 - `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, the public-cache trigger
   `bump_public_version` (so no runtime role can write `public_versions`), `submit_report`, the signup list's
@@ -434,8 +436,9 @@ Routing is a pure function, `resolve(host, path, query, hostMap, config)`, that 
   hostname data and re-checks the hostname invariants above.
 - The exact mechanics depend on the framework (ADR-0003). In the web app, `proxy.ts` runs `resolve()` on every request
   but build assets, with a routing table built from `GET /public/routing` on the API, which reads it as
-  `aiontheballot_web` (active tenants and their verified hostnames). The table is refreshed every 30 seconds and the
-  last good one kept; with none, the proxy answers 503, except for system paths, so the health probe keeps working.
+  `aiontheballot_web` (active tenants, with their public settings since PLAN R135, and their verified hostnames). The
+  table is refreshed every 30 seconds and the last good one kept; with none, the proxy answers 503, except for system
+  paths, so the health probe keeps working.
 
 ## Threat model (cross-tenant focus)
 

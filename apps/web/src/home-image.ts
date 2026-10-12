@@ -76,7 +76,7 @@ export const warmAllHomeImages = async (): Promise<void> => {
     { isLocale },
     { LINK_PREVIEW },
     { homeCardContent, homeCardHash },
-    { loadRoutingTable, loadTenantPage, openSites },
+    { loadRoutingTable, loadTenantPage },
     { siteIconSource },
   ] = await Promise.all([
     import('@aiontheballot/i18n/messages'),
@@ -93,7 +93,7 @@ export const warmAllHomeImages = async (): Promise<void> => {
     }
     await siteIconSource(slug, page.home);
     for (const locale of enabledLocales.filter(isLocale)) {
-      const card = homeCardContent(page.home, locale, page.base, openSites.has(slug));
+      const card = homeCardContent(page.home, locale, page.base, page.tenant.open);
       await homeImage(slug, locale, LINK_PREVIEW, homeCardHash(card, LINK_PREVIEW), card).catch(
         (error: unknown) => console.error('Could not pre-render a share image', error),
       );

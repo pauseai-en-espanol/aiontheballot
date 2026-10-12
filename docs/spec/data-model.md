@@ -131,6 +131,9 @@ create table app.tenants (
   methodology_kind   app.methodology_kind not null,       -- BRIEF §3 invariant 6: platform_admin only
   active             boolean not null default false,
   live_edits_need_second_approver  boolean not null default false,  -- platform_admin only (ADR-0002 §12)
+  site_open          boolean not null default false,      -- open, or coming soon: platform_admin only (PLAN R135)
+  search_indexing    boolean not null default true,       -- false keeps it out of search engines (a demo's)
+  plausible_script   text check (plausible_script ~ '^pa-[A-Za-z0-9_-]{1,100}\.js$'),  -- counted on its main host
   report_retention_days  int not null check (report_retention_days between 1 and 36500),  -- the operator's (Q7, R102)
   llm_monthly_cap_usd    numeric(10, 2) not null default 0,               -- 0 means LLM assistance is off
   created_at         timestamptz not null default now(),

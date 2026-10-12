@@ -11,6 +11,7 @@ import {
   servedWhileComingSoon,
   SITE_LOCALE_HEADER,
   SITE_MODE_HEADER,
+  SITE_NOINDEX_HEADER,
   SITE_ROOT_HEADER,
   type SiteMode,
 } from './site-mode';
@@ -27,16 +28,14 @@ const plain = (status: number, body: string): NextResponse =>
  * else is a generic 404. Without routing data it answers 503, but still lets system paths (the kubelet's health probe)
  * through. The Host header only selects public content.
  *
- * It also decides what a site shows (public-site spec §2): a site not in `openSites` is coming soon, and serves only
- * its home and always-on pages; the preview host shows every site as open, marked never to be indexed. Pages learn the
- * mode and their root from request headers set here, over whatever a client sent.
+ * It also decides what a site shows (public-site spec §2): a site a platform admin hasn't opened is coming soon, and
+ * serves only its home and always-on pages; the preview host shows every site as open, marked never to be indexed, as
+ * is a site a platform admin keeps out of search engines, wherever it is served (a demo's fictional content; PLAN
+ * R135). Pages learn the mode, their root and whether they may be indexed from request headers set here, over whatever
+ * a client sent.
  */
 export const createRoutingProxy =
-  (
-    routingTable: () => Promise<RoutingTable | undefined>,
-    config: RoutingConfig,
-    { openSites = new Set<string>() }: { openSites?: ReadonlySet<string> } = {},
-  ) =>
+  (routingTable: () => Promise<RoutingTable | undefined>, config: RoutingConfig) =>
   async (request: NextRequest): Promise<NextResponse> => {
     const table = await routingTable();
     // Crawlers read robots.txt only at a host's root, where the preview and platform hosts serve no site.
@@ -71,16 +70,14 @@ export const createRoutingProxy =
         return NextResponse.redirect(resolution.location, 301);
       case 'serve': {
         const { tenant, locale, internalPath, root, preview } = resolution;
-        const mode: SiteMode = preview
-          ? 'preview'
-          : openSites.has(tenant.slug)
-            ? 'open'
-            : 'coming-soon';
+        const mode: SiteMode = preview ? 'preview' : tenant.open ? 'open' : 'coming-soon';
         if (mode === 'coming-soon' && !servedWhileComingSoon(internalPath, tenant.slug, locale)) {
           return plain(404, 'Not found');
         }
+        const noindex = preview || !tenant.indexed;
         const headers = new Headers(request.headers);
         headers.set(SITE_MODE_HEADER, mode);
+        headers.set(SITE_NOINDEX_HEADER, noindex ? '1' : '0');
         headers.set(SITE_ROOT_HEADER, root);
         headers.set(SITE_LOCALE_HEADER, locale);
         // Resolved against the request's own URL, so Next rewrites internally (another origin would make it fetch
@@ -89,7 +86,7 @@ export const createRoutingProxy =
           new URL(`${internalPath}${request.nextUrl.search}`, request.url),
           { request: { headers } },
         );
-        if (preview) {
+        if (noindex) {
           response.headers.set('x-robots-tag', 'noindex, nofollow');
         }
         return response;

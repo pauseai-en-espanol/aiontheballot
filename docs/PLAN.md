@@ -717,13 +717,14 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   count a soft navigation to a missing page, so M3 should turn `autoCapturePageviews` off and send page views from its
   pages. Configuration: `PLAUSIBLE_URL`, Plausible's service inside the cluster, not its public host (the public
   gateway drops `X-Forwarded-For`, so every visitor would be one), and `PLAUSIBLE_SITES`, a JSON object from each
-  tenant host to its site's `pa-….js` script; the Plausible site must be named after the host (the platform host would
-  put every tenant served by path into one site). A malformed configuration, or events naming another site, count
-  nothing and say so in the log, at most once a minute, as do Plausible's failures (5xx, 429, no answer), with nothing
-  of the visitor's. The script runs on our origin, so it is Plausible's code, from our own server, with the page's
-  privileges; the public site has no session or cookie to reach. Unit tests cover the configuration, the relay and the
-  script's caching, an e2e test follows a stand-in script's view to a fake Plausible, and Plausible's real script was
-  checked once to send to the relay with our loader.
+  tenant host to its site's `pa-….js` script (since R135, each site's script in its settings, on its canonical host);
+  the Plausible site must be named after the host (the platform host would put every tenant served by path into one
+  site). A malformed configuration, or events naming another site, count nothing and say so in the log, at most once a
+  minute, as do Plausible's failures (5xx, 429, no answer), with nothing of the visitor's. The script runs on our
+  origin, so it is Plausible's code, from our own server, with the page's privileges; the public site has no session or
+  cookie to reach. Unit tests cover the configuration, the relay and the script's caching, an e2e test follows a
+  stand-in script's view to a fake Plausible, and Plausible's real script was checked once to send to the relay with
+  our loader.
 
 **Sign-in, slices 3b and 3c (M2; editorial workflow A4, ADR-0003 §2):**
 
@@ -1088,17 +1089,17 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   change, though for npm packages pnpm's own 3-day minimum (`pnpm-workspace.yaml`) may still refuse a fix younger
   than that in the lockfile. Lock-file maintenance keeps its own weekly PR (`config:best-practices`), since Renovate
   can't group it with other updates. From the adversarial review. To verify on the next Renovate PR's run.
-- **R121. The public site's spec, written where the plan left it open** ([spec/public-site.md](spec/public-site.md)).
-  A site is _coming soon_ until `OPEN_SITES` (the web app's environment, gitops) lists its slug, the Preview
-  go/no-go's switch, with no schema change; coming soon, it serves only its home and the always-on pages. The preview
-  host, `PREVIEW_HOST`, serves `/{slug}/…` for every tenant as if open, never redirected to a canonical host and never
-  indexed (`X-Robots-Tag` and the robots meta tag); its route belongs on `gateway-private` (a gitops step). The proxy
-  tells pages the mode and their root in request headers it always sets itself, over whatever a client sent. Only
-  live and archived elections are public, so going live shows an election's parties and criteria on the preview host
-  first, while the public addresses stay coming soon. Paths use the words of the tenant's default locale in every
-  locale (`/aviso-legal`, `/en/aviso-legal`), mapped in `resolve()` onto the app's English routes; an English word on
-  a Spanish site is a 404, so a page has one address. Every language's tenant-level words are reserved election slugs
-  (migration `reserved_site_paths`; `RESERVED_ELECTION_SLUGS` follows `SITE_WORDS`).
+- **R121. The public site's spec, written where the plan left it open** ([spec/public-site.md](spec/public-site.md)). A
+  site is _coming soon_ until `OPEN_SITES` (the web app's environment, gitops) lists its slug (since R135, a platform
+  admin's switch in the admin), the Preview go/no-go's switch, then with no schema change; coming soon, it serves only
+  its home and the always-on pages. The preview host, `PREVIEW_HOST`, serves `/{slug}/…` for every tenant as if open,
+  never redirected to a canonical host and never indexed (`X-Robots-Tag` and the robots meta tag); its route belongs on
+  `gateway-private` (a gitops step). The proxy tells pages the mode and their root in request headers it always sets
+  itself, over whatever a client sent. Only live and archived elections are public, so going live shows an election's
+  parties and criteria on the preview host first, while the public addresses stay coming soon. Paths use the words of
+  the tenant's default locale in every locale (`/aviso-legal`, `/en/aviso-legal`), mapped in `resolve()` onto the app's
+  English routes; an English word on a Spanish site is a 404, so a page has one address. Every language's tenant-level
+  words are reserved election slugs (migration `reserved_site_paths`; `RESERVED_ELECTION_SLUGS` follows `SITE_WORDS`).
 - **R122. The signup list (R119), as built** (migration `signups`, ADR-0002 §6, §7 and the data model amended, threat
   T27, then hardened after two adversarial reviews). `app.sign_up` counts and checks the site's daily cap first, for
   every signup alike: 1,000 a UTC day, whatever comes of them, in a per-day counter whose lock also makes a site's
@@ -1249,6 +1250,26 @@ needsDefaultLanguage`), and the admin opens that language's tab. A new version's
   for good), so the chapter could never use that name for anything else. One can still be added later if the chapter
   wants it: a verified, non-canonical `tenant_hostnames` row and a hostname on the web route (the `*.pauseai.es`
   wildcard certificate covers it).
+- **R135. A site's public settings are data, not deployment** (Dani's decision, after reviewing what the app needed
+  from gitops): whether a site is open (replacing R121's `OPEN_SITES`), whether search engines may index it (so a
+  demo's fictional content never reaches one), and its Plausible script (replacing R83's `PLAUSIBLE_SITES`) are three
+  columns of `tenants` (`site_open`, `search_indexing`, `plausible_script`), which a platform admin sets on the site's
+  admin page, each behind its own route and, for opening and indexing, a confirmation. The database keeps them a
+  platform admin's (`members_may_change` lists none of them for country admins) and checks the script's form; the
+  public site reads them with the routing data as `aiontheballot_web` (new column grants, ADR-0002 §6 amended), so a
+  change shows within a minute. A site kept out of search engines answers `noindex, nofollow` on every page and file it
+  serves and in its robots meta tag; its `robots.txt` allows crawling but names no sitemap, so crawlers read the
+  `noindex` (a disallow would leave indexed pages indexed); it has no sitemap and isn't named in the platform host's
+  `robots.txt`. An older API's routing data, without the settings, reads as their defaults, so a rollout never hides a
+  site; Plausible counts a site on its canonical host only, as `PLAUSIBLE_SITES` did in practice. What stays in
+  gitops is what belongs there: secrets, the cluster's facts (registry, gateway, storage, `PLAUSIBLE_URL`), and each
+  address's route and certificate. The demo runbook (R130) now ends in the admin: keep it out of search engines, then
+  open it. Review of the remaining coupling, with Dani: `PLATFORM_NAME` could become data later; the per-hostname
+  route line stays, since a catch-all route on the shared gateway would take every unknown host. After deploy, Dani's
+  steps: copy iaenlasurnas.es's `pa-….js` from the gitops `PLAUSIBLE_SITES` before syncing, enter it on the site's
+  admin page as soon as the new admin is up (counting stops in between), then remove `PLAUSIBLE_SITES` (and any
+  `OPEN_SITES`) from gitops; keep `PLAUSIBLE_URL`. Changed after an adversarial review: the rollout defaults, the
+  robots.txt of a hidden site, the Plausible hint naming the main address, and the tests of opening.
 
 ## Open decisions for Dani
 

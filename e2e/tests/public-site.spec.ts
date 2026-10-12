@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { expectAccessible } from '../axe.js';
 import { get } from '../fetch-by-host.js';
-import { PREVIEW_URL, TENANT_URL } from '../servers.js';
+import { PLATFORM_HOST, PORTS, PREVIEW_URL, TENANT_URL } from '../servers.js';
 
 const es = messages.es;
 /** Tenant ejemplo-a on the preview host, by path (packages/db/seeds/seed.ts: all fictional). */
@@ -200,6 +200,28 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
 });
 
 test.describe('security headers and search engines (public-site spec §7, §8)', () => {
+  test('keep a site out of search engines when a platform admin says so: every response, page and file alike', async ({
+    page,
+  }) => {
+    const platform = `http://${PLATFORM_HOST}:${PORTS.web}`;
+    const site = `${platform}/ejemplo-b`;
+    expect((await get(site)).headers['x-robots-tag']).toBe('noindex, nofollow');
+    // Crawlers may fetch its pages, so they read the noindex; there is no sitemap to send them there.
+    expect((await get(`${site}/robots.txt`)).body.toString('utf8')).toBe(
+      'User-agent: *\nAllow: /\n',
+    );
+    expect((await get(`${site}/sitemap.xml`)).status).toBe(404);
+    // The platform host's own robots.txt doesn't point crawlers at its sitemap either.
+    expect((await get(`${platform}/robots.txt`)).body.toString('utf8')).not.toContain('ejemplo-b');
+    await page.goto(site);
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      'content',
+      'noindex, nofollow',
+    );
+    // Any other site is indexed as before.
+    expect((await get(TENANT_URL)).headers['x-robots-tag']).toBeUndefined();
+  });
+
   test('send the CSP and its companions on pages, images and routes alike', async () => {
     for (const path of ['/', '/aviso-legal', '/favicon.ico', '/sitemap.xml']) {
       const { headers } = await get(`${TENANT_URL}${path}`);

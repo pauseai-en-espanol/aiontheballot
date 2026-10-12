@@ -2,9 +2,9 @@ import type { PublicHome } from '@aiontheballot/domain/public-home';
 
 import { canonicalBase, type RoutingConfig, type TenantRoute } from '@aiontheballot/domain/routing';
 
+import { analyticsFrom } from './analytics';
 import { createHomeLoader } from './home-data';
 import { createRoutingTableLoader } from './routing-table';
-import { readOpenSites } from './site-mode';
 
 /** The platform domain is optional (ADR-0002, hostnames): without it, tenants are reachable only on their own hostnames. */
 export const routingConfig: RoutingConfig = {
@@ -13,8 +13,8 @@ export const routingConfig: RoutingConfig = {
   previewHost: process.env.PREVIEW_HOST || undefined,
 };
 
-/** The tenants whose sites are open (`OPEN_SITES`); every other site is coming soon. */
-export const openSites = readOpenSites(process.env.OPEN_SITES);
+/** What is counted, and where (PLAN R135): `PLAUSIBLE_URL`, and each site's script from the routing data. */
+export const loadAnalytics = async () => analyticsFrom(process.env, await loadRoutingTable());
 
 export const loadRoutingTable = createRoutingTableLoader({
   apiUrl: process.env.API_URL,

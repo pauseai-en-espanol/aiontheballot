@@ -3901,9 +3901,13 @@ CREATE TABLE app.tenants (
     report_retention_days integer NOT NULL,
     llm_monthly_cap_usd numeric(10,2) DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    site_open boolean DEFAULT false NOT NULL,
+    search_indexing boolean DEFAULT true NOT NULL,
+    plausible_script text,
     CONSTRAINT tenants_check CHECK (((default_locale)::text = ANY ((enabled_locales)::text[]))),
     CONSTRAINT tenants_country_code_check CHECK ((country_code ~ '^[A-Z]{2}$'::text)),
     CONSTRAINT tenants_llm_monthly_cap_usd_check CHECK ((llm_monthly_cap_usd >= (0)::numeric)),
+    CONSTRAINT tenants_plausible_script_check CHECK ((plausible_script ~ '^pa-[A-Za-z0-9_-]{1,100}\.js$'::text)),
     CONSTRAINT tenants_report_retention_days_check CHECK ((report_retention_days > 0)),
     CONSTRAINT tenants_report_retention_days_max CHECK ((report_retention_days <= 36500)),
     CONSTRAINT theme_is_colours CHECK (
@@ -11115,6 +11119,30 @@ GRANT INSERT(llm_monthly_cap_usd),UPDATE(llm_monthly_cap_usd) ON TABLE app.tenan
 --
 
 GRANT SELECT(created_at) ON TABLE app.tenants TO aiontheballot_web;
+
+
+--
+-- Name: COLUMN tenants.site_open; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(site_open) ON TABLE app.tenants TO aiontheballot_admin;
+GRANT SELECT(site_open) ON TABLE app.tenants TO aiontheballot_web;
+
+
+--
+-- Name: COLUMN tenants.search_indexing; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(search_indexing) ON TABLE app.tenants TO aiontheballot_admin;
+GRANT SELECT(search_indexing) ON TABLE app.tenants TO aiontheballot_web;
+
+
+--
+-- Name: COLUMN tenants.plausible_script; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(plausible_script) ON TABLE app.tenants TO aiontheballot_admin;
+GRANT SELECT(plausible_script) ON TABLE app.tenants TO aiontheballot_web;
 
 
 --

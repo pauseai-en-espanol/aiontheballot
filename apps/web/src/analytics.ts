@@ -1,4 +1,4 @@
-import { normalizeHost } from '@aiontheballot/domain/routing';
+import { normalizeHost, type RoutingTable } from '@aiontheballot/domain/routing';
 import { readLimited } from '@aiontheballot/observability/relay';
 import { BlockList, isIP } from 'node:net';
 
@@ -12,7 +12,7 @@ import { BlockList, isIP } from 'node:net';
 export interface Analytics {
   /** Plausible's base URL inside the cluster, e.g. `http://plausible.plausible.svc.cluster.local`. */
   url: string;
-  /** Each tenant host's Plausible script (`pa-….js`, from the site's installation snippet). */
+  /** Each site's Plausible script (`pa-….js`, from the site's installation snippet), by its canonical host. */
   sites: ReadonlyMap<string, string>;
 }
 
@@ -31,59 +31,48 @@ export const throttledWarn: Warn = (message) => {
 };
 
 const SCRIPT_FILE = /^pa-[\w-]+\.js$/;
-const HOSTNAME = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$/;
-
-const parseAnalytics = (url: string, raw: string): Analytics | undefined => {
-  let base: URL;
-  let parsed: unknown;
-  try {
-    base = new URL(url);
-    parsed = JSON.parse(raw);
-  } catch {
-    return undefined;
-  }
-  if (
-    (base.protocol !== 'http:' && base.protocol !== 'https:') ||
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed)
-  ) {
-    return undefined;
-  }
-  const entries = Object.entries(parsed);
-  if (
-    entries.length === 0 ||
-    !entries.every(
-      ([host, file]) => HOSTNAME.test(host) && typeof file === 'string' && SCRIPT_FILE.test(file),
-    )
-  ) {
-    return undefined;
-  }
-  return { url: base.href.replace(/\/$/, ''), sites: new Map(entries as [string, string][]) };
-};
-
-let memo: { key: string; value: Analytics | undefined } | undefined;
 
 /**
- * The analytics configuration from the environment: `PLAUSIBLE_URL`, and `PLAUSIBLE_SITES` as a JSON object from
- * hostname to script file. Anything malformed counts nothing, rather than half of it, and says so in the log.
+ * The analytics configuration (PLAN R83, R135): Plausible's base URL inside the cluster, `PLAUSIBLE_URL`, the one
+ * setting the deployment gives; and each site's script, which a platform admin sets on the site's page, by the site's
+ * canonical host, the only one where it is counted (an alias redirects there; the preview and platform hosts are never
+ * counted). Without the URL or routing data nothing is counted; a malformed URL says so in the log.
  */
-export const readAnalytics = (
+export const analyticsFrom = (
   env: Record<string, string | undefined>,
+  table: RoutingTable | undefined,
   warn: Warn = throttledWarn,
 ): Analytics | undefined => {
-  const { PLAUSIBLE_URL: url, PLAUSIBLE_SITES: raw } = env;
-  if (!url && !raw) {
+  const url = env.PLAUSIBLE_URL;
+  if (!table) {
     return undefined;
   }
-  const key = `${url ?? ''}\n${raw ?? ''}`;
-  if (memo?.key !== key) {
-    memo = { key, value: url && raw ? parseAnalytics(url, raw) : undefined };
+  if (!url) {
+    if ([...table.tenantsBySlug.values()].some((tenant) => tenant.plausibleScript)) {
+      warn('A site has a Plausible script but PLAUSIBLE_URL is not set: nothing is counted');
+    }
+    return undefined;
   }
-  if (!memo.value) {
-    warn('PLAUSIBLE_URL or PLAUSIBLE_SITES is missing or malformed: nothing is counted');
+  let base: URL | undefined;
+  try {
+    base = new URL(url);
+  } catch {
+    base = undefined;
   }
-  return memo.value;
+  if (!base || (base.protocol !== 'http:' && base.protocol !== 'https:')) {
+    warn('PLAUSIBLE_URL is malformed: nothing is counted');
+    return undefined;
+  }
+  const sites = new Map<string, string>();
+  for (const tenant of table.tenantsBySlug.values()) {
+    const host = table.canonicalHosts.get(tenant.id);
+    const file = tenant.plausibleScript;
+    // The database checks the file's form too; this keeps anything else out of the upstream path.
+    if (host && file && SCRIPT_FILE.test(file)) {
+      sites.set(host, file);
+    }
+  }
+  return { url: base.href.replace(/\/$/, ''), sites };
 };
 
 /**
