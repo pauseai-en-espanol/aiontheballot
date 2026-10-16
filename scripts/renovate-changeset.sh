@@ -9,7 +9,11 @@ if pnpm release:check > /dev/null 2>&1 && scripts/check-deployables-released.sh 
   echo "No changeset needed: one exists and releases every changed deployable, or the PR changes no package"
   exit 0
 fi
-paths=$(git diff --name-only "$(git merge-base "$base" HEAD)" HEAD | grep -E '^(apps/[^/]+|packages/[^/]+|db)/' |
+if ! fork=$(git merge-base "$base" HEAD); then
+  echo "$base and HEAD share no history, so the packages the PR touches can't be found" >&2
+  exit 1
+fi
+paths=$(git diff --name-only "$fork" HEAD | grep -E '^(apps/[^/]+|packages/[^/]+|db)/' |
   sed -E 's#^(apps/[^/]+|packages/[^/]+|db)/.*#\1#' | sort -u || true)
 names=$(
   {

@@ -12,7 +12,12 @@ if ! git rev-parse --verify --quiet "$base^{commit}" > /dev/null; then
   echo "Base $base isn't in this clone (a new branch or a force push?), so migrations can't be checked" >&2
   exit 1
 fi
-changed=$(git diff --name-status --no-renames "$(git merge-base "$base" HEAD)" HEAD -- db/migrations | grep -v '^A' || true)
+# A history that shares no commit with the base (restarted, PLAN R210) has nothing to compare: fail rather than pass.
+if ! fork=$(git merge-base "$base" HEAD); then
+  echo "$base and HEAD share no history, so migrations can't be checked" >&2
+  exit 1
+fi
+changed=$(git diff --name-status --no-renames "$fork" HEAD -- db/migrations | grep -v '^A' || true)
 if [ -n "$changed" ]; then
   echo "Merged migrations must not change. Add a new migration instead:" >&2
   echo "$changed" >&2

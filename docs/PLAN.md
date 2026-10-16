@@ -3032,6 +3032,25 @@ private.file_sweep_list()`, both to `aiontheballot_sweeper`), then the secret's 
   pass, when it finds no list. The adversarial review found the worktree gap and loose wording, both fixed; and, if
   the secret is ever set, a force-push to `main` would fail the CI step on the missing base (left as it is).
 
+- **R210. The public history restarts from the released tree.** Dani approved restarting this repository's history,
+  whose older commits predate R205. One root commit holds exactly the tree that was tested, released and running; it
+  replaced `main` with a lease on the old tip, and the operator keeps a copy of the old history. That one push skipped
+  the pre-push hook and CI (`[skip ci]`), whose changeset and release checks compare with the previous tip, which a
+  restarted history shares no commit with; the tree had passed `pnpm verify`, and the private-terms check passed on
+  the root commit with the list required. The release tags (markers only: the release reads versions from the
+  umbrella chart) were deleted, not recreated, and the Actions caches cleared; Argo CD synced the root with nothing to
+  change. Left to the operator: deleting the old workflow runs, and asking GitHub Support to purge the unreachable
+  commits, their cached views, commit search and the closed pull requests' refs. The changelogs' short SHAs and the
+  chart's image tags name commits of the old history and stay as labels. The release now running has no tag commit
+  to revert, so rolling it back means setting the previous image tags by hand (incidents runbook §3); later releases
+  revert as before. An old clone must be cloned again: `git pull --rebase` would replay the old history onto the new.
+  Fixed: `scripts/check-migrations-append-only.sh` passed without comparing anything when the base shares no history
+  with HEAD, and `scripts/renovate-changeset.sh` went on without the PR's paths; both now fail. Decided (low impact):
+  the remarks on the deployment's shape that R205 weighed and kept (chart defaults, the error tracker as an
+  integration, the restorable-backup window the sweep needs, one volume shared by replicas) stay. The adversarial
+  review found the caches, commit search, the pull requests' refs, the second script and the disabled branch ruleset;
+  all handled as above, the ruleset left to Dani.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,
