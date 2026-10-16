@@ -1,0 +1,17 @@
+name: Install dependencies
+description: Install pnpm dependencies from the lockfile
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: |
+        # The self-hosted runner may provide a persistent pnpm store (PNPM_STORE_DIR, set by the runner); pnpm doesn't
+        # read that variable, so it is named here. Without it (a
+        # GitHub-hosted run), or if it can't be written, pnpm's own store in the workspace is used, downloaded afresh.
+        store=()
+        if [ -n "${PNPM_STORE_DIR:-}" ] && [ -d "$PNPM_STORE_DIR" ] && [ -w "$PNPM_STORE_DIR" ]; then
+          store=(--store-dir "$PNPM_STORE_DIR")
+          echo "Using the persistent pnpm store at $PNPM_STORE_DIR"
+        fi
+        pnpm install --frozen-lockfile --prefer-offline "${store[@]}"

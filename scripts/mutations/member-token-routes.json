@@ -1,0 +1,124 @@
+[
+  {
+    "name": "a token reaches any route",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      if (request.headers.authorization !== undefined && !tokenMayReach(request)) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a session write without the admin's Origin",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "        actor.tokenId === undefined &&\n        request.method !== 'GET' &&\n        request.headers.origin !== adminOrigin\n",
+    "new": "        false\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a token held to the browser's Origin",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "        actor.tokenId === undefined &&\n        request.method !== 'GET' &&\n        request.headers.origin !== adminOrigin\n",
+    "new": "        request.method !== 'GET' &&\n        request.headers.origin !== adminOrigin\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a token beside a cookie",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "          if (!tokens || bearer === '' || request.headers.cookie !== undefined) {",
+    "new": "          if (!tokens || bearer === '') {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a token mints tokens",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "      if (request.headers.authorization !== undefined) {\n        return undefined;\n      }\n      const found = await findSession(request);",
+    "new": "      const found = await findSession(request);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "minted without the admin's Origin",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "        if (request.headers.origin !== adminOrigin) {\n          return reply.code(403).send({ error: 'forbidden' });\n        }\n        if (!allowMint",
+    "new": "        if (!allowMint",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a revoked token still stands",
+    "file": "apps/api/src/auth/member-tokens.ts",
+    "old": "        WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND t.expires_at > now()",
+    "new": "        WHERE t.token_hash = $1 AND t.expires_at > now()",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "more tokens than a member keeps",
+    "file": "apps/api/src/auth/member-tokens.ts",
+    "old": "      if ((counted[0]?.active ?? 0) >= MAX_ACTIVE) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a blank name",
+    "file": "apps/api/src/auth/member-tokens.ts",
+    "old": "    if (trimmed === '' || trimmed.length > MAX_NAME) {",
+    "new": "    if (trimmed.length > MAX_NAME) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "last use never recorded",
+    "file": "apps/api/src/auth/member-tokens.ts",
+    "old": "    if (found.stale) {",
+    "new": "    if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a token applies a change at once",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            if (request.body.apply && actor.tokenId !== undefined) {",
+    "new": "            if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a token's HEAD refused",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "    `${request.method === 'HEAD' ? 'GET' : request.method} ${request.routeOptions.url ?? ''}`,",
+    "new": "    `${request.method} ${request.routeOptions.url ?? ''}`,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "routes matched on the path asked for, not the pattern",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "    `${request.method === 'HEAD' ? 'GET' : request.method} ${request.routeOptions.url ?? ''}`,",
+    "new": "    `${request.method === 'HEAD' ? 'GET' : request.method} ${request.url}`,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the token never reaches the database",
+    "file": "packages/db/src/actor.ts",
+    "old": "                     set_config('app.token_id', ${actor.tokenId ?? ''}, true)`",
+    "new": "                     set_config('app.token_id', '', true)`",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api",
+    "before": "pnpm --filter @aiontheballot/db build",
+    "after": "pnpm --filter @aiontheballot/db build"
+  },
+  {
+    "name": "the scheme's case matters",
+    "file": "apps/api/src/auth/session.ts",
+    "old": "  const match = /^bearer (\\S+)$/i.exec(header);",
+    "new": "  const match = /^Bearer (\\S+)$/.exec(header);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  }
+]

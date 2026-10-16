@@ -1,0 +1,101 @@
+[
+  {
+    "name": "migration: a contributor of the cell may attest its quotes",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "        WHEN src.require_second_reviewer\n             AND ((attesting AND TG_OP = 'UPDATE'\n",
+    "new": "        WHEN false\n             AND ((attesting AND TG_OP = 'UPDATE'\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: contributors are refused even when no second reviewer is required",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "        WHEN src.require_second_reviewer\n             AND ((attesting AND TG_OP = 'UPDATE'\n",
+    "new": "        WHEN true\n             AND ((attesting AND TG_OP = 'UPDATE'\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: an editor may rewrite a quote and attest it in one statement",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "             AND ((attesting AND TG_OP = 'UPDATE'\n                   AND (to_jsonb(NEW) - not_content) IS DISTINCT FROM (to_jsonb(OLD) - not_content))\n",
+    "new": "             AND ((false)\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the trail's contributors aren't counted",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "                        WHERE c.assessment_id = NEW.assessment_id\n                       UNION ALL\n",
+    "new": "                        WHERE false\n                       UNION ALL\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a contributor of any generation is refused",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": " AND a.generation = c.generation",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: any contributor of the cell keeps everyone from attesting",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "                  OR NEW.attested_by IN (\n",
+    "new": "                  OR EXISTS (\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: only attesting is checked, so an attester who edits the draft later keeps the attestation",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "                  OR NEW.attested_by IN (\n",
+    "new": "                  OR attesting AND NEW.attested_by IN (\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: uploaders of a source's copy aren't counted",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "                                        WHERE s.file_origin = 'uploaded'\n",
+    "new": "                                        WHERE false\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: copies of checked documents aren't counted",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "                                                       UNION ALL\n                                                       SELECT d.source_document_id FROM app.draft_checked_documents d\n                                                        WHERE d.assessment_id = NEW.assessment_id)\n",
+    "new": ")\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: uploaders of attestation files aren't counted",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "                                       UNION ALL\n                                       SELECT q.attestation_file_id FROM app.draft_evidence q\n                                        WHERE q.assessment_id = NEW.assessment_id)))\n",
+    "new": ")))\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a contributor's attestation is dropped silently instead of refused",
+    "file": "db/migrations/20261013101930_attesters_not_contributors.sql",
+    "old": "      ELSIF lapsed = 'contributor' AND attesting THEN\n",
+    "new": "      ELSIF false THEN\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  }
+]

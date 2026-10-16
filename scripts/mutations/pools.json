@@ -1,0 +1,10 @@
+[
+  {
+    "name": "db: a lost idle connection ends the process",
+    "file": "packages/db/src/pool.ts",
+    "old": "  pool.on('error', (error: Error & { code?: unknown }) => {",
+    "new": "  pool.once('never', (error: Error & { code?: unknown }) => {",
+    "cmd": "npx vitest run src/pool.spec.ts",
+    "cwd": "packages/db"
+  }
+]

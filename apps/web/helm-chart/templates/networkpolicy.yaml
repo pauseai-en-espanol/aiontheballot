@@ -1,0 +1,58 @@
+{{- $policy := .Values.networkPolicy | default dict }}
+{{- if $policy.enabled }}
+{{- /* An empty list or map is falsy: on with no gateway, or a gateway with no labels, would shut every visitor out
+     (Cilium drops, the pods stay Ready), or let every pod of a namespace in. Refuse to render either. */}}
+{{- if not $policy.gateways }}
+{{- fail "networkPolicy.gateways must list the gateways that bring visitors: on without one, nobody reaches the site" }}
+{{- end }}
+{{- range $policy.gateways }}
+{{- if or (not .namespace) (not .podLabels) }}
+{{- fail "networkPolicy.gateways[] needs a namespace and podLabels: without labels it would admit every pod there" }}
+{{- end }}
+{{- end }}
+# Who may open a connection to the public site's pods (PLAN R161): the gateways' Envoy pods, which bring every visitor,
+# the API's own pods, which tell each replica what changed (PLAN R151, through the headless Service), and, with the
+# preview on, the admin's pods, which fetch it (ADR-0005). Nothing else in the cluster: the site holds no secret, but
+# its internal paths (/_internal/revalidate) trust where a request comes from, and a pod that is none of these has no
+# reason to reach it. The admin's pods could reach those paths too: at most a refetch, as the API's. Ingress only: what the site reaches (the API, Plausible,
+# error tracking) is unchanged. The kubelet's probes come from the node, which Cilium always admits (`allow-localhost`),
+# as the worker's own policy already relies on.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "aiontheballot-web.fullname" . }}
+  labels:
+    {{- include "aiontheballot-web.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "aiontheballot-web.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- range $gateway := $policy.gateways }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $gateway.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $gateway.podLabels | nindent 14 }}
+        {{- end }}
+        # The API's pods, in this namespace: not its worker's or its jobs', whose names differ. The name is the API
+        # chart's nameOverride in the umbrella (helm-charts/aiontheballot/values.yaml): rename one, rename both, or
+        # every replica stops hearing about changes until its minute's refresh (CI checks they match).
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/name: {{ $policy.apiName | default "api" }}
+        {{- if .Values.preview.enabled }}
+        # The admin's pods, which fetch a site's preview inside the cluster (ADR-0005), with the shared secret.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/name: {{ $policy.adminName | default "admin" }}
+        {{- end }}
+      ports:
+        - port: {{ .Values.service.port }}
+          protocol: TCP
+{{- end }}

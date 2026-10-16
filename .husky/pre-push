@@ -1,0 +1,7 @@
+if ! pnpm release:check; then
+  echo "⚠️  No changeset detected, but they are expected — please run 'pnpm release:note'"
+  exit 1
+fi
+scripts/check-deployables-released.sh origin/main
+# The operator's infrastructure stays out of this public repository (PLAN R205): the terms come from .env.
+scripts/check-private-terms.sh origin/main

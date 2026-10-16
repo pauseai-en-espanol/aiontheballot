@@ -1,0 +1,81 @@
+{{- if and .Values.fileSweep.databaseUrlSecret.name .Values.persistence.enabled }}
+# The scheduled sweep of orphaned bytes (PLAN R117, R141; ADR-0004 §5): `sweep-files --from-database --delete`, which
+# deletes the bytes no row has named for the grace period, as R75's manual sweep does, with all of its refusals. A job
+# from the API's image, not the worker (R116), with its own login, aiontheballot_sweeper, whose one permission is the
+# list of named files; it mounts the file volume as the API does. Rendered once gitops names the login's secret.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "aiontheballot-api.fullname" . }}-file-sweep
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: file-sweep
+spec:
+  schedule: {{ .Values.fileSweep.schedule | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  # A run missed by more than this waits for the next one: bytes wait months before they go anyway.
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # Never retried at once: a refusal (a list from another database, too much to delete) needs a person.
+      backoffLimit: 0
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          # Not the API's selector labels: the API's Service must never send requests to this pod.
+          labels:
+            app.kubernetes.io/name: {{ include "aiontheballot-api.name" . }}-file-sweep
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/part-of: aiontheballot
+          annotations:
+            # A file-system backup of pod volumes (the annotation is Velero's) skips this scratch volume.
+            backup.velero.io/backup-volumes-excludes: tmp
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          # The API's, fsGroup included: it moves and deletes files on the volume, and writes its ledger there.
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: file-sweep
+              image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - node
+                - dist/sweep-files.js
+                - --from-database
+                - --delete
+                - --grace-days
+                - {{ .Values.fileSweep.graceDays | quote }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              env:
+                # Where the API keeps the bytes on the volume (deployment.yaml).
+                - name: FILES_ROOT
+                  value: {{ printf "%s/files" .Values.persistence.mountPath | quote }}
+                - name: SWEEPER_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.fileSweep.databaseUrlSecret.name }}
+                      key: {{ .Values.fileSweep.databaseUrlSecret.key }}
+              {{- with .Values.fileSweep.envFrom }}
+              envFrom:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              resources:
+                {{- toYaml .Values.fileSweep.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+                - name: files
+                  mountPath: {{ .Values.persistence.mountPath }}
+          volumes:
+            - name: tmp
+              emptyDir: {}
+            - name: files
+              persistentVolumeClaim:
+                claimName: {{ include "aiontheballot-api.fullname" . }}-files
+{{- end }}

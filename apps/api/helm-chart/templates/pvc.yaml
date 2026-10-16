@@ -1,0 +1,21 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "aiontheballot-api.fullname" . }}-files
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+  annotations:
+    # It holds data no database backup covers: never deleted with the release, nor pruned or deleted by Argo CD.
+    helm.sh/resource-policy: keep
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+    # The local-path provisioner reads this once, when it creates the volume (values.yaml).
+    volumeType: {{ .Values.persistence.volumeType | quote }}
+spec:
+  # ReadWriteOnce is per node: every replica on the node mounts it.
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ required "persistence.storageClass is required" .Values.persistence.storageClass | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

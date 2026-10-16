@@ -1,0 +1,83 @@
+[
+  {
+    "name": "migration: anyone may execute the list",
+    "file": "db/migrations/20261012021849_file_sweep_list.sql",
+    "old": "REVOKE ALL ON FUNCTION private.file_sweep_list() FROM PUBLIC;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sweep-list.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "equivalent": "the baseline migration revokes EXECUTE on new functions from PUBLIC by default; the REVOKE says it again"
+  },
+  {
+    "name": "migration: the list runs as its caller",
+    "file": "db/migrations/20261012021849_file_sweep_list.sql",
+    "old": "LANGUAGE sql STABLE SECURITY DEFINER",
+    "new": "LANGUAGE sql STABLE",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sweep-list.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: search_path not pinned",
+    "file": "db/migrations/20261012021849_file_sweep_list.sql",
+    "old": "  SET search_path = ''\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sweep-list.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the admin may read the list too",
+    "file": "db/migrations/20261012021849_file_sweep_list.sql",
+    "old": "    GRANT EXECUTE ON FUNCTION private.file_sweep_list() TO aiontheballot_sweeper;\n",
+    "new": "    GRANT EXECUTE ON FUNCTION private.file_sweep_list() TO aiontheballot_sweeper;\n    GRANT EXECUTE ON FUNCTION private.file_sweep_list() TO aiontheballot_admin;\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sweep-list.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a list missing forced rows still trusted",
+    "file": "db/migrations/20261012021849_file_sweep_list.sql",
+    "old": "AND (c.relforcerowsecurity",
+    "new": "AND (false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sweep-list.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the sweeper may read app's tables",
+    "file": "db/migrations/20261012021849_file_sweep_list.sql",
+    "old": "    GRANT USAGE ON SCHEMA private TO aiontheballot_sweeper;\n",
+    "new": "    GRANT USAGE ON SCHEMA private TO aiontheballot_sweeper;\n    GRANT USAGE ON SCHEMA app TO aiontheballot_sweeper;\n    GRANT SELECT ON app.files TO aiontheballot_sweeper;\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sweep-list.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "sweep: --from-database reads standard input",
+    "file": "apps/api/src/sweep-files.ts",
+    "old": "  if (fromDatabase) {\n    const connectionString",
+    "new": "  if (false) {\n    const connectionString",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sweep-from-database.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "migration: a table owned by another role still trusted",
+    "file": "db/migrations/20261012021849_file_sweep_list.sql",
+    "old": "                                OR c.relowner <> (SELECT r.oid FROM pg_catalog.pg_roles r WHERE r.rolname = current_user))))",
+    "new": "                                OR false)))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sweep-list.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a catalog read without its schema",
+    "file": "db/migrations/20261012021849_file_sweep_list.sql",
+    "old": "FROM pg_catalog.pg_database WHERE",
+    "new": "FROM pg_database WHERE",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sweep-list.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  }
+]

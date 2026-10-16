@@ -1,0 +1,174 @@
+[
+  {
+    "name": "changes: any field of a target taken",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "!allowed.update.includes(body.field)",
+    "new": "false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: an election added",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  if (!allowed.add) {\n    throw new Refusal(400, 'invalid');",
+    "new": "  if (false) {\n    throw new Refusal(400, 'invalid');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: an apply that wasn't approved kept",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            if (\n              request.body.apply &&",
+    "new": "            if (\n              false &&",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: an addition placed beside one still waiting",
+    "file": "apps/api/src/admin/changes.ts",
+    "old": "             (SELECT max((proposed_value ->> 'display_order')::int) FROM app.change_requests",
+    "new": "             (SELECT NULL::int FROM app.change_requests",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: no public note needed",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  const publicNote = publishable(requiredLocalized(body.publicNote, access), access, true);",
+    "new": "  const publicNote = body.publicNote;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: reviewers approve",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "(['country_admin'] as const)",
+    "new": "(['reviewer', 'country_admin'] as const)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "a reviewer can't write structure, so the database refuses the approval it would apply (R24)"
+  },
+  {
+    "name": "changes: a decided request decided again",
+    "file": "apps/api/src/admin/changes.ts",
+    "old": "  if (found.state !== 'pending') {\n    return 'decided';\n  }",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "the change rules refuse to change a decided request (restrict_violation, 409 too)"
+  },
+  {
+    "name": "changes: a decided request withdrawn",
+    "file": "apps/api/src/admin/changes.ts",
+    "old": "      .where('state', '=', 'pending')\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "the delete policy admits pending requests only"
+  },
+  {
+    "name": "changes: an editor who is also a reviewer applies",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "if (request.body.apply && !holds(access, 'country_admin')) {",
+    "new": "if (false) {",
+    "equivalent": "the change rules refuse the approval too (migration change_request_approvers), as 403",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: a public text without the default language",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "    return publishable(requiredLocalized(value as Record<string, string>, access), access, true);",
+    "new": "    return requiredLocalized(value as Record<string, string>, access);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: a criterion added without its short title",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  criterion: ['slug', 'title', 'short_title', 'description'],",
+    "new": "  criterion: ['slug', 'title', 'description'],",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: a day past JavaScript's taken",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  if (value !== null && (typeof value !== 'string' || !DAY_PATTERN.test(value))) {",
+    "new": "  if (value !== null && typeof value !== 'string') {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: territory codes nested",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "    value.some((code) => typeof code !== 'string' || lengthOf(code) > 10)",
+    "new": "    value.some((code) => typeof code === 'number')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: a blank reviewer's name",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "    if (trimmed === '' && !blank) {",
+    "new": "    if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: a column left out of an addition",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  if ((NEEDED_TO_ADD[body.targetKind] ?? []).some((column) => !Object.hasOwn(added, column))) {",
+    "new": "  if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "migration: anyone who decides approves",
+    "file": "db/migrations/20261012033156_change_request_approvers.sql",
+    "old": "      IF NOT (NEW.tenant_id IN (SELECT private.my_tenants(VARIADIC ARRAY['country_admin']::app.tenant_role[]))\n              OR private.is_platform_admin()) THEN",
+    "new": "      IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-control.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: approvals of one target race",
+    "file": "db/migrations/20261012033156_change_request_approvers.sql",
+    "old": "        EXECUTE find_target || ' FOR NO KEY UPDATE OF x' INTO target USING OLD.target_id, OLD.election_id;",
+    "new": "        NULL;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-control.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the target locked more than its write",
+    "file": "db/migrations/20261012033156_change_request_approvers.sql",
+    "old": "find_target || ' FOR NO KEY UPDATE OF x'",
+    "new": "find_target || ' FOR UPDATE OF x'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-control.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "changes: any colour taken",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "    if (!shape.test(taken)) {",
+    "new": "    if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: a territory outside the site's country",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "!TERRITORY.test(code) || !code.startsWith(`${access.countryCode}-`)",
+    "new": "!TERRITORY.test(code)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "changes: no source kind at all",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  if (value.length === 0) {\n    throw new Refusal(422, 'incomplete', 'methodologies_check1');",
+    "new": "  if (false) {\n    throw new Refusal(422, 'incomplete', 'methodologies_check1');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts",
+    "cwd": "apps/api"
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "name": "reference: a template drawn differently goes unnoticed",
+    "file": "packages/og/src/coming-soon.ts",
+    "old": "        fontSize: l.label,\n        letterSpacing: 2,",
+    "new": "        fontSize: l.label,\n        letterSpacing: 6,",
+    "cmd": "npx vitest run src/references.spec.ts",
+    "cwd": "packages/og"
+  },
+  {
+    "name": "fingerprint: the pictures' bytes left out",
+    "file": "packages/og/src/fingerprint.ts",
+    "old": "    digest.update(`${id}\\0${png.byteLength}\\0`).update(png);",
+    "new": "    digest.update(`${id}\\0`);",
+    "cmd": "npx vitest run src/fingerprint.spec.ts",
+    "cwd": "packages/og"
+  },
+  {
+    "name": "fingerprint: a probe's sizes skipped",
+    "file": "packages/og/src/fingerprint.ts",
+    "old": "    for (const size of SIZES) {",
+    "new": "    for (const size of SIZES.slice(0, 1)) {",
+    "cmd": "npx vitest run src/fingerprint.spec.ts",
+    "cwd": "packages/og"
+  },
+  {
+    "name": "cardHash: the fingerprint left out of the URL",
+    "file": "packages/og/src/hash.ts",
+    "old": "    .update(JSON.stringify([fingerprint, template, size, data]))",
+    "new": "    .update(JSON.stringify([template, size, data]))",
+    "cmd": "npx vitest run src/hash.spec.ts",
+    "cwd": "packages/og"
+  },
+  {
+    "name": "cardHash: a template without a fingerprint hashed anyway",
+    "file": "packages/og/src/hash.ts",
+    "old": "  if (!fingerprint) {",
+    "new": "  if (false) {",
+    "cmd": "npx vitest run src/hash.spec.ts",
+    "cwd": "packages/og"
+  }
+]

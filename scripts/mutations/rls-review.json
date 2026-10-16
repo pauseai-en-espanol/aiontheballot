@@ -1,0 +1,93 @@
+[
+  {
+    "name": "migration: an editor's copy may be called fetched",
+    "file": "db/migrations/20261012175549_fetched_copies_from_jobs_only.sql",
+    "old": "    IF NEW.file_origin = 'fetched' AND current_user <> 'aiontheballot_worker'\n",
+    "new": "    IF false AND NEW.file_origin = 'fetched' AND current_user <> 'aiontheballot_worker'\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a copy may be called fetched once it is stored, by an update",
+    "file": "db/migrations/20261012175549_fetched_copies_from_jobs_only.sql",
+    "old": "       AND (TG_OP = 'INSERT' OR OLD.file_origin IS DISTINCT FROM 'fetched') THEN",
+    "new": "       AND TG_OP = 'INSERT' THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the worker can't store a fetched copy either",
+    "file": "db/migrations/20261012175549_fetched_copies_from_jobs_only.sql",
+    "old": "current_user <> 'aiontheballot_worker'",
+    "new": "current_user <> 'nobody'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/jobs.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a member adds themselves as a contributor directly",
+    "file": "db/migrations/20261012175550_contributors_from_the_trail_only.sql",
+    "old": "  WITH CHECK (pg_catalog.pg_trigger_depth() > 0\n              AND (tenant_id",
+    "new": "  WITH CHECK ((tenant_id",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts tests/rls/matrix.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the trail can't add its writer",
+    "file": "db/migrations/20261012175550_contributors_from_the_trail_only.sql",
+    "old": "pg_catalog.pg_trigger_depth() > 0",
+    "new": "pg_catalog.pg_trigger_depth() > 9",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts tests/workflow.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a trigger may add someone else as a contributor",
+    "file": "db/migrations/20261012175550_contributors_from_the_trail_only.sql",
+    "old": "              AND user_id = private.current_user_id());",
+    "new": "              AND true);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a trigger may add a contributor in a site not the writer's",
+    "file": "db/migrations/20261012175550_contributors_from_the_trail_only.sql",
+    "old": "              AND (tenant_id IN (SELECT private.my_tenants('country_admin', 'editor', 'reviewer'))\n                   OR (SELECT private.is_platform_admin()))\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "equivalent": "private.contributor_rules refuses, as insufficient privilege, a cell the writer can't see, which a cell of a site not theirs is"
+  },
+  {
+    "name": "migration: the purge exemption trusts whose rights run, not who logged in",
+    "file": "db/migrations/20261012175551_immutability_purge_from_owner_sessions.sql",
+    "old": "\n       AND pg_catalog.pg_has_role(session_user, table_owner, 'MEMBER') THEN",
+    "new": " THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the owner's own purge is refused",
+    "file": "db/migrations/20261012175551_immutability_purge_from_owner_sessions.sql",
+    "old": "pg_catalog.pg_has_role(session_user, table_owner, 'MEMBER')",
+    "new": "pg_catalog.pg_has_role(session_user, table_owner, 'MEMBER') AND false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts tests/purge.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "meta-test: a function pinned to public, not to nothing",
+    "file": "db/migrations/20261012175551_immutability_purge_from_owner_sessions.sql",
+    "old": "  LANGUAGE plpgsql\n  SET search_path = ''\n",
+    "new": "  LANGUAGE plpgsql\n  SET search_path = public\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  }
+]

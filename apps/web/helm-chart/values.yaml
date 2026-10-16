@@ -1,0 +1,97 @@
+replicaCount: 2
+image:
+  repository: aiontheballot/web
+  tag: ''
+  pullPolicy: IfNotPresent
+service:
+  port: 3000
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: '1'
+    memory: 512Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+# Extra environment (plain values, or secretKeyRef for credentials sealed in gitops)
+env: []
+envFrom: []
+
+# Gateway API HTTPRoute. Hostnames and gateway come from gitops values.
+route:
+  enabled: false
+  # e.g. - name: example-gateway
+  #        namespace: example-gateway
+  parentRefs: []
+  hostnames: []
+  annotations: {}
+  trafficPolicy:
+    enabled: true
+    # Per-client-address limits at the gateway (ADR-0001, Traffic spikes; PLAN R158): requests a minute for each
+    # address, past which Envoy answers 429. They are Envoy Gateway global limits (a bucket per address needs them), so
+    # its rate-limit service and Redis must be on first, or the whole route answers 500; the address is the
+    # connection's peer, so the gateway must see real clients and trust no forwarded header. Set them as a flood
+    # ceiling, above what a crowd behind one address sends, so the app's own limits answer first in the site's words.
+    # 0 leaves a group unlimited, and all 0 (the default) adds nothing. Gitops sets them per environment.
+    rateLimit:
+      # POST to the site's forms: a right-of-reply report, the signup list and its confirm and unsubscribe.
+      forms: 0
+      # POST /_relay/errors: browser error reports (packages/observability).
+      errorRelay: 0
+      # POST /_relay/views: page views and engagement, relayed to Plausible (PLAN R83).
+      analyticsRelay: 0
+      # GET share images (/og/, anywhere in the path), the costly ones to render (PLAN R54, R148). Icons and logos
+      # (/brand/) are served from a cache by content hash, and stay unlimited.
+      images: 0
+  apiPaths: []
+
+# Who may connect to the site's pods (PLAN R161): off by default. On, only the gateways' Envoy pods listed here and the
+# API's own pods (which tell each replica what changed) may; nothing else in the cluster. Ingress only. Gitops turns it
+# on with the gateways of its environment.
+networkPolicy:
+  enabled: false
+  # Each gateway whose Envoy pods bring visitors: their namespace and their pods' labels, e.g.
+  #   - namespace: envoy-gateway-system
+  #     podLabels:
+  #       gateway.envoyproxy.io/owning-gateway-name: example-gateway
+  #       gateway.envoyproxy.io/owning-gateway-namespace: example-gateway
+  gateways: []
+  # The API's pods' app.kubernetes.io/name: the API chart's nameOverride in the umbrella (api). They must match.
+  apiName: api
+  # The admin's pods' app.kubernetes.io/name (the admin chart's nameOverride, admin): with the preview on, they fetch
+  # its pages inside the cluster (ADR-0005), so the policy admits them too.
+  adminName: admin
+
+# Previewing a site through the admin (ADR-0005, PLAN R174): off by default. On, the preview host (an in-cluster name
+# no gateway routes, never one of the route's hostnames) serves every active site as open, never indexed, to a request
+# carrying the shared token, which only this app and the admin hold; anything else there is a 404.
+preview:
+  enabled: false
+  # e.g. aiontheballot-preview.internal
+  host: ''
+  # The shared secret (a gitops SealedSecret), the same the admin's preview names.
+  tokenSecret:
+    name: ''
+    key: token
+
+# The API service: the proxy reads routing data from it (API_URL), and public API paths on public hosts are routed to
+# it (none yet).
+api:
+  # Defaults to <release>-api, the API service of the same release.
+  serviceName: ''
+  servicePort: 3001
+
+# The platform domain, for tenants reachable by path (https://<platformHost>/<slug>/…). Optional (ADR-0002).
+platformHost: ''

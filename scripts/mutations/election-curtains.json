@@ -1,0 +1,369 @@
+[
+  {
+    "name": "migration: an election in preview goes back to draft",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "OR OLD.status = 'preview' AND NEW.status = 'live'",
+    "new": "OR OLD.status = 'preview' AND NEW.status IN ('live', 'draft')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: went_live_at is stamped on the way into preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "CASE WHEN NEW.status = 'live' AND OLD.status IS DISTINCT FROM 'live' THEN now()",
+    "new": "CASE WHEN NEW.status IN ('preview', 'live') AND OLD.status IS DISTINCT FROM NEW.status THEN now()",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: preview is entered without what going live needs",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "IF NEW.status IN ('preview', 'live') AND NEW.status IS DISTINCT FROM OLD.status THEN",
+    "new": "IF NEW.status = 'live' AND NEW.status IS DISTINCT FROM OLD.status THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: going live from preview checks nothing again",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "IF NEW.status IN ('preview', 'live') AND NEW.status IS DISTINCT FROM OLD.status THEN",
+    "new": "IF NEW.status IN ('preview', 'live') AND OLD.status = 'draft' THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: short titles aren't needed for preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "FOR EACH ROW WHEN (OLD.status IN ('draft', 'preview') AND NEW.status IN ('preview', 'live')",
+    "new": "FOR EACH ROW WHEN (OLD.status IN ('draft', 'preview') AND NEW.status IN ('live')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the election's slug is fixed in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "IF OLD.status NOT IN ('draft', 'preview')\n       AND (NEW.slug",
+    "new": "IF OLD.status <> 'draft'\n       AND (NEW.slug",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the announcement is fixed in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "IF OLD.status NOT IN ('draft', 'preview') AND NEW.announced",
+    "new": "IF OLD.status <> 'draft' AND NEW.announced",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a party's slug is fixed in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "election_status NOT IN ('draft', 'preview') AND fresh ? 'slug'",
+    "new": "election_status <> 'draft' AND fresh ? 'slug'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a party of an election in preview can't be deleted",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "WHERE e.id = parties.election_id AND e.status IN ('draft', 'preview')",
+    "new": "WHERE e.id = parties.election_id AND e.status IN ('draft')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts && npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.parties\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a criterion of an election in preview can't be deleted",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "WHERE e.id = criteria.election_id AND e.status IN ('draft', 'preview')",
+    "new": "WHERE e.id = criteria.election_id AND e.status IN ('draft')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.criteria\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a methodology of an election in preview can't be deleted",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "WHERE e.id = methodologies.election_id AND e.status IN ('draft', 'preview')",
+    "new": "WHERE e.id = methodologies.election_id AND e.status IN ('draft')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.methodologies\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: an external reviewer of an election in preview can't be deleted",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "WHERE m.id = methodology_reviewers.methodology_id AND e.status IN ('draft', 'preview')",
+    "new": "WHERE m.id = methodology_reviewers.methodology_id AND e.status IN ('draft')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.methodology_reviewers\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: nothing is published in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "IF NOT (election.status IN ('preview', 'live')",
+    "new": "IF NOT (election.status IN ('live')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a revision doesn't record that it was published in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "NEW.published_in_preview := election.status = 'preview';",
+    "new": "NEW.published_in_preview := false;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the corrections log lists what was republished in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "WHERE r.change_kind <> 'initial' AND NOT r.published_in_preview",
+    "new": "WHERE r.change_kind <> 'initial'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the public sees elections in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "USING ((status IN ('live', 'archived') OR (status IN ('draft', 'preview') AND announced))",
+    "new": "USING ((status IN ('preview', 'live', 'archived') OR (status IN ('draft', 'preview') AND announced))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: an announcement stops at preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "USING ((status IN ('live', 'archived') OR (status IN ('draft', 'preview') AND announced))",
+    "new": "USING ((status IN ('live', 'archived') OR (status IN ('draft') AND announced))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.elections\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role sees every draft",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "USING ((status IN ('preview', 'live', 'archived') OR (status = 'draft' AND announced))",
+    "new": "USING ((status IN ('draft', 'preview', 'live', 'archived') OR (status = 'draft' AND announced))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.elections\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role sees no election in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "USING ((status IN ('preview', 'live', 'archived') OR (status = 'draft' AND announced))",
+    "new": "USING ((status IN ('live', 'archived') OR (status = 'draft' AND announced))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.elections\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role sees a draft's parties",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "WHERE e.id = parties.election_id AND e.status IN ('preview', 'live', 'archived')",
+    "new": "WHERE e.id = parties.election_id AND e.status IN ('draft', 'preview', 'live', 'archived')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.parties\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role sees no criteria in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "WHERE e.id = criteria.election_id AND e.status IN ('preview', 'live', 'archived')",
+    "new": "WHERE e.id = criteria.election_id AND e.status IN ('live', 'archived')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.criteria\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role sees no revision in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "WHERE e.id = assessment_revisions.election_id AND e.status IN ('preview', 'live', 'archived')",
+    "new": "WHERE e.id = assessment_revisions.election_id AND e.status IN ('live', 'archived')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role sees no checked document in preview",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "                  WHERE e.id = revision_checked_documents.election_id\n                    AND e.status IN ('preview', 'live', 'archived')",
+    "new": "                  WHERE e.id = revision_checked_documents.election_id\n                    AND e.status IN ('live', 'archived')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role reads an inactive site",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "CREATE POLICY preview_read ON app.tenants FOR SELECT TO aiontheballot_preview USING (active);",
+    "new": "CREATE POLICY preview_read ON app.tenants FOR SELECT TO aiontheballot_preview USING (true);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.tenants\"",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role reads stored sources",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "CREATE POLICY preview_read ON app.files FOR SELECT TO aiontheballot_preview\n  USING (bucket = 'public_assets'",
+    "new": "CREATE POLICY preview_read ON app.files FOR SELECT TO aiontheballot_preview\n  USING (bucket IS NOT NULL",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t \"matrix: app.files\"",
+    "cwd": "packages/db",
+    "equivalent": "Defense in depth: a file the policy's other conditions admit is a party's logo or a brand selection's upload, which their own triggers keep in public_assets (logo_is_public_asset, the brand image rule), and no role may change a file's bucket; the public role's policy has the same check."
+  },
+  {
+    "name": "migration: the preview's role reaches private",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "GRANT USAGE ON SCHEMA app TO aiontheballot_preview;",
+    "new": "GRANT USAGE ON SCHEMA app, private TO aiontheballot_preview;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role may submit reports",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "GRANT USAGE ON SCHEMA app TO aiontheballot_preview;",
+    "new": "GRANT USAGE ON SCHEMA app TO aiontheballot_preview;\nGRANT EXECUTE ON FUNCTION app.submit_report TO aiontheballot_preview;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts && npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role writes signups",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "GRANT USAGE ON SCHEMA app TO aiontheballot_preview;",
+    "new": "GRANT USAGE ON SCHEMA app TO aiontheballot_preview;\nGRANT INSERT ON app.reports TO aiontheballot_preview;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the preview's role misses the column grants",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "              AND has_column_privilege('aiontheballot_web', c.oid, a.attnum, 'SELECT')",
+    "new": "              AND false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "api: the preview's routes answer without the secret",
+    "file": "apps/api/src/app.ts",
+    "old": "      preview !== undefined && headerMatches(headers[PREVIEW_TOKEN_HEADER], preview.token),",
+    "new": "      preview !== undefined,",
+    "cmd": "npx vitest run src/app.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: the public home source lists elections in preview",
+    "file": "apps/api/src/home-data.ts",
+    "old": ".where('status', 'in', preview ? ['preview', 'live', 'archived'] : ['live', 'archived'])",
+    "new": ".where('status', 'in', ['preview', 'live', 'archived'])",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/home-data.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: the public election source serves one in preview",
+    "file": "apps/api/src/election-data.ts",
+    "old": ".where('e.status', 'in', preview ? ['preview', 'live', 'archived'] : ['live', 'archived'])\n    .executeTakeFirst();\n  const status =\n    election?.status === 'archived'\n      ? 'archived'\n      : election?.status === 'live' || (preview && election?.status === 'preview')",
+    "new": ".where('e.status', 'in', ['preview', 'live', 'archived'])\n    .executeTakeFirst();\n  const status =\n    election?.status === 'archived'\n      ? 'archived'\n      : election?.status === 'live' || election?.status === 'preview'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/election-data.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: a cell's history keeps what was republished in preview",
+    "file": "apps/api/src/election-data.ts",
+    "old": "cell.revisions.push({ revision, inPreview: row.published_in_preview });",
+    "new": "cell.revisions.push({ revision, inPreview: false });",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/election-data.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "domain: the public history shows every version published in preview",
+    "file": "packages/domain/src/public-history.ts",
+    "old": "  if (!latest) {\n    return published;",
+    "new": "  if (!latest || true) {\n    return revisions.map(({ revision }) => revision);",
+    "cmd": "npx vitest run src/public-history.spec.ts",
+    "cwd": "packages/domain"
+  },
+  {
+    "name": "web: the preview's loaders read the public data",
+    "file": "apps/web/src/data-stage.ts",
+    "old": "`${preview ? '/preview' : '/public'}${path}`",
+    "new": "`/public${path}`",
+    "cmd": "npx vitest run src/home-data.spec.ts src/election-data.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: the preview's secret isn't sent",
+    "file": "apps/web/src/data-stage.ts",
+    "old": "preview ? { [PREVIEW_TOKEN_HEADER]: preview.token } : {};",
+    "new": "{};",
+    "cmd": "npx vitest run src/home-data.spec.ts src/election-data.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: the preview's pages read the public data",
+    "file": "apps/web/src/site-page.ts",
+    "old": "loadTenantPage(slug, { preview: site.mode === 'preview' })",
+    "new": "loadTenantPage(slug, { preview: false })",
+    "before": "TURBO_CACHE=local:r pnpm --filter @aiontheballot/web build",
+    "after": "TURBO_CACHE=local:r pnpm --filter @aiontheballot/web build",
+    "cmd": "cd e2e && pnpm exec playwright test tests/status.spec.ts -g \"never on the open site\"",
+    "cwd": "."
+  },
+  {
+    "name": "admin: an election in preview isn't edited as a draft",
+    "file": "apps/admin/src/elections/data.ts",
+    "old": "  status === 'draft' || status === 'preview';",
+    "new": "  status === 'draft';",
+    "before": "TURBO_CACHE=local:r pnpm --filter @aiontheballot/admin build",
+    "after": "TURBO_CACHE=local:r pnpm --filter @aiontheballot/admin build",
+    "cmd": "cd e2e && pnpm exec playwright test tests/status.spec.ts -g \"goes to preview\"",
+    "cwd": "."
+  },
+  {
+    "name": "migration: the first version after a withdrawal in preview is a correction",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "                        AND p.published_in_preview AND p.change_kind = 'withdrawal')",
+    "new": "                        AND false)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "api: the admin's corrections log lists what was republished in preview",
+    "file": "apps/api/src/admin/corrections.ts",
+    "old": "        inPreview: r.published_in_preview,",
+    "new": "        inPreview: false,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/history.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: another login acting as the role is taken",
+    "file": "apps/api/src/database-roles.ts",
+    "old": "  return rows[0]?.login === role && rows[0]?.acting === role;",
+    "new": "  return rows[0]?.acting === role;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/database-roles.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "web: the preview's mode is taken without the secret",
+    "file": "apps/web/src/preview-guard.ts",
+    "old": "  return a.length === b.length && timingSafeEqual(a, b) ? 'preview' : 'coming-soon';",
+    "new": "  return 'preview';",
+    "cmd": "npx vitest run src/preview-guard.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: the preview fails while the API has none configured",
+    "file": "apps/web/src/data-stage.ts",
+    "old": "  if (!preview || response.status !== 503) {",
+    "new": "  if (true) {",
+    "cmd": "npx vitest run src/home-data.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: preview share images read logos from the public's data",
+    "file": "apps/web/src/app/%5Ftenant/[slug]/[locale]/[election]/og/[...path]/route.ts",
+    "old": "    preview ? previewAccess : undefined,\n  );",
+    "new": "    undefined,\n  );",
+    "before": "TURBO_CACHE=local:r pnpm --filter @aiontheballot/web build",
+    "after": "TURBO_CACHE=local:r pnpm --filter @aiontheballot/web build",
+    "cmd": "cd e2e && pnpm exec playwright test tests/status.spec.ts -g \"never on the open site\"",
+    "cwd": "."
+  },
+  {
+    "name": "migration: a publish reads the election without waiting for a change of its status",
+    "file": "db/migrations/20261013210051_election_curtains.sql",
+    "old": "    SELECT * INTO election FROM app.elections e WHERE e.id = cell.election_id FOR SHARE;",
+    "new": "    SELECT * INTO election FROM app.elections e WHERE e.id = cell.election_id;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
+    "cwd": "packages/db"
+  }
+]

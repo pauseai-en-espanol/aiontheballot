@@ -1,0 +1,82 @@
+[
+  {
+    "name": "version ignored",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "  return row.content_version === version && (!states || states.includes(row.state))\n",
+    "new": "  return (!states || states.includes(row.state))\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts tests/admin-routes.spec.ts -t 'cell|version|stale|workflow|draft'",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "election not scoped",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "    .where('election_id', '=', electionId)\n    .where('id', '=', cellId)\n    .forUpdate()",
+    "new": "    .where('id', '=', cellId)\n    .forUpdate()",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "silent delete",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "  return deleted.numDeletedRows > 0n ? 'changed' : 'forbidden';",
+    "new": "  return 'changed';",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "blank note",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  if (trimmed === '') {\n    throw new Refusal(422, 'incomplete');\n  }\n  return trimmed;",
+    "new": "  return trimmed;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t cells",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "stale as 404",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  if (result === 'stale') {\n    throw new Refusal(409, 'cellChanged');\n  }\n  if (result === 'forbidden') {",
+    "new": "  if (result === 'stale') {\n    throw new Refusal(404, 'notFound');\n  }\n  if (result === 'forbidden') {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t cells",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "match without RLS check",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "  if (!source) {\n    return undefined;\n  }\n  const units",
+    "new": "  const units",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts tests/admin-routes.spec.ts -t 'cell|match|source'",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "no state check",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "  return row.content_version === version && (!states || states.includes(row.state))",
+    "new": "  return row.content_version === version",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "names of anyone",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "          ).filter((id) => members.has(id));",
+    "new": "          );",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t cells",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "match unlimited",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            if (!allowMatch(actor.userId)) {",
+    "new": "            if (!allowMatch(actor.userId) && false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t cells",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "kept copy without RLS",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              if (kept && (await sourceVisible(trx, election.id, sourceId))) {",
+    "new": "              if (kept) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t cells",
+    "cwd": "apps/api"
+  }
+]

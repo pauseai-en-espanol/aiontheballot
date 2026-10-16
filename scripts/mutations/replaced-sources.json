@@ -1,0 +1,83 @@
+[
+  {
+    "name": "migration: a replaced source takes new quotes",
+    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "old": "    IF src.replaced_at IS NOT NULL\n       AND (TG_OP = 'INSERT' OR NEW.source_document_id IS DISTINCT FROM OLD.source_document_id) THEN\n      RAISE EXCEPTION 'source % was replaced: quote the source that replaced it'",
+    "new": "    IF false\n       AND (TG_OP = 'INSERT' OR NEW.source_document_id IS DISTINCT FROM OLD.source_document_id) THEN\n      RAISE EXCEPTION 'source % was replaced: quote the source that replaced it'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a quote may be moved to a replaced source",
+    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "old": "       AND (TG_OP = 'INSERT' OR NEW.source_document_id IS DISTINCT FROM OLD.source_document_id) THEN\n      RAISE EXCEPTION 'source % was replaced: quote the source that replaced it'",
+    "new": "       AND (TG_OP = 'INSERT') THEN\n      RAISE EXCEPTION 'source % was replaced: quote the source that replaced it'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a replaced source's quotes can't be edited",
+    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "old": "       AND (TG_OP = 'INSERT' OR NEW.source_document_id IS DISTINCT FROM OLD.source_document_id) THEN\n      RAISE EXCEPTION 'source % was replaced: quote the source that replaced it'",
+    "new": "       AND true THEN\n      RAISE EXCEPTION 'source % was replaced: quote the source that replaced it'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a replaced source is still checked for not mentioned",
+    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "old": "    IF src.replaced_at IS NOT NULL\n       AND (TG_OP = 'INSERT' OR NEW.source_document_id IS DISTINCT FROM OLD.source_document_id) THEN\n      RAISE EXCEPTION 'source % was replaced: check the source that replaced it'",
+    "new": "    IF false\n       AND (TG_OP = 'INSERT' OR NEW.source_document_id IS DISTINCT FROM OLD.source_document_id) THEN\n      RAISE EXCEPTION 'source % was replaced: check the source that replaced it'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/evidence.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a source with a stored copy can't be marked",
+    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "old": "    workflow text[] := ARRAY['extraction_status', 'archive_url', 'replaced_at'];",
+    "new": "    workflow text[] := ARRAY['extraction_status', 'archive_url'];",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the mark can be cleared or moved",
+    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "old": "      IF OLD.replaced_at IS NOT NULL AND NEW.replaced_at IS DISTINCT FROM OLD.replaced_at THEN\n        RAISE EXCEPTION 'source % is marked replaced once, for good'",
+    "new": "      IF false AND NEW.replaced_at IS DISTINCT FROM OLD.replaced_at THEN\n        RAISE EXCEPTION 'source % is marked replaced once, for good'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the caller picks the mark's time",
+    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "old": "        NEW.replaced_at := now();",
+    "new": "        NULL;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a new source may start replaced",
+    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "old": " OR NEW.replaced_at IS NOT NULL THEN",
+    "new": " THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the admin role can't mark a source",
+    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "old": "GRANT UPDATE (replaced_at) ON app.source_documents TO aiontheballot_admin;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts tests/rls/matrix.spec.ts -t 'replaced'",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  }
+]

@@ -1,0 +1,126 @@
+[
+  {
+    "name": "migration: a retirement or an addition names a field",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "  CHECK (action = 'update' OR field IS NULL);",
+    "new": "  CHECK (true);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: an empty set, or one with no value, stored past the triggers",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "         OR coalesce(jsonb_typeof(proposed_value) = 'object' AND proposed_value <> '{}'::jsonb, false));",
+    "new": "         OR jsonb_typeof(proposed_value) = 'object');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a set of nothing proposed",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": " OR NEW.proposed_value = '{}'::jsonb) THEN",
+    "new": ") THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "the next refusal, of a set that changes nothing, refuses an empty one too (no field left), as the table's own check does"
+  },
+  {
+    "name": "migration: a set of fields the target never changes through a request",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "IF multi AND EXISTS (SELECT 1 FROM jsonb_object_keys(NEW.proposed_value) k WHERE NOT k = ANY (updatable)) THEN",
+    "new": "IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a set's current values not read from the target",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "WHEN multi THEN (SELECT jsonb_object_agg(k, target -> k) FROM jsonb_object_keys(NEW.proposed_value) k)",
+    "new": "WHEN multi THEN NEW.previous_value",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a set approved over a field changed since",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "WHERE target -> k IS DISTINCT FROM OLD.previous_value -> k)",
+    "new": "WHERE false)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a set's texts approved without the default locale",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "                                ELSE OLD.proposed_value ? c END",
+    "new": "                                ELSE OLD.action = 'add' AND OLD.proposed_value ? c END",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: only one of a set's fields applied",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "                               FROM jsonb_object_keys(NEW.proposed_value) k))",
+    "new": "                               FROM (SELECT jsonb_object_keys(NEW.proposed_value) k LIMIT 1) k))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a set lets through any value of its fields",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "                                              AND r.proposed_value -> col = fresh -> col) END) THEN",
+    "new": "                                              ) END) THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "an approval now lets through only its own apply (until its public record is written, in the same trigger), which writes exactly its values: no other write can use it"
+  },
+  {
+    "name": "migration: a set lets through any field",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "                                      AND (r.field = col AND r.proposed_value = fresh -> col\n                                           OR r.field IS NULL AND r.proposed_value ? col",
+    "new": "                                      AND (r.field = col AND r.proposed_value = fresh -> col\n                                           OR r.field IS NULL AND (r.proposed_value ? col OR true)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "the value check that follows needs the field in the set: a missing key's value is NULL, never equal"
+  },
+  {
+    "name": "migration: a retired row's update proposed",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "      IF NEW.action = 'update' AND target ->> 'retired_at' IS NOT NULL THEN",
+    "new": "      IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: an update approved after its row was retired",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "                                  OR target ->> 'retired_at' IS NOT NULL) THEN",
+    "new": "                                  OR OLD.action = 'retire' AND target ->> 'retired_at' IS NOT NULL) THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a set keeps the fields it wouldn't change",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "                                WHERE NEW.proposed_value -> k IS DISTINCT FROM target -> k);",
+    "new": "                                WHERE true);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a set that changes nothing proposed",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "        IF NEW.proposed_value IS NULL THEN\n          RAISE EXCEPTION 'this % change set changes nothing'",
+    "new": "        IF false THEN\n          RAISE EXCEPTION 'this % change set changes nothing'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "the table's own check (change_requests_set_check) refuses a set with no value just after"
+  },
+  {
+    "name": "migration: an approval lets through every later write of its value in its transaction",
+    "file": "db/migrations/20261014001204_change_sets.sql",
+    "old": "                        -- The write that applies it, once: its public record follows that write.\n                        AND NOT EXISTS (SELECT 1 FROM app.structural_changes s WHERE s.change_request_id = r.id)\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-sets.spec.ts",
+    "cwd": "packages/db"
+  }
+]

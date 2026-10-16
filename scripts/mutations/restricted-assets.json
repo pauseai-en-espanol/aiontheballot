@@ -1,0 +1,90 @@
+[
+  {
+    "name": "migration: the other restriction never looked for",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "count(DISTINCT a.restricted) FROM app.brand_assets a WHERE a.sha256 = NEW.sha256) > 1",
+    "new": "count(DISTINCT a.restricted) FROM app.brand_assets a WHERE a.sha256 = NEW.sha256) > 2",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/restricted-assets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: every image's restrictions counted together",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "FROM app.brand_assets a WHERE a.sha256 = NEW.sha256) > 1",
+    "new": "FROM app.brand_assets a WHERE a.sha256 IS NOT NULL) > 1",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/restricted-assets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a change of restriction never checked",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "  AFTER INSERT OR UPDATE OF sha256, restricted ON app.brand_assets",
+    "new": "  AFTER INSERT ON app.brand_assets",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/restricted-assets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: another's bytes taken by a change",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "  AFTER INSERT OR UPDATE OF sha256, restricted ON app.brand_assets",
+    "new": "  AFTER INSERT OR UPDATE OF restricted ON app.brand_assets",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/restricted-assets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: two writers at once, unserialised",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "    PERFORM pg_advisory_xact_lock(hashtextextended('brand_asset_restriction:' || NEW.sha256, 0));\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/restricted-assets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the lock taken after the check's read",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "    PERFORM pg_advisory_xact_lock(hashtextextended('brand_asset_restriction:' || NEW.sha256, 0));\n    IF (SELECT count(DISTINCT a.restricted) FROM app.brand_assets a WHERE a.sha256 = NEW.sha256) > 1 THEN\n      RAISE EXCEPTION 'brand asset %: the same bytes are stored with the other restriction', NEW.id\n        USING ERRCODE = 'check_violation';\n    END IF;\n",
+    "new": "    IF (SELECT count(DISTINCT a.restricted) FROM app.brand_assets a WHERE a.sha256 = NEW.sha256) > 1 THEN\n      RAISE EXCEPTION 'brand asset %: the same bytes are stored with the other restriction', NEW.id\n        USING ERRCODE = 'check_violation';\n    END IF;\n    PERFORM pg_advisory_xact_lock(hashtextextended('brand_asset_restriction:' || NEW.sha256, 0));\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/restricted-assets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: written under repeatable read",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "IN ('repeatable read', 'serializable') THEN",
+    "new": "IN ('serializable') THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/restricted-assets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: written under serializable",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "IN ('repeatable read', 'serializable') THEN",
+    "new": "IN ('repeatable read') THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/restricted-assets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: checked row by row, not at commit",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "  DEFERRABLE INITIALLY DEFERRED\n  FOR EACH ROW EXECUTE FUNCTION private.brand_asset_restriction_is_one();",
+    "new": "  FOR EACH ROW EXECUTE FUNCTION private.brand_asset_restriction_is_one();",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/restricted-assets.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: stored pairs let through",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "    IF mixed > 0 THEN",
+    "new": "    IF mixed > 1 THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/migration-guards.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: copies of the same restriction refused",
+    "file": "db/migrations/20261014131409_brand_asset_one_restriction.sql",
+    "old": "GROUP BY sha256 HAVING count(DISTINCT restricted) > 1) m);",
+    "new": "GROUP BY sha256 HAVING count(*) > 1) m);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/migration-guards.spec.ts",
+    "cwd": "packages/db"
+  }
+]

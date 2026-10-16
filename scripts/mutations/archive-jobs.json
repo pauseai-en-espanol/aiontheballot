@@ -1,0 +1,29 @@
+[
+  {
+    "name": "migration: no unique index on open archive jobs",
+    "file": "db/migrations/20261013123900_archive_jobs.sql",
+    "old": "CREATE UNIQUE INDEX job_requests_one_open_archive",
+    "new": "CREATE INDEX job_requests_one_open_archive",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/jobs.spec.ts -t 'one archive'",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts"
+  },
+  {
+    "name": "migration: the index counts finished archive jobs too",
+    "file": "db/migrations/20261013123900_archive_jobs.sql",
+    "old": "WHERE kind = 'archive_source' AND finished_at IS NULL;",
+    "new": "WHERE kind = 'archive_source';",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/jobs.spec.ts -t 'one archive'",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts"
+  },
+  {
+    "name": "migration: an archive job for a source with no stored copy, whose URL can still change",
+    "file": "db/migrations/20261013123900_archive_jobs.sql",
+    "old": "WHEN 'archive_source' THEN source.url IS NOT NULL AND source.file_id IS NOT NULL AND source.archive_url IS NULL",
+    "new": "WHEN 'archive_source' THEN source.url IS NOT NULL AND source.archive_url IS NULL",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/jobs.spec.ts -t 'archive for a source without a copy'",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts"
+  }
+]

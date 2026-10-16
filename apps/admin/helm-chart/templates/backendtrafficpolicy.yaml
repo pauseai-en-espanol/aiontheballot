@@ -1,0 +1,44 @@
+{{- if and .Values.route.enabled .Values.route.trafficPolicy.enabled }}
+{{- $limits := .Values.route.trafficPolicy.rateLimit | default dict }}
+{{- $errorRelay := int ($limits.errorRelay | default 0) }}
+# Envoy Gateway policy for this HTTPRoute. One policy per route: Envoy Gateway refuses a second one
+# targeting it as conflicting, so the rate limit lives here too.
+# - retry connection-level failures only (never 5xx), so a request that may have been processed is never replayed;
+# - close idle upstream connections (60s) before the pods would (keep-alive 75s), avoiding reset races;
+# - a per-client-address limit on the error relay (PLAN R208), when values set it.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: {{ include "aiontheballot-admin.fullname" . }}
+  labels:
+    {{- include "aiontheballot-admin.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ include "aiontheballot-admin.fullname" . }}
+  retry:
+    numRetries: 2
+    retryOn:
+      triggers:
+        - connect-failure
+        - refused-stream
+        - reset
+  timeout:
+    http:
+      connectionIdleTimeout: 60s
+  {{- if gt $errorRelay 0 }}
+  # A global limit, as the web chart's: only Envoy Gateway's rate-limit service counts each client address apart
+  # (Distinct), IPv4 and IPv6 alike, and without it Envoy Gateway answers every request of this route with a 500.
+  rateLimit:
+    global:
+      rules:
+        {{- range $cidr := list "0.0.0.0/0" "::/0" }}
+        - clientSelectors:
+            - sourceCIDR: { type: Distinct, value: {{ $cidr | quote }} }
+              methods: [{ value: POST }]
+              path: { type: PathPrefix, value: /_relay/errors }
+          limit: { requests: {{ $errorRelay }}, unit: Minute }
+        {{- end }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aiontheballot-admin.fullname" . }}
+  labels:
+    {{- include "aiontheballot-admin.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "aiontheballot-admin.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "aiontheballot-admin.selectorLabels" . | nindent 8 }}
+      annotations:
+        # For a file-system backup of pod volumes (the annotation is Velero's), which copies every volume unless told:
+        # these two scratch volumes (named below) hold nothing to keep. Rename them together.
+        backup.velero.io/backup-volumes-excludes: next-cache,tmp
+    spec:
+      # preStop sleep + time to drain in-flight requests
+      terminationGracePeriodSeconds: 30
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+            # Server-side calls to the API (who is signed in, and their data), inside the cluster.
+            - name: API_URL
+              value: {{ printf "http://%s:%v" (.Values.api.serviceName | default (printf "%s-api" .Release.Name)) .Values.api.servicePort | quote }}
+            {{- if .Values.preview.enabled }}
+            # A site's preview (ADR-0005): the web app inside the cluster, its preview host, and the secret it asks for.
+            - name: WEB_URL
+              value: {{ printf "http://%s:%v" (.Values.preview.web.serviceName | default (printf "%s-web" .Release.Name)) .Values.preview.web.servicePort | quote }}
+            - name: PREVIEW_HOST
+              value: {{ required "preview.host is required with the preview on" .Values.preview.host | quote }}
+            - name: PREVIEW_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "preview.tokenSecret.name is required with the preview on" .Values.preview.tokenSecret.name }}
+                  key: {{ .Values.preview.tokenSecret.key }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              # Keep serving while the endpoint removal reaches the gateway; SIGTERM arrives after the sleep.
+              exec:
+                command: ['sleep', '8']
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: next-cache
+              mountPath: /app/apps/admin/.next/cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: next-cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

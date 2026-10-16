@@ -1,0 +1,69 @@
+{{- if .Values.reports.anonymize.databaseUrlSecret.name }}
+# The daily anonymization of right-of-reply reports past their site's retention (apps/api/src/anonymize-expired-
+# reports.ts, PLAN R149): personal data, removed on time. A job from the API's image, never the API's own process
+# (ADR-0003 §1), as aiontheballot_worker, the one role that may run private.anonymize_expired_reports(), and with no
+# other credential.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "aiontheballot-api.fullname" . }}-report-anonymization
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: report-anonymization
+spec:
+  schedule: {{ .Values.reports.anonymize.schedule | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  # A run missed by more than this (the node was down) waits for the next day: nothing here is urgent.
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          # Not the API's selector labels: the API's Service must never send requests to this pod.
+          labels:
+            app.kubernetes.io/name: {{ include "aiontheballot-api.name" . }}-report-anonymization
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/part-of: aiontheballot
+          annotations:
+            # A file-system backup of pod volumes (the annotation is Velero's) skips this scratch volume.
+            backup.velero.io/backup-volumes-excludes: tmp
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: report-anonymization
+              image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ['node', 'dist/anonymize-expired-reports.js']
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              env:
+                - name: WORKER_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.reports.anonymize.databaseUrlSecret.name }}
+                      key: {{ .Values.reports.anonymize.databaseUrlSecret.key }}
+              {{- with .Values.reports.anonymize.envFrom }}
+              envFrom:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              resources:
+                {{- toYaml .Values.reports.anonymize.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

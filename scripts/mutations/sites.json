@@ -1,0 +1,26 @@
+[
+  {
+    "name": "slug new allowed",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  if (slug === 'new') {",
+    "new": "  if (slug === 'never') {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t sites",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "retention unbounded",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "    // The column's own bounds, so a number past Postgres's integers is a refusal, not a fault.\n    reportRetentionDays: { type: 'integer', minimum: 1, maximum: 36_500 },",
+    "new": "    // The column's own bounds, so a number past Postgres's integers is a refusal, not a fault.\n    reportRetentionDays: { type: 'integer' },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t sites",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "demo takes XK",
+    "file": "packages/db/demo/demo-content.ts",
+    "old": "  IF d_country !~ '^X[A-JL-Z]$' THEN",
+    "new": "  IF d_country !~ '^X[A-Z]$' THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/demo-content.spec.ts",
+    "cwd": "packages/db"
+  }
+]

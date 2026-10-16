@@ -1,0 +1,91 @@
+[
+  {
+    "name": "audit: a page shows every site's entries",
+    "file": "apps/api/src/admin/audit.ts",
+    "old": "      ? query.where('tenant_id', 'is', null)\n      : query.where('tenant_id', '=', filter.tenantId);",
+    "new": "      ? query\n      : query;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/history.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "audit: the platform's page open to anyone signed in",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            if (!(await isPlatformAdmin(trx, actor.userId))) {\n              throw new Refusal(404, 'notFound');\n            }\n            return listAudit(trx, auditFilter(null, request.query));",
+    "new": "            return listAudit(trx, auditFilter(null, request.query));",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/history.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "RLS shows the platform's own entries (no site) to platform admins only (audit_log's country_admin_read policy), so anyone else gets an empty page; the 404 only says so sooner"
+  },
+  {
+    "name": "admin log: a first rating listed as a correction",
+    "file": "apps/api/src/admin/corrections.ts",
+    "old": "      .where('r.change_kind', '<>', 'initial')\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/history.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "public log: a first rating listed as a correction",
+    "file": "apps/web/src/corrections-log.ts",
+    "old": "      revision.changeKind === 'initial'",
+    "new": "      false",
+    "cmd": "npx vitest run src/corrections-log.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "public data: another election's structural changes listed",
+    "file": "apps/api/src/election-data.ts",
+    "old": "    .where('s.election_id', '=', election.id)\n    .orderBy('s.approved_at', 'desc')",
+    "new": "    .orderBy('s.approved_at', 'desc')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/election-data.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "public data: an external reviewer's names sent",
+    "file": "apps/api/src/election-data.ts",
+    "old": "      const values = kind !== 'methodology_reviewer';",
+    "new": "      const values = true;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/election-data.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "public data: a retired reviewer named",
+    "file": "apps/api/src/election-data.ts",
+    "old": "                  change.reviewer_retired\n",
+    "new": "                  false\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/election-data.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "public log: a reviewer's names shown",
+    "file": "apps/web/src/corrections-log.ts",
+    "old": "  change.targetKind !== 'methodology_reviewer' &&\n",
+    "new": "",
+    "cmd": "npx vitest run src/corrections-log.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "admin log: another election's structural changes listed",
+    "file": "apps/api/src/admin/corrections.ts",
+    "old": "      .where('s.election_id', '=', election.id)\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/history.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "audit: the last day's end left out",
+    "file": "apps/api/src/admin/audit.ts",
+    "old": "    date.setUTCDate(date.getUTCDate() + 1);\n",
+    "new": "",
+    "cmd": "npx vitest run src/admin/audit.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "audit: a page past its end",
+    "file": "apps/api/src/admin/audit.ts",
+    "old": "    .limit(AUDIT_PAGE + 1)",
+    "new": "    .limit(AUDIT_PAGE)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/history.spec.ts",
+    "cwd": "apps/api"
+  }
+]

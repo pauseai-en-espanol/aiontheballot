@@ -1,0 +1,116 @@
+[
+  {
+    "name": "logo: changed directly in a live election",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              if (!editedDirectly(found.election.status)) {\n                throw new Refusal(409, 'changeControlled');",
+    "new": "              if (false) {\n                throw new Refusal(409, 'changeControlled');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "logo: anyone's bytes stored",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              if (!holds(found.access, 'editor', 'country_admin')) {\n                throw new Refusal(403, 'forbidden');\n              }\n              if (!editedDirectly(found.election.status)) {",
+    "new": "              if (false) {\n                throw new Refusal(403, 'forbidden');\n              }\n              if (!editedDirectly(found.election.status)) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "logo: type not checked against its bytes",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              image.type !== contentType ||",
+    "new": "              false ||",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "logo: no side limit",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              image.width > MAX_LOGO_SIDE ||",
+    "new": "              false ||",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "logo: no size limit",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              if (size > MAX_LOGO_BYTES) {",
+    "new": "              if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "logo: SVG taken",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;",
+    "new": "const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "an SVG has no PNG, JPEG or WebP header, so the image check refuses it all the same"
+  },
+  {
+    "name": "logo: replaced file kept",
+    "file": "apps/api/src/admin/structure.ts",
+    "old": "    await dropFileIfUnnamed(trx, party.logo_file_id);",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "logo: a file still named makes the change fail",
+    "file": "apps/api/src/admin/structure.ts",
+    "old": "    if ((error as { code?: unknown }).code !== '23503') {",
+    "new": "    if (true) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "logo: same bytes as another type taken",
+    "file": "apps/api/src/admin/structure.ts",
+    "old": "    if (existing && existing.content_type !== upload.contentType) {\n      return 'otherType';",
+    "new": "    if (false) {\n      return 'otherType';",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "a logo's type must be the one its own header says, so the same bytes always come as the same type"
+  },
+  {
+    "name": "public: party logos not served",
+    "file": "apps/api/src/home-data.ts",
+    "old": "    if (!logo) {\n      return undefined;\n    }",
+    "new": "    if (true) {\n      return undefined;\n    }",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/brand-images.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "logo: no rate limit",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            if (!allowLogo(actor.userId)) {",
+    "new": "            if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "logo: a file a pending change request names dropped",
+    "file": "apps/api/src/admin/structure.ts",
+    "old": "  if (proposed.rows.length > 0) {\n    return;\n  }",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/party-logos.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "image: JPEG fill bytes read as a segment",
+    "file": "packages/domain/src/image-size.ts",
+    "old": "          code === 0xff ||\n",
+    "new": "",
+    "cmd": "npx vitest run src/image-size.spec.ts",
+    "cwd": "packages/domain"
+  },
+  {
+    "name": "image: PNG signature not checked whole",
+    "file": "packages/domain/src/image-size.ts",
+    "old": "      PNG_SIGNATURE.every((byte, i) => bytes[i] === byte) &&",
+    "new": "      ascii(1, 3) === 'PNG' &&",
+    "cmd": "npx vitest run src/image-size.spec.ts",
+    "cwd": "packages/domain"
+  }
+]

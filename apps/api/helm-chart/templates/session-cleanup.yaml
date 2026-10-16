@@ -1,0 +1,68 @@
+{{- if .Values.auth.databaseUrlSecret.name }}
+# The daily clean-up of sign-in data (apps/api/src/delete-expired-sessions.ts): expired sessions and verification
+# values, and day-old rate-limit rows. A job from the API's image, never the API's own process (ADR-0003 §1), with
+# Better Auth's role and no other credential.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "aiontheballot-api.fullname" . }}-session-cleanup
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: session-cleanup
+spec:
+  schedule: {{ .Values.auth.cleanup.schedule | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  # A run missed by more than this (the node was down) waits for the next day: nothing here is urgent.
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          # Not the API's selector labels: the API's Service must never send requests to this pod.
+          labels:
+            app.kubernetes.io/name: {{ include "aiontheballot-api.name" . }}-session-cleanup
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/part-of: aiontheballot
+          annotations:
+            # A file-system backup of pod volumes (the annotation is Velero's) skips this scratch volume.
+            backup.velero.io/backup-volumes-excludes: tmp
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: session-cleanup
+              image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ['node', 'dist/delete-expired-sessions.js']
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              env:
+                - name: AUTH_DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.auth.databaseUrlSecret.name }}
+                      key: {{ .Values.auth.databaseUrlSecret.key }}
+              {{- with .Values.auth.cleanup.envFrom }}
+              envFrom:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              resources:
+                {{- toYaml .Values.auth.cleanup.resources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

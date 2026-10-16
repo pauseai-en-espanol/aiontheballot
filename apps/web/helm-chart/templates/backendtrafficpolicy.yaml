@@ -1,0 +1,73 @@
+{{- if and .Values.route.enabled .Values.route.trafficPolicy.enabled }}
+{{- $limits := .Values.route.trafficPolicy.rateLimit | default dict }}
+{{- $forms := int ($limits.forms | default 0) }}
+{{- $errorRelay := int ($limits.errorRelay | default 0) }}
+{{- $analyticsRelay := int ($limits.analyticsRelay | default 0) }}
+{{- $images := int ($limits.images | default 0) }}
+# Envoy Gateway policy for this HTTPRoute. One policy per route: Envoy Gateway refuses a second one
+# targeting it as conflicting, so the rate limits live here too.
+# - retry connection-level failures only (never 5xx), so a request that may have been processed is never replayed;
+# - close idle upstream connections (60s) before the pods would (keep-alive 75s), avoiding reset races;
+# - per-client-address limits on the endpoints that write or render (PLAN R158), when values set them.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: {{ include "aiontheballot-web.fullname" . }}
+  labels:
+    {{- include "aiontheballot-web.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: {{ include "aiontheballot-web.fullname" . }}
+  retry:
+    numRetries: 2
+    retryOn:
+      triggers:
+        - connect-failure
+        - refused-stream
+        - reset
+  timeout:
+    http:
+      connectionIdleTimeout: 60s
+  {{- if or (gt $forms 0) (gt $errorRelay 0) (gt $analyticsRelay 0) (gt $images 0) }}
+  # Global limits: only Envoy Gateway's rate-limit service counts each client address apart (Distinct), IPv4 and IPv6
+  # alike. It must be on before any number is set: without it Envoy Gateway answers every request of this route with
+  # a 500, not just this policy refused (PLAN R158; the order is in the runbook). Counted per address, per host and per
+  # rule. The path is matched whole, query included, and tenant and election prefixes come first, so images match
+  # anywhere.
+  rateLimit:
+    global:
+      rules:
+        {{- range $cidr := list "0.0.0.0/0" "::/0" }}
+        {{- if gt $forms 0 }}
+        - clientSelectors:
+            - sourceCIDR: { type: Distinct, value: {{ $cidr | quote }} }
+              methods: [{ value: POST }]
+              path: { type: PathPrefix, value: /_relay/, invert: true }
+          limit: { requests: {{ $forms }}, unit: Minute }
+        {{- end }}
+        {{- if gt $errorRelay 0 }}
+        - clientSelectors:
+            - sourceCIDR: { type: Distinct, value: {{ $cidr | quote }} }
+              methods: [{ value: POST }]
+              path: { type: PathPrefix, value: /_relay/errors }
+          limit: { requests: {{ $errorRelay }}, unit: Minute }
+        {{- end }}
+        {{- if gt $analyticsRelay 0 }}
+        - clientSelectors:
+            - sourceCIDR: { type: Distinct, value: {{ $cidr | quote }} }
+              methods: [{ value: POST }]
+              path: { type: PathPrefix, value: /_relay/views }
+          limit: { requests: {{ $analyticsRelay }}, unit: Minute }
+        {{- end }}
+        {{- if gt $images 0 }}
+        - clientSelectors:
+            - sourceCIDR: { type: Distinct, value: {{ $cidr | quote }} }
+              methods: [{ value: GET }, { value: HEAD }]
+              path: { type: RegularExpression, value: '.*/og/.*' }
+          limit: { requests: {{ $images }}, unit: Minute }
+        {{- end }}
+        {{- end }}
+  {{- end }}
+{{- end }}

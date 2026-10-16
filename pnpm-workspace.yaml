@@ -1,0 +1,38 @@
+packages:
+  - apps/*
+  - packages/*
+  - db
+  - e2e
+
+# Wait 3 days (4320 min) after a version is published before installing it
+# (supply-chain hardening); keep in sync with minimumReleaseAge in renovate.json5.
+minimumReleaseAge: 4320
+
+minimumReleaseAgeExclude:
+  - '@slango/*'
+  - '@slango.configs/*'
+
+# better-auth lists framework integrations as optional peers, and pnpm fills them from the workspace (the web and
+# admin apps' Next.js and React, the test runner), so `pnpm deploy --prod` put Next.js, Playwright and Vitest in the
+# API's image. Nothing imports the entry points that need them (better-auth/react, better-auth/next-js…); '-' drops
+# each from better-auth's peers. pg, which the API connects through, stays.
+overrides:
+  'better-auth>next': '-'
+  'better-auth>react': '-'
+  'better-auth>react-dom': '-'
+  'better-auth>vitest': '-'
+  # satori pins fflate 0.7.3, which has a loop in unzipSync on a malformed ZIP64 archive (GHSA-px8p-9vwx-vf98). Nothing
+  # calls unzipSync, but 0.7.5, the fix, is a patch release of the same line (PLAN R208).
+  'fflate@<0.8': '0.7.5'
+
+injectWorkspacePackages: true
+linkWorkspacePackages: true
+syncInjectedDepsAfterScripts:
+  - build
+
+# Packages allowed to run install scripts; add entries deliberately, one by one.
+allowBuilds:
+  # native file watcher, pulled in by next-intl
+  '@parcel/watcher': true
+  # native SWC binary, pulled in by next-intl
+  '@swc/core': true

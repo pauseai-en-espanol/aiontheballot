@@ -1,0 +1,74 @@
+[
+  {
+    "name": "api: no undo on failure",
+    "file": "apps/api/src/signups.ts",
+    "old": "      await unsubscribe(db, tenantId, token);\n    } catch (undoError) {",
+    "new": "    } catch (undoError) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/signups.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: no NFC",
+    "file": "apps/api/src/signups.ts",
+    "old": "email.trim().normalize('NFC').toLowerCase()",
+    "new": "email.trim().toLowerCase()",
+    "cmd": "npx vitest run src/signups.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: no punycode",
+    "file": "apps/api/src/signups.ts",
+    "old": "  const address = `${local}@${domain}`;",
+    "new": "  const address = `${local}@${given}`;",
+    "cmd": "npx vitest run src/signups.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: controls allowed",
+    "file": "apps/api/src/signups.ts",
+    "old": "    /[\\s\\p{Cc}\\p{Cf}/?#\\\\]/u.test(trimmed) ||",
+    "new": "    /[/?#\\\\]/u.test(trimmed) ||",
+    "cmd": "npx vitest run src/signups.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: IPv6 per address",
+    "file": "apps/api/src/rate-limit.ts",
+    "old": "    .slice(0, 4)",
+    "new": "    .slice(0, 8)",
+    "cmd": "npx vitest run src/rate-limit.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: full limiter clears all",
+    "file": "apps/api/src/rate-limit.ts",
+    "old": "          if (windows.size < maxKeys) {\n            break;\n          }\n          windows.delete(other);",
+    "new": "          windows.delete(other);",
+    "cmd": "npx vitest run src/rate-limit.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: signups without link base",
+    "file": "apps/api/src/home-data.ts",
+    "old": "        (tenant.has_canonical_host === true || platformHost !== undefined),",
+    "new": "        true,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/home-data.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: failure quotes message",
+    "file": "apps/api/src/mail/mailer.ts",
+    "old": "  const words = [code, responseCode, command].filter(",
+    "new": "  const words = [code, responseCode, command, (error as Error)?.message].filter(",
+    "cmd": "npx vitest run src/mail/mailer.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "web: double slash is home",
+    "file": "apps/web/src/site-mode.ts",
+    "old": "  return first !== '' && COMING_SOON_ROUTES.has(first);",
+    "new": "  return first === '' || COMING_SOON_ROUTES.has(first);",
+    "cmd": "npx vitest run src/routing-proxy.spec.ts",
+    "cwd": "apps/web"
+  }
+]

@@ -1,0 +1,3 @@
+# Built from the subcharts' file:// sources by `helm dependency build`, which Argo CD and CI run (PLAN R80). Run it
+# before rendering locally too: Helm only checks that a subchart is here, not that it is current.
+charts/

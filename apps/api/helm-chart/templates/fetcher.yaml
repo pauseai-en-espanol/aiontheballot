@@ -1,0 +1,191 @@
+{{- if .Values.fetcher.enabled }}
+{{- $name := printf "%s-fetcher" (include "aiontheballot-api.fullname" .) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fetcher
+spec:
+  # It holds nothing between requests: a fetch is answered within its deadline, and an archive job whose capture was
+  # cut off by a restart is asked for again when its sources are listed (ADR-0007 §4).
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "aiontheballot-api.fetcherSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      # Not the API's selector labels: the API's Service must never send requests to this pod.
+      labels:
+        {{- include "aiontheballot-api.fetcherSelectorLabels" . | nindent 8 }}
+        app.kubernetes.io/part-of: aiontheballot
+        app.kubernetes.io/component: fetcher
+      annotations:
+        # A file-system backup of pod volumes (the annotation is Velero's) skips this scratch volume.
+        backup.velero.io/backup-volumes-excludes: tmp
+    spec:
+      terminationGracePeriodSeconds: 30
+      # No service-account token, no database login, no file volume (ADR-0007): it holds nothing worth taking.
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: fetcher
+          image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["node", "dist/fetcher.js"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.fetcher.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.fetcher.port | quote }}
+            - name: FETCH_TIMEOUT_MS
+              value: {{ .Values.fetcher.timeoutMs | quote }}
+            - name: ARCHIVE_URL
+              value: {{ .Values.fetcher.archiveUrl | quote }}
+            {{- with .Values.fetcher.userAgent }}
+            - name: FETCHER_USER_AGENT
+              value: {{ . | quote }}
+            {{- end }}
+            # The secret it shares with the API, which every request must carry (ADR-0007 §1).
+            - name: FETCHER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "fetcher.tokenSecret.name is required with the fetcher" .Values.fetcher.tokenSecret.name }}
+                  key: {{ .Values.fetcher.tokenSecret.key }}
+          {{- with .Values.fetcher.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.fetcher.resources | nindent 12 }}
+          volumeMounts:
+            # Node needs a writable /tmp; nothing else in the filesystem is writable.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fetcher
+spec:
+  selector:
+    {{- include "aiontheballot-api.fetcherSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.fetcher.port }}
+      targetPort: http
+{{- if .Values.fetcher.networkPolicy.enabled }}
+---
+# Only the API's pods reach the fetcher; the fetcher reaches only DNS and, on ports 80 and 443, the public internet:
+# never a private, loopback, link-local, shared or multicast address, so a URL can't lead it into the cluster (ADR-0007
+# §2; it checks every address in code too). With error tracking set, also the error tracker's pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fetcher
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "aiontheballot-api.fetcherSelectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            # The API's pods alone.
+            matchLabels:
+              {{- include "aiontheballot-api.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: {{ .Values.fetcher.port }}
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 0.0.0.0/8
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.0.0.0/24
+              - 192.0.2.0/24
+              - 192.88.99.0/24
+              - 192.168.0.0/16
+              - 198.18.0.0/15
+              - 198.51.100.0/24
+              - 203.0.113.0/24
+              - 224.0.0.0/4
+              - 240.0.0.0/4
+        - ipBlock:
+            cidr: 2000::/3
+            except:
+              - 2001::/32
+              - 2001:2::/48
+              - 2001:10::/28
+              - 2001:20::/28
+              - 2001:db8::/32
+              - 2002::/16
+              - 3fff::/20
+      ports:
+        - port: 80
+          protocol: TCP
+        - port: 443
+          protocol: TCP
+    {{- with .Values.fetcher.networkPolicy.errorTracking }}
+    {{- if .namespace }}
+    # Error tracking's in-cluster Service: the port is its pods' (a policy sees the connection after the Service).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace }}
+          {{- with .podLabels }}
+          podSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+          {{- end }}
+      ports:
+        - port: {{ .port }}
+          protocol: TCP
+    {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

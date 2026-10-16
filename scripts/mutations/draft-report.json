@@ -1,0 +1,99 @@
+[
+  {
+    "name": "publishing doesn't record the report",
+    "file": "db/migrations/20261013063332_draft_report_link.sql",
+    "old": "              (SELECT a.draft_report_id FROM app.assessments a WHERE a.id = NEW.assessment_id));",
+    "new": "              NULL);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "the next draft keeps the report",
+    "file": "db/migrations/20261013063332_draft_report_link.sql",
+    "old": "      NEW.draft_report_id := NULL;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "the link is no content",
+    "file": "db/migrations/20261013063332_draft_report_link.sql",
+    "old": "    content text[] := ARRAY['draft_rating', 'draft_summary', 'draft_change_kind', 'draft_public_note',\n                            'draft_report_id'];",
+    "new": "    content text[] := ARRAY['draft_rating', 'draft_summary', 'draft_change_kind', 'draft_public_note'];",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "a reviewer links a report",
+    "file": "db/migrations/20261013063332_draft_report_link.sql",
+    "old": "                                                         'draft_change_kind', 'draft_public_note', 'recheck_reason',\n                                                         'draft_report_id');",
+    "new": "                                                         'draft_change_kind', 'draft_public_note', 'recheck_reason');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "a report the writer can't read is linked",
+    "file": "db/migrations/20261013063332_draft_report_link.sql",
+    "old": "      IF NEW.draft_report_id IS NOT NULL\n           AND NOT EXISTS (SELECT 1 FROM app.reports r WHERE r.id = NEW.draft_report_id)\n         OR",
+    "new": "      IF false\n         OR",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "a platform admin clears the link",
+    "file": "db/migrations/20261013063332_draft_report_link.sql",
+    "old": "         OR OLD.draft_report_id IS NOT NULL\n           AND NOT EXISTS (SELECT 1 FROM app.reports r WHERE r.id = OLD.draft_report_id) THEN",
+    "new": " THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "a report of another election is linked",
+    "file": "db/migrations/20261013063332_draft_report_link.sql",
+    "old": "                          WHERE r.id = NEW.draft_report_id AND r.election_id = NEW.election_id) THEN",
+    "new": "                          WHERE r.id = NEW.draft_report_id) THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "a site whose draft names a report can't be purged",
+    "file": "db/migrations/20261013063332_draft_report_link.sql",
+    "old": "    SET CONSTRAINTS app.assessments_draft_report_fkey DEFERRED;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "editors may not write the link",
+    "file": "db/migrations/20261013063332_draft_report_link.sql",
+    "old": "GRANT UPDATE (draft_report_id) ON app.assessments TO aiontheballot_admin;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts > /dev/null"
+  },
+  {
+    "name": "the API takes a report the writer can't read to the database",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "    fields.reportId &&\n    !(await trx",
+    "new": "    false &&\n    !(await trx",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t cells tests/cells.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a form without the field unlinks the report",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "      ...(fields.reportId === undefined ? {} : { draft_report_id: fields.reportId }),",
+    "new": "      draft_report_id: fields.reportId ?? null,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t cells",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the API takes a report of another election to the database",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "      .where('election_id', '=', electionId)\n      .executeTakeFirst())",
+    "new": "      .executeTakeFirst())",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/cells.spec.ts",
+    "cwd": "apps/api"
+  }
+]

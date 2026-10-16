@@ -1,0 +1,70 @@
+replicaCount: 1
+image:
+  repository: aiontheballot/admin
+  tag: ''
+  pullPolicy: IfNotPresent
+service:
+  port: 3002
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: '1'
+    memory: 512Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+# Extra environment (plain values, or secretKeyRef for credentials sealed in gitops)
+env: []
+envFrom: []
+
+# Gateway API HTTPRoute. Hostnames and gateway come from gitops values.
+route:
+  enabled: false
+  # e.g. - name: example-gateway
+  #        namespace: example-gateway
+  parentRefs: []
+  hostnames: []
+  annotations: {}
+  trafficPolicy:
+    enabled: true
+    # Per-client-address limits at the gateway, as the web chart's (PLAN R158, R208): requests a minute for each
+    # address, past which Envoy answers 429. They are Envoy Gateway global limits, so its rate-limit service and Redis
+    # must be on first, or the whole route answers 500, sign-in included; the address is the connection's peer, so the
+    # gateway must see real clients and trust no forwarded header. 0 (the default) adds nothing. Gitops sets them per
+    # environment.
+    rateLimit:
+      # POST /_relay/errors: browser error reports (packages/observability), which anyone can send.
+      errorRelay: 0
+
+# Previewing a site through the admin (ADR-0005, PLAN R174): off by default. On, the admin serves each site's pages to
+# its members under /t/{site}/preview/, fetched from the web app inside the cluster on its preview host with the shared
+# secret, sandboxed and script-free. The web app's preview must be on with the same host and secret.
+preview:
+  enabled: false
+  # The web app's preview host: the same as its preview.host.
+  host: ''
+  tokenSecret:
+    name: ''
+    key: token
+  # The web app's Service; defaults to <release>-web, of the same release.
+  web:
+    serviceName: ''
+    servicePort: 3000
+
+# Where /api on the admin host is sent, and where the admin's server calls the API (API_URL).
+api:
+  # Defaults to <release>-api, the API service of the same release.
+  serviceName: ''
+  servicePort: 3001

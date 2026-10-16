@@ -1,0 +1,165 @@
+{{- if .Values.worker.databaseUrlSecret.name }}
+{{- $name := printf "%s-worker" (include "aiontheballot-api.fullname" .) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  # One worker, never two at once, even during a rollout: its queue, and its refusal of a job it already has, are its
+  # own process's (ADR-0006). A job cut off by a restart is handed over again by the API.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "aiontheballot-api.workerSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      # Not the API's selector labels: the API's Service must never send requests to this pod.
+      labels:
+        {{- include "aiontheballot-api.workerSelectorLabels" . | nindent 8 }}
+        app.kubernetes.io/part-of: aiontheballot
+        app.kubernetes.io/component: worker
+      annotations:
+        # A file-system backup of pod volumes (the annotation is Velero's) skips this scratch volume.
+        backup.velero.io/backup-volumes-excludes: tmp
+    spec:
+      terminationGracePeriodSeconds: 30
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["node", "dist/worker.js"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.worker.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.worker.port | quote }}
+            - name: EXTRACTION_TIMEOUT_MS
+              value: {{ .Values.worker.extraction.timeoutMs | quote }}
+            - name: EXTRACTION_MEMORY_MB
+              value: {{ .Values.worker.extraction.memoryMb | quote }}
+            - name: WORKER_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.worker.databaseUrlSecret.name }}
+                  key: {{ .Values.worker.databaseUrlSecret.key }}
+            # The secret it shares with the API, which every job must carry (ADR-0006).
+            - name: WORKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "worker.tokenSecret.name is required with the worker" .Values.worker.tokenSecret.name }}
+                  key: {{ .Values.worker.tokenSecret.key }}
+          {{- with .Values.worker.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            # Node needs a writable /tmp; nothing else in the filesystem is writable.
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  selector:
+    {{- include "aiontheballot-api.workerSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.worker.port }}
+      targetPort: http
+{{- if .Values.worker.networkPolicy.enabled }}
+---
+# Only the API's pods reach the worker; the worker reaches only the database, DNS and, when set, error tracking (PLAN
+# R116, ADR-0006).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "aiontheballot-api.workerSelectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            # The API's pods alone: the worker's and the cleanup job's carry names of their own.
+            matchLabels:
+              {{- include "aiontheballot-api.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: {{ .Values.worker.port }}
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ required "worker.networkPolicy.database.namespace is required with the network policy" .Values.worker.networkPolicy.database.namespace }}
+      ports:
+        - port: {{ .Values.worker.networkPolicy.database.port }}
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    {{- with .Values.worker.networkPolicy.errorTracking }}
+    {{- if .namespace }}
+    # Error tracking's in-cluster Service: the port is its pods' (a policy sees the connection after the Service).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .namespace }}
+          {{- with .podLabels }}
+          podSelector:
+            matchLabels:
+              {{- toYaml . | nindent 14 }}
+          {{- end }}
+      ports:
+        - port: {{ .port }}
+          protocol: TCP
+    {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

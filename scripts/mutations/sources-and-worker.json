@@ -1,0 +1,378 @@
+[
+  {
+    "name": "worker: bytes not checked against the source's hash",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "          if (!isCopy(bytes, source.sha256)) {",
+    "new": "          if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: isCopy always true",
+    "file": "apps/api/src/worker/jobs.ts",
+    "old": "createHash('sha256').update(bytes).digest('hex') === sha256;",
+    "new": "true;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: its own fault recorded as the document's",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "            return reply.code(503).send({ error: 'unavailable' });\n          }",
+    "new": "            result = { status: 'failed' };\n          }",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: finished jobs still served",
+    "file": "apps/api/src/worker/jobs.ts",
+    "old": "      .where('finished_at', 'is', null)\n",
+    "new": "\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "RLS shows the worker only its open job (job_requests' worker policy), so a finished one is never read"
+  },
+  {
+    "name": "worker: non-pending source still served",
+    "file": "apps/api/src/worker/jobs.ts",
+    "old": "source?.sha256 && source.extraction_status === 'pending'",
+    "new": "source?.sha256",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "an extraction job can only be requested for a pending source, and finishing it sets both at once (job rules)"
+  },
+  {
+    "name": "worker: writes not in the requester's name",
+    "file": "apps/api/src/worker/jobs.ts",
+    "old": "    await sql`SELECT set_config('app.user_id', ${job.requested_by}, true)`.execute(trx);\n",
+    "new": "\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: queue never full",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "      if (waiting >= maxWaiting) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: jobs run at once, not one at a time",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "        await turn;\n",
+    "new": "\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: a job already here parsed again",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "      if (here.has(id)) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: body not capped",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "    if (size > maxBytes) {",
+    "new": "    if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "child: no memory watchdog",
+    "file": "apps/api/src/worker/watchdog.ts",
+    "old": "         process.kill(process.pid, 'SIGKILL');",
+    "new": "",
+    "cmd": "npx vitest run src/worker/child.spec.ts src/worker/child-extractor.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "child: environment passed on",
+    "file": "apps/api/src/worker/child.ts",
+    "old": "{ env: {}, stdio:",
+    "new": "{ env: process.env, stdio:",
+    "cmd": "npx vitest run src/worker/child.spec.ts src/worker/child-extractor.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "child: no permission model",
+    "file": "apps/api/src/worker/child.ts",
+    "old": "        '--permission',\n",
+    "new": "",
+    "cmd": "npx vitest run src/worker/child.spec.ts src/worker/child-extractor.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "child: deadline reported as a crash",
+    "file": "apps/api/src/worker/child.ts",
+    "old": "        resolve({ kind: 'fault', fault: 'time' });",
+    "new": "        resolve({ kind: 'fault', fault: 'crash' });",
+    "cmd": "npx vitest run src/worker/child.spec.ts src/worker/child-extractor.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "child: answer not capped",
+    "file": "apps/api/src/worker/child.ts",
+    "old": "      if (outputBytes > maxOutputBytes) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run src/worker/child.spec.ts src/worker/child-extractor.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "child: answer trusted, not checked",
+    "file": "apps/api/src/worker/child-extractor.ts",
+    "old": "ok === true && isExtraction(result) ? result",
+    "new": "ok === true ? (result as Extraction)",
+    "cmd": "npx vitest run src/worker/child.spec.ts src/worker/child-extractor.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "upload: anyone may store bytes",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              if (!holds(found.access, 'editor', 'country_admin')) {\n                throw new Refusal(403, 'forbidden');\n              }\n              const source = await sourceForUpload(",
+    "new": "              if (false) {\n                throw new Refusal(403, 'forbidden');\n              }\n              const source = await sourceForUpload(",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "upload: a second copy read before refused",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              if (source.hasCopy) {",
+    "new": "              if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "open: whole file out before its hash is checked",
+    "file": "packages/db/src/file-store.ts",
+    "old": "          if (held) {\n            yield held;\n          }\n          held = bytes;",
+    "new": "          yield bytes;",
+    "cmd": "cd packages/db && npx vitest run src/file-store.spec.ts"
+  },
+  {
+    "name": "copy: served inline",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": ".header('content-disposition', `attachment; filename=",
+    "new": ".header('content-disposition', `inline; filename=",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "copy: no sandbox",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": ".header('content-disposition', `attachment; filename=\"${copy.sha256.slice(0, 12)}\"`)\n            .header('x-content-type-options', 'nosniff')\n            .header('content-security-policy', \"sandbox; default-src 'none'\")",
+    "new": ".header('content-disposition', `attachment; filename=\"${copy.sha256.slice(0, 12)}\"`)\n            .header('x-content-type-options', 'nosniff')\n            .header('content-security-policy', \"default-src 'none'\")",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "source: language not checked by the API",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "    language: { type: ['string', 'null'], pattern: '^[a-z]{2}(-[a-z]{2})?$' },",
+    "new": "    language: { type: ['string', 'null'] },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "upload: same bytes not kept once",
+    "file": "apps/api/src/admin/sources.ts",
+    "old": "  let fileId = existing?.id;",
+    "new": "  let fileId: string | undefined;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "list: citable regardless of extraction",
+    "file": "apps/api/src/admin/sources.ts",
+    "old": "    citable:\n      r.sha256 !== null &&\n      (r.extraction_status === 'done' || r.extraction_status === 'not_applicable'),",
+    "new": "    citable: true,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "upload: no extraction requested",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            extraction?.dispatch({\n              jobId: job,",
+    "new": "            void ({\n              jobId: job,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "extract: anyone may ask",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            if (!holds(access, 'editor', 'country_admin')) {\n              throw new Refusal(403, 'forbidden');\n            }\n            return pendingExtraction(",
+    "new": "            if (false) {\n              throw new Refusal(403, 'forbidden');\n            }\n            return pendingExtraction(",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "extract: no rate limit",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "          if (!allowExtraction(actor.userId)) {",
+    "new": "          if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: a job sent twice while on its way",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "      if (onTheirWay.has(job.jobId)) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "text: undeclared page read as windows-1252 always",
+    "file": "apps/api/src/worker/extract.ts",
+    "old": "isUtf8(bytes) ? 'UTF-8' : 'windows-1252'",
+    "new": "'windows-1252'",
+    "cmd": "npx vitest run src/worker/extract.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "text: <br> runs words together",
+    "file": "apps/api/src/worker/extract.ts",
+    "old": "      paragraph += '\\n';\n",
+    "new": "\n",
+    "cmd": "npx vitest run src/worker/extract.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "text: nested blocks repeated",
+    "file": "apps/api/src/worker/extract.ts",
+    "old": "    if (block) {\n      flush();\n    }\n    if (SECTION_HEADINGS",
+    "new": "    if (block) {\n      flush();\n      paragraph += node.textContent ?? '';\n    }\n    if (SECTION_HEADINGS",
+    "cmd": "npx vitest run src/worker/extract.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "text: NUL kept",
+    "file": "apps/api/src/worker/extract.ts",
+    "old": "text.replaceAll('\\u0000', '')",
+    "new": "text",
+    "cmd": "npx vitest run src/worker/extract.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "text: units past the cap dropped",
+    "file": "apps/api/src/worker/extract.ts",
+    "old": "  if (units.length <= MAX_UNITS) {",
+    "new": "  if (true) {",
+    "cmd": "npx vitest run src/worker/extract.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "text: plain text not decoded as windows-1252",
+    "file": "apps/api/src/worker/extract.ts",
+    "old": "    return new TextDecoder('windows-1252').decode(bytes);",
+    "new": "    return new TextDecoder('utf-8').decode(bytes);",
+    "cmd": "npx vitest run src/worker/extract.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "migration: open extraction jobs not unique",
+    "file": "db/migrations/20261012020531_open_extraction_once.sql",
+    "old": "CREATE UNIQUE INDEX job_requests_one_open_extraction",
+    "new": "CREATE INDEX job_requests_one_open_extraction",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/jobs.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "admin: hasCopy not worded",
+    "file": "apps/admin/src/write.ts",
+    "old": "  'hasCopy',\n",
+    "new": "",
+    "cmd": "npx vitest run src/write-keys.spec.ts",
+    "cwd": "apps/admin"
+  },
+  {
+    "name": "store: no size limit while streaming",
+    "file": "packages/db/src/file-store.ts",
+    "old": "            if (byteSize > maxBytes) {",
+    "new": "            if (false) {",
+    "cmd": "cd packages/db && npx vitest run src/file-store.spec.ts"
+  },
+  {
+    "name": "worker: a gone request stays in the queue",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "          gone = true;\n          leave();\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: mismatch answered as already here",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "return reply.code(422).send({ error: 'mismatch' });",
+    "new": "return reply.code(409).send({ error: 'mismatch' });",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "upload: any content type taken",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            if (!isUploadType(contentType) || typeof request.body?.iterator !== 'function') {",
+    "new": "            if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "upload: too large while streaming not refused",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              if (error instanceof TooLargeError) {\n                throw new Refusal(413, 'tooLarge');",
+    "new": "              if (false) {\n                throw new Refusal(413, 'tooLarge');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "upload: same bytes as another type taken",
+    "file": "apps/api/src/admin/sources.ts",
+    "old": "  if (existing && existing.content_type !== upload.contentType) {",
+    "new": "  if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "upload: a refused body read to its end",
+    "file": "apps/api/src/unread-body.ts",
+    "old": "        timer = setTimeout(() => raw.destroy(), maxMs);",
+    "new": "        timer = undefined;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts -t 'close a refused'",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "store: empty put kept",
+    "file": "packages/db/src/file-store.ts",
+    "old": "        if (byteSize === 0) {\n          throw new EmptyError();",
+    "new": "        if (false) {\n          throw new EmptyError();",
+    "cmd": "cd packages/db && npx vitest run src/file-store.spec.ts"
+  },
+  {
+    "name": "child: reads outside its roots",
+    "file": "apps/api/src/worker/child.ts",
+    "old": "        ...readRoots.map((root) => `--allow-fs-read=${root}`),",
+    "new": "        '--allow-fs-read=/',",
+    "cmd": "npx vitest run src/worker/child.spec.ts src/worker/child-extractor.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "text: control characters kept",
+    "file": "apps/api/src/worker/extract.ts",
+    "old": ".replace(/(?![\\t\\n\\r])\\p{Cc}/gu, ' ')",
+    "new": "",
+    "cmd": "npx vitest run src/worker/extract.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: a refusal by the worker not reported",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "    if (!response.ok && response.status !== 404 && response.status !== 409) {",
+    "new": "    if (false) {",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  }
+]

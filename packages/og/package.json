@@ -1,0 +1,47 @@
+{
+  "name": "@aiontheballot/og",
+  "version": "0.7.3",
+  "private": true,
+  "description": "Share-image templates and their renderer (satori, then resvg): ADR-0003 §8",
+  "type": "module",
+  "exports": {
+    "./*": {
+      "import": "./dist/*.js",
+      "types": "./dist/*.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/fingerprint.mjs",
+    "build:watch": "tsc --watch -p tsconfig.build.json",
+    "build:check": "tsc --noEmit",
+    "lint": "oxlint --type-aware --max-warnings 0 .",
+    "lint:fix": "oxlint --type-aware --fix --max-warnings 0 .",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "prepare": "[ \"$PACKAGED\" = true ] && echo 'Skipping prepare for packaged production dependencies install' || (tsc -p tsconfig.build.json && node scripts/fingerprint.mjs)",
+    "fonts": "node scripts/embed-fonts.mjs",
+    "cards:accept": "node scripts/accept-cards.mjs"
+  },
+  "devDependencies": {
+    "@slango.configs/lint-staged": "2.0.8",
+    "@slango.configs/oxlint": "0.1.13",
+    "@slango.configs/typescript": "3.0.0",
+    "@slango.configs/vitest": "2.1.2",
+    "@types/pngjs": "6.0.5",
+    "@types/react": "19.3.0",
+    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/ui": "5.0.3",
+    "oxlint": "1.87.0",
+    "oxlint-tsgolint": "7.0.2004",
+    "pixelmatch": "8.0.0",
+    "pngjs": "7.0.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  },
+  "dependencies": {
+    "@aiontheballot/domain": "workspace:*",
+    "@aiontheballot/ui": "workspace:*",
+    "@resvg/resvg-js": "2.6.2",
+    "satori": "0.47.1"
+  }
+}

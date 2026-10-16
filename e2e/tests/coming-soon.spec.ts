@@ -1,0 +1,149 @@
+import { messages } from '@aiontheballot/i18n/messages';
+import { AxeBuilder } from '@axe-core/playwright';
+import { type Page } from '@playwright/test';
+
+import { PLATFORM_HOST, PORTS, TENANT_URL } from '../servers.js';
+import { expect, test } from '../test.js';
+
+const es = messages.es.home;
+const en = messages.en.home;
+
+/** Tenant ejemplo-b has no hostname of its own: it is served by path on the platform host, in Spanish and English. */
+const TENANT_B = `http://${PLATFORM_HOST}:${PORTS.web}/ejemplo-b`;
+const TENANT_B_EN = `${TENANT_B}/en`;
+
+/** WCAG 2.2 AA, as axe checks it (PLAN M3: zero violations). */
+const violations = async (page: Page) =>
+  (
+    await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .analyze()
+  ).violations.map((v) => `${v.id}: ${v.nodes.map((n) => String(n.target)).join(', ')}`);
+
+/** The `<time>`'s date written in full, as the page should: that day in UTC, the weekday capitalised. */
+const fullDate = async (page: Page, locale: 'es' | 'en') => {
+  const datetime = (await page.locator('time').getAttribute('datetime')) ?? '';
+  expect(datetime).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  const text = new Intl.DateTimeFormat(locale, { dateStyle: 'full', timeZone: 'UTC' }).format(
+    new Date(`${datetime}T12:00:00Z`),
+  );
+  return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
+};
+
+// Expressions, not functions: this package's types have no DOM.
+const scrollsSideways = async (page: Page) =>
+  (await page.evaluate(
+    'document.documentElement.scrollWidth > document.documentElement.clientWidth',
+  )) as boolean;
+
+test.describe('the coming-soon home (fictional seeds)', () => {
+  test("shows the tenant, its operator and its next election, all from the tenant's data", async ({
+    page,
+  }) => {
+    await page.goto(TENANT_URL);
+
+    await expect(page.getByText(messages.es.home.comingSoon, { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Inquilino de ejemplo A');
+    await expect(page.getByText(es.question)).toBeVisible();
+    await expect(
+      page.getByText('con las demandas de Organización de ejemplo A', { exact: false }),
+    ).toBeVisible();
+    // The seed's live election has no date yet: its name alone.
+    await expect(page.getByText('Elecciones generales de ejemplo', { exact: true })).toBeVisible();
+    await expect(page.locator('time')).toHaveCount(0);
+    // No newsletter button: subscribing to the operator's newsletter is not being told when the site is out.
+    await expect(
+      page.locator('a[href="https://boletin.organizacion-ejemplo-a.example/"]'),
+    ).toHaveCount(0);
+    // Who runs the site, once: in the footer, with the operator's logo.
+    await expect(page.getByText(messages.es.layout.initiativeLead, { exact: true })).toHaveCount(1);
+    await expect(
+      page.locator('footer').getByRole('img', { name: 'Organización de ejemplo A' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Conoce Organización de ejemplo A' }),
+    ).toHaveAttribute('href', 'https://organizacion-ejemplo-a.example/');
+    await expect(
+      page.getByRole('link', { name: 'contacto@organizacion-ejemplo-a.example' }),
+    ).toHaveAttribute('href', 'mailto:contacto@organizacion-ejemplo-a.example');
+    // How the site works, then the signup list (PLAN R119), offered since A has a published privacy policy.
+    await expect(page.getByRole('heading', { level: 2 })).toHaveText([
+      es.how.title,
+      messages.es.signup.title,
+    ]);
+    await expect(page.getByRole('heading', { level: 3 })).toHaveText([
+      es.how.quotes.title,
+      es.how.history.title,
+      es.how.corrections.title,
+    ]);
+  });
+
+  test('names an announced election with its date, never an unannounced one, and leaves out what the operator has not given', async ({
+    page,
+  }) => {
+    await page.goto(TENANT_B_EN);
+
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Example tenant B');
+    await expect(page.locator('[lang="en"]').first()).toBeVisible();
+    await expect(page.getByText(en.question)).toBeVisible();
+    await expect(
+      page.getByText("Example organisation B's demands", { exact: false }),
+    ).toBeVisible();
+    // B's announced draft (packages/db/seeds/seed.ts), not its unannounced one, though that one is sooner: its name,
+    // then its date in full on a line of its own.
+    await expect(page.getByText('Example regional election', { exact: true })).toBeVisible();
+    await expect(page.locator('time')).toHaveText(await fullDate(page, 'en'));
+    await expect(page.locator('time')).toHaveText(/^[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}, \d{4}$/);
+    await expect(page.getByText('Example local election')).toHaveCount(0);
+    // B's operator has no website, contact address or newsletter, and B no published policy texts: the only links are
+    // the legal notice, always there, and the language switch.
+    await expect(page.getByRole('link')).toHaveText([messages.en.layout.legalNotice, 'Español']);
+    await expect(page.locator('#avisos')).toHaveCount(0);
+  });
+
+  test('starts the full date with a capital in Spanish, where the weekday is written in lowercase', async ({
+    page,
+  }) => {
+    await page.goto(TENANT_B);
+
+    await expect(
+      page.getByText('Elecciones autonómicas de ejemplo', { exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('time')).toHaveText(await fullDate(page, 'es'));
+    await expect(page.locator('time')).toHaveText(
+      /^(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo), \d{1,2} de [a-z]+ de \d{4}$/,
+    );
+  });
+
+  test('has no WCAG 2.2 AA violations that axe can find, on a desktop and on a phone', async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 1280, height: 900 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      for (const url of [TENANT_URL, TENANT_B_EN]) {
+        await page.goto(url);
+        expect(await violations(page), `${url} at ${viewport.width}px`).toEqual([]);
+        expect(await scrollsSideways(page), `${url} at ${viewport.width}px`).toBe(false);
+      }
+    }
+  });
+
+  test('serves its fonts itself, with no request leaving the site', async ({ page }) => {
+    const hosts = new Set<string>();
+    page.on('request', (request) => hosts.add(new URL(request.url()).host));
+
+    await page.goto(TENANT_URL);
+    await page.evaluate('document.fonts.ready.then(() => undefined)');
+
+    expect([...hosts]).toEqual([new URL(TENANT_URL).host]);
+    // The display face (700), the body face (400) and the numerals' face (900) are in use, rather than next/font's
+    // metric-matched fallbacks.
+    const weights = (await page.evaluate(
+      "[...document.fonts].filter((f) => f.status === 'loaded' && !f.family.endsWith('Fallback')).map((f) => f.weight)",
+    )) as string[];
+    expect([...weights].sort((a, b) => a.localeCompare(b))).toEqual(['400', '700', '900']);
+  });
+});

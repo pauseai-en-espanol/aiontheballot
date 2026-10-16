@@ -1,0 +1,157 @@
+[
+  {
+    "name": "api: the public site never told a site changed",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      if (writes && reply.statusCode < 400) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reports.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: the live match, which saves nothing, tells it at every pause in typing",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "          { writes: false },",
+    "new": "          {},",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: a write answered with a 4xx tells it too",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      if (writes && reply.statusCode < 400) {",
+    "new": "      if (writes) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reports.spec.ts tests/admin-routes.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "every refusal of a write is thrown and answered in the catch, which returns first; only the live match answered a 4xx itself, and it says it writes nothing"
+  },
+  {
+    "name": "api: a HEAD counts as a write",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      { writes = WRITES.has(request.method) }: { writes?: boolean } = {},",
+    "new": "      { writes = request.method !== 'GET' }: { writes?: boolean } = {},",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: a platform screen's site never told",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "        const tenant = typeof params.tenant === 'string' ? params.tenant : params.site;",
+    "new": "        const tenant = typeof params.tenant === 'string' ? params.tenant : undefined;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: an organization's sites never told",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "          for (const tenant of sites) {",
+    "new": "          for (const tenant of sites.slice(0, 0)) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: a failing notice fails the committed write",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      } catch (error) {\n        captureException(error);\n      }\n    };",
+    "new": "      } finally {\n        void captureException;\n      }\n    };",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "web: answered on a public host",
+    "file": "apps/web/src/revalidate.ts",
+    "old": "  if (!isInternalHost(request.headers.get('host'))) {",
+    "new": "  if (false) {",
+    "cmd": "npx vitest run src/revalidate.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: the proxy lets a public host reach it",
+    "file": "apps/web/src/routing-proxy.ts",
+    "old": "        return request.nextUrl.pathname === REVALIDATE_PATH &&",
+    "new": "        return request.nextUrl.pathname === `${REVALIDATE_PATH}-never` &&",
+    "cmd": "npx vitest run src/routing-proxy.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: any bracketed text is an IPv6 address",
+    "file": "apps/web/src/revalidate.ts",
+    "old": "    return isIP(ipv6) === 6;",
+    "new": "    return ipv6.length > 0;",
+    "cmd": "npx vitest run src/revalidate.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: any dotted number is an IPv4 address",
+    "file": "apps/web/src/revalidate.ts",
+    "old": "  return isIP(name) === 4 || name === 'localhost'",
+    "new": "  return /^[\\d.]+$/u.test(name) || name === 'localhost'",
+    "cmd": "npx vitest run src/revalidate.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: a site the routing table lacks is refetched all the same",
+    "file": "apps/web/src/revalidate.ts",
+    "old": "    if (!(await targets.routing(what.tenant))) {\n      return;\n    }",
+    "new": "    await targets.routing(what.tenant);",
+    "cmd": "npx vitest run src/revalidate.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: no bound on refetches at once",
+    "file": "apps/web/src/revalidate.ts",
+    "old": "    if (running.size >= maxKeys) {",
+    "new": "    if (running.size >= Number.MAX_SAFE_INTEGER) {",
+    "cmd": "npx vitest run src/revalidate.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: a change asked for meanwhile missed",
+    "file": "apps/web/src/revalidate.ts",
+    "old": "    } while (state.again);",
+    "new": "    } while (false);",
+    "cmd": "npx vitest run src/revalidate.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: a force runs beside the refresh on its way",
+    "file": "apps/web/src/refresh-queue.ts",
+    "old": "      slot.queued ??= slot.running.catch(() => undefined).then(() => begin(key));\n      return slot.queued;",
+    "new": "      return begin(key);",
+    "cmd": "npx vitest run src/refresh-queue.spec.ts src/home-data.spec.ts src/election-data.spec.ts src/routing-table.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: a forced site load takes the copy on its way",
+    "file": "apps/web/src/home-data.ts",
+    "old": "      await queue.force(slug);",
+    "new": "      await queue.join(slug);",
+    "cmd": "npx vitest run src/home-data.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: a forced election load takes the copy on its way",
+    "file": "apps/web/src/election-data.ts",
+    "old": "      await queue.force(pair);",
+    "new": "      await queue.join(pair);",
+    "cmd": "npx vitest run src/election-data.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: a forced routing load takes the copy on its way",
+    "file": "apps/web/src/routing-table.ts",
+    "old": "      await queue.force(undefined);",
+    "new": "      await queue.join(undefined);",
+    "cmd": "npx vitest run src/routing-table.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "end to end: the change waits for the minute's refresh",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "          tellPublicSite({\n            tenant,",
+    "new": "          void ({\n            tenant,",
+    "before": "pnpm --filter @aiontheballot/api build",
+    "after": "pnpm --filter @aiontheballot/api build",
+    "cmd": "pnpm exec playwright test tests/revalidate.spec.ts",
+    "cwd": "e2e"
+  }
+]

@@ -1,0 +1,106 @@
+[
+  {
+    "name": "form: the hidden field left unchecked",
+    "file": "apps/web/src/report-route.ts",
+    "old": "  const trap = (form.get('website') ?? '') !== '';",
+    "new": "  const trap = false;",
+    "cmd": "npx vitest run src/report-route.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "form: no time trap",
+    "file": "apps/web/src/report-route.ts",
+    "old": "  if (trap || elapsed < MIN_FILL_MS) {",
+    "new": "  if (trap) {",
+    "cmd": "npx vitest run src/report-route.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "form: posts from another site taken",
+    "file": "apps/web/src/report-route.ts",
+    "old": "  if (!fromThisSite(request)) {",
+    "new": "  if (false) {",
+    "cmd": "npx vitest run src/report-route.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "intake: a message made of links taken",
+    "file": "apps/api/src/reports.ts",
+    "old": "  if (linkCount(message) > MAX_LINKS) {",
+    "new": "  if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reports.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "intake: a draft election's slug resolved",
+    "file": "apps/api/src/reports.ts",
+    "old": "      .where('e.status', 'in', ['live', 'archived'])\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reports.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "intake: no limit per visitor",
+    "file": "apps/api/src/app.ts",
+    "old": "      const withinWindow = allowReport(visitor);",
+    "new": "      const withinWindow = true;",
+    "cmd": "npx vitest run src/app.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "queue: another site's reports listed",
+    "file": "apps/api/src/admin/reports.ts",
+    "old": "    .where('r.tenant_id', '=', tenantId);",
+    "new": "    ;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reports.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "change requests: a report the proposer can't see linked",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            if (proposal.reportId && !(await getReport(trx, access.tenantId, proposal.reportId))) {",
+    "new": "            if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reports.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "form: a stale form answered as sent, its report lost",
+    "file": "apps/web/src/report-route.ts",
+    "old": "    return back('expired');",
+    "new": "    return back('sent');",
+    "cmd": "npx vitest run src/report-route.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "intake: no daily limit per visitor",
+    "file": "apps/api/src/app.ts",
+    "old": "      if (!allowReportToday(visitor) || !withinWindow) {",
+    "new": "      if (!withinWindow) {",
+    "cmd": "npx vitest run src/app.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "intake: an IPv6 network counted by each /64",
+    "file": "apps/api/src/app.ts",
+    "old": "visitorKey(header, { ipv6Prefix: 48 })",
+    "new": "visitorKey(header)",
+    "cmd": "npx vitest run src/app.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "intake: invisible formatting taken",
+    "file": "apps/api/src/reports.ts",
+    "old": "  const hidden = lines ? /[\\u202A-\\u202E\\u2066-\\u2069]/u : /\\p{Cf}/u;",
+    "new": "  const hidden = /$^/u;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reports.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "home: the form offered while reports aren't taken",
+    "file": "apps/api/src/home-data.ts",
+    "old": "      reports: reports && published.privacy_policy !== undefined,",
+    "new": "      reports: published.privacy_policy !== undefined,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/home-data.spec.ts",
+    "cwd": "apps/api"
+  }
+]

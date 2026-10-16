@@ -1,0 +1,1589 @@
+import { createAuthPool } from '@aiontheballot/db/auth-pool';
+import { createDatabase } from '@aiontheballot/db/client';
+import Fastify, { type FastifyInstance } from 'fastify';
+import { sql } from 'kysely';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+
+import type { ProfileSource } from '../src/admin/profiles.js';
+import type { PasswordLinkResult, PasswordLinks } from '../src/auth/password-links.js';
+
+import { createProfileSource } from '../src/admin/profiles.js';
+import { adminDataRoutes } from '../src/admin/routes.js';
+import { PasswordMailFailed } from '../src/auth/password-links.js';
+import { createAccount, deleteAccount } from './auth-fixtures.js';
+import {
+  ELECTIONS_A,
+  LIVE_A,
+  LIVE_B,
+  OPERATOR_A,
+  SHARED_BRAND_ASSET,
+  TENANT_A,
+  UNLINKED_ORGANIZATION,
+  USERS,
+} from './fixtures.js';
+import './db.js';
+
+const env = (name: string): string => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is not set. Copy .env.example to .env.`);
+  }
+  return value;
+};
+
+const ORIGIN = 'https://admin.ejemplo.test';
+const admin = createDatabase({
+  connectionString: env('TEST_ADMIN_DATABASE_URL'),
+  maxConnections: 2,
+});
+const owner = createDatabase({
+  connectionString: env('TEST_SUPERUSER_DATABASE_URL'),
+  maxConnections: 1,
+});
+
+/** What the routes asked the profile source for, so a test can see they asked for no more than RLS showed. */
+const asked: { ids: readonly string[]; emails: boolean }[] = [];
+
+/** Fictional names for the fixture users, who have no accounts; one is left without, as a deleted account would be. */
+const profiles: ProfileSource = async (ids, { emails }) => {
+  asked.push({ ids, emails });
+  return new Map(
+    ids
+      .filter((id) => id !== USERS.editorAReviewerB)
+      .map((id) => [
+        id,
+        {
+          name: `Persona ${id.slice(-2)}`,
+          ...(emails ? { email: `persona-${id.slice(-2)}@example.org` } : {}),
+        },
+      ]),
+  );
+};
+
+/**
+ * The routes as the API mounts them, with the actor a test names in a header standing in for the session, which the
+ * sign-in tests cover (auth.spec.ts). Writes here commit, so each test puts back what it changed.
+ */
+/** What the public site's replicas were told changed (R151). */
+const revalidated: { tenant: string; election?: string }[] = [];
+
+/** The password reset emails asked for from the members page (R170), and what the next one answers. */
+const resets: { userId: string; by: { name: string; site: string; locale: string } }[] = [];
+let nextReset: PasswordLinkResult | 'fail' = 'sent';
+const passwordLinks: PasswordLinks = {
+  send: async (userId, by) => {
+    resets.push({ userId, by });
+    if (nextReset === 'fail') {
+      throw new PasswordMailFailed('An email could not be sent: EENVELOPE');
+    }
+    return nextReset;
+  },
+};
+
+const build = (
+  options: {
+    withAdmin?: boolean;
+    withPasswordLinks?: boolean;
+    revalidate?: (target: { tenant: string; election?: string }) => void;
+  } = {},
+): FastifyInstance => {
+  const app = Fastify();
+  void app.register(
+    adminDataRoutes({
+      admin: options.withAdmin === false ? undefined : admin,
+      profiles,
+      passwordLinks: options.withPasswordLinks === false ? undefined : passwordLinks,
+      adminOrigin: ORIGIN,
+      revalidate: options.revalidate ?? ((target) => revalidated.push(target)),
+      actorFor: async (request) => {
+        const user = request.headers['x-test-user'];
+        return typeof user === 'string' ? { userId: user, aal: 2 } : undefined;
+      },
+    }),
+    { prefix: '/api' },
+  );
+  return app;
+};
+const app = build();
+
+const send = (
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+  url: string,
+  as: string | undefined,
+  { body, origin = ORIGIN }: { body?: unknown; origin?: string | null } = {},
+) =>
+  app.inject({
+    method,
+    url,
+    headers: {
+      ...(as ? { 'x-test-user': as } : {}),
+      ...(method !== 'GET' && origin !== null ? { origin } : {}),
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    },
+    ...(body === undefined ? {} : { payload: JSON.stringify(body) }),
+  });
+
+/** A role as the owner adds one, stamped as the member's own, to put back what a test removed. */
+const restoreRole = (userId: string, role: 'country_admin' | 'editor' | 'reviewer') =>
+  owner.transaction().execute(async (trx) => {
+    await sql`SELECT set_config('app.user_id', ${userId}, true)`.execute(trx);
+    await sql`INSERT INTO app.memberships (user_id, tenant_id, role)
+              VALUES (${userId}, ${TENANT_A}, ${role}) ON CONFLICT DO NOTHING`.execute(trx);
+  });
+
+const rolesOf = async (userId: string) =>
+  (
+    await sql<{ role: string }>`SELECT role FROM app.memberships
+                                 WHERE user_id = ${userId} AND tenant_id = ${TENANT_A} ORDER BY role`.execute(
+      owner,
+    )
+  ).rows.map((row) => row.role);
+
+beforeAll(async () => {
+  await app.ready();
+});
+
+afterAll(async () => {
+  await app.close();
+  await admin.destroy();
+  await owner.destroy();
+});
+
+describe('the signed-in data routes', () => {
+  it('answer 401 without an actor, and 503 without the admin role', async () => {
+    expect((await send('GET', '/api/tenants', undefined)).statusCode).toBe(401);
+    const unconfigured = build({ withAdmin: false });
+    const response = await unconfigured.inject({
+      method: 'GET',
+      url: '/api/tenants',
+      headers: { 'x-test-user': USERS.editorA },
+    });
+    expect(response.statusCode).toBe(503);
+    await unconfigured.close();
+  });
+
+  it('list the tenants RLS shows, and say whether the user is a platform admin (A6)', async () => {
+    const member = await send('GET', '/api/tenants', USERS.editorAReviewerB);
+    expect(member.json()).toEqual({
+      tenants: [
+        { slug: 'test-a', name: expect.any(Object), defaultLocale: 'es' },
+        { slug: 'test-b', name: expect.any(Object), defaultLocale: 'es' },
+      ],
+      platformAdmin: false,
+    });
+    const platform = await send('GET', '/api/tenants', USERS.platformAdmin);
+    expect(platform.json()).toMatchObject({ platformAdmin: true });
+    expect(platform.json<{ tenants: unknown[] }>().tenants).toHaveLength(3);
+  });
+
+  it("give a tenant's settings and the actor's roles there, and 404 for a tenant RLS hides", async () => {
+    const overview = await send('GET', '/api/t/test-a', USERS.countryAdminA);
+    expect(overview.statusCode).toBe(200);
+    expect(overview.json()).toMatchObject({
+      tenant: {
+        slug: 'test-a',
+        defaultLocale: 'es',
+        enabledLocales: expect.arrayContaining(['es']),
+        methodologyKind: expect.any(String),
+        active: true,
+        reportRetentionDays: expect.any(Number),
+        liveEditsNeedSecondApprover: expect.any(Boolean),
+      },
+      roles: ['country_admin'],
+      platformAdmin: false,
+    });
+    const hidden = await send('GET', '/api/t/test-a', USERS.countryAdminB);
+    expect(hidden.statusCode).toBe(404);
+    expect(hidden.json()).toEqual({ error: 'notFound' });
+    expect((await send('GET', '/api/t/no-existe', USERS.platformAdmin)).statusCode).toBe(404);
+    expect((await send('GET', '/api/t/Not_A_Slug', USERS.platformAdmin)).statusCode).toBe(400);
+  });
+});
+
+describe('members (editorial workflow A7)', () => {
+  it('give every member names and roles, and emails only to country and platform admins', async () => {
+    const editor = (await send('GET', '/api/t/test-a/members', USERS.editorA)).json<{
+      members: Record<string, unknown>[];
+      canManage: boolean;
+      emailsShown: boolean;
+    }>();
+    expect(editor).toMatchObject({ canManage: false, emailsShown: false });
+    expect(editor.members).toHaveLength(4);
+    expect(editor.members).toContainEqual({
+      userId: USERS.reviewerA,
+      name: 'Persona 03',
+      roles: ['reviewer'],
+    });
+    for (const member of editor.members) {
+      expect(member).not.toHaveProperty('email');
+    }
+    for (const manager of [USERS.countryAdminA, USERS.platformAdmin]) {
+      const managed = (await send('GET', '/api/t/test-a/members', manager)).json<{
+        members: Record<string, unknown>[];
+        canManage: boolean;
+      }>();
+      expect(managed.canManage).toBe(true);
+      expect(managed.members).toContainEqual({
+        userId: USERS.reviewerA,
+        name: 'Persona 03',
+        email: 'persona-03@example.org',
+        roles: ['reviewer'],
+      });
+      // An account that is gone keeps its roles, with neither name nor email.
+      expect(managed.members).toContainEqual({
+        userId: USERS.editorAReviewerB,
+        name: null,
+        email: null,
+        roles: ['editor'],
+      });
+    }
+    expect((await send('GET', '/api/t/test-a/members', USERS.countryAdminB)).statusCode).toBe(404);
+  });
+
+  it("ask Better Auth's role only for the members RLS showed, and for emails only when they are shown", async () => {
+    asked.length = 0;
+    await send('GET', '/api/t/test-a/members', USERS.editorA);
+    await send('GET', '/api/t/test-a/members', USERS.countryAdminA);
+    await send('GET', '/api/t/test-a/members', USERS.countryAdminB);
+    expect(asked).toHaveLength(2);
+    const members = [USERS.editorA, USERS.reviewerA, USERS.countryAdminA, USERS.editorAReviewerB];
+    expect([...(asked[0]?.ids ?? [])].sort()).toEqual([...members].sort());
+    expect(asked.map((call) => call.emails)).toEqual([false, true]);
+  });
+
+  it('send a password reset email for whoever manages the members, naming them and the site (R170)', async () => {
+    const url = `/api/t/test-a/members/${USERS.reviewerA}/password-reset`;
+    resets.length = 0;
+    revalidated.length = 0;
+    nextReset = 'sent';
+    for (const manager of [USERS.countryAdminA, USERS.platformAdmin]) {
+      expect((await send('POST', url, manager)).statusCode).toBe(204);
+    }
+    expect(resets).toEqual([
+      {
+        userId: USERS.reviewerA,
+        by: { name: 'Persona 04', site: expect.any(String), locale: 'es' },
+      },
+      {
+        userId: USERS.reviewerA,
+        by: { name: 'Persona 05', site: expect.any(String), locale: 'es' },
+      },
+    ]);
+    expect(resets[0]?.by.site).not.toBe('');
+    // Nothing the public sees changed.
+    expect(revalidated).toEqual([]);
+    const listed = (await send('GET', '/api/t/test-a/members', USERS.countryAdminA)).json<{
+      resetReady: boolean;
+    }>();
+    expect(listed.resetReady).toBe(true);
+  });
+
+  it('refuse a password reset email to anyone else, for a non-member, and say when one was just sent', async () => {
+    const url = (userId: string) => `/api/t/test-a/members/${userId}/password-reset`;
+    resets.length = 0;
+    nextReset = 'sent';
+    for (const member of [USERS.editorA, USERS.reviewerA]) {
+      const refused = await send('POST', url(USERS.countryAdminA), member);
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json()).toEqual({ error: 'forbidden' });
+    }
+    expect((await send('POST', url(USERS.reviewerA), USERS.countryAdminB)).statusCode).toBe(404);
+    const stranger = await send('POST', url(USERS.countryAdminB), USERS.countryAdminA);
+    expect(stranger.statusCode).toBe(404);
+    expect(stranger.json()).toEqual({ error: 'notFound' });
+    expect(
+      (await send('POST', url(USERS.reviewerA), USERS.countryAdminA, { origin: null })).statusCode,
+    ).toBe(403);
+    expect(resets).toEqual([]);
+    try {
+      nextReset = 'too-soon';
+      const soon = await send('POST', url(USERS.reviewerA), USERS.countryAdminA);
+      expect(soon.statusCode).toBe(429);
+      expect(soon.json()).toEqual({ error: 'tooSoon' });
+      nextReset = 'no-account';
+      expect((await send('POST', url(USERS.reviewerA), USERS.countryAdminA)).json()).toEqual({
+        error: 'notFound',
+      });
+      nextReset = 'not-enrolled';
+      const unenrolled = await send('POST', url(USERS.reviewerA), USERS.countryAdminA);
+      expect(unenrolled.statusCode).toBe(409);
+      expect(unenrolled.json()).toEqual({ error: 'notEnrolled' });
+      nextReset = 'fail';
+      const failed = await send('POST', url(USERS.reviewerA), USERS.countryAdminA);
+      expect(failed.statusCode).toBe(502);
+      expect(failed.json()).toEqual({ error: 'mailFailed' });
+    } finally {
+      nextReset = 'sent';
+    }
+    const unready = build({ withPasswordLinks: false });
+    try {
+      const answer = await unready.inject({
+        method: 'POST',
+        url: url(USERS.reviewerA),
+        headers: { 'x-test-user': USERS.countryAdminA, origin: ORIGIN },
+      });
+      expect(answer.statusCode).toBe(503);
+    } finally {
+      await unready.close();
+    }
+  });
+
+  it('remove a role, as a country admin, and take it from the member at once', async () => {
+    try {
+      const removed = await send(
+        'DELETE',
+        `/api/t/test-a/members/${USERS.editorAReviewerB}/roles/editor`,
+        USERS.countryAdminA,
+      );
+      expect(removed.statusCode).toBe(204);
+      expect(await rolesOf(USERS.editorAReviewerB)).toEqual([]);
+      // No role left in A: the tenant is gone for them, and B is still theirs.
+      expect((await send('GET', '/api/t/test-a', USERS.editorAReviewerB)).statusCode).toBe(404);
+      expect((await send('GET', '/api/t/test-b', USERS.editorAReviewerB)).statusCode).toBe(200);
+    } finally {
+      await restoreRole(USERS.editorAReviewerB, 'editor');
+    }
+  });
+
+  // Each refusal test puts the role back too, so a build that wrongly allows the write can't break the next tests.
+  it("refuse the tenant's last country admin, and change nothing", async () => {
+    try {
+      const refused = await send(
+        'DELETE',
+        `/api/t/test-a/members/${USERS.countryAdminA}/roles/country_admin`,
+        USERS.platformAdmin,
+      );
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json()).toEqual({ error: 'lastCountryAdmin' });
+      expect(await rolesOf(USERS.countryAdminA)).toEqual(['country_admin']);
+    } finally {
+      await restoreRole(USERS.countryAdminA, 'country_admin');
+    }
+  });
+
+  it('refuse an editor, a missing role, a write from another origin, and a role that is no role', async () => {
+    try {
+      await refusals();
+    } finally {
+      await restoreRole(USERS.reviewerA, 'reviewer');
+    }
+  });
+
+  const refusals = async () => {
+    const url = `/api/t/test-a/members/${USERS.reviewerA}/roles/reviewer`;
+    const editor = await send('DELETE', url, USERS.editorA);
+    expect(editor.statusCode).toBe(403);
+    expect(editor.json()).toEqual({ error: 'forbidden' });
+    const missing = await send(
+      'DELETE',
+      `/api/t/test-a/members/${USERS.reviewerA}/roles/editor`,
+      USERS.countryAdminA,
+    );
+    expect(missing.statusCode).toBe(404);
+    for (const origin of [null, 'https://otro.ejemplo.test']) {
+      expect((await send('DELETE', url, USERS.countryAdminA, { origin })).statusCode).toBe(403);
+    }
+    expect(
+      (
+        await send(
+          'DELETE',
+          `/api/t/test-a/members/${USERS.reviewerA}/roles/owner`,
+          USERS.countryAdminA,
+        )
+      ).statusCode,
+    ).toBe(400);
+    expect(await rolesOf(USERS.reviewerA)).toEqual(['reviewer']);
+  };
+
+  it('give an existing member another role, and refuse what the database or the API refuses', async () => {
+    const url = (userId: string) => `/api/t/test-a/members/${userId}/roles`;
+    try {
+      const added = await send('POST', url(USERS.editorA), USERS.countryAdminA, {
+        body: { role: 'reviewer' },
+      });
+      expect(added.statusCode).toBe(204);
+      expect(await rolesOf(USERS.editorA)).toEqual(['editor', 'reviewer']);
+
+      const again = await send('POST', url(USERS.editorA), USERS.countryAdminA, {
+        body: { role: 'reviewer' },
+      });
+      expect(again.statusCode).toBe(409);
+      expect(again.json()).toEqual({ error: 'taken', constraint: 'memberships_pkey' });
+
+      const stranger = await send('POST', url(USERS.countryAdminB), USERS.countryAdminA, {
+        body: { role: 'editor' },
+      });
+      expect(stranger.statusCode).toBe(409);
+      expect(stranger.json()).toEqual({ error: 'notMember' });
+
+      const editor = await send('POST', url(USERS.reviewerA), USERS.editorA, {
+        body: { role: 'editor' },
+      });
+      expect(editor.statusCode).toBe(403);
+      expect(editor.json()).toEqual({ error: 'forbidden' });
+
+      const odd = await send('POST', url(USERS.reviewerA), USERS.countryAdminA, {
+        body: { role: 'platform_admin' },
+      });
+      expect(odd.statusCode).toBe(400);
+      expect(await rolesOf(USERS.reviewerA)).toEqual(['reviewer']);
+    } finally {
+      await sql`DELETE FROM app.memberships
+                 WHERE user_id = ${USERS.editorA} AND tenant_id = ${TENANT_A} AND role = 'reviewer'`.execute(
+        owner,
+      );
+      await sql`DELETE FROM app.memberships
+                 WHERE user_id IN (${USERS.countryAdminB}, ${USERS.reviewerA}) AND tenant_id = ${TENANT_A}
+                   AND role = 'editor'`.execute(owner);
+    }
+  });
+});
+
+describe("members' names and emails (PLAN R94)", () => {
+  const authPool = createAuthPool({
+    connectionString: env('TEST_AUTH_DATABASE_URL'),
+    maxConnections: 1,
+  });
+
+  afterAll(async () => {
+    await authPool.end();
+  });
+
+  it("are read by id from Better Auth's tables, for real accounts only", async () => {
+    const { id, email } = await createAccount(authPool);
+    try {
+      const source = createProfileSource(authPool);
+      const ids = [id, crypto.randomUUID(), 'not-an-id', id];
+      expect([...(await source(ids, { emails: true }))]).toEqual([
+        [id, { name: 'Persona de ejemplo', email }],
+      ]);
+      expect([...(await source(ids, { emails: false }))]).toEqual([
+        [id, { name: 'Persona de ejemplo' }],
+      ]);
+      expect(await source([], { emails: true })).toEqual(new Map());
+    } finally {
+      await deleteAccount(authPool, id);
+    }
+  });
+});
+
+describe('settings and policy texts (editorial workflow §5, P1)', () => {
+  /** A's fixture texts: a published privacy policy and a newer draft of it. */
+  const PUBLISHED_A = '0190f8c4-0000-7000-8000-000000000501';
+  const DRAFT_A = '0190f8c4-0000-7000-8000-000000000502';
+
+  const settingsOfA = async () =>
+    (
+      await sql<{ days: number; second: boolean }>`
+        SELECT report_retention_days AS days, live_edits_need_second_approver AS second
+          FROM app.tenants WHERE id = ${TENANT_A}`.execute(owner)
+    ).rows[0];
+
+  it("change a tenant's settings as the database allows, and refuse what doesn't fit", async () => {
+    const before = await settingsOfA();
+    try {
+      const url = '/api/t/test-a/settings';
+      const days = await send('PATCH', url, USERS.countryAdminA, {
+        body: { reportRetentionDays: 90 },
+      });
+      expect(days.statusCode).toBe(204);
+      expect((await settingsOfA())?.days).toBe(90);
+      const second = await send('PATCH', url, USERS.countryAdminA, {
+        body: { liveEditsNeedSecondApprover: true },
+      });
+      expect(second.statusCode).toBe(403);
+      expect(second.json()).toEqual({ error: 'forbidden' });
+      expect(
+        (await send('PATCH', url, USERS.editorA, { body: { reportRetentionDays: 7 } })).statusCode,
+      ).toBe(403);
+      for (const body of [
+        {},
+        { reportRetentionDays: 0 },
+        { reportRetentionDays: 36_501 },
+        { reportRetentionDays: 1.5 },
+        { theme: {} },
+      ]) {
+        expect(
+          (await send('PATCH', url, USERS.countryAdminA, { body })).statusCode,
+          JSON.stringify(body),
+        ).toBe(400);
+      }
+      const platform = await send('PATCH', url, USERS.platformAdmin, {
+        body: { liveEditsNeedSecondApprover: true },
+      });
+      expect(platform.statusCode).toBe(204);
+      expect((await settingsOfA())?.second).toBe(true);
+    } finally {
+      // As the fixture platform admin: the tenant's trigger leaves that setting to platform admins, the owner included.
+      await owner.transaction().execute(async (trx) => {
+        await sql`SELECT set_config('app.user_id', ${USERS.platformAdmin}, true),
+                         set_config('app.aal', '2', true)`.execute(trx);
+        await sql`UPDATE app.tenants SET report_retention_days = ${before?.days ?? 365},
+                         live_edits_need_second_approver = ${before?.second ?? false}
+                   WHERE id = ${TENANT_A}`.execute(trx);
+      });
+    }
+  });
+
+  it("set and reset the site's own colour as a country admin, never one no text reads on (T1, R178)", async () => {
+    const themeOfA = async () =>
+      (
+        await sql<{ theme: unknown }>`SELECT theme FROM app.tenants WHERE id = ${TENANT_A}`.execute(
+          owner,
+        )
+      ).rows[0]?.theme;
+    const before = await themeOfA();
+    try {
+      const url = '/api/t/test-a/settings';
+      const set = await send('PATCH', url, USERS.countryAdminA, {
+        body: { theme: { accent: '#1D3557' } },
+      });
+      expect(set.statusCode).toBe(204);
+      // Stored as the database keeps colours: lowercase.
+      expect(await themeOfA()).toEqual({ accent: '#1d3557' });
+      const overview = await send('GET', '/api/t/test-a', USERS.editorA);
+      expect(overview.json()).toMatchObject({ tenant: { theme: { accent: '#1d3557' } } });
+
+      // A middle grey: neither ink nor paper reads on it at WCAG AA.
+      const grey = await send('PATCH', url, USERS.countryAdminA, {
+        body: { theme: { accent: '#7a7a7a' } },
+      });
+      expect(grey.statusCode).toBe(422);
+      expect(grey.json()).toEqual({ error: 'themeContrast' });
+      for (const theme of [{ accent: 'orange' }, { accent: '#f94' }, { primary: '#123456' }, {}]) {
+        const refused = await send('PATCH', url, USERS.countryAdminA, { body: { theme } });
+        expect(refused.statusCode, JSON.stringify(theme)).toBe(400);
+      }
+      expect(
+        (await send('PATCH', url, USERS.editorA, { body: { theme: { accent: '#ffd166' } } }))
+          .statusCode,
+      ).toBe(403);
+      expect(await themeOfA()).toEqual({ accent: '#1d3557' });
+
+      // Back to the platform's colour.
+      const reset = await send('PATCH', url, USERS.countryAdminA, {
+        body: { theme: { accent: null } },
+      });
+      expect(reset.statusCode).toBe(204);
+      expect(await themeOfA()).toEqual({});
+    } finally {
+      await sql`UPDATE app.tenants SET theme = ${JSON.stringify(before ?? {})}::jsonb
+                 WHERE id = ${TENANT_A}`.execute(owner);
+    }
+  });
+
+  it('start, save, publish and delete versions of a text, as a country admin', async () => {
+    const created: string[] = [];
+    try {
+      const base = '/api/t/test-a/documents';
+      const list = await send('GET', base, USERS.editorA);
+      expect(list.json()).toMatchObject({ canEdit: false });
+      expect(list.json<{ documents: unknown[] }>().documents).toHaveLength(2);
+
+      // A draft of the privacy policy already exists.
+      const blocked = await send('POST', base, USERS.countryAdminA, {
+        body: { kind: 'privacy_policy', body: { es: 'Texto de ejemplo' } },
+      });
+      expect(blocked.statusCode).toBe(409);
+      expect(blocked.json()).toEqual({ error: 'draftExists' });
+
+      const draft = await send('POST', base, USERS.countryAdminA, {
+        body: { kind: 'about_operator', body: { es: 'Sobre la organización de ejemplo' } },
+      });
+      expect(draft.statusCode).toBe(201);
+      const { id } = draft.json<{ id: string }>();
+      created.push(id);
+      for (const [body, status] of [
+        // A language the tenant doesn't enable (A's is Spanish only), and nothing but blanks.
+        [{ body: { en: 'Example text' } }, 400],
+        [{ body: { es: '  ' } }, 422],
+      ] as const) {
+        expect(
+          (await send('PATCH', `${base}/${id}`, USERS.countryAdminA, { body })).statusCode,
+        ).toBe(status);
+      }
+      const published = await send('PATCH', `${base}/${id}`, USERS.countryAdminA, {
+        body: { body: { es: 'Sobre la organización de ejemplo, publicado' }, publish: true },
+      });
+      expect(published.statusCode).toBe(204);
+      const again = await send('PATCH', `${base}/${id}`, USERS.countryAdminA, {
+        body: { body: { es: 'Otro texto' } },
+      });
+      expect(again.statusCode).toBe(409);
+      expect((await send('DELETE', `${base}/${id}`, USERS.countryAdminA)).statusCode).toBe(409);
+      expect(
+        (await send('DELETE', `${base}/${crypto.randomUUID()}`, USERS.countryAdminA)).statusCode,
+      ).toBe(404);
+      // B's published text, named through A.
+      expect(
+        (await send('DELETE', `${base}/0190f8c4-0000-7000-8000-000000000503`, USERS.countryAdminA))
+          .statusCode,
+      ).toBe(404);
+      expect((await send('DELETE', `${base}/${id}`, USERS.editorA)).statusCode).toBe(409);
+
+      const second = await send('POST', base, USERS.countryAdminA, {
+        body: { kind: 'about_operator', body: { es: 'Segunda versión de ejemplo' } },
+      });
+      const secondId = second.json<{ id: string }>().id;
+      created.push(secondId);
+      expect((await send('DELETE', `${base}/${secondId}`, USERS.editorA)).statusCode).toBe(403);
+      expect((await send('DELETE', `${base}/${secondId}`, USERS.countryAdminA)).statusCode).toBe(
+        204,
+      );
+    } finally {
+      // Everything but A's two fixture texts, whatever a broken build let through.
+      await sql`DELETE FROM app.tenant_documents
+                 WHERE tenant_id = ${TENANT_A} AND (id = ANY(${created}) OR id NOT IN (${PUBLISHED_A}, ${DRAFT_A}))`.execute(
+        owner,
+      );
+    }
+  });
+});
+
+describe('the signup list (PLAN R119)', () => {
+  it('give country admins and platform admins counts, never addresses, and refuse anyone else', async () => {
+    const counts = { unconfirmed: 1, confirmed: 0, futureElections: 0 };
+    for (const user of [USERS.countryAdminA, USERS.platformAdmin]) {
+      const response = await send('GET', '/api/t/test-a/signups', user);
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual(counts);
+    }
+    for (const user of [USERS.editorA, USERS.reviewerA]) {
+      expect((await send('GET', '/api/t/test-a/signups', user)).statusCode).toBe(403);
+    }
+    expect((await send('GET', '/api/t/test-b/signups', USERS.countryAdminA)).statusCode).toBe(404);
+  });
+});
+
+describe('organizations (editorial workflow P2)', () => {
+  const BODY = {
+    displayName: { es: 'Organización de ejemplo' },
+    legalName: '  Organización de Ejemplo  ',
+    taxId: '',
+    address: null,
+    registryEntry: '   ',
+    contactEmail: ' Contacto@Ejemplo.ORG ',
+    privacyEmail: null,
+    url: 'https://ejemplo.org',
+    newsletterUrl: null,
+    // A's operator is a PauseAI chapter, and A uses a restricted brand asset, which needs one (P3).
+    isPauseaiChapter: true,
+  };
+
+  const organization = async (id: string) =>
+    (
+      await sql<Record<string, unknown>>`
+        SELECT display_name, legal_name, tax_id, address, registry_entry, contact_email, privacy_email, url,
+               newsletter_url, is_pauseai_chapter
+          FROM app.organizations WHERE id = ${id}`.execute(owner)
+    ).rows[0];
+
+  it("are for platform admins only: anyone else gets a 404, as for a page they can't open", async () => {
+    const listed = await send('GET', '/api/organizations', USERS.platformAdmin);
+    expect(listed.statusCode).toBe(200);
+    const body = listed.json<{ organizations: { id: string }[]; languages: string[] }>();
+    expect(body.organizations.map(({ id }) => id)).toContain(UNLINKED_ORGANIZATION);
+    expect(body.languages).toContain('es');
+    for (const user of [USERS.countryAdminA, USERS.editorA, USERS.noMembership]) {
+      expect((await send('GET', '/api/organizations', user)).statusCode).toBe(404);
+      expect((await send('GET', `/api/organizations/${OPERATOR_A}`, user)).statusCode).toBe(404);
+      expect(
+        (await send('PUT', `/api/organizations/${OPERATOR_A}`, user, { body: BODY })).statusCode,
+      ).toBe(404);
+      expect((await send('POST', '/api/organizations', user, { body: BODY })).statusCode).toBe(404);
+    }
+    const one = await send('GET', `/api/organizations/${OPERATOR_A}`, USERS.platformAdmin);
+    expect(one.statusCode).toBe(200);
+    expect(one.json()).toMatchObject({
+      organization: { id: OPERATOR_A, tenants: [{ slug: 'test-a', role: 'operator' }] },
+      languages: ['es'],
+    });
+    expect(
+      (
+        await send(
+          'GET',
+          '/api/organizations/0190f8c4-0000-7000-8000-000000000399',
+          USERS.platformAdmin,
+        )
+      ).statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await send(
+          'PUT',
+          '/api/organizations/0190f8c4-0000-7000-8000-000000000399',
+          USERS.platformAdmin,
+          {
+            body: BODY,
+          },
+        )
+      ).statusCode,
+    ).toBe(404);
+  });
+
+  it('change every field at once, trimmed, blank as unset, emails in lowercase', async () => {
+    const before = await organization(OPERATOR_A);
+    try {
+      const url = `/api/organizations/${OPERATOR_A}`;
+      revalidated.length = 0;
+      expect((await send('PUT', url, USERS.platformAdmin, { body: BODY })).statusCode).toBe(204);
+      // Its details show on every site it runs, which the path doesn't name: each is told (R151).
+      expect(revalidated).toEqual([{ tenant: 'test-a' }]);
+      expect(await organization(OPERATOR_A)).toEqual({
+        display_name: { es: 'Organización de ejemplo' },
+        legal_name: 'Organización de Ejemplo',
+        tax_id: null,
+        address: null,
+        registry_entry: null,
+        contact_email: 'contacto@ejemplo.org',
+        privacy_email: null,
+        url: 'https://ejemplo.org',
+        newsletter_url: null,
+        is_pauseai_chapter: true,
+      });
+      expect(
+        (
+          await send('PUT', url, USERS.platformAdmin, {
+            body: BODY,
+            origin: 'https://otro.example',
+          })
+        ).statusCode,
+      ).toBe(403);
+    } finally {
+      await owner
+        .updateTable('app.organizations')
+        .set({
+          display_name: JSON.stringify(before?.display_name),
+          legal_name: before?.legal_name as string,
+          tax_id: before?.tax_id as string | null,
+          address: before?.address as string | null,
+          registry_entry: before?.registry_entry as string | null,
+          contact_email: before?.contact_email as string | null,
+          privacy_email: before?.privacy_email as string | null,
+          url: before?.url as string | null,
+          newsletter_url: before?.newsletter_url as string | null,
+          is_pauseai_chapter: before?.is_pauseai_chapter as boolean,
+        })
+        .where('id', '=', OPERATOR_A)
+        .execute();
+    }
+  });
+
+  it("refuse what the database or the form's shape refuses, and change nothing", async () => {
+    const before = await organization(OPERATOR_A);
+    const url = `/api/organizations/${OPERATOR_A}`;
+    const put = (body: unknown) => send('PUT', url, USERS.platformAdmin, { body });
+    for (const [body, status, constraint] of [
+      [{ ...BODY, url: 'http://ejemplo.org' }, 422, 'organizations_url_check'],
+      [{ ...BODY, newsletterUrl: 'ejemplo.org' }, 422, 'organizations_newsletter_url_check'],
+      [{ ...BODY, contactEmail: 'no es un correo' }, 422, 'organizations_contact_email_check'],
+      [{ ...BODY, privacyEmail: 'privacidad@' }, 422, 'organizations_privacy_email_check'],
+      [{ ...BODY, legalName: '   ' }, 422, undefined],
+      [{ ...BODY, displayName: { es: '  ' } }, 422, undefined],
+      [{ ...BODY, displayName: { xx: 'Otra' } }, 400, undefined],
+      // A tenant of its uses a restricted brand asset, which only a PauseAI chapter's tenants may.
+      [{ ...BODY, isPauseaiChapter: false }, 422, undefined],
+      [(({ taxId: _, ...rest }) => rest)(BODY), 400, undefined],
+    ] as const) {
+      const answer = await put(body);
+      expect(answer.statusCode, JSON.stringify(body)).toBe(status);
+      if (constraint !== undefined) {
+        expect(answer.json()).toMatchObject({ error: 'incomplete', constraint });
+      }
+    }
+    expect(await organization(OPERATOR_A)).toEqual(before);
+  });
+
+  it("keep what the form doesn't show: the logo, and a language no site has but the name does", async () => {
+    const {
+      id: _,
+      created_at: __,
+      ...before
+    } = await owner
+      .selectFrom('app.organizations')
+      .selectAll()
+      .where('id', '=', OPERATOR_A)
+      .executeTakeFirstOrThrow();
+    try {
+      await owner
+        .updateTable('app.organizations')
+        .set({
+          display_name: JSON.stringify({ fr: "Organisation d'exemple" }),
+          logo_asset_id: SHARED_BRAND_ASSET,
+        })
+        .where('id', '=', OPERATOR_A)
+        .execute();
+      const url = `/api/organizations/${OPERATOR_A}`;
+      const shown = await send('GET', url, USERS.platformAdmin);
+      expect(shown.json<{ languages: string[] }>().languages).toEqual(['es', 'fr']);
+      const body = {
+        ...BODY,
+        displayName: { fr: "Organisation d'exemple", es: 'Organización de ejemplo' },
+      };
+      expect((await send('PUT', url, USERS.platformAdmin, { body })).statusCode).toBe(204);
+      expect(await organization(OPERATOR_A)).toMatchObject({
+        display_name: { fr: "Organisation d'exemple", es: 'Organización de ejemplo' },
+      });
+      expect(
+        (
+          await sql<{ logo: string | null }>`
+            SELECT logo_asset_id AS logo FROM app.organizations WHERE id = ${OPERATOR_A}`.execute(
+            owner,
+          )
+        ).rows[0]?.logo,
+      ).toBe(SHARED_BRAND_ASSET);
+      // A new one may only be named in the sites' languages.
+      expect(
+        (await send('POST', '/api/organizations', USERS.platformAdmin, { body })).statusCode,
+      ).toBe(400);
+    } finally {
+      await owner
+        .updateTable('app.organizations')
+        .set({ ...before, display_name: JSON.stringify(before.display_name) })
+        .where('id', '=', OPERATOR_A)
+        .execute();
+    }
+  });
+
+  it('create one, as a platform admin', async () => {
+    const created = await send('POST', '/api/organizations', USERS.platformAdmin, { body: BODY });
+    expect(created.statusCode).toBe(201);
+    const { id } = created.json<{ id: string }>();
+    try {
+      expect(await organization(id)).toMatchObject({
+        legal_name: 'Organización de Ejemplo',
+        contact_email: 'contacto@ejemplo.org',
+      });
+    } finally {
+      await owner.deleteFrom('app.organizations').where('id', '=', id).execute();
+    }
+  });
+});
+
+describe('sites (PLAN R129)', () => {
+  // Writes here commit: whatever site a test made goes, as the tables' owner, the only role purge_tenant may delete
+  // immutable rows as (ADR-0002 §14).
+  afterEach(async () => {
+    const { rows } = await sql<{ id: string }>`
+      SELECT id FROM app.tenants WHERE slug = ${BODY.slug}`.execute(owner);
+    for (const { id } of rows) {
+      await owner.transaction().execute(async (trx) => {
+        await sql`SET LOCAL ROLE aiontheballot_owner`.execute(trx);
+        await sql`SELECT private.purge_tenant(${id})`.execute(trx);
+      });
+    }
+  });
+
+  const BODY = {
+    slug: 'sitio-de-rutas',
+    name: { es: 'Sitio de rutas', en: 'Routes site' },
+    countryCode: ' xd ',
+    defaultLocale: 'es',
+    enabledLocales: ['en'],
+    methodologyKind: 'descriptive',
+    operatorId: UNLINKED_ORGANIZATION,
+    reportRetentionDays: 30,
+  };
+
+  it("are for platform admins only: anyone else gets a 404, as for a page they can't open", async () => {
+    for (const user of [USERS.countryAdminA, USERS.editorA, USERS.noMembership]) {
+      expect((await send('GET', '/api/sites', user)).statusCode).toBe(404);
+      expect((await send('GET', '/api/sites/test-a', user)).statusCode).toBe(404);
+      // Nor its details (PLAN R195).
+      expect(
+        (
+          await send('PATCH', '/api/sites/test-a', user, {
+            body: { name: { es: 'Sitio ajeno' }, enabledLocales: [], operatorId: OPERATOR_A },
+          })
+        ).statusCode,
+      ).toBe(404);
+      expect((await send('POST', '/api/sites', user, { body: BODY })).statusCode).toBe(404);
+      expect(
+        (await send('PUT', '/api/sites/test-a/active', user, { body: { active: false } }))
+          .statusCode,
+      ).toBe(404);
+      // Nor its public settings (PLAN R135).
+      for (const [path, body] of [
+        ['open', { open: true }],
+        ['indexing', { indexed: false }],
+        ['analytics', { plausibleScript: 'pa-ajeno.js' }],
+      ] as const) {
+        expect(
+          (await send('PUT', `/api/sites/test-a/${path}`, user, { body })).statusCode,
+          path,
+        ).toBe(404);
+      }
+      expect(
+        (
+          await send('POST', '/api/sites/test-a/hostnames', user, {
+            body: { hostname: 'otra.example.test', canonical: false },
+          })
+        ).statusCode,
+      ).toBe(404);
+    }
+    const listed = await send('GET', '/api/sites', USERS.platformAdmin);
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json<{ sites: { slug: string }[] }>().sites.map(({ slug }) => slug)).toContain(
+      'test-a',
+    );
+    expect((await send('GET', '/api/sites/no-existe', USERS.platformAdmin)).statusCode).toBe(404);
+  });
+
+  it('change their name, other languages and operator, never their main language (PLAN R195)', async () => {
+    expect((await send('POST', '/api/sites', USERS.platformAdmin, { body: BODY })).statusCode).toBe(
+      201,
+    );
+    const path = `/api/sites/${BODY.slug}`;
+    const siteNow = async () =>
+      (await send('GET', path, USERS.platformAdmin)).json<{
+        site: {
+          name: Record<string, string>;
+          defaultLocale: string;
+          enabledLocales: string[];
+          operator: { id: string } | null;
+        };
+      }>().site;
+    revalidated.length = 0;
+    const changed = await send('PATCH', path, USERS.platformAdmin, {
+      body: { name: { es: 'Sitio renombrado' }, enabledLocales: [], operatorId: OPERATOR_A },
+    });
+    expect(changed.statusCode).toBe(204);
+    expect(revalidated).toEqual([{ tenant: BODY.slug }]);
+    expect(await siteNow()).toMatchObject({
+      name: { es: 'Sitio renombrado' },
+      defaultLocale: 'es',
+      enabledLocales: ['es'],
+      operator: { id: OPERATOR_A },
+    });
+    // Its main language stays whatever is sent; another comes back, with the name in it.
+    expect(
+      (
+        await send('PATCH', path, USERS.platformAdmin, {
+          body: {
+            name: { es: 'Sitio de rutas', en: 'Routes site' },
+            enabledLocales: ['en', 'es'],
+            operatorId: UNLINKED_ORGANIZATION,
+          },
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(await siteNow()).toMatchObject({
+      name: { es: 'Sitio de rutas', en: 'Routes site' },
+      enabledLocales: ['es', 'en'],
+      operator: { id: UNLINKED_ORGANIZATION },
+    });
+    // Refused at their fields: no name, a name in a language the site lacks, a language the platform has no words
+    // for, an organization that isn't there.
+    for (const [body, status, answer] of [
+      [{ name: { es: ' ' } }, 422, { error: 'incomplete' }],
+      [
+        { name: { en: 'Routes site' }, enabledLocales: [] },
+        400,
+        { error: 'invalid', field: 'name' },
+      ],
+      [{ enabledLocales: ['fr'] }, 400, { error: 'invalid', field: 'enabledLocales' }],
+      [{ operatorId: '0190f8c4-0000-7000-8000-0000000000ff' }, 409, { error: 'linked' }],
+    ] as const) {
+      const refused = await send('PATCH', path, USERS.platformAdmin, {
+        body: {
+          name: { es: 'Sitio de rutas', en: 'Routes site' },
+          enabledLocales: ['en'],
+          operatorId: UNLINKED_ORGANIZATION,
+          ...body,
+        },
+      });
+      expect([refused.statusCode, refused.json()], JSON.stringify(body)).toEqual([
+        status,
+        expect.objectContaining(answer),
+      ]);
+    }
+    expect(await siteNow()).toMatchObject({
+      name: { es: 'Sitio de rutas', en: 'Routes site' },
+      operator: { id: UNLINKED_ORGANIZATION },
+    });
+  });
+
+  it("tell the public site a site's settings changed, never after a HEAD, and answer even if telling fails (R151)", async () => {
+    const indexed = async () =>
+      (
+        await sql<{ search_indexing: boolean }>`
+          SELECT search_indexing FROM app.tenants WHERE slug = 'test-a'`.execute(owner)
+      ).rows[0]?.search_indexing ?? true;
+    // The value it has, so nothing changes.
+    const body = { indexed: await indexed() };
+    revalidated.length = 0;
+    expect(
+      (await send('PUT', '/api/sites/test-a/indexing', USERS.platformAdmin, { body })).statusCode,
+    ).toBe(204);
+    expect(revalidated).toEqual([{ tenant: 'test-a' }]);
+    revalidated.length = 0;
+    const head = await app.inject({
+      method: 'HEAD',
+      url: '/api/t/test-a',
+      headers: { 'x-test-user': USERS.countryAdminA, origin: ORIGIN },
+    });
+    expect(head.statusCode).toBe(200);
+    expect(revalidated).toEqual([]);
+    const failing = build({
+      revalidate: () => {
+        throw new Error('the revalidator broke');
+      },
+    });
+    // A write whose answer is its return value, sent after the notice: a draft election renamed to its own name.
+    const { slug, id } = ELECTIONS_A.empty;
+    const name = (
+      await sql<{ name: Record<string, string> }>`
+        SELECT name FROM app.elections WHERE id = ${id}`.execute(owner)
+    ).rows[0]?.name;
+    try {
+      const answer = await failing.inject({
+        method: 'PATCH',
+        url: `/api/t/test-a/e/${slug}`,
+        headers: {
+          'x-test-user': USERS.countryAdminA,
+          origin: ORIGIN,
+          'content-type': 'application/json',
+        },
+        payload: JSON.stringify({ name }),
+      });
+      expect(answer.statusCode).toBe(200);
+      expect(answer.json()).toEqual({ slug });
+    } finally {
+      await failing.close();
+    }
+    expect(await indexed()).toBe(body.indexed);
+  });
+
+  it.each([
+    [
+      'a language the platform has no messages for',
+      { enabledLocales: ['fr'], name: { es: 'Sitio de rutas' } },
+      400,
+      'invalid',
+    ],
+    ['a name in a language the site lacks', { name: { de: 'Seite' } }, 400, 'invalid'],
+    ['no name at all', { name: { es: '  ' } }, 422, 'incomplete'],
+    ['a malformed short name', { slug: 'Sitio Malo' }, 422, 'incomplete'],
+    ['a malformed country code', { countryCode: 'España' }, 422, 'incomplete'],
+    ['the short name the admin keeps for its form', { slug: 'new' }, 409, 'taken'],
+  ])('refuse %s', async (_name, change, status, error) => {
+    const answer = await send('POST', '/api/sites', USERS.platformAdmin, {
+      body: { ...BODY, ...change },
+    });
+    expect(answer.statusCode).toBe(status);
+    expect(answer.json()).toMatchObject({ error });
+  });
+
+  // The schema's own refusals, before the database can overflow: the field they are about, by the body's name for it,
+  // so the admin marks it (admin forms §1.2, PLAN R189), and nothing of the value.
+  it.each([
+    [
+      'a retention past what the column takes',
+      { reportRetentionDays: 2 ** 31 },
+      'reportRetentionDays',
+    ],
+    ['a name longer than any', { name: { es: 'x'.repeat(5_000) } }, 'name'],
+    ['no short name at all', { slug: undefined }, 'slug'],
+  ])('refuse %s, naming the field', async (_name, change, field) => {
+    const answer = await send('POST', '/api/sites', USERS.platformAdmin, {
+      body: { ...BODY, ...change },
+    });
+    expect(answer.statusCode).toBe(400);
+    expect(answer.json()).toEqual({ error: 'invalid', field });
+  });
+
+  it('are created off and turned on by a platform admin, and give hostnames no route here', async () => {
+    const created = await send('POST', '/api/sites', USERS.platformAdmin, {
+      body: { ...BODY, slug: ` ${BODY.slug} ` },
+    });
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toEqual({ slug: BODY.slug });
+    const on = await send('PUT', `/api/sites/${BODY.slug}/active`, USERS.platformAdmin, {
+      body: { active: true },
+    });
+    expect(on.statusCode).toBe(204);
+    const site = await send('GET', `/api/sites/${BODY.slug}`, USERS.platformAdmin);
+    expect(site.json()).toEqual({
+      site: {
+        slug: BODY.slug,
+        name: BODY.name,
+        defaultLocale: 'es',
+        enabledLocales: ['es', 'en'],
+        countryCode: 'XD',
+        active: true,
+        methodologyKind: 'descriptive',
+        reportRetentionDays: 30,
+        operator: {
+          id: UNLINKED_ORGANIZATION,
+          name: expect.any(Object),
+          legalName: expect.any(String),
+        },
+        hostnames: [],
+        // A new site is coming soon, indexed, and counted nowhere (PLAN R135).
+        open: false,
+        indexed: true,
+        plausibleScript: null,
+      },
+    });
+    // Its public settings, one route each: opened, kept out of search engines, counted by Plausible.
+    for (const [path, body] of [
+      ['open', { open: true }],
+      ['indexing', { indexed: false }],
+      ['analytics', { plausibleScript: 'pa-Demo_1.js' }],
+    ] as const) {
+      expect(
+        (await send('PUT', `/api/sites/${BODY.slug}/${path}`, USERS.platformAdmin, { body }))
+          .statusCode,
+        path,
+      ).toBe(204);
+    }
+    expect(
+      (await send('GET', `/api/sites/${BODY.slug}`, USERS.platformAdmin)).json(),
+    ).toMatchObject({ site: { open: true, indexed: false, plausibleScript: 'pa-Demo_1.js' } });
+    // Only a script's file name: not a path, not a URL; and null removes it.
+    for (const plausibleScript of ['../admin.js', 'https://plausible.io/js/script.js', 'pa-.js']) {
+      expect(
+        (
+          await send('PUT', `/api/sites/${BODY.slug}/analytics`, USERS.platformAdmin, {
+            body: { plausibleScript },
+          })
+        ).statusCode,
+        plausibleScript,
+      ).toBe(400);
+    }
+    expect(
+      (
+        await send('PUT', `/api/sites/${BODY.slug}/analytics`, USERS.platformAdmin, {
+          body: { plausibleScript: null },
+        })
+      ).statusCode,
+    ).toBe(204);
+    expect(
+      (await send('GET', `/api/sites/${BODY.slug}`, USERS.platformAdmin)).json(),
+    ).toMatchObject({ site: { plausibleScript: null } });
+    // Hostnames are verified and routed by runbook (ADR-0002): the admin has no route to add one.
+    const hostname = await send('POST', `/api/sites/${BODY.slug}/hostnames`, USERS.platformAdmin, {
+      body: { hostname: 'otra.example.test', canonical: true },
+    });
+    expect(hostname.statusCode).toBe(404);
+    const again = await send('POST', '/api/sites', USERS.platformAdmin, { body: BODY });
+    expect(again.json()).toEqual({ error: 'taken', constraint: 'tenants_slug_key' });
+  });
+});
+
+describe("a site's work queues (editorial workflow C1.2)", () => {
+  it('answer each member with what waits for them, and a 404 to anyone outside the site', async () => {
+    const editor = await send('GET', '/api/t/test-a/queues', USERS.editorA);
+    expect(editor.statusCode).toBe(200);
+    expect(editor.json()).toMatchObject({ review: null, reports: 1, drafts: { total: 1 } });
+    const reviewer = await send('GET', '/api/t/test-a/queues', USERS.reviewerA);
+    expect(reviewer.json()).toMatchObject({ recheck: null, review: { total: 1 } });
+    for (const user of [USERS.countryAdminB, USERS.noMembership]) {
+      expect((await send('GET', '/api/t/test-a/queues', user)).statusCode).toBe(404);
+    }
+  });
+});
+
+describe('cells (editorial workflow §8)', () => {
+  const grid = '/api/t/test-a/e/generales-de-ejemplo/cells';
+  const SOURCE_A = '0190f8c4-0000-7000-8000-000000000651';
+
+  it("serve the election's grid and each cell to its members, and a 404 to anyone else", async () => {
+    const shown = await send('GET', grid, USERS.editorA);
+    expect(shown.statusCode).toBe(200);
+    const body = shown.json<{
+      cells: { partyId: string; criterionId: string; assessmentId: string | null }[];
+    }>();
+    const cell = body.cells.find((c) => c.assessmentId === LIVE_A.cells.draft);
+    expect(cell).toBeDefined();
+    const one = await send('GET', `${grid}/${cell?.partyId}/${cell?.criterionId}`, USERS.reviewerA);
+    expect(one.statusCode).toBe(200);
+    expect(one.json()).toMatchObject({ draft: { id: LIVE_A.cells.draft }, you: USERS.reviewerA });
+    for (const user of [USERS.countryAdminB, USERS.noMembership]) {
+      expect((await send('GET', grid, user)).statusCode).toBe(404);
+      expect(
+        (await send('GET', `${grid}/${cell?.partyId}/${cell?.criterionId}`, user)).statusCode,
+      ).toBe(404);
+    }
+  });
+
+  it('link a draft to a report its writer can read (C10.4), and to nothing else', async () => {
+    const cellUrl = `${grid}/${LIVE_A.cells.draft}`;
+    const reportOf = async (tenant: string) =>
+      (
+        await sql<{ id: string }>`SELECT id FROM app.reports WHERE tenant_id = ${tenant}`.execute(
+          owner,
+        )
+      ).rows[0]?.id;
+    // Tenant B's id, as the matrix fixtures define it.
+    const [reportA, reportB] = [
+      await reportOf(TENANT_A),
+      await reportOf('0190f8c4-0000-7000-8000-00000000000b'),
+    ];
+    /** The draft as it is, to save it back unchanged but for its report. */
+    const draft = async () => {
+      const { rows } = await sql<{
+        content_version: number;
+        draft_rating: string | null;
+        draft_summary: unknown;
+        draft_change_kind: string | null;
+        draft_public_note: unknown;
+      }>`SELECT content_version, draft_rating, draft_summary, draft_change_kind, draft_public_note
+           FROM app.assessments WHERE id = ${LIVE_A.cells.draft}`.execute(owner);
+      const row = rows[0];
+      return {
+        version: row?.content_version,
+        rating: row?.draft_rating ?? null,
+        summary: row?.draft_summary ?? null,
+        changeKind: row?.draft_change_kind ?? null,
+        publicNote: row?.draft_public_note ?? null,
+      };
+    };
+    const linked = async () =>
+      (
+        await sql<{ draft_report_id: string | null }>`
+          SELECT draft_report_id FROM app.assessments WHERE id = ${LIVE_A.cells.draft}`.execute(
+          owner,
+        )
+      ).rows[0]?.draft_report_id;
+
+    // One that doesn't exist, another site's, and any for a platform admin, who reads no reports (PLAN P11).
+    for (const [user, reportId] of [
+      [USERS.editorA, '0190f8c4-0000-7000-8000-0000000fffff'],
+      [USERS.editorA, reportB],
+      [USERS.platformAdmin, reportA],
+    ] as const) {
+      const refused = await send('PUT', cellUrl, user, { body: { ...(await draft()), reportId } });
+      expect(refused.statusCode, `${user} ${reportId}`).toBe(404);
+      expect(refused.json()).toEqual({ error: 'notFound' });
+    }
+    expect(await linked()).toBe(null);
+
+    // A save answers with the version it left the cell at (R190).
+    try {
+      expect(
+        (
+          await send('PUT', cellUrl, USERS.editorA, {
+            body: { ...(await draft()), reportId: reportA },
+          })
+        ).statusCode,
+      ).toBe(200);
+      expect(await linked()).toBe(reportA);
+      const { rows } = await sql<{ party_id: string; criterion_id: string }>`
+        SELECT party_id, criterion_id FROM app.assessments WHERE id = ${LIVE_A.cells.draft}`.execute(
+        owner,
+      );
+      const one = await send(
+        'GET',
+        `${grid}/${rows[0]?.party_id}/${rows[0]?.criterion_id}`,
+        USERS.editorA,
+      );
+      expect(one.json()).toMatchObject({ draft: { id: LIVE_A.cells.draft, reportId: reportA } });
+      // A form that doesn't offer it leaves it as it is.
+      expect((await send('PUT', cellUrl, USERS.editorA, { body: await draft() })).statusCode).toBe(
+        200,
+      );
+      expect(await linked()).toBe(reportA);
+      // Unlinked through the form, as an editor does.
+      expect(
+        (
+          await send('PUT', cellUrl, USERS.editorA, {
+            body: { ...(await draft()), reportId: null },
+          })
+        ).statusCode,
+      ).toBe(200);
+      expect(await linked()).toBe(null);
+    } finally {
+      // Back as it was, whatever failed: later tests read this draft. As its editor, whom its rules let.
+      await owner.transaction().execute(async (trx) => {
+        await sql`SELECT set_config('app.user_id', ${USERS.editorA}, true),
+                         set_config('app.aal', '2', true)`.execute(trx);
+        await sql`UPDATE app.assessments SET draft_report_id = NULL
+                   WHERE id = ${LIVE_A.cells.draft} AND draft_report_id IS NOT NULL`.execute(trx);
+      });
+    }
+  });
+
+  it("refuse a change made against an older version, which someone else's change made stale (C14)", async () => {
+    const answer = await send('PUT', `${grid}/${LIVE_A.cells.draft}`, USERS.editorA, {
+      body: { version: 9999, rating: null, summary: null, changeKind: null, publicNote: null },
+    });
+    expect(answer.statusCode).toBe(409);
+    expect(answer.json()).toEqual({ error: 'cellChanged' });
+  });
+
+  it("never act on another tenant's cell or source under this tenant's path, even for a member of both", async () => {
+    const { rows } = await sql<{
+      id: string;
+      party_id: string;
+      criterion_id: string;
+      content_version: number;
+    }>`
+      SELECT id, party_id, criterion_id, content_version FROM app.assessments
+       WHERE election_id = ${LIVE_B.id} LIMIT 1`.execute(owner);
+    const b = rows[0];
+    const sourceB = '0190f8c4-0000-7000-8000-000000000653';
+    const who = USERS.editorAReviewerB;
+    expect((await send('GET', `${grid}/${b?.party_id}/${b?.criterion_id}`, who)).statusCode).toBe(
+      404,
+    );
+    expect(
+      (
+        await send('PUT', `${grid}/${b?.id}`, who, {
+          body: {
+            version: b?.content_version,
+            rating: null,
+            summary: null,
+            changeKind: null,
+            publicNote: null,
+          },
+        })
+      ).statusCode,
+    ).toBe(404);
+    // B's own member matches against it first, so the API keeps its text: A's path must still not reach it.
+    expect(
+      (
+        await send(
+          'POST',
+          `/api/t/test-b/e/generales-de-ejemplo/sources/${sourceB}/match`,
+          USERS.countryAdminB,
+          {
+            body: { quote: 'Texto de ejemplo del programa ficticio' },
+          },
+        )
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await send('POST', `/api/t/test-a/e/generales-de-ejemplo/sources/${sourceB}/match`, who, {
+          body: { quote: 'Texto de ejemplo del programa ficticio' },
+        })
+      ).statusCode,
+    ).toBe(404);
+  });
+
+  it('match a quote as the editor types, without saving anything (C2.6)', async () => {
+    const url = `/api/t/test-a/e/generales-de-ejemplo/sources/${SOURCE_A}/match`;
+    revalidated.length = 0;
+    const matched = await send('POST', url, USERS.editorA, {
+      body: { quote: 'propone una moratoria de ejemplo sobre los sistemas de prueba' },
+    });
+    expect(matched.json()).toEqual({
+      kind: 'matched',
+      span: { fromUnit: 1, toUnit: 1, location: 'p. 1' },
+    });
+    const short = await send('POST', url, USERS.editorA, { body: { quote: 'corta' } });
+    expect(short.json()).toMatchObject({ kind: 'too-short', counted: 'stored' });
+    // Nothing changed, so the public site isn't told (R151).
+    expect(revalidated).toEqual([]);
+    expect(
+      (await send('POST', url, USERS.countryAdminB, { body: { quote: 'x' } })).statusCode,
+    ).toBe(404);
+  });
+
+  it("name in the trail only the site's members, never a platform admin or anyone else", async () => {
+    const shown = await send('GET', grid, USERS.editorA);
+    const cell = shown
+      .json<{ cells: { partyId: string; criterionId: string; assessmentId: string | null }[] }>()
+      .cells.find((c) => c.assessmentId === LIVE_A.cells.published);
+    // A platform admin's comment: written for good, on the fixture's published cell.
+    await send('POST', `${grid}/${LIVE_A.cells.published}/comments`, USERS.platformAdmin, {
+      body: { note: 'Comentario de la plataforma' },
+    });
+    const one = await send('GET', `${grid}/${cell?.partyId}/${cell?.criterionId}`, USERS.editorA);
+    const { names, draft } = one.json<{
+      names: Record<string, string | null>;
+      draft: { events: { actorId: string }[] };
+    }>();
+    expect(draft.events.map((e) => e.actorId)).toContain(USERS.platformAdmin);
+    expect(Object.keys(names)).not.toContain(USERS.platformAdmin);
+    expect(Object.keys(names)).toContain(USERS.editorA);
+  });
+
+  it('limit the live match per member', async () => {
+    const url = `/api/t/test-a/e/generales-de-ejemplo/sources/${SOURCE_A}/match`;
+    const statuses = new Set<number>();
+    for (let n = 0; n < 121; n += 1) {
+      statuses.add(
+        (await send('POST', url, USERS.countryAdminA, { body: { quote: 'propone una moratoria' } }))
+          .statusCode,
+      );
+    }
+    expect([...statuses].sort((a, b) => a - b)).toEqual([200, 429]);
+  });
+
+  it('refuse a rejection without a note, before the database is asked', async () => {
+    const answer = await send('POST', `${grid}/${LIVE_A.cells.inReview}/reject`, USERS.reviewerA, {
+      body: { version: 0, note: '   ' },
+    });
+    expect(answer.statusCode).toBe(422);
+  });
+});
+
+describe('invitations (editorial workflow A2)', () => {
+  const sent: { email: string; role: string; locale: string; token: string }[] = [];
+  let failing = false;
+  /** Accounts by email, for the "already holds the role" check. */
+  const known = new Map<string, string>();
+  const inviting = Fastify();
+  void inviting.register(
+    adminDataRoutes({
+      admin,
+      profiles,
+      adminOrigin: ORIGIN,
+      invitations: {
+        accounts: {
+          accountId: async (email) => known.get(email),
+          create: async () => '',
+          remove: async () => undefined,
+        },
+        send: async (invitation) => {
+          if (failing) {
+            throw Object.assign(new Error('550 refused'), { responseCode: 550 });
+          }
+          sent.push(invitation);
+        },
+      },
+      actorFor: async (request) => {
+        const user = request.headers['x-test-user'];
+        return typeof user === 'string' ? { userId: user, aal: 2 } : undefined;
+      },
+    }),
+    { prefix: '/api' },
+  );
+  const call = (method: 'GET' | 'POST' | 'DELETE', url: string, as: string, body?: unknown) =>
+    inviting.inject({
+      method,
+      url,
+      headers: {
+        'x-test-user': as,
+        ...(method === 'GET' ? {} : { origin: ORIGIN }),
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { payload: JSON.stringify(body) }),
+    });
+  const url = '/api/t/test-a/invitations';
+  const stateOf = async (email: string) =>
+    (
+      await sql<{ state: string }>`
+        SELECT CASE WHEN revoked_at IS NOT NULL THEN 'revoked' WHEN accepted_at IS NOT NULL THEN 'accepted'
+                    ELSE 'pending' END AS state
+          FROM app.invitations WHERE email = ${email} ORDER BY created_at`.execute(owner)
+    ).rows.map((r) => r.state);
+  const cleanUp = (email: string) =>
+    sql`DELETE FROM app.invitations WHERE email = ${email}`.execute(owner);
+
+  afterAll(async () => {
+    await inviting.close();
+  });
+
+  it("are listed to the tenant's country admins, and to nobody else", async () => {
+    const listed = await call('GET', url, USERS.countryAdminA);
+    expect(listed.json()).toMatchObject({ canInvite: true, mailReady: true });
+    expect(
+      listed.json<{ invitations: { email: string }[] }>().invitations.map((i) => i.email),
+    ).toContain('persona-invitada-a@example.org');
+    expect((await call('GET', url, USERS.editorA)).json()).toMatchObject({
+      invitations: [],
+      canInvite: false,
+    });
+  });
+
+  it('send a link with a fresh token, stored only as its hash, replacing a pending one', async () => {
+    const email = `invitada-${crypto.randomUUID()}@example.org`;
+    try {
+      sent.length = 0;
+      const first = await call('POST', url, USERS.countryAdminA, {
+        email: `  ${email.toUpperCase()} `,
+        role: 'editor',
+      });
+      expect(first.statusCode).toBe(201);
+      expect(sent).toEqual([
+        {
+          email,
+          role: 'editor',
+          locale: 'es',
+          site: expect.any(String),
+          // On the site's behalf (R115): its operator's name.
+          operator: { name: 'Organización de ejemplo A', contactEmail: null },
+          inviter: expect.any(String),
+          token: expect.stringMatching(/^[\w-]{43}$/),
+        },
+      ]);
+      const { rows } = await sql<{ n: number }>`
+        SELECT count(*)::int AS n FROM app.invitations
+         WHERE email = ${email}
+           AND token_hash = encode(sha256(convert_to(${sent[0]?.token ?? ''}, 'UTF8')), 'hex')`.execute(
+        owner,
+      );
+      expect(rows[0]?.n).toBe(1);
+      await call('POST', url, USERS.countryAdminA, { email, role: 'editor' });
+      expect(await stateOf(email)).toEqual(['revoked', 'pending']);
+    } finally {
+      await cleanUp(email);
+    }
+  });
+
+  it("revoke the new invitation again when its email can't be sent, and keep the earlier one working", async () => {
+    const email = `fallida-${crypto.randomUUID()}@example.org`;
+    try {
+      await call('POST', url, USERS.countryAdminA, { email, role: 'reviewer' });
+      failing = true;
+      const answer = await call('POST', url, USERS.countryAdminA, { email, role: 'reviewer' });
+      expect(answer.statusCode).toBe(502);
+      expect(answer.json()).toEqual({ error: 'mailFailed' });
+      expect(await stateOf(email)).toEqual(['pending', 'revoked']);
+    } finally {
+      failing = false;
+      await cleanUp(email);
+    }
+  });
+
+  it('refuse someone who already holds the role, and anyone but a country admin before looking', async () => {
+    known.set('persona-editora@example.org', USERS.editorA);
+    const holds = await call('POST', url, USERS.countryAdminA, {
+      email: 'persona-editora@example.org',
+      role: 'editor',
+    });
+    expect(holds.statusCode).toBe(409);
+    expect(holds.json()).toEqual({ error: 'holdsRole' });
+    // An editor learns nothing about who holds which role: the same refusal, whoever the address is.
+    expect(
+      (
+        await call('POST', url, USERS.editorA, {
+          email: 'persona-editora@example.org',
+          role: 'editor',
+        })
+      ).json(),
+    ).toEqual({ error: 'forbidden' });
+    expect(
+      (await call('POST', url, USERS.countryAdminA, { email: 'persona@ejemplo', role: 'editor' }))
+        .statusCode,
+    ).toBe(400);
+    const email = `no-${crypto.randomUUID()}@example.org`;
+    try {
+      expect((await call('POST', url, USERS.editorA, { email, role: 'editor' })).statusCode).toBe(
+        403,
+      );
+    } finally {
+      await cleanUp(email);
+    }
+  });
+
+  it('are revoked while pending, and deleted only once decided', async () => {
+    const email = `borrar-${crypto.randomUUID()}@example.org`;
+    try {
+      await call('POST', url, USERS.countryAdminA, { email, role: 'reviewer' });
+      const { rows } = await sql<{ id: string }>`
+        SELECT id FROM app.invitations WHERE email = ${email}`.execute(owner);
+      const id = rows[0]?.id ?? '';
+      expect((await call('DELETE', `${url}/${id}`, USERS.countryAdminA)).statusCode).toBe(403);
+      expect((await call('POST', `${url}/${id}/revoke`, USERS.countryAdminA)).statusCode).toBe(204);
+      expect((await call('POST', `${url}/${id}/revoke`, USERS.countryAdminA)).statusCode).toBe(404);
+      expect((await call('DELETE', `${url}/${id}`, USERS.countryAdminA)).statusCode).toBe(204);
+      expect(await stateOf(email)).toEqual([]);
+    } finally {
+      await cleanUp(email);
+    }
+  });
+});

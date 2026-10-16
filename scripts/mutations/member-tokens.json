@@ -1,0 +1,347 @@
+[
+  {
+    "name": "migration: the minting date taken as given",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "IF NEW.created_at IS DISTINCT FROM now() OR NEW.last_used_at",
+    "new": "IF NEW.last_used_at",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: minting not queued behind a change of credentials",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "    PERFORM 1 FROM auth.users u WHERE u.id = NEW.user_id FOR SHARE;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "the account's row is locked either way: a token's foreign key to auth.users takes a KEY SHARE lock on it, which the revocation's FOR UPDATE waits for; and in the other order the mint's KEY SHARE on the session waits for the change deleting it, then finds it gone. The explicit lock states the intent"
+  },
+  {
+    "name": "migration: minted without a second factor",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "WHERE f.user_id = NEW.user_id AND f.verified IS NOT FALSE FOR KEY SHARE;\n    IF NOT FOUND THEN",
+    "new": "WHERE f.user_id = NEW.user_id AND f.verified IS NOT FALSE FOR KEY SHARE;\n    IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: minted with a second factor never verified",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "WHERE f.user_id = NEW.user_id AND f.verified IS NOT FALSE FOR KEY SHARE;",
+    "new": "WHERE f.user_id = NEW.user_id FOR KEY SHARE;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: minted from another account's session",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "WHERE s.id = NEW.session_id AND s.user_id = NEW.user_id AND s.aal = 2",
+    "new": "WHERE s.id = NEW.session_id AND s.aal = 2",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: minted from a password alone",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "AND s.user_id = NEW.user_id AND s.aal = 2 AND",
+    "new": "AND s.user_id = NEW.user_id AND s.aal >= 1 AND",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: minted from an ended session",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "AND s.aal = 2 AND s.expires_at > now()\n",
+    "new": "AND s.aal = 2\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: lasts longer than 30 days",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "expires_at <= created_at + interval '30 days'",
+    "new": "expires_at <= created_at + interval '300 days'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: expires before it is minted",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "CHECK (expires_at > created_at AND",
+    "new": "CHECK (",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: kept in clear",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "CHECK (token_hash ~ '^[0-9a-f]{64}$')",
+    "new": "CHECK (token_hash <> '')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the same token twice",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "token_hash text NOT NULL UNIQUE",
+    "new": "token_hash text NOT NULL",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a nameless token",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "CHECK (char_length(btrim(name)) BETWEEN 1 AND 80)",
+    "new": "CHECK (char_length(name) <= 80)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a revocation undone",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "IF OLD.revoked_at IS NOT NULL AND NEW.revoked_at IS DISTINCT FROM OLD.revoked_at THEN",
+    "new": "IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token's name or member changed by the owner's scripts",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "    IF (to_jsonb(NEW) - 'last_used_at' - 'revoked_at') IS DISTINCT FROM (to_jsonb(OLD) - 'last_used_at' - 'revoked_at')\n    THEN",
+    "new": "    IF false\n    THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a revocation dated as given",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "      NEW.revoked_at := now();\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a last use dated as given",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "      NEW.last_used_at := now();\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: Better Auth's role deletes tokens",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "GRANT SELECT, INSERT ON auth.member_tokens TO aiontheballot_auth;",
+    "new": "GRANT SELECT, INSERT, DELETE ON auth.member_tokens TO aiontheballot_auth;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: its name or hash changed through a grant",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "GRANT UPDATE (last_used_at, revoked_at) ON auth.member_tokens",
+    "new": "GRANT UPDATE ON auth.member_tokens",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: revocation not queued behind a token being minted",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "    PERFORM 1 FROM auth.users u WHERE u.id = account FOR UPDATE;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: only one of a member's tokens revoked",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "WHERE t.user_id = account AND t.revoked_at IS NULL;",
+    "new": "WHERE t.id = (SELECT min(m.id::text)::uuid FROM auth.member_tokens m WHERE m.user_id = account AND m.revoked_at IS NULL);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: sessions kept after a change of credentials",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "      DELETE FROM auth.sessions s WHERE s.user_id = account;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: kept when the second factor goes",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "CREATE TRIGGER revoke_member_tokens AFTER DELETE ON auth.two_factors",
+    "new": "CREATE TRIGGER revoke_member_tokens AFTER INSERT ON auth.two_factors",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: sessions kept when the second factor goes",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "FOR EACH ROW EXECUTE FUNCTION private.revoke_member_tokens('sessions');\nCREATE TRIGGER revoke_member_tokens_on_enrolment",
+    "new": "FOR EACH ROW EXECUTE FUNCTION private.revoke_member_tokens('tokens');\nCREATE TRIGGER revoke_member_tokens_on_enrolment",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: kept when the second factor is enrolled again",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "FOR EACH ROW WHEN (OLD.secret IS DISTINCT FROM NEW.secret)",
+    "new": "FOR EACH ROW WHEN (false)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: sessions ended by an enrolment",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "EXECUTE FUNCTION private.revoke_member_tokens('tokens');",
+    "new": "EXECUTE FUNCTION private.revoke_member_tokens('sessions');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: kept when the password changes",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "FOR EACH ROW WHEN (OLD.password IS DISTINCT FROM NEW.password)",
+    "new": "FOR EACH ROW WHEN (false)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: kept when a password is added",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "AFTER INSERT OR DELETE ON auth.accounts",
+    "new": "AFTER DELETE ON auth.accounts",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: kept when a password is removed",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "AFTER INSERT OR DELETE ON auth.accounts",
+    "new": "AFTER INSERT ON auth.accounts",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token goes unnoticed",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "IF coalesce(current_setting('app.token_id', true), '') <> '' THEN",
+    "new": "IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a table left open to tokens",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "AND c.relname NOT IN ('elections', 'parties', 'files', 'change_requests', 'audit_log',",
+    "new": "AND c.relname NOT IN ('elections', 'parties', 'files', 'change_requests', 'audit_log', 'tenants',",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: tables refuse only inserts",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "CREATE TRIGGER needs_a_person BEFORE INSERT OR UPDATE OR DELETE ON app.%I",
+    "new": "CREATE TRIGGER needs_a_person BEFORE INSERT ON app.%I",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token changes an election's status",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status OR ",
+    "new": "FOR EACH ROW WHEN (",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token announces an election",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "OLD.announced IS DISTINCT FROM NEW.announced\n",
+    "new": "false\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token freezes an election",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "OR OLD.frozen_from IS DISTINCT FROM NEW.frozen_from\n",
+    "new": "\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token ends an election's freeze",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "OR OLD.frozen_until IS DISTINCT FROM NEW.frozen_until\n",
+    "new": "\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token drops the second reviewer",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "OR OLD.require_second_reviewer IS DISTINCT FROM NEW.require_second_reviewer)",
+    "new": "OR false)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token deletes an election",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "CREATE TRIGGER needs_a_person_to_delete BEFORE DELETE ON app.elections\n  FOR EACH ROW EXECUTE",
+    "new": "CREATE TRIGGER needs_a_person_to_delete BEFORE DELETE ON app.elections\n  FOR EACH ROW WHEN (false) EXECUTE",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token publishes a programme",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "FOR EACH ROW WHEN (OLD.programme_status IS DISTINCT FROM NEW.programme_status)",
+    "new": "FOR EACH ROW WHEN (false)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token decides on a change",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "CREATE TRIGGER needs_a_person BEFORE UPDATE OF state ON app.change_requests",
+    "new": "CREATE TRIGGER needs_a_person BEFORE UPDATE OF public_note ON app.change_requests",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the audit log forgets the token",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "      nullif(current_setting('app.token_id', true), '')::uuid);",
+    "new": "      NULL::uuid);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token edits an election the public sees",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "  FOR EACH ROW WHEN (OLD.announced OR OLD.status IN ('live', 'archived'))",
+    "new": "  FOR EACH ROW WHEN (OLD.status IN ('live', 'archived'))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token stores any file",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "  FOR EACH ROW WHEN (NEW.bucket <> 'public_assets') EXECUTE",
+    "new": "  FOR EACH ROW WHEN (false) EXECUTE",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token withdraws someone else's change",
+    "file": "db/migrations/20261015055444_member_tokens.sql",
+    "old": "  FOR EACH ROW WHEN (OLD.proposed_by IS DISTINCT FROM private.current_user_id())",
+    "new": "  FOR EACH ROW WHEN (false)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  }
+]

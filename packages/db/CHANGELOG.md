@@ -1,0 +1,288 @@
+# @aiontheballot/db
+
+## 0.16.1
+
+### Patch Changes
+
+- e1010f7: Comments, chart notes and examples describe what the platform needs from its host, never the host itself (PLAN
+  R205): the deployment's specifics stay in the operator's private configuration. No behaviour changes.
+
+## 0.16.0
+
+### Minor Changes
+
+- 8bf6d1e: A member's tokens for tools, in the API and the admin (PLAN R203, ADR-0008): a tool's request with a token acts as
+  its member on the routes that draft an election's parties, and on no other; the admin's "Tokens for tools" page
+  creates one (shown once), lists them and revokes them.
+
+## 0.15.2
+
+### Patch Changes
+
+- 1ffae74: Dependencies bmp
+
+## 0.15.1
+
+### Patch Changes
+
+- f5ab992: A live election's party, criterion, reviewer, methodology or the election itself changes through one request for
+  any of its fields at once, each shown beside what it is now, with one public note: proposed, reviewed and applied as
+  one, and listed field by field in the change list and both corrections logs; a party's new logo is uploaded first
+  (PLAN R183). The party form takes the logo, previewed before it is uploaded, also when creating a party; a new party
+  has no colour until someone picks one; the party page shows its name and logo first and stays put after a save;
+  the list shows each party's logo and what it still lacks. Invitations start on the editing role, and the
+  organization form says which legal details only a site's operator needs.
+
+## 0.15.0
+
+### Minor Changes
+
+- d7e62ac: An election can go to preview before it goes live: its site's members see it in the admin's preview as the public
+  will, and edit it as a draft, while the public sees none of it, read through a database role of its own (PLAN R181).
+
+## 0.14.1
+
+### Patch Changes
+
+- 4771d67: The database pools survive a lost idle connection (PLAN R153): a Postgres restart or a restore that ends every session
+  no longer crashes the API; the pool logs the SQLSTATE and opens another connection when needed.
+
+## 0.14.0
+
+### Minor Changes
+
+- 09dbde9: The sweep of orphaned bytes can run on a schedule (PLAN R117, R141): migration `file_sweep_list` adds
+  `private.file_sweep_list()`, the list of named files, executable by a new login, `aiontheballot_sweeper`, only;
+  `sweep-files --from-database` reads it with that login; and the API's chart renders a weekly CronJob once gitops names
+  the login's secret. The owner's manual sweep reads the same list.
+
+### Patch Changes
+
+- 4516915: Party logos (PLAN R142): uploaded on a party's admin page while its election is a draft (PNG, JPEG or WebP, up to 2 MB
+  and 4,096 pixels a side, checked by its own header), and shown beside the party's name on the public pages.
+
+## 0.13.0
+
+### Minor Changes
+
+- c99354a: Sources (editorial workflow §7): editors add an election's sources, store a copy of each (uploaded, up to 50 MB, the
+  same bytes kept once per site, checked before a byte is read and streamed to the store), and members read the text
+  extracted from it and download the copy. A new worker (`node dist/worker.js`, PLAN R116, R133 and R139) extracts the
+  text one copy at a time, each in a child process with a memory limit, a deadline and no access to the disk, the
+  network or its environment; the chart renders it only once gitops names its database login, and the API hands it
+  each job (PLAN D12). Migration `open_extraction_once`: one open extraction job per source.
+
+## 0.12.0
+
+### Minor Changes
+
+- 658a870: A site's public settings are data (PLAN R135): whether it is open, whether search engines may index it, and its
+  Plausible script are switches on the site's admin page, for platform admins, instead of `OPEN_SITES` and
+  `PLAUSIBLE_SITES` in the web app's environment. A site kept out of search engines answers `noindex, nofollow`
+  everywhere, disallows everything in its robots.txt and has no sitemap, for a demo's fictional content.
+
+## 0.11.3
+
+### Patch Changes
+
+- 7bd93a4: The site's own signup list (PLAN R119, R122): double opt-in through three narrow database functions, a confirmation
+  email through the platform's one sender (R115, R123), one-click unsubscribe, unconfirmed addresses deleted after 7
+  days, and counts for country admins. The legal notice, privacy policy and page about the operator, served before the
+  site opens (R124). Site modes (coming soon, open, preview) and a site's own words in its paths (R121).
+- 5896c16: Sites on the platform's own screens (PLAN R129): platform admins list every site with its addresses, create one
+  (off, with its operator) and turn it on or off. Demo content for a demo site (PLAN R130): a script prints the SQL
+  that fills an empty, active site in a user-assigned country with an obviously fictional election.
+
+## 0.11.2
+
+### Patch Changes
+
+- 74222eb: No archiving inside a freeze window (PLAN R109, D11): an election goes from live to archived only once its freeze
+  window is over or cleared, so an archived election's corrections can't stay frozen for good.
+- 7ba5873: Dependencies bump
+
+## 0.11.1
+
+### Patch Changes
+
+- 0ebe03a: Elections and their structure (editorial workflow §6, P1; PLAN R101–R106). Editors create elections as drafts and
+  change them while they are; country admins announce and delete them, and write the methodology and its named external
+  reviewers, take them live after a checklist and a typed confirmation, set their freeze window and archive them;
+  platform admins turn four-eyes off after a confirmation. Editors add, order by keyboard, change and delete parties and
+  criteria. Live and archived elections are shown read-only. Two migrations: `slug_length` (slugs stop at 63
+  characters) and `report_retention_cap` (reports are kept a century at most). New API routes under
+  `/api/t/:tenant/elections` and `/api/t/:tenant/e/:election`, with its `checklist`, `methodology`,
+  `methodology/reviewers`, `parties` and `criteria`.
+
+## 0.11.0
+
+### Minor Changes
+
+- 4f5e76a: Better Auth's tables, in the `auth` schema that only `aiontheballot_auth` reaches (migration `auth_schema`,
+  ADR-0002 §2), and `createAuthPool` for its connections. Nothing signs in yet.
+
+## 0.10.1
+
+### Patch Changes
+
+- 9d44cb0: Better Auth gets its own database role, `aiontheballot_auth` (ADR-0002 §2), created locally and in CI and kept
+  out of `app` and `private` by the catalog tests. Nothing uses it yet.
+
+## 0.10.0
+
+### Minor Changes
+
+- 70a6a4e: The orphan-bytes sweep (ADR-0004 §5): `node dist/sweep-files.js` reads the owner's list of every file row, brand asset
+  and file a row stopped naming (`--print-query` prints the query) and, with `--delete`, deletes bytes no row has named
+  for longer than the grace period (120 days, never less than 111), never ones stored or reused within a day of the list,
+  and nothing in a run after a database restore.
+
+### Patch Changes
+
+- f10bcac: An election's slug can never be `brand`, `og` or `healthz`, paths the public site serves itself (migration
+  `reserved_election_slugs`; `RESERVED_ELECTION_SLUGS` in `packages/domain`).
+
+## 0.9.0
+
+### Minor Changes
+
+- bc2fe41: A country admin may announce a draft election (migration `announced_elections`), so a tenant's coming-soon page names
+  it and gives its date before it goes live. The public sees the announced election's own row and nothing under it.
+  ADR-0002's public-visibility rule is amended accordingly (PLAN R51).
+
+## 0.8.1
+
+### Patch Changes
+
+- 7f83fd8: Site icons: the platform's default (the coming-soon ballot, marked with the AI sparkle, on an orange tile), or a
+  tenant's own square PNG from its new `site_icon` logo slot (a whole PNG, 512 to 1,024 px). Pages name the icons by
+  content hash at `/brand/icon/{size}.{hash}.png`, cached as immutable, with `/favicon.ico` and a web manifest. The
+  seeds give `ejemplo-a` a fictional icon.
+
+## 0.8.0
+
+### Minor Changes
+
+- a2cea6d: File bytes move from Postgres to a persistent volume (migration `files_on_volume`, ADR-0004): the API mounts a
+  node-local volume at `/data` and reads each file's bytes from its row's own tenant and bucket, only
+  for a row RLS shows, checking the hash on every read. `file_blobs` and the brand assets' inline bytes are gone; the
+  migration refuses to run while any bytes are stored in the database. `node dist/put-file.js <tenant-id> <bucket>`
+  puts bytes on the volume from stdin until the admin can upload them, and `node dist/purge-tenant-files.js` deletes a
+  purged tenant's folder, given proof of the purge. Web and admin are rebuilt only because turbo.json changed.
+
+## 0.7.0
+
+### Minor Changes
+
+- 1f4eabe: Tenants' own logos (migration `tenant_brand_uploads`): a brand selection can name one of the tenant's uploaded
+  images, public while an active tenant selects it. The API serves the home data's brand images by hash; the web app
+  shows the operator's logo in the coming-soon page's header and footer, at `/brand/{sha256}.{ext}` cached as immutable,
+  and draws it on the share cards.
+
+## 0.6.0
+
+### Minor Changes
+
+- d530322: Criteria get a short title (migration `criteria_short_title`), the public table's column header now that parties
+  always run down the side. Going live needs one in the default locale for every criterion, a public election's criteria
+  keep it, and once live it is change-controlled like the title.
+
+## 0.5.0
+
+### Minor Changes
+
+- d167b29: The coming-soon page offers the operator's newsletter ("Avísame cuando se publique"), from the new
+  `organizations.newsletter_url` (migration `organization_newsletter`); the platform collects no addresses. The ballot is
+  now an SVG that scales down to a phone, and the tenant's name is sized by its longest word, which never breaks.
+
+### Patch Changes
+
+- 2f43760: A tenant's home is now its coming-soon page, in PauseAI's brand: the tenant's name, what the site will do, the next
+  public election and the operator's links, all from data, in Spanish and English, on a desktop and a phone. The API
+  serves it at `GET /public/tenants/{slug}/home` (read as `aiontheballot_web`); the web app caches each tenant's copy
+  and keeps it when the API fails. The shared preset gains the brand colours as semantic tokens, contrast-tested, and
+  the self-hosted fonts. The e2e suite checks the page with axe at both sizes.
+
+## 0.4.0
+
+### Minor Changes
+
+- 3650ed0: Add the cell workflow: submit, recall, reject with a note and publish transitions; the content lock while in review;
+  content versions; contributors and review events written by triggers; and archived elections taking only corrections
+  and withdrawals.
+- 30cd780: Add change control for live elections: `change_requests`, the public `structural_changes` and the `corrections_log`
+  view. A live election's structure changes only through a request approved in the same transaction, applied by the
+  approver, with a second approver when the tenant requires one and no approvals in the freeze window.
+- d02ea23: Add the evidence rules: quotes and checked documents cite only stored, extracted sources of no party or the cell's
+  party, of kinds the methodology admits; quotes are matched verbatim across pages (or attested by a second person for
+  sources without text); submitting needs every quote matched or attested.
+- 60e7e1d: Add the programme-status rules: "published" needs the party's programme among its sources; every update stamps the
+  check date and is refused inside the freeze window; publishing a programme flags the party's "not mentioned" ratings
+  for a recheck.
+- ad628fb: Add publishing: `private.publish_revision()`, the trigger behind `INSERT INTO app.assessment_revisions
+(assessment_id, reviewed_version)`. It checks the publisher, four-eyes, the election and freeze window, the change kind
+  and note, re-runs the verbatim match and the evidence requirement, copies the reviewed draft and starts the next
+  generation.
+- f89b648: Add `private.purge_tenant()`, executable only by the owner: it deletes every row of a tenant (published history and
+  audit rows included), keeps its hostnames as tombstones and records the purge in `purge_log`.
+- bdde473: Add right-of-reply reports: `app.submit_report()` (the public's only write, with a per-tenant daily cap), triage by
+  members (never platform admins), anonymization on request or by the worker's daily
+  `private.anonymize_expired_reports()`, and personal-data columns kept out of the audit log.
+- 5153712: Add published revisions: `assessment_revisions`, `revision_evidence`, `revision_checked_documents`, the private
+  `revision_internal` and the `current_revisions` view. All immutable; publishers insert only the cell and the version
+  reviewed; the public reads revisions of live and archived elections of active tenants and the sources they cite.
+- 9118d0d: Add fictional seeds (`pnpm db:seed`): three tenants with hostnames, a live election and a published cell, loaded through
+  the real triggers. The seed refuses any database that is not on this machine, and any that holds other tenants.
+
+## 0.3.0
+
+### Minor Changes
+
+- 7c39e38: Add cells: `assessments`, `assessment_contributors`, `draft_evidence`, `draft_checked_documents` and `review_events`.
+  Editors and country admins write draft content; reviewers change only the state and attest quotes; every member
+  reads. Also fix `app.localized`, whose check refused SQL NULL, so nullable localized columns can use it.
+- 72e2756: Add job requests and the worker's access. The worker sets `app.job_request_id` and acts as the request's requester;
+  its RLS shows only that open request and what it names (its tenant, source, the source's copy and pages, its LLM run
+  and the run's election), a trigger limits what each job kind may change, and finishing the request ends what it
+  authorizes. Requests are made only when their job has something to do, and change only by finishing, once.
+
+## 0.2.0
+
+### Minor Changes
+
+- af3eb82: Add the audit log: `app.audit_log`, immutable, and the `private.audit()` trigger on every table, which records each
+  write with its tenant, actor, key and diff and never copies columns commented `personal data`. Country admins read
+  their tenant's entries; platform admins read all of them.
+- eb77f18: Add hostnames: `platform_hostnames`, `tenant_hostnames`, `hostname_tombstones` and `hostname_verifications`, with the
+  `app.hostname` domain (the form `resolve()` normalizes to). Only platform admins write them; hostnames are never
+  deleted, renamed or moved; reserved and tombstoned names can't be claimed; at most one canonical hostname per tenant,
+  verified and not retired. The public reads verified hostnames of active tenants and all tombstones.
+- 87a226b: Add invitations: `app.invitations`, visible only to country admins and platform admins, storing only the token's
+  SHA-256, expiring within 30 days, and changing once (revoked, or accepted before expiry, with time and acceptor from
+  the session). Non-pending invitations can be deleted, so emails aren't kept longer than needed. The matrix supports
+  per-row rules for row states.
+- eaddfe3: Add organizations and brand assets: `organizations`, `tenant_organizations` (one operator per tenant), `brand_assets`
+  (PNG, JPEG or WebP up to 2 MB, hash checked), `brand_asset_grants` and `tenant_brand_selections`. Platform admins write
+  organizations, links, assets and grants; country admins choose their tenant's selections. Writes to a shared
+  organization or asset bump every tenant that shows it, and the audit log no longer copies binary columns.
+- 2cd4215: Add the public cache key: `app.public_versions`, one counter per tenant that the public reads (active tenants only)
+  and that only the `SECURITY DEFINER` trigger `private.bump_public_version()` moves, on every write to a table the
+  public can read. No runtime role can set or rewind it.
+- 9208dc8: Add tenancy: `tenants`, `platform_admins` and `memberships` with RLS, and the policy helpers `private.my_tenants()`
+  and `private.is_platform_admin()` (aal2 only). The admin shows each user only what is theirs; public-visibility
+  policies are for `aiontheballot_web` only. Country admins change only their tenant's theme, report retention and LLM
+  cap. The isolation matrix now generates its cases from per-table rules and runs them against shared fixtures.
+
+## 0.1.0
+
+### Minor Changes
+
+- 9a83b4d: Add @aiontheballot/db (Kysely client, withActor, generated types) and the TypeScript quote normaliser in @aiontheballot/domain,
+  kept identical to private.normalize_for_match() by parity tests against Postgres.
+
+### Patch Changes
+
+- 300f450: Add the tenant-isolation matrix harness: principals from ADR-0002, a runner that refuses to pass on a missing target,
+  a deny that changed data, or an allow touching more than one row, and a completeness test against the `app` schema.
+- e13c986: Move to @slango.configs/typescript 3.0.0 and @slango.configs/vitest 2.1.0: drop the composite/incremental overrides
+  and the i18n JSON include they required, and write the Vitest configs in TypeScript.

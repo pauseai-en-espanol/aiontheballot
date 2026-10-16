@@ -1,0 +1,23 @@
+name: Setup yq
+description: Install a pinned yq release, verified by checksum, for the runner's architecture
+runs:
+  using: composite
+  steps:
+    - name: Install yq
+      shell: bash
+      env:
+        YQ_VERSION: v4.54.1
+        # SHA-256 from the release's published checksums file.
+        YQ_SHA256_AMD64: 8e34fc298390875de416e6a4afcb8cabeceb25d9aa8506c1a2f9353cf702ea5f
+        YQ_SHA256_ARM64: 189088da0c6429ec5178dfaab1a114805f6cab0b61b165ab236efedf1d57a71b
+      run: |
+        case "$(uname -m)" in
+          x86_64) arch=amd64; sum="$YQ_SHA256_AMD64" ;;
+          aarch64 | arm64) arch=arm64; sum="$YQ_SHA256_ARM64" ;;
+          *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+        esac
+        mkdir -p "$RUNNER_TEMP/bin"
+        curl -fsSL -o "$RUNNER_TEMP/bin/yq" "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${arch}"
+        echo "${sum}  $RUNNER_TEMP/bin/yq" | sha256sum -c -
+        chmod +x "$RUNNER_TEMP/bin/yq"
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"

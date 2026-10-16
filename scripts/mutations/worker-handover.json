@@ -1,0 +1,226 @@
+[
+  {
+    "name": "dispatch: a failed handover never tried again",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "          error.kind !== 'transient' ||\n",
+    "new": "          true ||\n",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: tried again without end",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "          error.kind !== 'transient' ||\n          attempt >= retry.attempts\n",
+    "new": "          error.kind !== 'transient'\n",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts --testTimeout 5000",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: a busy worker taken as final",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "      TRANSIENT_STATUSES.has(response.status) ? 'transient' : 'final',",
+    "new": "      'final',",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: the worker's 500 tried again (the document parsed again for the same fault)",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "const TRANSIENT_STATUSES = new Set([429, 502, 503, 504]);",
+    "new": "const TRANSIENT_STATUSES = new Set([429, 500, 502, 503, 504]);",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "backoff: waits that don't grow",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "  const step = Math.min(policy.capMs, policy.baseMs * 2 ** (retry - 1));",
+    "new": "  const step = Math.min(policy.capMs, policy.baseMs);",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "backoff: no cap",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "  const step = Math.min(policy.capMs, policy.baseMs * 2 ** (retry - 1));",
+    "new": "  const step = policy.baseMs * 2 ** (retry - 1);",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "backoff: no jitter",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "  return step / 2 + random() * (step / 2);",
+    "new": "  return step;",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: the shared secret not sent",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "          authorization: `Bearer ${token}`,\n",
+    "new": "",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "redelivery: a job just requested handed over again",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "          job.waitedMs >= redeliverAfterMs &&\n",
+    "new": "",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "redelivery: a job tried lately handed over again",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "          (state === undefined || now() - state.tried >= redeliverAfterMs)",
+    "new": "          true",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "stale report: sent again at every listing",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "        (staleReported === undefined || now() - staleReported >= staleReportEveryMs)",
+    "new": "        true",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "stale report: never sent",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "        stale.length > 0 &&",
+    "new": "        false &&",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "listing: the election's open jobs never reach the dispatch",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              open: extraction ? await openExtractions(trx, election.id) : [],",
+    "new": "              open: [],",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "listing: a source page's open job never reaches the dispatch",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              open: extraction ? await openExtractions(trx, election.id, request.params.id) : [],",
+    "new": "              open: [],",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "listing: finished jobs handed over again",
+    "file": "apps/api/src/admin/sources.ts",
+    "old": "    .where('j.finished_at', 'is', null);",
+    "new": "    ;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: a job taken without the shared secret",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "        if (!bearerMatches(request.headers.authorization, token)) {",
+    "new": "        if (false) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "token: any bearer credential matches",
+    "file": "apps/api/src/worker/token.ts",
+    "old": "  return timingSafeEqual(digest(header.slice(scheme.length)), digest(token));",
+    "new": "  return true;",
+    "cmd": "npx vitest run src/worker/token.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "token: a short secret taken",
+    "file": "apps/api/src/worker/token.ts",
+    "old": "  if (!value || value.length < MIN_TOKEN_LENGTH) {",
+    "new": "  if (!value) {",
+    "cmd": "npx vitest run src/worker/token.spec.ts src/config.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "config: a secret without the worker's address taken",
+    "file": "apps/api/src/config.ts",
+    "old": "  if (!url) {",
+    "new": "  if (false) {",
+    "cmd": "npx vitest run src/config.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "worker: a fault reported with its message",
+    "file": "apps/api/src/worker/server.ts",
+    "old": "        onFault(new Error(`Extraction job failed: ${reason}`));",
+    "new": "        onFault(error as Error);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/worker.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "redelivery: a job that failed for good handed over again by itself",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "          !state?.final &&\n",
+    "new": "",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "redelivery: no limit on a job the worker keeps going away with",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "      if (state.lost >= MAX_LOST) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: a job the worker went away with tried again at once (a bomb re-parsed)",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "        'lost',\n",
+    "new": "        'transient',\n",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: an unreachable worker taken for one that went away",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "      if (code !== undefined && CONNECT_CODES.has(code)) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: no limit on handovers at once",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "    while (inFlight < maxInFlight && queued.length > 0) {",
+    "new": "    while (queued.length > 0) {",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "dispatch: a damaged copy taken for the worker's fault",
+    "file": "apps/api/src/extraction-dispatch.ts",
+    "old": "      if (unreadable) {",
+    "new": "      if (false) {",
+    "cmd": "npx vitest run src/extraction-dispatch.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "token: a token a header can't carry taken",
+    "file": "apps/api/src/worker/token.ts",
+    "old": "  if (!TOKEN.test(value)) {",
+    "new": "  if (false) {",
+    "cmd": "npx vitest run src/worker/token.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "listing: other elections' open jobs handed to the dispatch",
+    "file": "apps/api/src/admin/sources.ts",
+    "old": "    .where('s.election_id', '=', electionId)\n    .where('j.kind', '=', 'extract_source')\n    .where('j.finished_at', 'is', null);",
+    "new": "    .where('j.kind', '=', 'extract_source')\n    .where('j.finished_at', 'is', null);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "apps/api"
+  }
+]

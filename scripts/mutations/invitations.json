@@ -1,0 +1,142 @@
+[
+  {
+    "name": "any email",
+    "file": "db/migrations/20261011183422_invitation_acceptance.sql",
+    "old": "                    WHERE u.id = actor AND u.email_verified AND lower(u.email) = invitation.email) THEN",
+    "new": "                    WHERE u.id = actor AND u.email_verified) THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "unverified ok",
+    "file": "db/migrations/20261011183422_invitation_acceptance.sql",
+    "old": "                    WHERE u.id = actor AND u.email_verified AND lower(u.email) = invitation.email) THEN",
+    "new": "                    WHERE u.id = actor AND lower(u.email) = invitation.email) THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "case-sensitive email",
+    "file": "db/migrations/20261011183422_invitation_acceptance.sql",
+    "old": "AND lower(u.email) = invitation.email) THEN",
+    "new": "AND u.email = invitation.email) THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "pending shows revoked",
+    "file": "db/migrations/20261011183422_invitation_acceptance.sql",
+    "old": "     WHERE i.token_hash = pending_invitation.token_hash\n       AND i.accepted_at IS NULL\n       AND i.revoked_at IS NULL",
+    "new": "     WHERE i.token_hash = pending_invitation.token_hash\n       AND i.accepted_at IS NULL",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "superseded: 20261014130659_invitation_site_name creates the lookup again, and its own entries break the same rule"
+  },
+  {
+    "name": "pending shows expired",
+    "file": "db/migrations/20261011183422_invitation_acceptance.sql",
+    "old": "       AND i.revoked_at IS NULL\n       AND i.expires_at > now()\n  $$;",
+    "new": "       AND i.revoked_at IS NULL\n  $$;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "superseded: 20261014130659_invitation_site_name creates the lookup again, and its own entries break the same rule"
+  },
+  {
+    "name": "no actor ok",
+    "file": "db/migrations/20261011183422_invitation_acceptance.sql",
+    "old": "    IF actor IS NULL OR accept_invitation.token_hash IS NULL THEN",
+    "new": "    IF accept_invitation.token_hash IS NULL THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "with no actor, the function's own check of the account's verified email finds no account and accepts nothing either way"
+  },
+  {
+    "name": "open to web",
+    "file": "db/migrations/20261011183422_invitation_acceptance.sql",
+    "old": "TO aiontheballot_admin;\n\n-- migrate:down",
+    "new": "TO aiontheballot_admin, aiontheballot_web;\n\n-- migrate:down",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "accepted twice",
+    "file": "db/migrations/20261011183422_invitation_acceptance.sql",
+    "old": "     WHERE i.token_hash = accept_invitation.token_hash\n       AND i.accepted_at IS NULL",
+    "new": "     WHERE i.token_hash = accept_invitation.token_hash",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "lookup before role check",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            if (!holds(access, 'country_admin')) {\n              throw new Refusal(403, 'forbidden');\n            }\n            if (!allowInvitation",
+    "new": "            if (!allowInvitation",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t invitations",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "revoke others before send",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "          await withActor(db, actor, (trx) =>\n            revokeOthers(trx, made.access.tenantId, { id: made.id, email, role }),\n          );\n          return reply.code(201)",
+    "new": "          return reply.code(201)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts -t invitations",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "other account as invalid",
+    "file": "apps/api/src/auth/invitation-routes.ts",
+    "old": "            ? reply.code(409).send({ error: 'otherAccount' })",
+    "new": "            ? reply.code(404).send(invalid)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitation-acceptance.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "long password ok",
+    "file": "apps/api/src/auth/invited-accounts.ts",
+    "old": "password.length > MAX_PASSWORD_LENGTH",
+    "new": "password.length > 1000",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitation-acceptance.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "the route's schema refuses a password over 128 characters before this check runs"
+  },
+  {
+    "name": "migration: a pending invitation names every site, not its own",
+    "file": "db/migrations/20261014130659_invitation_site_name.sql",
+    "old": "      JOIN app.tenants t ON t.id = i.tenant_id",
+    "new": "      JOIN app.tenants t ON true",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: an expired invitation still named",
+    "file": "db/migrations/20261014130659_invitation_site_name.sql",
+    "old": "       AND i.expires_at > now()\n",
+    "new": "\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a revoked invitation still named",
+    "file": "db/migrations/20261014130659_invitation_site_name.sql",
+    "old": "       AND i.revoked_at IS NULL\n",
+    "new": "\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: an accepted invitation still named",
+    "file": "db/migrations/20261014130659_invitation_site_name.sql",
+    "old": "       AND i.accepted_at IS NULL\n",
+    "new": "\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the lookup open to every role again",
+    "file": "db/migrations/20261014130659_invitation_site_name.sql",
+    "old": "GRANT EXECUTE ON FUNCTION private.pending_invitation(text) TO aiontheballot_admin;\n",
+    "new": "GRANT EXECUTE ON FUNCTION private.pending_invitation(text) TO PUBLIC;\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/invitations.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db"
+  }
+]

@@ -1,0 +1,82 @@
+[
+  {
+    "name": "a table is left out (signups)",
+    "file": "scripts/export-tenant.sql",
+    "old": "  UNION ALL\n  SELECT 30, json_build_object('table', 'app.signups', 'rows',\n    (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.signups x WHERE x.tenant_id = (SELECT id FROM site)))::text\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "an invitation's token hash leaves",
+    "file": "scripts/export-tenant.sql",
+    "old": "to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.invitations x",
+    "new": "to_jsonb(x) ORDER BY to_jsonb(x)::text), '[]') FROM app.invitations x",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "a token hash leaves in the audit log's diffs",
+    "file": "scripts/export-tenant.sql",
+    "old": " #- '{diff,new,token_hash}'",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "another site's reports go out",
+    "file": "scripts/export-tenant.sql",
+    "old": "FROM app.reports x WHERE x.tenant_id = (SELECT id FROM site)",
+    "new": "FROM app.reports x",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "a short name no site has exports nothing, silently",
+    "file": "scripts/export-tenant.sql",
+    "old": "  IF NOT EXISTS (SELECT 1 FROM app.tenants t WHERE t.slug = current_setting('export.slug')) THEN",
+    "new": "  IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "members' credentials go out",
+    "file": "scripts/export-tenant.sql",
+    "old": "json_build_object('id', u.id, 'name', u.name, 'email', u.email)",
+    "new": "to_jsonb(u)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "every organization goes out",
+    "file": "scripts/export-tenant.sql",
+    "old": "      WHERE x.id IN (SELECT o.organization_id FROM app.tenant_organizations o WHERE o.tenant_id = (SELECT id FROM site))))::text",
+    "new": "      WHERE true))::text",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "brand assets granted to other sites go out",
+    "file": "scripts/export-tenant.sql",
+    "old": "         OR x.id IN (SELECT g.brand_asset_id FROM app.brand_asset_grants g WHERE g.tenant_id = (SELECT id FROM site))))::text",
+    "new": "         OR x.id IN (SELECT g.brand_asset_id FROM app.brand_asset_grants g)))::text",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "every core criterion goes out",
+    "file": "scripts/export-tenant.sql",
+    "old": "      WHERE x.id IN (SELECT c.core_criterion_id FROM app.criteria c WHERE c.tenant_id = (SELECT id FROM site))))::text",
+    "new": "      WHERE true))::text",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "every account's name and email go out",
+    "file": "scripts/export-tenant.sql",
+    "old": "      WHERE u.id IN (SELECT m.user_id FROM app.memberships m WHERE m.tenant_id = (SELECT id FROM site))))::text",
+    "new": "      WHERE true))::text",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/export.spec.ts",
+    "cwd": "packages/db"
+  }
+]

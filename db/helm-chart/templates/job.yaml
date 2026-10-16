@@ -1,0 +1,42 @@
+{{- if .Values.enabled }}
+# Runs on every sync, after the Secrets and the default ServiceAccount patch (sync wave -2 in gitops) and before the
+# Deployments (wave 0), so the schema is migrated before new pods start. Not a PreSync hook: on a first sync, PreSync
+# would run before those exist. A failed migration rolls back and stops the sync; old pods keep serving.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "aiontheballot-migrations.fullname" . }}
+  labels:
+    {{- include "aiontheballot-migrations.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: '-1'
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: {{ .Values.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "aiontheballot-migrations.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrations
+          image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            # The owner's connection string (aiontheballot_owner), sealed in gitops.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseUrlSecret.name is required" .Values.databaseUrlSecret.name }}
+                  key: {{ .Values.databaseUrlSecret.key }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}

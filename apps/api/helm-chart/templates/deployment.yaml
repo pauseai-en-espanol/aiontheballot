@@ -1,0 +1,148 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aiontheballot-api.fullname" . }}
+  labels:
+    {{- include "aiontheballot-api.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "aiontheballot-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "aiontheballot-api.selectorLabels" . | nindent 8 }}
+      annotations:
+        # For a file-system backup of pod volumes (the annotation is Velero's): it copies the file volume; the scratch
+        # volume `tmp` (below) holds nothing to keep. Rename them together.
+        backup.velero.io/backup-volumes-excludes: tmp
+    spec:
+      # preStop sleep + time to drain in-flight requests
+      terminationGracePeriodSeconds: 30
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: PORT
+              value: {{ .Values.service.port | quote }}
+            {{- if .Values.worker.databaseUrlSecret.name }}
+            # Extraction jobs go to the worker, with their copy and the secret the two share (PLAN R116, ADR-0006).
+            - name: WORKER_URL
+              value: {{ printf "http://%s-worker:%v" (include "aiontheballot-api.fullname" .) .Values.worker.port | quote }}
+            - name: WORKER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "worker.tokenSecret.name is required with the worker" .Values.worker.tokenSecret.name }}
+                  key: {{ .Values.worker.tokenSecret.key }}
+            {{- end }}
+            {{- if .Values.fetcher.enabled }}
+            # Copies by URL and snapshots go to the fetcher, with the secret the two share (ADR-0007).
+            - name: FETCHER_URL
+              value: {{ printf "http://%s-fetcher:%v" (include "aiontheballot-api.fullname" .) .Values.fetcher.port | quote }}
+            - name: FETCHER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "fetcher.tokenSecret.name is required with the fetcher" .Values.fetcher.tokenSecret.name }}
+                  key: {{ .Values.fetcher.tokenSecret.key }}
+            - name: ARCHIVE_URL
+              value: {{ .Values.fetcher.archiveUrl | quote }}
+            {{- end }}
+            {{- if .Values.web.revalidate.enabled }}
+            # The public site's pods, told when a site changes (PLAN R151).
+            - name: WEB_REVALIDATE_URL
+              value: {{ printf "http://%s:%v" (.Values.web.revalidate.serviceName | default (printf "%s-web-pods" .Release.Name)) .Values.web.revalidate.port | quote }}
+            {{- end }}
+            {{- if .Values.reports.anonymize.databaseUrlSecret.name }}
+            # The right-of-reply form opens only while reports' retention is enforced (PLAN R149).
+            - name: REPORTS_ENABLED
+              value: "true"
+            {{- end }}
+            {{- if .Values.persistence.enabled }}
+            - name: FILES_ROOT
+              value: {{ printf "%s/files" .Values.persistence.mountPath | quote }}
+            {{- end }}
+            {{- $signIn := or .Values.auth.adminOrigin .Values.auth.databaseUrlSecret.name .Values.auth.betterAuthSecret.name }}
+            {{- if $signIn }}
+            # Sign-in takes all of these or none (apps/api/src/config.ts), so a partial set fails here, not at startup.
+            - name: ADMIN_ORIGIN
+              value: {{ required "auth.adminOrigin is required with sign-in" .Values.auth.adminOrigin | quote }}
+            - name: PLATFORM_NAME
+              value: {{ required "platformName is required with sign-in" .Values.platformName | quote }}
+            - name: AUTH_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "auth.databaseUrlSecret.name is required with sign-in" .Values.auth.databaseUrlSecret.name }}
+                  key: {{ .Values.auth.databaseUrlSecret.key }}
+            - name: BETTER_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "auth.betterAuthSecret.name is required with sign-in" .Values.auth.betterAuthSecret.name }}
+                  key: {{ .Values.auth.betterAuthSecret.key }}
+            {{- else if .Values.platformName }}
+            - name: PLATFORM_NAME
+              value: {{ .Values.platformName | quote }}
+            {{- end }}
+            {{- if or .Values.mail.smtpUrlSecret.name .Values.mail.from }}
+            # Mail takes both or neither (apps/api/src/config.ts), so one without the other fails here.
+            - name: SMTP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "mail.smtpUrlSecret.name is required with mail.from" .Values.mail.smtpUrlSecret.name }}
+                  key: {{ .Values.mail.smtpUrlSecret.key }}
+            - name: MAIL_FROM
+              value: {{ required "mail.from is required with mail.smtpUrlSecret" .Values.mail.from | quote }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              # Keep serving while the endpoint removal reaches the gateway; SIGTERM arrives after the sleep.
+              exec:
+                command: ['sleep', '8']
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.persistence.enabled }}
+            - name: files
+              mountPath: {{ .Values.persistence.mountPath }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.persistence.enabled }}
+        - name: files
+          persistentVolumeClaim:
+            claimName: {{ include "aiontheballot-api.fullname" . }}-files
+        {{- end }}

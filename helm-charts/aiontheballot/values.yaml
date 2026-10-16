@@ -1,0 +1,18 @@
+# Image tags are written by the release workflow (.github/workflows/release.yml). Everything environment-specific
+# (hostnames, gateway, registry, secrets) lives in the gitops values for each environment, not here.
+aiontheballot-migrations:
+  nameOverride: migrations
+  image:
+    tag: '0.25.3.c8c12f5'
+aiontheballot-api:
+  nameOverride: api
+  image:
+    tag: '0.29.3.c8c12f5'
+aiontheballot-web:
+  nameOverride: web
+  image:
+    tag: '0.19.16.c8c12f5'
+aiontheballot-admin:
+  nameOverride: admin
+  image:
+    tag: '0.30.3.c8c12f5'

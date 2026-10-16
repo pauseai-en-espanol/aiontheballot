@@ -1,0 +1,129 @@
+[
+  {
+    "name": "migration: web can't read the settings",
+    "file": "db/migrations/20261012000420_site_settings.sql",
+    "old": "GRANT SELECT (site_open, search_indexing, plausible_script) ON app.tenants TO aiontheballot_web;",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: admin can't update the settings",
+    "file": "db/migrations/20261012000420_site_settings.sql",
+    "old": "GRANT UPDATE (site_open, search_indexing, plausible_script) ON app.tenants TO aiontheballot_admin;",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: web may write the settings",
+    "file": "db/migrations/20261012000420_site_settings.sql",
+    "old": "GRANT SELECT (site_open, search_indexing, plausible_script) ON app.tenants TO aiontheballot_web;",
+    "new": "GRANT SELECT, UPDATE (site_open, search_indexing, plausible_script) ON app.tenants TO aiontheballot_web;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts tests/rls/matrix.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: no check on the script",
+    "file": "db/migrations/20261012000420_site_settings.sql",
+    "old": "    CONSTRAINT tenants_plausible_script_check CHECK (plausible_script ~ '^pa-[A-Za-z0-9_-]{1,100}\\.js$');",
+    "new": ";",
+    "cmd": "(cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts >/dev/null 2>&1); cd apps/api && npx vitest run -c vitest.db.config.ts tests/sites.spec.ts",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "proxy: indexing ignored",
+    "file": "apps/web/src/routing-proxy.ts",
+    "old": "const noindex = preview || !tenant.indexed;",
+    "new": "const noindex = preview;",
+    "cmd": "npx vitest run src/routing-proxy.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "proxy: open ignored",
+    "file": "apps/web/src/routing-proxy.ts",
+    "old": "tenant.open ? 'open' : 'coming-soon'",
+    "new": "'coming-soon'",
+    "cmd": "npx vitest run src/routing-proxy.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "proxy: client may set the noindex header",
+    "file": "apps/web/src/routing-proxy.ts",
+    "old": "        headers.set(SITE_NOINDEX_HEADER, noindex ? '1' : '0');\n",
+    "new": "        if (noindex) {\n          headers.set(SITE_NOINDEX_HEADER, '1');\n        }\n",
+    "cmd": "npx vitest run src/routing-proxy.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "platform robots lists a hidden site",
+    "file": "packages/domain/src/routing.ts",
+    "old": "!table.canonicalHosts.has(tenant.id) && tenant.indexed",
+    "new": "!table.canonicalHosts.has(tenant.id)",
+    "cmd": "npx vitest run src/routing.spec.ts",
+    "cwd": "packages/domain"
+  },
+  {
+    "name": "analytics: counted without a canonical host",
+    "file": "apps/web/src/analytics.ts",
+    "old": "    const host = table.canonicalHosts.get(tenant.id);",
+    "new": "    const host = table.canonicalHosts.get(tenant.id) ?? `${tenant.slug}.anywhere`;",
+    "cmd": "npx vitest run src/analytics.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "analytics: any script file",
+    "file": "apps/web/src/analytics.ts",
+    "old": "if (host && file && SCRIPT_FILE.test(file)) {",
+    "new": "if (host && file) {",
+    "cmd": "npx vitest run src/analytics.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "api: no pattern on the script",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "plausibleScript: { type: ['string', 'null'], pattern: '^pa-[A-Za-z0-9_-]{1,100}\\\\.js$' },",
+    "new": "plausibleScript: { type: ['string', 'null'] },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: settings for anyone",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "              await platformOnly(trx, actor);\n              const site = await siteFor(trx, request.params.site);\n              refuseUnless(\n                // Fastify",
+    "new": "              const site = await siteFor(trx, request.params.site);\n              refuseUnless(\n                // Fastify",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/admin-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "robots.txt allows a hidden site",
+    "file": "apps/web/src/app/%5Ftenant/[slug]/[locale]/robots.txt/route.ts",
+    "old": "      : indexed\n",
+    "new": "      : true\n",
+    "cmd": "pnpm exec playwright test tests/public-site.spec.ts -g 'keep a site out of search engines' --reporter=line",
+    "cwd": "e2e",
+    "before": "pnpm --filter @aiontheballot/web build",
+    "after": "pnpm --filter @aiontheballot/web build"
+  },
+  {
+    "name": "sitemap served for a hidden site",
+    "file": "apps/web/src/app/%5Ftenant/[slug]/[locale]/sitemap.xml/route.ts",
+    "old": "  if (!indexed && mode !== 'preview') {\n    return notFound();\n  }\n",
+    "new": "",
+    "cmd": "pnpm exec playwright test tests/public-site.spec.ts -g 'keep a site out of search engines' --reporter=line",
+    "cwd": "e2e",
+    "before": "pnpm --filter @aiontheballot/web build",
+    "after": "pnpm --filter @aiontheballot/web build"
+  },
+  {
+    "name": "page meta indexable when hidden",
+    "file": "apps/web/src/page-metadata.ts",
+    "old": "noindex || !site.indexed",
+    "new": "noindex || site.mode === 'preview'",
+    "cmd": "pnpm exec playwright test tests/public-site.spec.ts -g 'keep a site out of search engines' --reporter=line",
+    "cwd": "e2e",
+    "before": "pnpm --filter @aiontheballot/web build",
+    "after": "pnpm --filter @aiontheballot/web build"
+  }
+]

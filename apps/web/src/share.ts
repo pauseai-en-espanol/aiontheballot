@@ -1,0 +1,126 @@
+import type { ComingSoonCard } from '@aiontheballot/og/coming-soon';
+
+import { pickLocalized } from '@aiontheballot/domain/localized';
+import {
+  BRAND_SLOTS,
+  type BrandImage,
+  type PublicElectionSummary,
+  type PublicHome,
+} from '@aiontheballot/domain/public-home';
+import { getTranslator, type Locale } from '@aiontheballot/i18n/messages';
+import { cardHash } from '@aiontheballot/og/hash';
+import { isShareSize, type ShareSize } from '@aiontheballot/og/sizes';
+import { cardTheme, DEFAULT_CARD_THEME } from '@aiontheballot/og/theme';
+
+/**
+ * The views people share, each with its own image template. Only the home exists while the site is coming soon;
+ * the overview, party, criterion and cell views join with the public site (PLAN, social sharing).
+ */
+export const SHARE_TEMPLATES = ['home'] as const;
+export type ShareTemplate = (typeof SHARE_TEMPLATES)[number];
+
+/** A page's address: the tenant's canonical base, the locale unless it's the default, then the path. */
+export const pageUrl = (base: string, locale: string, defaultLocale: string, path = ''): string =>
+  `${base}${locale === defaultLocale ? '' : `/${locale}`}${path}`;
+
+/** Where an image lives, relative to its page's locale root: `/og/home.1200x630.0123456789ab.png`. */
+export const imagePath = (template: ShareTemplate, size: ShareSize, hash: string): string =>
+  `/og/${template}.${size}.${hash}.png`;
+
+export const parseImageFile = (
+  file: string,
+): { template: ShareTemplate; size: ShareSize; hash: string } | undefined => {
+  const match = /^([a-z]+)\.(\d+x\d+)\.([0-9a-f]{12})\.png$/.exec(file);
+  const [, template, size, hash] = match ?? [];
+  if (
+    !(SHARE_TEMPLATES as readonly string[]).includes(template ?? '') ||
+    !isShareSize(size) ||
+    !hash
+  ) {
+    return undefined;
+  }
+  return { template: template as ShareTemplate, size, hash };
+};
+
+/**
+ * The operator's logo for the cards' accent (PLAN R178): the one made for the accent while the accent takes ink, as the
+ * platform's orange does; on an accent dark enough for paper, the one made for dark surfaces, since a logo drawn for
+ * the orange would vanish there. None, and the operator line stays in words, when the site has no such logo.
+ */
+export const accentLogo = (home: PublicHome): BrandImage | undefined =>
+  home.brand[
+    cardTheme(home.tenant.theme ?? {}).onAccent === DEFAULT_CARD_THEME.onAccent
+      ? BRAND_SLOTS.operatorLogoOnAccent
+      : BRAND_SLOTS.operatorLogoOnInverse
+  ];
+
+/** og:locale: the language and the tenant's country, `es_ES`. */
+export const ogLocale = (locale: string, countryCode: string): string => `${locale}_${countryCode}`;
+
+/**
+ * The home card's content: every text from the tenant's data and the messages, the address from the base. While the
+ * site is coming soon it says so, with the election it announces; once the site is open (a platform admin's switch,
+ * whatever host asks) and has a public election, it names that election instead, as every page shares this card.
+ */
+export const homeCardContent = (
+  home: PublicHome,
+  locale: Locale,
+  base: string,
+  open: boolean,
+): ComingSoonCard => {
+  const t = getTranslator(locale);
+  const local = (value: PublicHome['tenant']['displayName']) =>
+    pickLocalized(value, locale, home.tenant.defaultLocale) ?? '';
+  const { election } = home;
+  // satori draws PNG and JPEG; a WebP logo leaves the operator line in words.
+  const logo = accentLogo(home);
+  const drawable =
+    logo && ['image/png', 'image/jpeg'].includes(logo.contentType) ? logo : undefined;
+  const electionText = (shown: Pick<PublicElectionSummary, 'name' | 'date'>) =>
+    shown.date
+      ? t('home.election', {
+          name: local(shown.name),
+          date: new Date(`${shown.date}T12:00:00Z`),
+        })
+      : local(shown.name);
+  const [current] = open ? home.elections : [];
+  const label = current
+    ? electionText(current)
+    : election
+      ? `${t('home.comingSoon')} · ${electionText(election)}`
+      : t('home.comingSoon');
+  return {
+    theme: cardTheme(home.tenant.theme ?? {}),
+    label,
+    name: local(home.tenant.displayName),
+    question: t('home.question'),
+    address: base.replace(/^https:\/\//, ''),
+    initiative: t('layout.initiativeOf', { operator: local(home.operator.displayName) }),
+    initiativeLead: t('layout.initiativeLead'),
+    ...(drawable
+      ? { operatorLogo: { sha256: drawable.sha256, contentType: drawable.contentType } }
+      : {}),
+  };
+};
+
+/** The image's content hash: it changes whenever anything on the card does, or the way the card is drawn. */
+export const homeCardHash = (card: ComingSoonCard, size: ShareSize): string =>
+  cardHash('coming-soon', size, card);
+
+/**
+ * The card an image request is answered with: this pod's, unless the other mode's is the one asked for. Each pod
+ * refreshes its routing data on its own, so for a moment after a site is opened, pods disagree on whether it is open;
+ * rendering the other's card, rather than redirecting to this pod's, keeps two pods from sending a crawler back and
+ * forth.
+ */
+export const requestedHomeCard = (
+  home: PublicHome,
+  locale: Locale,
+  base: string,
+  open: boolean,
+  size: ShareSize,
+  hash: string,
+): ComingSoonCard => {
+  const other = homeCardContent(home, locale, base, !open);
+  return homeCardHash(other, size) === hash ? other : homeCardContent(home, locale, base, open);
+};

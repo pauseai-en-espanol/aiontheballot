@@ -1,0 +1,117 @@
+[
+  {
+    "name": "the TOTP secret and backup codes stay",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "    await client.query('DELETE FROM two_factors WHERE user_id = $1', [userId]);\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the account still says it has a second factor",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "'UPDATE users SET two_factor_enabled = false, updated_at = now() WHERE id = $1'",
+    "new": "'UPDATE users SET updated_at = now() WHERE id = $1'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "sessions survive the reset",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "'DELETE FROM sessions WHERE user_id = $1 RETURNING expires_at > now() AS open'",
+    "new": "'SELECT expires_at > now() AS open FROM sessions WHERE user_id = $1'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a sign-in waiting for its code is kept",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "          AND (v.identifier LIKE '2fa-%' OR v.identifier LIKE 'trust-device-%' OR (${passwordLinkRow('v')}))`,",
+    "new": "          AND (v.identifier LIKE 'trust-device-%' OR (${passwordLinkRow('v')}))`,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a trusted device is kept",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "          AND (v.identifier LIKE '2fa-%' OR v.identifier LIKE 'trust-device-%' OR (${passwordLinkRow('v')}))`,",
+    "new": "          AND (v.identifier LIKE '2fa-%' OR (${passwordLinkRow('v')}))`,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "an account without a factor is reset anyway (its sessions end)",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "    if (!account?.enrolled) {",
+    "new": "    if (!account) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a stored factor without the flag is never reset",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "const HAS_FACTOR = `(coalesce(u.two_factor_enabled, false)\n                     OR EXISTS (SELECT 1 FROM two_factors f WHERE f.user_id = u.id))`;",
+    "new": "const HAS_FACTOR = `coalesce(u.two_factor_enabled, false)`;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the address is matched as typed",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "    [email.trim().toLowerCase()],",
+    "new": "    [email.trim()],",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "no confirmation",
+    "file": "apps/api/src/reset-authenticator.ts",
+    "old": "    if (answer !== 'reset') {",
+    "new": "    if (answer === 'never') {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the address isn't asked twice",
+    "file": "apps/api/src/reset-authenticator.ts",
+    "old": "  if (again.trim().toLowerCase() !== email.trim().toLowerCase()) {",
+    "new": "  if (again === 'never') {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a code's session after the reset is kept",
+    "file": "db/migrations/20261012151725_aal2_needs_second_factor.sql",
+    "old": "    IF NOT FOUND THEN",
+    "new": "    IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts > /dev/null; cd ../../apps/api && npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts > /dev/null"
+  },
+  {
+    "name": "the account's row isn't locked",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "FROM users u WHERE u.id = $1 FOR UPDATE OF u`",
+    "new": "FROM users u WHERE u.id = $1`",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "Orders two resets of one account, which no test runs at once; a session insert is ordered by the factor row's lock, taken first."
+  },
+  {
+    "name": "the factor row isn't locked first",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "    await client.query('SELECT 1 FROM two_factors WHERE user_id = $1 FOR UPDATE', [userId]);\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "Without it a reset and a session insert can deadlock mid-statement (each refused or failed safely, 40P01), a timing no test can hold still."
+  },
+  {
+    "name": "a password link is kept",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "          AND (v.identifier LIKE '2fa-%' OR v.identifier LIKE 'trust-device-%' OR (${passwordLinkRow('v')}))`,",
+    "new": "          AND (v.identifier LIKE '2fa-%' OR v.identifier LIKE 'trust-device-%')`,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/reset-authenticator.spec.ts",
+    "cwd": "apps/api"
+  }
+]

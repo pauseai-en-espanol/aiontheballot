@@ -1,0 +1,234 @@
+replicaCount: 2
+image:
+  repository: aiontheballot/api
+  tag: ''
+  pullPolicy: IfNotPresent
+service:
+  port: 3001
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    cpu: '1'
+    memory: 384Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  # The file volume's group is set once, not walked file by file at every start.
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+# Extra environment (plain values, or secretKeyRef for credentials sealed in gitops). Public routes (the web app's routing
+# data) need WEB_DATABASE_URL, the aiontheballot_web role's connection; without it they answer 503. Signed-in routes need
+# ADMIN_DATABASE_URL (aiontheballot_admin).
+env: []
+envFrom: []
+
+# The platform's name (PLATFORM_NAME), from each deployment's configuration: what authenticator apps file the admin
+# accounts under. Sign-in needs it.
+platformName: ''
+
+# Sign-in (Better Auth, ADR-0003 §2) on the central admin host's /api. Set all three and platformName, or none of the
+# three: with none, /api answers 503; with some, the chart refuses to render (and the API to start).
+auth:
+  # The admin host's origin, e.g. https://admin.example.org: the only host /api answers on.
+  adminOrigin: ''
+  # The aiontheballot_auth role's connection (ADR-0002 §2), the only role that reaches Better Auth's tables.
+  databaseUrlSecret:
+    name: ''
+    key: DATABASE_URL
+  # Signs Better Auth's cookies and encrypts TOTP secrets and backup codes. Changing it signs everyone out and makes
+  # every enrolled authenticator unreadable, so it is set once.
+  betterAuthSecret:
+    name: ''
+    key: BETTER_AUTH_SECRET
+  # A daily CronJob from this image deletes expired sessions and sign-in data Better Auth never meets again (personal
+  # data, PLAN R81), as aiontheballot_auth and with no other credential. Rendered once databaseUrlSecret is set.
+  cleanup:
+    # Its own extra environment, never the API's, which holds other roles' credentials: e.g. the secret with the
+    # API's SENTRY_DSN, so its failures reach error tracking.
+    envFrom: []
+    # UTC, at a quiet hour.
+    schedule: '17 3 * * *'
+    # Node, pg and the Sentry SDK: about 110 MiB at its peak, measured locally.
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# The platform's one mail sender (PLAN R115): the platform's SMTP submission, with the platform account's credentials.
+# Set both or neither: with neither, nothing sends mail and no site offers its signup list (PLAN R119); with one, the
+# chart refuses to render (and the API to start).
+mail:
+  # The SMTP URL, credentials included, from a secret sealed in gitops: smtps://user:password@host:465, or smtp://…:587
+  # for STARTTLS. Through a Service inside the cluster, add ?tls.servername=<the name on the SMTP server's
+  # certificate>.
+  smtpUrlSecret:
+    name: ''
+    key: SMTP_URL
+  # The sending address, for the envelope and From, e.g. avisos@example.org; a site's mail shows the operator's name.
+  from: ''
+
+# Stored files' bytes (ADR-0001, files; ADR-0004): a persistent volume every API pod mounts, holding each file under
+# its tenant, bucket and SHA-256 (FILES_ROOT). No database dump covers it, so it needs its own backup (gitops backup
+# plan), taken after the database dump.
+persistence:
+  enabled: true
+  # The default class, local-path, enforces no quota and expands nothing: this is a label, and the volume can fill
+  # its node's disk.
+  size: 5Gi
+  # By default a folder on one node (ADR-0004): replicas share it while they run on that node (ReadWriteOnce is per
+  # node).
+  storageClass: local-path
+  # `local`, not `hostPath`: a file-system backup of pod volumes can copy local volumes but not hostPath ones. Read
+  # only when the volume is created, so it can't be changed later.
+  volumeType: local
+  mountPath: /data
+
+# The worker (PLAN R116, R133): extracts the text of sources' copies, which are a party's and so hostile. It gets each
+# copy's bytes from the API (WORKER_URL), never the file volume; its only credential is the aiontheballot_worker role's
+# connection, which sees the one job it runs. Not root, a read-only root filesystem, hard memory and CPU limits, one
+# copy at a time, each parsed in a child process with a memory limit, a deadline, no environment, and no access to the
+# disk (beyond reading its code), the network or other processes; and a NetworkPolicy: only the API reaches it, and it
+# reaches only the database and DNS. Rendered once databaseUrlSecret is set.
+worker:
+  databaseUrlSecret:
+    name: ''
+    key: WORKER_DATABASE_URL
+  # The secret the API and the worker share (ADR-0006): every job carries it, and the worker refuses one without it.
+  # Required with the worker; scripts/seal-worker-token-secret.sh seals one.
+  tokenSecret:
+    name: ''
+    key: WORKER_TOKEN
+  port: 3002
+  extraction:
+    # A copy whose parsing takes longer, or more memory (all of the child's, not only its heap), is recorded as failed.
+    timeoutMs: 120000
+    memoryMb: 512
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    # Room for the child's memoryMb plus the worker itself: about 100 MB, the copy it holds (50 MB at most), and the
+    # child's answer as it parses it (about five times the answer, itself at most 50 MB). Raise this with memoryMb:
+    # past the limit the kernel stops the whole container, the worker with its child, and the job stays open.
+    limits:
+      cpu: '1'
+      memory: 1280Mi
+  # Its own extra environment, never the API's: e.g. the secret with SENTRY_DSN, for its own faults (never a
+  # document's content). Set networkPolicy.errorTracking too, or its reports can't leave.
+  envFrom: []
+  networkPolicy:
+    enabled: true
+    # The database's namespace and port, the one place the worker must connect to besides DNS.
+    database:
+      namespace: ''
+      port: 5432
+    # Error tracking inside the cluster (e.g. GlitchTip), when the worker reports: its namespace, its web pods' labels
+    # and their port (the pods', not the Service's). Without a namespace, the worker reaches no error tracking.
+    errorTracking:
+      namespace: ''
+      podLabels: {}
+      port: 8000
+
+# The fetcher (ADR-0007): fetches a source's copy from its URL and asks the archive for a snapshot, for the API alone,
+# with no database login, no volume and no service-account token. Off by default; on, the API gets FETCHER_URL and
+# FETCHER_TOKEN (the admin then offers "Fetch a copy" and snapshots), and its NetworkPolicy lets it reach only DNS and
+# the public internet on ports 80 and 443. Snapshots need the worker too, which records them (ADR-0007 §4).
+fetcher:
+  enabled: false
+  # The secret the API and the fetcher share: every request carries it. Required with the fetcher;
+  # scripts/seal-fetcher-token-secret.sh seals one.
+  tokenSecret:
+    name: ''
+    key: FETCHER_TOKEN
+  port: 3003
+  # The whole fetch, redirects included (1000 to 10000): under the admin route's 15 seconds (Envoy's default), with
+  # room for the bytes' way to the API and their storing.
+  timeoutMs: 8000
+  # Save Page Now's address (O1: the Internet Archive). Its keys, optional but raising its limits a lot, come through
+  # envFrom (ARCHIVE_ACCESS_KEY and ARCHIVE_SECRET_KEY, from an archive.org account's S3 keys).
+  archiveUrl: https://web.archive.org
+  # How the fetcher names itself to sites; empty, a generic browser-compatible name.
+  userAgent: ''
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    # A fetch holds its copy (50 MB at most, twice while it is joined) until it is sent; at most 2 at once.
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # Its own extra environment, never the API's: the archive's keys, and the secret with SENTRY_DSN for its own faults.
+  # Set networkPolicy.errorTracking too, or its reports can't leave.
+  envFrom: []
+  networkPolicy:
+    enabled: true
+    errorTracking:
+      namespace: ''
+      podLabels: {}
+      port: 8000
+
+# The scheduled sweep of orphaned bytes (PLAN R117, R141; ADR-0004 §5): a CronJob from this image that deletes the bytes
+# no row has named for graceDays, as aiontheballot_sweeper, whose one permission is the list of named files. Rendered
+# once databaseUrlSecret is set (and the volume is on); until then the sweep is the owner's, by hand (R75).
+fileSweep:
+  # That login's connection (gitops: the database role, and its URL sealed).
+  databaseUrlSecret:
+    name: ''
+    key: SWEEPER_DATABASE_URL
+  # UTC, weekly at a quiet hour: bytes wait 120 days before they go, so more often gains nothing.
+  schedule: '43 4 * * 0'
+  # Never under 111 (the sweep refuses less): the oldest restorable dump with the gitops backup plan (PLAN R67).
+  graceDays: 120
+  # Its own extra environment, never the API's: e.g. the secret with SENTRY_DSN.
+  envFrom: []
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# Right-of-reply reports (PLAN R149): a daily CronJob anonymizes those past their site's retention (personal data, data
+# model §3.8), as aiontheballot_worker, the one role that may run private.anonymize_expired_reports(). Rendered once
+# databaseUrlSecret is set: until then reports past their retention keep their personal data.
+reports:
+  anonymize:
+    # The worker role's connection: the same secret as the worker's (gitops), with its key.
+    databaseUrlSecret:
+      name: ''
+      key: WORKER_DATABASE_URL
+    # UTC, daily, at a quiet hour.
+    schedule: '29 3 * * *'
+    # Its own extra environment, never the API's: e.g. the secret with SENTRY_DSN.
+    envFrom: []
+    resources:
+      requests:
+        cpu: 10m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# The public site's pods (PLAN R151): told at once when a site's public data changes, through the web chart's headless
+# Service, whose name resolves to every ready pod. The name defaults to <release>-web-pods, the same release's.
+web:
+  revalidate:
+    enabled: true
+    serviceName: ''
+    # The pods' own port (the headless Service gives addresses, not a port).
+    port: 3000

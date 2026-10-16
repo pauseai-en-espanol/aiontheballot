@@ -1,0 +1,28 @@
+[
+  {
+    "name": "draft quotes new vs new",
+    "file": "db/migrations/20261011181045_quote_normaliser_unicode.sql",
+    "old": "       + (SELECT count(*) FROM app.draft_evidence e\n           WHERE private.normalize_for_match(e.quote) IS DISTINCT FROM private.normalize_for_match_r113(e.quote))",
+    "new": "       + (SELECT count(*) FROM app.draft_evidence e\n           WHERE private.normalize_for_match_r113(e.quote) IS DISTINCT FROM private.normalize_for_match_r113(e.quote))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/migration-guards.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "js join with \\s",
+    "file": "packages/domain/src/matching.ts",
+    "old": "\\n\\p{White_Space}*(\\p{Alphabetic})/gu",
+    "new": "\\n\\s*(\\p{Alphabetic})/gu",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts",
+    "cwd": "packages/db",
+    "before": "pnpm -s --filter @aiontheballot/domain build",
+    "after": "pnpm -s --filter @aiontheballot/domain build"
+  },
+  {
+    "name": "pg folding miscounted",
+    "file": "db/migrations/20261011181045_quote_normaliser_unicode.sql",
+    "old": "$map$'''''\"\"\"\"\"\"\"-------$map$\n          ) COLLATE \"pg_c_utf8\",\n          '([[:alpha:]])-[[:space:]]*\\n[[:space:]]*([[:alpha:]])', '\\1\\2', 'g'\n        ),\n        '[[:space:]]+', ' ', 'g'\n      )\n    )\n  $$;\n\n-- migrate:down",
+    "new": "$map$''''\"\"\"\"\"\"\"\"-------$map$\n          ) COLLATE \"pg_c_utf8\",\n          '([[:alpha:]])-[[:space:]]*\\n[[:space:]]*([[:alpha:]])', '\\1\\2', 'g'\n        ),\n        '[[:space:]]+', ' ', 'g'\n      )\n    )\n  $$;\n\n-- migrate:down",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts",
+    "cwd": "packages/db"
+  }
+]

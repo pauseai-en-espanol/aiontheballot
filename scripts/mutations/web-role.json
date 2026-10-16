@@ -1,0 +1,57 @@
+[
+  {
+    "name": "migration: the web role reads all of tenant_documents again",
+    "file": "db/migrations/20261013102453_web_role_least_privilege.sql",
+    "old": "GRANT SELECT (id, tenant_id, kind, version, body, published_at) ON app.tenant_documents",
+    "new": "GRANT SELECT ON app.tenant_documents",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t tenant_documents",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the column grant names created_by",
+    "file": "db/migrations/20261013102453_web_role_least_privilege.sql",
+    "old": "body, published_at) ON app.tenant_documents",
+    "new": "body, published_at, created_by) ON app.tenant_documents",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts -t tenant_documents",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the column grant leaves out a column the public site reads",
+    "file": "db/migrations/20261013102453_web_role_least_privilege.sql",
+    "old": "kind, version, body, published_at",
+    "new": "kind, version, published_at",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts && cd ../../apps/api && npx vitest run -c vitest.db.config.ts tests/home-data.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the web role keeps its SELECT on hostname_tombstones",
+    "file": "db/migrations/20261013102453_web_role_least_privilege.sql",
+    "old": "REVOKE SELECT ON app.hostname_tombstones FROM aiontheballot_web;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts tests/rls/matrix.spec.ts -t 'tombstones|public cache key'",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the tombstones' public policy stays",
+    "file": "db/migrations/20261013102453_web_role_least_privilege.sql",
+    "old": "DROP POLICY public_read ON app.hostname_tombstones;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts tests/rls/matrix.spec.ts -t 'tombstones|public cache key'",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "equivalent": "the policy reads nothing for a role whose SELECT the line above revokes"
+  },
+  {
+    "name": "migration: the web role keeps USAGE on private",
+    "file": "db/migrations/20261013102453_web_role_least_privilege.sql",
+    "old": "REVOKE USAGE ON SCHEMA private FROM aiontheballot_web;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  }
+]

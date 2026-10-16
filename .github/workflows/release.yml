@@ -1,0 +1,183 @@
+name: 📦 Release
+
+# After CI passes on main:
+#   1. version: apply the changesets (versions and changelogs) and commit the result.
+#   2. deploy: build and push the image of every deployable whose version is ahead of the umbrella chart, then write
+#      the new tags into the chart. Argo CD deploys main to production until the preview, then the production branch
+#      (ADR-0001).
+# One workflow with two jobs, rather than a chain of workflow_run workflows: both jobs work on the commit CI tested,
+# never on whatever main points to by the time they start.
+on:
+  workflow_run:
+    workflows: ['🧪 CI']
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Version
+    # A pull request whose head branch is called main also passes the branches filter, hence the event check.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: [self-hosted, linux, arm64]
+    timeout-minutes: 15
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      # The registry's host is the operator's, and this repository's logs are public (PLAN R205): masked before any
+      # step could print it.
+      - name: Mask the registry's host
+        run: '[ -z "${DOCKER_REGISTRY:-}" ] || echo "::add-mask::$DOCKER_REGISTRY"'
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Changesets links each changelog entry to the commit that added it.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/install-pnpm-dependencies
+
+      # Changesets 3 fails when there is nothing to version (a push of docs only, say): then there is nothing to do.
+      - name: Apply changesets
+        run: |
+          if find .changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | grep -q .; then
+            pnpm release:bump
+          else
+            echo "::notice::No changesets: nothing to version."
+          fi
+
+      - name: Commit the release
+        id: commit
+        env:
+          TESTED: ${{ github.event.workflow_run.head_sha || github.sha }}
+          HUSKY: 0
+        run: |
+          git fetch --quiet origin main
+          if [ "$(git rev-parse origin/main)" != "$TESTED" ]; then
+            echo "::notice::main has moved past $TESTED. The release after CI passes on the newer commit includes this one."
+            exit 0
+          fi
+          git add -A
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m "Release: bump versions [skip ci]"
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Build and deploy
+    needs: version
+    if: needs.version.outputs.sha != ''
+    runs-on: [self-hosted, linux, arm64]
+    timeout-minutes: 60
+    steps:
+      # The registry's host is the operator's, and this repository's logs are public (PLAN R205): masked before any
+      # step could print it.
+      - name: Mask the registry's host
+        run: '[ -z "${DOCKER_REGISTRY:-}" ] || echo "::add-mask::$DOCKER_REGISTRY"'
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/setup-pnpm
+      - uses: ./.github/actions/setup-yq
+
+      - name: Plan the release
+        id: plan
+        run: |
+          scripts/release-plan.sh | tee "$RUNNER_TEMP/release-plan"
+          if [ -s "$RUNNER_TEMP/release-plan" ]; then
+            echo "due=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Every deployable is already at its current version"
+          fi
+
+      # buildx as a Docker CLI plugin, pinned and checked, and the daemon's own builder (the docker driver), which shares
+      # its image store: what docker/setup-buildx-action did, without printing the host's details into the public log
+      # (PLAN R205). A new version: its sha256 for each architecture from the release's checksums.txt.
+      - name: Install buildx
+        if: steps.plan.outputs.due == 'true'
+        env:
+          BUILDX_VERSION: v0.38.0
+        run: |
+          case "$(uname -m)" in
+            aarch64 | arm64) arch=arm64 sum=38e890e1a162bfdbf32fbe91404991dc4fc28e55b0de901b34374a061bab4d2c ;;
+            x86_64) arch=amd64 sum=4fe4cc38adf48169132749b6ca22a990928db0118e3407584ee553723115d287 ;;
+            *) echo "No buildx pinned for this architecture" && exit 1 ;;
+          esac
+          curl -fsSL -o "$RUNNER_TEMP/docker-buildx" \
+            "https://github.com/docker/buildx/releases/download/$BUILDX_VERSION/buildx-$BUILDX_VERSION.linux-$arch"
+          echo "$sum  $RUNNER_TEMP/docker-buildx" | sha256sum -c --quiet
+          plugins="${DOCKER_CONFIG:-$HOME/.docker}/cli-plugins"
+          mkdir -p "$plugins"
+          install -m 0755 "$RUNNER_TEMP/docker-buildx" "$plugins/docker-buildx"
+          docker buildx use default
+          docker buildx version
+
+      # Tags are <version>.<short sha>, pushed to the runner's DOCKER_REGISTRY. The build runs under emulation when
+      # the runner's architecture differs from the cluster's, so images are built one at a time.
+      - name: Build and push images
+        if: steps.plan.outputs.due == 'true'
+        run: |
+          : "${DOCKER_REGISTRY:?The runner must set DOCKER_REGISTRY}"
+          export DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
+          DOCKER_TAG_SUFFIX="$(git rev-parse --short HEAD)"
+          export DOCKER_TAG_SUFFIX
+          echo "DOCKER_TAG_SUFFIX=$DOCKER_TAG_SUFFIX" >> "$GITHUB_ENV"
+          filters=()
+          while read -r _ name _; do
+            filters+=("--filter=$name")
+          done < "$RUNNER_TEMP/release-plan"
+          # The shared builder's file system now and then interrupts a system call inside a build ("Interrupted
+          # system call" creating a folder, PLAN R198): the step tries again, three times in all, which BuildKit's
+          # layer cache makes quick. A build that is really broken fails all three and stops the release as before.
+          turbo="turbo@$(node -p "require('./package.json').devDependencies.turbo")"
+          for attempt in 1 2 3; do
+            if pnpm dlx "$turbo" run docker:push --concurrency=1 "${filters[@]}"; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              exit 1
+            fi
+            echo "::warning::Building and pushing the images failed (attempt $attempt of 3): trying again"
+          done
+
+      # If main has moved on, the push fails and nothing is lost: the next release still finds these versions ahead
+      # of the chart and builds them again.
+      - name: Write image tags into the umbrella chart
+        if: steps.plan.outputs.due == 'true'
+        env:
+          HUSKY: 0
+        run: |
+          tags=()
+          while read -r key _ version; do
+            tag="$version.$DOCKER_TAG_SUFFIX"
+            KEY="$key" TAG="$tag" yq -i '.[env(KEY)].image.tag = env(TAG)' helm-charts/aiontheballot/values.yaml
+            tags+=("$key-v$tag")
+          done < "$RUNNER_TEMP/release-plan"
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Release: update image tags [skip ci]" -- helm-charts/aiontheballot/values.yaml
+          git push origin HEAD:main
+          for tag in "${tags[@]}"; do
+            git tag "$tag"
+          done
+          git push origin "${tags[@]}"
