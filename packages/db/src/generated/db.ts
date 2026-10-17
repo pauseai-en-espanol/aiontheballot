@@ -455,9 +455,13 @@ export interface AppPublicVersions {
 export interface AppPurgeLog {
   at: Generated<Timestamp>;
   counts: Json;
+  finished_at: Timestamp | null;
   id: Generated<Int8>;
   leftovers: Json;
+  purge_xact: string | null;
   purged_by: string;
+  purged_election_id: string | null;
+  purged_election_slug: string | null;
   purged_tenant_id: string;
   purged_tenant_slug: string;
 }
