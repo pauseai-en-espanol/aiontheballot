@@ -10,6 +10,7 @@ export const EXECUTE_ALLOWLIST: readonly string[] = [
   'aiontheballot_admin private.my_tenants(VARIADIC roles app.tenant_role[])',
   'aiontheballot_admin private.normalize_for_match(input text)',
   'aiontheballot_admin private.pending_invitation(token_hash text)',
+  'aiontheballot_admin private.purge_election(tenant uuid, election uuid, confirmation text)',
   'aiontheballot_sweeper private.file_sweep_list()',
   'aiontheballot_web app.confirm_signup(tenant uuid, token_hash text)',
   'aiontheballot_web app.sign_up(tenant uuid, email text, locale text, future_elections boolean, token_hash text)',
@@ -35,4 +36,5 @@ export const SECURITY_DEFINER_ALLOWLIST: readonly string[] = [
   'private.my_tenants',
   'private.pending_invitation',
   'private.publish_revision',
+  'private.purge_election',
 ];

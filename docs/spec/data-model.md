@@ -67,11 +67,12 @@ lives. Any example data here is fictional.
 - **Timestamps:** `created_at timestamptz not null default now()`. Mutable tables also get `updated_at`, kept by a
   trigger.
 - **Deletes:**
-  - Published data is never deleted. Parties, criteria and methodology reviewers of a live election are retired,
-    not deleted.
+  - Published data is never deleted, except with its whole election by a platform admin's purge (below). Parties,
+    criteria and methodology reviewers of a live election are retired, not deleted.
   - Drafts can be deleted, including a cell that was never published (with its drafts and contributor rows).
   - Reports are anonymized, never deleted, because corrections cite them.
-  - A whole tenant can be removed only through `private.purge_tenant()` (ADR-0002 §14).
+  - A whole tenant can be removed only through `private.purge_tenant()`, and a whole election only through
+    `private.purge_election()` (ADR-0002 §14, PLAN R212).
 
 The SQL below is **illustrative**: it shows columns, types and constraints, but leaves out the grants, policies and
 triggers, which the [enforcement map](#6-enforcement-map) covers.
@@ -543,7 +544,7 @@ create table app.assessments (
   foreign key (tenant_id, election_id, party_id)     references app.parties (tenant_id, election_id, id),
   foreign key (tenant_id, election_id, criterion_id) references app.criteria (tenant_id, election_id, id),
   foreign key (tenant_id, draft_report_id)           references app.reports (tenant_id, id)
-    deferrable initially immediate                    -- deferred only by purge_tenant: reports name cells too
+    deferrable initially immediate                    -- deferred only by the purges: reports name cells too
 );
 -- draft_report_id (PLAN D16, R157) is content like the other draft columns: editors and country admins write it,
 -- only to name a report of the cell's own election that they can read (a platform admin reads none), and publishing
@@ -698,7 +699,7 @@ ADR-0002 allowlist), does the rest in the same transaction:
    sets `revision_no` and `published_at`; writes `revision_internal`, with the report the draft answers.
 9. Moves the cell to `published`, increments its `generation` and clears the draft change kind, note and report.
 
-Nothing here is ever updated or deleted, except through `purge_tenant`.
+Nothing here is ever updated or deleted, except through `purge_tenant` or `purge_election`.
 
 **How the publish trigger is built.** One function runs before the insert (steps 1–7, then filling in the revision)
 and after it (copying, `revision_internal`, and setting the cell `published`, whose own trigger does step 9). It
@@ -926,13 +927,13 @@ create table app.report_daily_counts (
 );
 ```
 
-**Anonymization instead of deletion.** Corrections and change requests cite reports, and published history can't
-lose a reference, so reports are never deleted (except by `purge_tenant`). At `anonymize_after`, or on an erasure
-request, the personal-data columns are set to null and `anonymized_at` is set; the report's kind, status, dates and
-links stay. The daily run is `private.anonymize_expired_reports()`, a `SECURITY DEFINER` function that takes no
-arguments and that only `aiontheballot_worker` can execute (ADR-0002 allowlist). A country admin's erasure is an
-UPDATE that the trigger accepts only if it nulls exactly those columns. Reports stay triageable when their election
-is archived.
+**Anonymization instead of deletion.** Corrections and change requests cite reports, and published history can't lose
+a reference, so reports are never deleted (except by the purges, with what cites them). At `anonymize_after`, or on an
+erasure request, the personal-data columns are set to null and `anonymized_at` is set; the report's kind, status,
+dates and links stay. The daily run is `private.anonymize_expired_reports()`, a `SECURITY DEFINER` function that takes
+no arguments and that only `aiontheballot_worker` can execute (ADR-0002 allowlist). A country admin's erasure is an
+UPDATE that the trigger accepts only if it nulls exactly those columns. Reports stay triageable when their election is
+archived.
 
 **Sending and triaging** (`app.submit_report()`, `private.report_rules()`):
 
@@ -1090,13 +1091,16 @@ create table app.audit_log (                           -- append-only; no person
                                                        -- null for the admin's own requests
 );
 
-create table app.purge_log (                           -- written only by purge_tenant(); platform admins read it
+create table app.purge_log (                           -- written only by the purges; platform admins read it
   id                  bigint generated always as identity primary key,
   purged_tenant_id    uuid not null,                   -- no foreign key: the tenant is gone
   purged_tenant_slug  text not null,
-  purged_by           text not null,                   -- the database role that ran it
+  purged_by           text not null,                   -- the database role that ran it, or the platform admin's id
   counts              jsonb not null,                  -- rows deleted, by table
   leftovers           jsonb not null,                  -- organizations and users the tenant leaves unused
+  purged_election_id  uuid,                            -- an election's purge (R212): the election, its short name and
+  purged_election_slug text,                           -- its transaction, which lets that purge past the immutable
+  purge_xact          xid8,                            -- tables; all three or none
   at                  timestamptz not null default now()
 );
 ```

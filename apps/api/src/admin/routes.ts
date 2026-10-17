@@ -97,6 +97,7 @@ import {
   type ElectionType,
   getElection,
   listElections,
+  purgeElection,
   updateElection,
 } from './elections.js';
 import {
@@ -3631,6 +3632,30 @@ export const adminDataRoutes =
           await withActor(db, actor, async (trx) => {
             const { access, election } = await electionFor(trx, actor, request.params);
             refuseUnless(await deleteElection(trx, access.tenantId, election.id));
+          });
+          return reply.code(204).send();
+        }),
+    );
+
+    // Deletes an election for good, whatever its status (PLAN R212): platform admins, who type its short name.
+    scope.post<{ Params: { tenant: string; election: string }; Body: { confirmation: string } }>(
+      '/t/:tenant/e/:election/purge',
+      {
+        schema: {
+          params: ELECTION_PARAMS,
+          body: {
+            type: 'object',
+            properties: { confirmation: { type: 'string', maxLength: 100 } },
+            required: ['confirmation'],
+            additionalProperties: false,
+          },
+        },
+      },
+      async (request, reply) =>
+        signedIn(request, reply, async (db, actor) => {
+          await withActor(db, actor, async (trx) => {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            await purgeElection(trx, access.tenantId, election.id, request.body.confirmation);
           });
           return reply.code(204).send();
         }),

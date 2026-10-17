@@ -143,11 +143,13 @@ names the token.
   `bump_public_version` (so no runtime role can write `public_versions`), `submit_report`, the signup list's
   `sign_up`, `confirm_signup` and `unsubscribe` (amended, PLAN R119, R122), the invitations' `pending_invitation` and
   `accept_invitation` (amended, PLAN R114), the publish trigger `publish_revision` and `anonymize_expired_reports`
-  (worker only), and the sweep's `file_sweep_list` (amended, PLAN R117, R141). All of them set `search_path = ''`.
+  (worker only), the sweep's `file_sweep_list` (amended, PLAN R117, R141), and `purge_election` (§14; amended, PLAN
+  R212). All of them set `search_path = ''`.
 - The actor helpers (`private.current_user_id`, `private.current_aal`) and the policy helpers
   (`private.my_tenants`, `private.is_platform_admin`) are executable by `aiontheballot_admin`, whose policies and
   triggers call them.
-- `private.pending_invitation` and `private.accept_invitation` are executable by `aiontheballot_admin` only (§10).
+- `private.pending_invitation` and `private.accept_invitation` are executable by `aiontheballot_admin` only (§10), and
+  so is `private.purge_election` (§14).
 - `private.normalize_for_match` is executable by `aiontheballot_admin` (the match trigger) and
   `aiontheballot_worker` (the generated column on `source_texts`).
 - The worker may also execute `private.current_user_id`: it sets `app.user_id` to its job request's requester, so what
@@ -319,26 +321,41 @@ expires_at)`, under RLS.
 A withdrawal is a draft (`draft_change_kind = 'withdrawal'`) reviewed like any other change. Its revision leaves the
 cell without a rating (_withdrawn_, distinct from _pending_) and logs a correction with its public note.
 
-### 14. Immutability, with one purge path
+### 14. Immutability, with two purge paths
 
 - Triggers reject `UPDATE`, `DELETE` and `TRUNCATE` on revisions and their child tables, `structural_changes`,
   `review_events`, `audit_log` and `purge_log`. These triggers fire even for the owner role. The corrections log is
   a view over revisions and `structural_changes`, so it can't be edited either.
 - Stored files are immutable, and deletable only while nothing references them. A purge deletes the tenant's bytes
   from the file volume with `purge-tenant-files`, after the rows (ADR-0004).
-- The only exception is `private.purge_tenant(tenant_id)`:
+- The first exception is `private.purge_tenant(tenant_id)`:
   - Only `aiontheballot_owner` can execute it.
   - It sets a transaction-local `app.purge` flag that the triggers honour, and writes a platform-level purge record.
   - It covers per-tenant deletion (BRIEF §7) and GDPR erasure.
+- The second is `private.purge_election(tenant, election, confirmation)` (amended, PLAN R212, Dani's decision): a
+  platform admin deletes one election for good from the admin, whatever its status, with everything in it, its audit
+  trail and the files nothing else names (their bytes go with the sweep, ADR-0004).
+  - `aiontheballot_admin` executes it, `SECURITY DEFINER`. It refuses anyone but a platform admin in person (second
+    factor, no member token) and a `confirmation` other than the election's short name.
+  - It first writes the purge record, with this transaction's id and the election; no runtime role may write
+    `purge_log`. It then sets a transaction-local `app.purge_election` flag naming the election. The immutable tables
+    and the audit let a change through only with the owner's rights while the flag and an unfinished record of this
+    transaction match, so neither the flag nor a `SECURITY DEFINER` function alone exempts anything. Before it
+    returns, it marks the record finished and clears the flag, so nothing later in the transaction gets it back.
+  - The trade-off, accepted: a platform admin, or a stolen platform-admin session with its second factor, can remove a
+    published comparison and its corrections. The purge record keeps who, when, which election and how many rows of
+    each kind; backups keep the rest for their retention.
 - Personal data is never copied into `audit_log`. A report's entries keep its non-personal columns (its kind, cell,
   status, triage and whether a party representative sent it), never its reporter's details or words; platform admins
   read them too, like every audit entry (PLAN R166: D17b, kept by Dani's decision).
 - Reports are anonymized, never deleted, because corrections cite them: at the end of the tenant's retention period
-  or on an erasure request, their personal-data columns are set to null.
+  or on an erasure request, their personal-data columns are set to null. An election's purge deletes its reports
+  with the corrections that cite them.
 - A purge moves the tenant's hostnames to `hostname_tombstones`, so they can never be claimed again.
 - While purging, the audit and public-cache triggers skip writes only in a session whose role is a member of the table
   owner: a runtime role setting `app.purge` gets neither that nor the immutability exemption, also where it runs with
-  the owner's rights (a SECURITY DEFINER function, a foreign key's action; PLAN R165).
+  the owner's rights (a SECURITY DEFINER function, a foreign key's action; PLAN R165). An election's purge is the one
+  case where the owner's rights suffice, and only with its own record of this transaction (above).
 
 ### 15. The Host header never authorizes
 

@@ -377,6 +377,36 @@ const ElectionPage = async ({ params }: Params) => {
           )}
         </FormSection>
       ) : null}
+
+      {platformAdmin ? (
+        <FormSection
+          id="purge"
+          title={t('admin.election.purge')}
+          description={t('admin.election.purgeIntro')}
+          danger
+        >
+          {/* Whatever its status, with everything in it (PLAN R212): the address name typed first, as for archiving. */}
+          <ConfirmButton
+            method="POST"
+            path={`${path}/purge`}
+            then={`/t/${tenant.slug}/elections`}
+            typeToConfirm={{
+              slug: election.slug,
+              label: template(t, 'admin.election.typeToPurge'),
+              mismatch: t('admin.status.slugMismatch'),
+            }}
+            text={{
+              button: t('admin.election.purge'),
+              title: t('admin.election.purgeTitle'),
+              body: t('admin.election.purgeBody'),
+              confirm: t('admin.election.purge'),
+              cancel: t('admin.members.cancel'),
+              done: t('admin.election.purged'),
+              errors,
+            }}
+          />
+        </FormSection>
+      ) : null}
     </>
   );
 };

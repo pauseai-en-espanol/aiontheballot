@@ -508,7 +508,13 @@
         "live": "Siguiente paso, cuando haya resultados: archivarla."
       },
       "settingsTitle": "Ajustes",
-      "deleted": "Elección borrada."
+      "deleted": "Elección borrada.",
+      "purge": "Borrar para siempre",
+      "purgeIntro": "Solo administración de la plataforma. Borra la elección, esté como esté, con todo lo que contiene: su metodología, partidos, criterios, fuentes, celdas, valoraciones publicadas y sus correcciones, mensajes e historial. Se guarda constancia del borrado.",
+      "purgeTitle": "¿Borrar esta elección para siempre?",
+      "purgeBody": "Todo lo que contiene se borra para siempre, también las valoraciones publicadas y las correcciones, y el sitio público deja de mostrarla. No se puede deshacer.",
+      "typeToPurge": "Escribe el nombre en la dirección de la elección, {slug}, para borrarla para siempre",
+      "purged": "Elección borrada para siempre."
     },
     "methodology": {
       "kind": "Tipo: {kind}. Es el del sitio y el mismo en todas sus elecciones.",

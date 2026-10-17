@@ -1,0 +1,107 @@
+[
+  {
+    "name": "migration: anyone may purge",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "old": "    IF nullif(current_setting('app.token_id', true), '') IS NOT NULL OR NOT private.is_platform_admin() THEN",
+    "new": "    IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a member token may purge",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "old": "    IF nullif(current_setting('app.token_id', true), '') IS NOT NULL OR NOT private.is_platform_admin() THEN",
+    "new": "    IF NOT private.is_platform_admin() THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "the purge log's own needs_a_person trigger refuses a member token's insert first, with the same 42501"
+  },
+  {
+    "name": "migration: any confirmation will do",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "old": "    IF confirmation IS DISTINCT FROM election_slug THEN",
+    "new": "    IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the flag alone exempts the immutable tables",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "old": "    SELECT EXISTS (SELECT 1 FROM app.purge_log l\n                    WHERE l.purge_xact = pg_catalog.pg_current_xact_id()\n                      AND l.finished_at IS NULL\n                      AND l.purged_election_id::text = current_setting('app.purge_election', true))",
+    "new": "    SELECT coalesce(current_setting('app.purge_election', true), '') <> ''",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the flag stays set after the purge",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "old": "    PERFORM set_config('app.purge_election', '', true);\n    RETURN logged;",
+    "new": "    RETURN logged;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: any past purge of it exempts",
+    "old": "                    WHERE l.purge_xact = pg_catalog.pg_current_xact_id()\n                      AND l.finished_at IS NULL\n",
+    "new": "                    WHERE l.finished_at IS NULL\n",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the record is never finished, so the exemption outlives the purge",
+    "old": "    UPDATE app.purge_log SET finished_at = clock_timestamp() WHERE id = logged;\n",
+    "new": "",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a finished purge still exempts",
+    "old": "                      AND l.finished_at IS NULL\n",
+    "new": "",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: rows deleted before keep their audit trail",
+    "old": "        ELSE '{\"election_id\": \"elections\"}'\n",
+    "new": "        ELSE '{}'\n",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the audit trail is kept",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "old": "      DELETE FROM app.audit_log a\n       WHERE a.tenant_id = tenant AND a.table_name = t\n         AND a.row_id IN (SELECT jsonb_array_elements_text(audited -> t));\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a file another election names is dropped",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "old": "       AND NOT EXISTS (SELECT 1 FROM app.parties p WHERE p.logo_file_id = f.id AND p.election_id <> election)\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the purge writes its own audit rows",
+    "file": "db/migrations/20261017073230_purge_election.sql",
+    "old": "            AND pg_catalog.pg_has_role(session_user, (SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.oid = relation),\n                                       'MEMBER'))\n        OR private.purging_election()",
+    "new": "            AND pg_catalog.pg_has_role(session_user, (SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.oid = relation),\n                                       'MEMBER'))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/purge-election.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "api: the purge route is gone",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "            await purgeElection(trx, access.tenantId, election.id, request.body.confirmation);",
+    "new": "            void purgeElection;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/election-routes.spec.ts",
+    "cwd": "apps/api"
+  }
+]

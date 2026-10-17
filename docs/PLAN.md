@@ -3069,6 +3069,32 @@ private.file_sweep_list()`, both to `aiontheballot_sweeper`), then the secret's 
   it (it now waits for the refresh), three mutation entries stale against the proxy (updated;
   `scripts/mutations/slow-api.json` breaks this fix), and loose wording; all fixed.
 
+- **R212. Platform admins delete an election permanently.** Dani: "i think admins should be allowed to permanently
+  delete stuff"; asked how far, they chose any election, published ones included, from a button in the admin rather
+  than a script only the owner runs. `private.purge_election(tenant, election, confirmation)` (migration
+  `purge_election`; ADR-0002 §6 and §14 amended) deletes the election with everything in it, children before parents
+  as `purge_tenant` does, its audit trail (that of its rows deleted before included, found in the audit by the
+  election or the parent its entries name), and the files nothing else names (the sweep removes their bytes,
+  ADR-0004). It refuses anyone but a platform admin in person (second factor, no member token), and a confirmation
+  other than the election's short name. The immutable tables, which R165 opened to owner sessions only, now have one
+  more narrow exemption: the owner's rights, a transaction-local flag naming the election, and an unfinished purge
+  record of this very transaction, which the function writes first and no runtime role can write; it marks the record
+  finished and clears the flag before returning. The admin shows "Delete permanently" to platform admins on every
+  election's page, behind the address name typed (`ConfirmButton` takes a typed confirmation now), through `POST
+/t/:tenant/e/:election/purge`. The trade-off, accepted: a published comparison and its corrections can be removed;
+  the purge log keeps who, when, which election and how many rows of each kind. Tests first: the database test purges
+  a live election with published revisions, reviews, evidence and a report, a draft with a party deleted before, and
+  an archived one, and checks that nothing of them is left, their audit trails are gone, the rest is untouched, a
+  shared file stays, and that the refusals and the attempts to fake or reuse the exemption hold; a route test, a wrong
+  Origin included; `scripts/mutations/purge-election.json`. Specs: editorial workflow E8.4, data model. The
+  adversarial review found the exemption usable after the purge returned (the record is now finished first), the audit
+  trail of rows deleted before the purge left behind, no test pinning "this transaction", and no archived election or
+  wrong Origin in the tests; all fixed. Decided (low impact): a purged election's short name is free again (no
+  tombstone, unlike hostnames); a purge isn't refused during a freeze window; share images already in outside caches
+  expire on their own; the site's public version isn't bumped (nothing reads it, and the route tells the public site,
+  R151); a change request of another election that names this one's report (the foreign keys don't keep them to one
+  election) makes the purge refuse with "linked", rather than reach into the other election.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

@@ -15,6 +15,7 @@ import * as styles from './styles';
  * An action that can't be undone, such as a delete, behind a confirmation (an alert dialog, so keyboard-complete and
  * announced). Once done, the page goes to `then` and says `done` there, or reloads its data and announces `done` in the
  * status line, which takes focus, since the button may be gone. A refusal shows in the alert, which the button names.
+ * With `typeToConfirm`, the dialog also asks for a name typed, as going live does (PLAN R193, R212).
  */
 export const ConfirmButton = ({
   method,
@@ -22,12 +23,18 @@ export const ConfirmButton = ({
   body,
   then,
   removes = false,
+  typeToConfirm,
   text,
   secondary = true,
 }: {
   method: 'DELETE' | 'POST' | 'PATCH' | 'PUT';
   path: string;
-  body?: unknown;
+  body?: Record<string, unknown>;
+  /**
+   * The name to type before acting, shown as code where `label` says `{slug}`; what was typed is sent as the body's
+   * `confirmation`, which the API checks again.
+   */
+  typeToConfirm?: { slug: string; label: string; mismatch: string };
   /** Where to go once done; without it, the page stays and reloads its data. */
   then?: string;
   /** Whether the button goes with what it removes, so the page's announcer says it's done (announce.ts). */
@@ -57,11 +64,18 @@ export const ConfirmButton = ({
   // Whether the dialog closed on Confirm: after Cancel, focus goes back to the button, whatever `removes` says.
   const confirmed = useRef(false);
   const errorId = useId();
+  const inputId = useId();
+  const [typed, setTyped] = useState('');
+  const [mismatch, setMismatch] = useState(false);
 
   // The dialog closes before the write, so what follows is announced outside it, and hands focus to the status line,
   // since the button may be gone afterwards (after Cancel, it goes back to the button).
   const act = async () => {
     if (busy.current) {
+      return;
+    }
+    if (typeToConfirm && typed.trim() !== typeToConfirm.slug) {
+      setMismatch(true);
       return;
     }
     focusStatus.current = then === undefined && !removes;
@@ -71,7 +85,11 @@ export const ConfirmButton = ({
     setPending(true);
     setError(undefined);
     setStatus('');
-    const answer = await sendToApi(method, path, body);
+    const answer = await sendToApi(
+      method,
+      path,
+      typeToConfirm ? { ...body, confirmation: typed.trim() } : body,
+    );
     busy.current = false;
     setPending(false);
     if (!answer.ok) {
@@ -110,6 +128,8 @@ export const ConfirmButton = ({
           setError(undefined);
           focusStatus.current = false;
           confirmed.current = false;
+          setTyped('');
+          setMismatch(false);
           setOpen(true);
         }}
       >
@@ -140,6 +160,47 @@ export const ConfirmButton = ({
             <Dialog.Content className={styles.dialog}>
               <Dialog.Title className={styles.dialogTitle}>{text.title}</Dialog.Title>
               <Dialog.Description>{text.body}</Dialog.Description>
+              {typeToConfirm ? (
+                <>
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor={inputId}>
+                      {typeToConfirm.label.split('{slug}').map((part, index) =>
+                        index === 0 ? (
+                          part
+                        ) : (
+                          <span key={part}>
+                            <code className={styles.copyableCode}>{typeToConfirm.slug}</code>
+                            {part}
+                          </span>
+                        ),
+                      )}
+                    </label>
+                    <input
+                      id={inputId}
+                      className={styles.input}
+                      value={typed}
+                      onChange={(event) => {
+                        setTyped(event.target.value);
+                        setMismatch(false);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          void act();
+                        }
+                      }}
+                      aria-invalid={mismatch ? true : undefined}
+                      aria-describedby={`${inputId}-mismatch`}
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                    />
+                  </div>
+                  <p id={`${inputId}-mismatch`} role="alert" className={styles.hint}>
+                    {mismatch ? typeToConfirm.mismatch : null}
+                  </p>
+                </>
+              ) : null}
               <div className={styles.actions}>
                 <Dialog.CloseTrigger className={styles.secondaryButton}>
                   {text.cancel}

@@ -253,3 +253,19 @@ export const deleteElection = async (
     .executeTakeFirst();
   return deleted ? 'changed' : 'forbidden';
 };
+
+/**
+ * Deletes an election for good, whatever its status, with everything in it and its audit trail (PLAN R212, ADR-0002
+ * §14): a platform admin in person, who types its short name as `confirmation`. The database checks both, refusing
+ * anyone else (42501) and another name (22023), and records the purge.
+ */
+export const purgeElection = async (
+  trx: Transaction<DB>,
+  tenantId: string,
+  electionId: string,
+  confirmation: string,
+): Promise<void> => {
+  await sql`SELECT private.purge_election(${tenantId}::uuid, ${electionId}::uuid, ${confirmation})`.execute(
+    trx,
+  );
+};

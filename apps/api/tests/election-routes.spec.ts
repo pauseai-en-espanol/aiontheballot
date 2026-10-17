@@ -259,6 +259,75 @@ describe('election routes (editorial workflow §6)', () => {
     }
   });
 
+  it('purge an election for good as a platform admin who types its short name (PLAN R212)', async () => {
+    try {
+      const body = {
+        slug: 'elecciones-de-purga',
+        type: 'general',
+        territoryCode: null,
+        name: { es: 'Elecciones de purga' },
+        date: '2030-10-04',
+      };
+      expect(
+        (await send('POST', '/api/t/test-a/elections', USERS.countryAdminA, body)).statusCode,
+      ).toBe(201);
+      const url = '/api/t/test-a/e/elecciones-de-purga';
+      const { election } = (await send('GET', url, USERS.countryAdminA)).json<{
+        election: { id: string };
+      }>();
+      created.push(election.id);
+      // Not empty, so the draft's own delete refuses it.
+      const party = {
+        slug: 'partido-ejemplo-p',
+        name: { es: 'Partido Ejemplo P' },
+        shortName: { es: 'PEP' },
+        colour: null,
+        website: null,
+        territoryCodes: null,
+      };
+      expect((await send('POST', `${url}/parties`, USERS.countryAdminA, party)).statusCode).toBe(
+        201,
+      );
+      expect((await send('DELETE', url, USERS.countryAdminA)).statusCode).toBe(409);
+
+      const purge = `${url}/purge`;
+      expect(
+        (await send('POST', purge, USERS.countryAdminA, { confirmation: 'elecciones-de-purga' }))
+          .statusCode,
+      ).toBe(403);
+      const mistyped = await send('POST', purge, USERS.platformAdmin, {
+        confirmation: 'elecciones-de-purg',
+      });
+      expect(mistyped.statusCode).toBe(400);
+      expect(mistyped.json()).toMatchObject({ error: 'invalid' });
+      expect((await send('POST', purge, USERS.platformAdmin, {})).statusCode).toBe(400);
+      // Another site's page can't send it for a platform admin.
+      const elsewhere = await app.inject({
+        method: 'POST',
+        url: purge,
+        headers: {
+          'x-test-user': USERS.platformAdmin,
+          origin: 'https://otro-sitio.example.test',
+          'content-type': 'application/json',
+        },
+        payload: JSON.stringify({ confirmation: 'elecciones-de-purga' }),
+      });
+      expect(elsewhere.statusCode).toBe(403);
+      expect(
+        (await send('POST', purge, USERS.platformAdmin, { confirmation: 'elecciones-de-purga' }))
+          .statusCode,
+      ).toBe(204);
+      expect((await send('GET', url, USERS.platformAdmin)).statusCode).toBe(404);
+      const logged = await sql<{ slug: string }>`
+        SELECT purged_election_slug AS slug FROM app.purge_log WHERE purged_election_id = ${election.id}`.execute(
+        owner,
+      );
+      expect(logged.rows).toEqual([{ slug: 'elecciones-de-purga' }]);
+    } finally {
+      await cleanUp();
+    }
+  });
+
   it('write a draft election’s methodology and reviewers as a country admin', async () => {
     try {
       const base = `/api/t/test-a/e/${ELECTIONS_A.empty.slug}/methodology`;

@@ -508,7 +508,13 @@
         "live": "Next, once the results are in: archive it."
       },
       "settingsTitle": "Settings",
-      "deleted": "Election deleted."
+      "deleted": "Election deleted.",
+      "purge": "Delete permanently",
+      "purgeIntro": "Platform admins only. Deletes the election whatever its status, with everything in it: its methodology, parties, criteria, sources, cells, published ratings and their corrections, reports and history. A record of the deletion is kept.",
+      "purgeTitle": "Delete this election permanently?",
+      "purgeBody": "Everything in it goes for good, published ratings and corrections included, and the public site stops showing it. This can’t be undone.",
+      "typeToPurge": "Type the election's address name, {slug}, to delete it permanently",
+      "purged": "Election deleted permanently."
     },
     "methodology": {
       "kind": "Kind: {kind}. It is the site's, and the same for all its elections.",

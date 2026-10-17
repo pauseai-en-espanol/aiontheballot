@@ -344,6 +344,9 @@ also go live straight from draft. [DB: transitions, `election_rules`, change con
    [DB: foreign keys; UI]
 3. _Built (PLAN R101–R107):_ E1–E8, with P1's four-eyes setting; the delete screen says what to delete first rather
    than listing it; drag-and-drop ordering waits (keyboard buttons instead, R104).
+4. A platform admin deletes an election permanently, whatever its status, with everything in it: published ratings,
+   corrections, reports and its audit trail included, after typing its address name; a record of the purge stays
+   (PLAN R212, ADR-0002 §14). [DB: `private.purge_election`; UI: the election's page]
 
 ## 7. Sources
 
