@@ -6845,7 +6845,7 @@ CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.core_crit
 -- Name: criteria needs_a_person; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.criteria FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change criteria');
+CREATE TRIGGER needs_a_person BEFORE DELETE ON app.criteria FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('delete criteria');
 
 
 --
@@ -7105,6 +7105,27 @@ CREATE TRIGGER needs_a_person_to_change BEFORE DELETE OR UPDATE ON app.files FOR
 --
 
 CREATE TRIGGER needs_a_person_to_delete BEFORE DELETE ON app.elections FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('delete an election');
+
+
+--
+-- Name: criteria needs_a_person_to_link; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER needs_a_person_to_link BEFORE INSERT ON app.criteria FOR EACH ROW WHEN ((new.core_criterion_id IS NOT NULL)) EXECUTE FUNCTION private.needs_a_person('link a criterion to a core criterion');
+
+
+--
+-- Name: change_requests needs_a_person_to_propose; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER needs_a_person_to_propose BEFORE INSERT ON app.change_requests FOR EACH ROW WHEN ((new.target_kind = ANY (ARRAY['criterion'::text, 'methodology'::text, 'methodology_reviewer'::text]))) EXECUTE FUNCTION private.needs_a_person('propose a change to criteria or the methodology');
+
+
+--
+-- Name: criteria needs_a_person_to_relink; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER needs_a_person_to_relink BEFORE UPDATE ON app.criteria FOR EACH ROW WHEN ((old.core_criterion_id IS DISTINCT FROM new.core_criterion_id)) EXECUTE FUNCTION private.needs_a_person('link a criterion to a core criterion');
 
 
 --

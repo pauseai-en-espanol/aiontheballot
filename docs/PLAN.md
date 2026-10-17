@@ -3095,6 +3095,24 @@ private.file_sweep_list()`, both to `aiontheballot_sweeper`), then the secret's 
   R151); a change request of another election that names this one's report (the foreign keys don't keep them to one
   election) makes the purge refuse with "linked", rather than reach into the other election.
 
+- **R213. A member's token drafts criteria too, in words a person approved.** Dani asked for a test election's
+  criteria, drafted from proposals the chapter wrote, to go in through the MCP server rather than typed in the admin.
+  Criteria were refused to tokens outright, as the chapter's words (CLAUDE.md); Dani decided a tool may carry them.
+  Migration `criteria_drafted_by_tokens` narrows the criteria's `needs_a_person` guard: a token may add, edit and
+  order an election's criteria while it is edited directly, never delete one nor link one to a core criterion (nor
+  unlink it); a live election's criteria change only through an approved change. The API's token routes add the
+  criteria's list, create, edit and order (never delete); the MCP server adds `list_criteria`, `create_criterion`,
+  `update_criterion` and `reorder_criteria`, whose descriptions tell the tool to enter only the exact wording a person
+  gave and approved, and never to write, complete, reword or translate any. The database can't tell approved wording
+  from a tool's, so ADR-0008 and the README say a person rereads criteria before the election goes live. ADR-0008 and
+  the README amended. Tests first (the database's token guard, the token routes, the tools), and the mutation lists
+  `member-tokens` and `member-token-routes`. The adversarial review found that the API took a token's proposal of a
+  change to a live election's criteria or methodology, which the MCP server never offered; the same migration now
+  refuses it to tokens. It also found an unproven "equivalent" mutation, untested unlinking, refusal reasons that sent
+  a tool round in circles on a live election, a stale comment and wording that tied this plan to a real election; all
+  fixed. Decided (low impact): the API keeps answering a direct write to a live election's structure as stale, as for
+  people; the tool's reasons now say what that means.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

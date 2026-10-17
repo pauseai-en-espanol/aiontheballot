@@ -13,15 +13,22 @@ const REASONS: Readonly<Record<string, string>> = {
   forbidden:
     'The database refused it: a token drafts and never decides, and the member’s roles may not allow it either.',
   changeControlled:
-    'The election is live: propose the change with propose_change, and a person approves it in the admin.',
-  notFound: 'No such site, election, party or change, or not one this member can open.',
+    'The election is live: propose a change to it or its parties with propose_change, and a person approves it in ' +
+    'the admin; its criteria and methodology are a person’s to change there.',
+  notFound: 'No such site, election, party, criterion or change, or not one this member can open.',
   taken: 'That short name (slug) is taken in this election.',
   invalid: 'A value was refused: check the field named.',
-  stale: 'It changed meanwhile: read it again, then retry.',
+  stale:
+    'It changed meanwhile, or the election is live and changes only through an approved change: read it again, and ' +
+    'retry only if it is still a draft or in preview.',
   limit: 'A limit was reached: wait and try again later.',
 };
 
 const FACTS = ' Only facts from official sources or the party’s own; never invent any.';
+/** Criteria are the chapter's words (CLAUDE.md): a tool carries them, never writes them (PLAN R213). */
+const CHAPTER_WORDS =
+  ' Only the exact wording a person of the site gave and approved for it, in the languages they gave it in; ' +
+  'never write, complete, reword or translate any.';
 
 const answer = (value: unknown): CallToolResult => ({
   content: [{ type: 'text', text: JSON.stringify(value ?? { ok: true }, null, 2) }],
@@ -98,6 +105,23 @@ interface Party {
   territoryCodes: string[] | null;
 }
 
+interface Criterion {
+  id: string;
+  slug: string;
+  title: Record<string, string>;
+  shortTitle: Record<string, string> | null;
+  description: Record<string, string>;
+  coreCriterionId: string | null;
+}
+
+const criterionFields = {
+  title: localized('The criterion’s title, as the chapter worded it'),
+  shortTitle: localized(
+    'Its short title, the public table’s column header (40 characters at most)',
+  ),
+  description: localized('What meets it, as the chapter worded it'),
+};
+
 const partyFields = {
   name: localized('The party’s full name'),
   shortName: localized('Its short name or acronym'),
@@ -119,7 +143,7 @@ const partyFields = {
     ),
 };
 
-/** The tools, each a route a token may reach (ADR-0008): reading, and drafting an election's parties. */
+/** The tools, each a route a token may reach (ADR-0008): reading, and drafting an election's parties and criteria. */
 export const registerTools = (
   server: McpServer,
   admin: AdminClient,
@@ -264,6 +288,87 @@ export const registerTools = (
     },
     ({ site: s, election: e, shown, ids }) =>
       run(() => admin.send('PUT', `${electionPath(s, e)}/parties/order`, { shown, ids })),
+  );
+
+  server.registerTool(
+    'list_criteria',
+    {
+      title: 'List criteria',
+      description:
+        'An election’s criteria, in their order, with their ids, titles, short titles and descriptions.',
+      inputSchema: { site, election },
+    },
+    ({ site: s, election: e }) => run(() => admin.get(`${electionPath(s, e)}/criteria`)),
+  );
+
+  server.registerTool(
+    'create_criterion',
+    {
+      title: 'Create a criterion',
+      description:
+        'Adds a criterion to an election not yet live, after the others; never linked to a core criterion, which ' +
+        'a person does in the admin.' +
+        CHAPTER_WORDS,
+      inputSchema: { site, election, slug, ...criterionFields },
+    },
+    ({ site: s, election: e, ...body }) =>
+      run(() =>
+        admin.send('POST', `${electionPath(s, e)}/criteria`, { ...body, coreCriterionId: null }),
+      ),
+  );
+
+  server.registerTool(
+    'update_criterion',
+    {
+      title: 'Update a criterion',
+      description:
+        'Changes some of a criterion’s fields in an election not yet live; the others, and its core criterion, ' +
+        'stay as they are (an edit a person makes at the same moment can be overwritten).' +
+        CHAPTER_WORDS,
+      inputSchema: {
+        site,
+        election,
+        criterion: z.string().uuid().describe('The criterion’s id, as list_criteria gives it'),
+        slug: slug.optional(),
+        title: criterionFields.title.optional(),
+        shortTitle: criterionFields.shortTitle.optional(),
+        description: criterionFields.description.optional(),
+      },
+    },
+    ({ site: s, election: e, criterion, ...changes }) =>
+      run(async () => {
+        const path = `${electionPath(s, e)}/criteria`;
+        const { criteria } = (await admin.get(path)) as { criteria: Criterion[] };
+        const current = criteria.find((found) => found.id === criterion);
+        if (!current) {
+          throw new AdminError(404, 'notFound');
+        }
+        return admin.send('PUT', `${path}/${segment(criterion)}`, {
+          slug: changes.slug ?? current.slug,
+          title: changes.title ?? current.title,
+          shortTitle: changes.shortTitle ?? current.shortTitle ?? {},
+          description: changes.description ?? current.description,
+          coreCriterionId: current.coreCriterionId,
+        });
+      }),
+  );
+
+  server.registerTool(
+    'reorder_criteria',
+    {
+      title: 'Reorder criteria',
+      description:
+        'Sets the order an election’s criteria are shown in, by their ids, every criterion once. `shown` is the ' +
+        'order list_criteria gave, so a change someone made meanwhile is refused rather than overwritten.',
+      inputSchema: {
+        site,
+        election,
+        shown: z.array(z.string().uuid()).min(1),
+        ids: z.array(z.string().uuid()).min(1),
+      },
+    },
+    ({ site: s, election: e, shown, ids }) =>
+      run(() => admin.send('PUT', `${electionPath(s, e)}/criteria/order`, { shown, ids })),
   );
 
   server.registerTool(

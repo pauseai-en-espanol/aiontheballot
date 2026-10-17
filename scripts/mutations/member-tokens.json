@@ -343,5 +343,45 @@
     "new": "  FOR EACH ROW WHEN (false)",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
     "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token deletes a criterion (R213)",
+    "old": "CREATE TRIGGER needs_a_person BEFORE DELETE ON app.criteria\n  FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('delete criteria');\n",
+    "new": "",
+    "file": "db/migrations/20261017085757_criteria_drafted_by_tokens.sql",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token adds a criterion linked to a core criterion (R213)",
+    "old": "CREATE TRIGGER needs_a_person_to_link BEFORE INSERT ON app.criteria\n  FOR EACH ROW WHEN (NEW.core_criterion_id IS NOT NULL)\n  EXECUTE FUNCTION private.needs_a_person('link a criterion to a core criterion');\n",
+    "new": "",
+    "file": "db/migrations/20261017085757_criteria_drafted_by_tokens.sql",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token links a criterion to a core criterion (R213)",
+    "old": "CREATE TRIGGER needs_a_person_to_relink BEFORE UPDATE ON app.criteria\n  FOR EACH ROW WHEN (OLD.core_criterion_id IS DISTINCT FROM NEW.core_criterion_id)\n  EXECUTE FUNCTION private.needs_a_person('link a criterion to a core criterion');\n",
+    "new": "",
+    "file": "db/migrations/20261017085757_criteria_drafted_by_tokens.sql",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token unlinks a criterion from its core criterion (R213)",
+    "old": "  FOR EACH ROW WHEN (OLD.core_criterion_id IS DISTINCT FROM NEW.core_criterion_id)\n",
+    "new": "  FOR EACH ROW WHEN (NEW.core_criterion_id IS NOT NULL AND OLD.core_criterion_id IS DISTINCT FROM NEW.core_criterion_id)\n",
+    "file": "db/migrations/20261017085757_criteria_drafted_by_tokens.sql",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a token proposes a change to a live election's criteria (R213)",
+    "old": "  FOR EACH ROW WHEN (NEW.target_kind IN ('criterion', 'methodology', 'methodology_reviewer'))\n",
+    "new": "  FOR EACH ROW WHEN (NEW.target_kind IN ('methodology', 'methodology_reviewer'))\n",
+    "file": "db/migrations/20261017085757_criteria_drafted_by_tokens.sql",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db"
   }
 ]

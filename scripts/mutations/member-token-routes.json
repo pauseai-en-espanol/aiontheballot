@@ -120,5 +120,37 @@
     "new": "  const match = /^Bearer (\\S+)$/.exec(header);",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
     "cwd": "apps/api"
+  },
+  {
+    "name": "api: a token can't draft criteria (R213)",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'POST /api/t/:tenant/e/:election/criteria',\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: a token reaches the criteria's delete (R213)",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'PUT /api/t/:tenant/e/:election/criteria/order',\n",
+    "new": "  'PUT /api/t/:tenant/e/:election/criteria/order',\n  'DELETE /api/t/:tenant/e/:election/criteria/:id',\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "mcp: a tool's new criterion may name a core criterion (R213)",
+    "file": "packages/mcp/src/tools.ts",
+    "old": "admin.send('POST', `${electionPath(s, e)}/criteria`, { ...body, coreCriterionId: null }),",
+    "new": "admin.send('POST', `${electionPath(s, e)}/criteria`, { ...body }),",
+    "cmd": "npx vitest run src/tools.spec.ts",
+    "cwd": "packages/mcp"
+  },
+  {
+    "name": "mcp: a criterion's update drops its core criterion (R213)",
+    "file": "packages/mcp/src/tools.ts",
+    "old": "          coreCriterionId: current.coreCriterionId,\n",
+    "new": "          coreCriterionId: null,\n",
+    "cmd": "npx vitest run src/tools.spec.ts",
+    "cwd": "packages/mcp"
   }
 ]

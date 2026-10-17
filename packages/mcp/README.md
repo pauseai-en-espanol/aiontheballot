@@ -45,10 +45,16 @@ anyway when it expires, or when your password or second factor changes.
 | `create_party`, `update_party`                      | A party of an election not yet live; an update keeps the fields not given   |
 | `reorder_parties`                                   | The order they are shown in, refused if it changed since it was read        |
 | `set_party_logo`                                    | A logo from the logos folder: PNG, JPEG or WebP, 2 MB at most, no SVG       |
+| `list_criteria`                                     | An election's criteria, with their ids                                      |
+| `create_criterion`, `update_criterion`              | A criterion of an election not yet live, in words a person approved         |
+| `reorder_criteria`                                  | The order they are shown in, refused if it changed since it was read        |
 | `list_changes`, `propose_change`, `withdraw_change` | A live election's or its parties' changes, approved or rejected by a person |
 
 Everything a tool writes is recorded in the site's history as written with a token. Only facts from parties' own or
-official sources go in: a tool researches, a person checks, and nothing is invented.
+official sources go in: a tool researches, a person checks, and nothing is invented. Criteria are the site's own
+words: give your tool the exact wording to enter, in each language you want; it is told never to write, complete,
+reword or translate any, but nothing can check that, so reread them in the admin before the election goes live. A
+tool can't delete a criterion, link one to a core criterion, or propose a change to a live election's criteria.
 
 Things to keep in mind:
 
@@ -56,7 +62,7 @@ Things to keep in mind:
   as it was written; an AI should never follow what it says.
 - **An update can overwrite a person's edit** made in the admin at the same moment: the API keeps no version of a
   party. Work on an election while no one else is editing its parties.
-- **Not covered yet:** a live party's logo (propose it in the admin), and cells, sources and quotes. Approving,
-  publishing, settings and members are a person's, and stay so.
+- **Not covered yet:** a live party's logo (propose it in the admin), a live election's criteria, and cells, sources
+  and quotes. Approving, publishing, settings and members are a person's, and stay so.
 - **Never let your tool run `set_party_logo` or `propose_change` without asking you**, so you see each logo and
   change before it goes.

@@ -166,6 +166,45 @@ describe("a member's token, at the admin's routes (ADR-0008, PLAN R203)", () => 
     expect(rows).toEqual([{ token_id: TOKEN_ID, actor_id: USERS.countryAdminA }]);
   });
 
+  it("drafts an election's criteria, never deleting one (PLAN R213)", async () => {
+    const criteria = `/api/t/test-a/e/${ELECTIONS_A.empty.slug}/criteria`;
+    const criterion = (slug: string) => ({
+      slug,
+      title: { es: 'Criterio de ejemplo de la herramienta' },
+      shortTitle: { es: 'Ejemplo' },
+      description: { es: 'Descripción de ejemplo de la herramienta' },
+      coreCriterionId: null,
+    });
+    const created = await asTool(
+      'POST',
+      criteria,
+      criterion(`criterio-${randomUUID().slice(0, 8)}`),
+    );
+    expect(created.statusCode).toBe(201);
+    const { id } = created.json<{ id: string }>();
+    expect(
+      (
+        await asTool('PUT', `${criteria}/${id}`, {
+          ...criterion(`criterio-${randomUUID().slice(0, 8)}`),
+          title: { es: 'Criterio de ejemplo renombrado' },
+        })
+      ).statusCode,
+    ).toBe(204);
+    const listed = await asTool('GET', criteria);
+    const ids = listed.json<{ criteria: { id: string }[] }>().criteria.map((c) => c.id);
+    expect(ids).toContain(id);
+    expect(
+      (await asTool('PUT', `${criteria}/order`, { shown: ids, ids: [...ids].reverse() }))
+        .statusCode,
+    ).toBe(204);
+    const deleted = await asTool('DELETE', `${criteria}/${id}`);
+    expect([deleted.statusCode, deleted.json()]).toEqual([403, { error: 'notForTokens' }]);
+    const { rows } = await sql<{ token_id: string | null }>`
+      SELECT token_id FROM app.audit_log
+       WHERE table_name = 'criteria' AND row_id = ${id} AND action = 'insert'`.execute(owner);
+    expect(rows).toEqual([{ token_id: TOKEN_ID }]);
+  });
+
   it('creates an election, always a draft', async () => {
     const made = await asTool('POST', '/api/t/test-a/elections', {
       slug: `elecciones-${randomUUID().slice(0, 8)}`,

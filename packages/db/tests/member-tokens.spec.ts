@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { errorCode, inRolledBackTransaction } from './db.js';
 import { superuserUrl } from './env.js';
-import { CELLS, ELECTIONS, TENANT_A, TENANT_B, USERS } from './rls/matrix.js';
+import { CELLS, CORE_CRITERION, ELECTIONS, TENANT_A, TENANT_B, USERS } from './rls/matrix.js';
 
 const CHECK_VIOLATION = '23514';
 const RESTRICT_VIOLATION = '23001';
@@ -585,6 +585,52 @@ const PEOPLE_ONLY: readonly Decision[] = [
     },
   ],
   [
+    'delete a criterion',
+    USERS.countryAdminA,
+    'delete criteria',
+    async () => `DELETE FROM app.criteria WHERE id = '${draft.secondCriterion}'`,
+  ],
+  [
+    'link a criterion to a core criterion',
+    USERS.countryAdminA,
+    'link a criterion to a core criterion',
+    async () =>
+      `UPDATE app.criteria SET core_criterion_id = '${CORE_CRITERION}' WHERE id = '${draft.criterion}'`,
+  ],
+  [
+    'unlink a criterion from its core criterion',
+    USERS.countryAdminA,
+    'link a criterion to a core criterion',
+    async (client) => {
+      await asPerson(client, () =>
+        client.query(`UPDATE app.criteria SET core_criterion_id = $1 WHERE id = $2`, [
+          CORE_CRITERION,
+          draft.criterion,
+        ]),
+      );
+      return `UPDATE app.criteria SET core_criterion_id = NULL WHERE id = '${draft.criterion}'`;
+    },
+  ],
+  [
+    "propose a change to a live election's criterion",
+    USERS.countryAdminA,
+    'propose a change to criteria or the methodology',
+    async () =>
+      `INSERT INTO app.change_requests (tenant_id, election_id, action, target_kind, target_id, field, proposed_value,
+                                        public_note)
+       VALUES ('${TENANT_A}', '${live.id}', 'update', 'criterion', '${live.criterion}', 'title',
+               '{"es": "Criterio de ejemplo bis"}', ${NOTE})`,
+  ],
+  [
+    'add a criterion linked to a core criterion',
+    USERS.countryAdminA,
+    'link a criterion to a core criterion',
+    async () =>
+      `INSERT INTO app.criteria (tenant_id, election_id, slug, title, description, display_order, core_criterion_id)
+       VALUES ('${TENANT_A}', '${draft.id}', 'criterio-enlazado', '{"es": "Criterio enlazado de ejemplo"}',
+               '{"es": "Descripción de ejemplo"}', 99, '${CORE_CRITERION}')`,
+  ],
+  [
     "remove someone's role",
     USERS.countryAdminA,
     'change memberships',
@@ -626,6 +672,8 @@ describe('what a token may never do, whatever its member may (private.needs_a_pe
         elections: 'BEFORE DELETE',
         // Its parties, never their programme's status.
         parties: 'BEFORE UPDATE',
+        // Its criteria, in words a person approved, never deleting one or linking it to a core criterion (R213).
+        criteria: 'BEFORE DELETE',
       };
       for (const { table, guard } of rows) {
         if (table in drafting) {
@@ -643,7 +691,7 @@ describe('what a token may never do, whatever its member may (private.needs_a_pe
     });
   });
 
-  it('drafts: an election, its details, its parties and their logos, and changes proposed to a live one', async () => {
+  it('drafts: an election, its details, its parties and their logos, its criteria, and changes proposed to a live one', async () => {
     await actingAs(USERS.countryAdminA, true, async (client) => {
       for (const statement of [
         `INSERT INTO app.elections (tenant_id, slug, type, name)
@@ -653,6 +701,10 @@ describe('what a token may never do, whatever its member may (private.needs_a_pe
          VALUES ('${TENANT_A}', '${draft.id}', 'partido-nuevo', '{"es": "Partido Nuevo de Ejemplo"}',
                  '{"es": "PNE"}', 99)`,
         `UPDATE app.parties SET colour = '#123456' WHERE id = '${draft.party}'`,
+        `INSERT INTO app.criteria (tenant_id, election_id, slug, title, short_title, description, display_order)
+         VALUES ('${TENANT_A}', '${draft.id}', 'criterio-nuevo', '{"es": "Criterio nuevo de ejemplo"}',
+                 '{"es": "Nuevo"}', '{"es": "Descripción de ejemplo"}', 99)`,
+        `UPDATE app.criteria SET title = '{"es": "Criterio de ejemplo bis"}' WHERE id = '${draft.criterion}'`,
         `INSERT INTO app.files (tenant_id, bucket, content_type, byte_size, sha256)
          VALUES ('${TENANT_A}', 'public_assets', 'image/png', 4,
                  encode(sha256(convert_to('logo de ejemplo', 'UTF8')), 'hex'))`,

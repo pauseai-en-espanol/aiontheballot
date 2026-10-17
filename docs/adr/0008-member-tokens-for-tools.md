@@ -65,9 +65,13 @@ do, except what drafting needs:
 - its parties, including removing or retiring one, while the election is edited directly (a live election's go
   through change requests); never whether their programme is published, which the public sees and which reopens
   checks;
+- its criteria, adding, editing and ordering them while the election is edited directly (amended, PLAN R213, Dani's
+  decision); never deleting one, nor linking one to a core criterion. Their words are the site's: the tool is told to
+  enter only the exact wording a person gave and approved, which the database can't tell from wording a tool wrote,
+  so a person rereads them before the election goes live;
 - the files their logos are (the public assets bucket only);
-- changes its member proposes to a live election, and withdrawing them (never approving or rejecting one, nor
-  withdrawing someone else's);
+- changes its member proposes to a live election and its parties, and withdrawing them (never approving or rejecting
+  one, nor withdrawing someone else's, nor proposing one to its criteria or methodology, R213);
 - what the database writes itself for those (the audit log, the public cache).
 
 A table added later refuses it too, until a catalog test's list says otherwise, so widening what a tool may do is a
@@ -84,9 +88,9 @@ allowlist, with no new definer function or grant.
 - A request carrying `Authorization: Bearer <token>` acts as the token's member at aal2, if the token is unrevoked and
   unexpired and its member still has their second factor; its `last_used_at` is updated at most once a minute.
 - Such a request reaches only the routes marked for tokens, which the database's list above bounds: reading the
-  member's sites, elections and parties; creating an election (always a draft), and creating, editing and ordering
-  parties and setting their logos where the election is edited directly; proposing a change to a live one and
-  withdrawing it. Every other route refuses it
+  member's sites, elections, parties and criteria; creating an election (always a draft), and creating, editing and
+  ordering parties and criteria and setting the parties' logos where the election is edited directly (criteria since
+  R213); proposing a change to a live one and withdrawing it. Every other route refuses it
   (403), the token routes themselves included, so a token never mints, lists or revokes tokens.
 - It carries no cookie and is never sent one, so the Origin check that stops cross-site writes doesn't apply to it; a
   request carrying both a cookie and a token is refused.

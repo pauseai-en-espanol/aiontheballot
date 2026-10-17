@@ -1308,9 +1308,9 @@ const siteFor = async (trx: Transaction<DB>, slug: string) => {
 const WRITES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
- * The routes a member's token reaches (ADR-0008, PLAN R203), by method and pattern: reading the member's sites,
- * elections and parties, and drafting an election's parties: creating an election (always a draft), creating, editing
- * and ordering its parties and their logos, and proposing changes to a live one and withdrawing them. Every other
+ * The routes a member's token reaches (ADR-0008, PLAN R203, R213), by method and pattern: reading the member's sites,
+ * elections, parties and criteria, and drafting: creating an election (always a draft), creating, editing and ordering
+ * its parties, their logos and its criteria, and proposing changes to a live one and withdrawing them. Every other
  * route refuses a token, whatever its member may do there; the database bounds what these write (needs_a_person).
  */
 export const TOKEN_ROUTES: ReadonlySet<string> = new Set([
@@ -1326,6 +1326,11 @@ export const TOKEN_ROUTES: ReadonlySet<string> = new Set([
   'GET /api/t/:tenant/e/:election/parties/:id/logo',
   'PUT /api/t/:tenant/e/:election/parties/:id/logo',
   'PUT /api/t/:tenant/e/:election/parties/:id/proposed-logo',
+  // Criteria, in words a person approved; never deleted (PLAN R213).
+  'GET /api/t/:tenant/e/:election/criteria',
+  'POST /api/t/:tenant/e/:election/criteria',
+  'PUT /api/t/:tenant/e/:election/criteria/:id',
+  'PUT /api/t/:tenant/e/:election/criteria/order',
   'GET /api/t/:tenant/e/:election/changes',
   'POST /api/t/:tenant/e/:election/changes',
   'DELETE /api/t/:tenant/e/:election/changes/:id',
