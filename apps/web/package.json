@@ -1,6 +1,6 @@
 {
   "name": "@aiontheballot/web",
-  "version": "0.19.16",
+  "version": "0.19.17",
   "private": true,
   "description": "Public site: scorecards, methodology and share images (no sessions, no cookies)",
   "type": "module",
