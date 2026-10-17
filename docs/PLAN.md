@@ -3053,6 +3053,22 @@ private.file_sweep_list()`, both to `aiontheballot_sweeper`), then the secret's 
   review found the caches, commit search, the pull requests' refs, the second script and the disabled branch ruleset;
   all handled as above, the ruleset left to Dani.
 
+- **R211. The public site stays up while the database is slow.** In an incident, the database answered so slowly for
+  about a quarter of an hour that the API's queries timed out; the cause was outside this app. The web's proxy waited
+  for a refresh of its routing table, once that was past its age, on every request, the kubelet's health probe
+  included, whose one-second timeout then failed: the kubelet restarted both web pods, each restart dropped the last
+  good table, and without one the site answered 503 until the database recovered. Fixed, tests first: the system paths
+  (the probe, the relays, the API's word that a site changed), which resolve the same without routing data, are
+  answered before the table is awaited; and a table past its age is served at once while a single refresh runs behind
+  it, so only the first load and a forced one (R151) wait for the API. Since the probe no longer refreshes the table,
+  an idle pod refreshes it on its next request, serving the last one meanwhile; the API's notice of a change still
+  forces it. The incidents runbook (§4) covers a database that is slow rather than down. Left as is (low impact,
+  decided): the home and election data still wait for a refresh past their age, up to the API's 5-second timeout,
+  before serving their last copy; serving them at once too would need care with the election pages read fresh right
+  after an edit. The adversarial review found the test that a failed refresh keeps the table passing without checking
+  it (it now waits for the refresh), three mutation entries stale against the proxy (updated;
+  `scripts/mutations/slow-api.json` breaks this fix), and loose wording; all fixed.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

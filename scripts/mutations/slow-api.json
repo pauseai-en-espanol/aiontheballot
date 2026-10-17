@@ -1,0 +1,26 @@
+[
+  {
+    "name": "web: the health probe waits for the routing table",
+    "file": "apps/web/src/routing-proxy.ts",
+    "old": "    if (resolve(target, EMPTY, config).kind === 'system') {\n      return system(request);\n    }\n",
+    "new": "",
+    "cmd": "npx vitest run src/routing-proxy.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: a table past its age waits for the API",
+    "file": "apps/web/src/routing-table.ts",
+    "old": "      void queue.join(undefined);",
+    "new": "      await queue.join(undefined);",
+    "cmd": "npx vitest run src/routing-table.spec.ts",
+    "cwd": "apps/web"
+  },
+  {
+    "name": "web: a failed refresh drops the last good table",
+    "file": "apps/web/src/routing-table.ts",
+    "old": "      console.error('Could not refresh the routing table; keeping the last one', error);",
+    "new": "      console.error('Could not refresh the routing table; keeping the last one', error);\n      current = undefined;",
+    "cmd": "npx vitest run src/routing-table.spec.ts",
+    "cwd": "apps/web"
+  }
+]

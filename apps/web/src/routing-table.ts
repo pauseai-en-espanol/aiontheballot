@@ -50,9 +50,11 @@ export const withSettings = (
   }));
 
 /**
- * Loads the routing table from the API and keeps it for `maxAgeMs`. When a refresh fails (the API is down, or its
- * data breaks a hostname invariant), the last good table stays in use; with none, the result is undefined and the
- * proxy answers 503. There is never a fallback tenant.
+ * Loads the routing table from the API and keeps it for `maxAgeMs`. Past that age the table is still answered at once
+ * while a refresh runs behind it, so a slow API or database never holds a request on routing (PLAN R211); only the
+ * first load, and a forced one, wait for the API. When a refresh fails (the API is down, or its data breaks a hostname invariant), the
+ * last good table stays in use; with none, the result is undefined and the proxy answers 503. There is never a
+ * fallback tenant.
  */
 export const createRoutingTableLoader = ({
   apiUrl,
@@ -87,8 +89,11 @@ export const createRoutingTableLoader = ({
   return async ({ force = false } = {}) => {
     if (force) {
       await queue.force(undefined);
-    } else if (!current || now() - current.loadedAt >= maxAgeMs) {
+    } else if (!current) {
       await queue.join(undefined);
+    } else if (now() - current.loadedAt >= maxAgeMs) {
+      // refresh() catches its own failures, so nothing rejects unhandled here.
+      void queue.join(undefined);
     }
     return current?.table;
   };

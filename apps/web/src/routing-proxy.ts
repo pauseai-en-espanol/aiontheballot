@@ -25,6 +25,12 @@ const EMPTY = buildRoutingTable([]);
 const plain = (status: number, body: string): NextResponse =>
   new NextResponse(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } });
 
+/** A system path's answer. The API's word that a site changed is for the cluster only: from the internet, a 404. */
+const system = (request: NextRequest): NextResponse =>
+  request.nextUrl.pathname === REVALIDATE_PATH && !isInternalHost(request.headers.get('host'))
+    ? plain(404, 'Not found')
+    : NextResponse.next();
+
 /** The secret the admin's preview sends (ADR-0005), and the root it serves the preview under. */
 export const PREVIEW_TOKEN_HEADER = 'x-aiontheballot-preview-token';
 export const PREVIEW_ROOT_HEADER = 'x-aiontheballot-preview-root';
@@ -63,7 +69,8 @@ const carriesToken = (sent: string | null, token: string | undefined): boolean =
  * Routes a request by its Host header, never X-Forwarded-Host (ADR-0002, routing): a tenant's page is rewritten to the
  * internal /_tenant/{slug}/{locale}/… path, an alias or a platform path redirects to the canonical address, and anything
  * else is a generic 404. Without routing data it answers 503, but still lets system paths (the kubelet's health probe)
- * through. The Host header only selects public content.
+ * through; they are answered before the routing data is awaited, so a slow API never fails the probe (PLAN R211). The
+ * Host header only selects public content.
  *
  * It also decides what a site shows (public-site spec §2): a site a platform admin hasn't opened is coming soon, and
  * serves only its home and always-on pages; the preview host shows every site as open, marked never to be indexed, as
@@ -91,6 +98,15 @@ export const createRoutingProxy =
       onPreviewHost && carriesToken(request.headers.get(PREVIEW_TOKEN_HEADER), previewToken);
     const sentRoot = request.headers.get(PREVIEW_ROOT_HEADER);
     const previewRoot = preview && sentRoot && PREVIEW_ROOT.test(sentRoot) ? sentRoot : undefined;
+    const target = {
+      host: request.headers.get('host') ?? '',
+      path: request.nextUrl.pathname,
+      search: request.nextUrl.search,
+    };
+    // resolve() decides system paths before it reads the table, on every host: no need to wait for it.
+    if (resolve(target, EMPTY, config).kind === 'system') {
+      return system(request);
+    }
     const table = await routingTable();
     // Crawlers read robots.txt only at a host's root, where the preview and platform hosts serve no site.
     const robots =
@@ -108,25 +124,13 @@ export const createRoutingProxy =
         },
       });
     }
-    const resolution = resolve(
-      {
-        host: request.headers.get('host') ?? '',
-        path: request.nextUrl.pathname,
-        search: request.nextUrl.search,
-      },
-      table ?? EMPTY,
-      config,
-    );
+    const resolution = resolve(target, table ?? EMPTY, config);
     if (!table && resolution.kind !== 'system') {
       return plain(503, 'Service unavailable');
     }
     switch (resolution.kind) {
       case 'system':
-        // The API's word that a site changed is for the cluster only: from the internet, a 404 for every method.
-        return request.nextUrl.pathname === REVALIDATE_PATH &&
-          !isInternalHost(request.headers.get('host'))
-          ? plain(404, 'Not found')
-          : NextResponse.next();
+        return system(request);
       case 'redirect': {
         if (onPreviewHost && !preview) {
           return plain(404, 'Not found');

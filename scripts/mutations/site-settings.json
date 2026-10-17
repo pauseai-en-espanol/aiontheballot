@@ -35,16 +35,16 @@
   {
     "name": "proxy: indexing ignored",
     "file": "apps/web/src/routing-proxy.ts",
-    "old": "const noindex = preview || !tenant.indexed;",
-    "new": "const noindex = preview;",
+    "old": "const noindex = resolution.preview || !tenant.indexed;",
+    "new": "const noindex = resolution.preview;",
     "cmd": "npx vitest run src/routing-proxy.spec.ts",
     "cwd": "apps/web"
   },
   {
     "name": "proxy: open ignored",
     "file": "apps/web/src/routing-proxy.ts",
-    "old": "tenant.open ? 'open' : 'coming-soon'",
-    "new": "'coming-soon'",
+    "old": "          : tenant.open\n            ? 'open'\n            : 'coming-soon';",
+    "new": "          : 'coming-soon';",
     "cmd": "npx vitest run src/routing-proxy.spec.ts",
     "cwd": "apps/web"
   },

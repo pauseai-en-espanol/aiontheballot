@@ -109,10 +109,23 @@ Image tags live in this repository (`helm-charts/aiontheballot/values.yaml`), wr
    A full disk shows as write errors. The file volume may share a disk with the database's, and its storage class
    may not cap its size (ADR-0004 §6), so check both.
 
-3. A runtime role refused (`password authentication failed`) after a secret changed: the role's password in the
+3. **Slow rather than down:** the API logs `ETIMEDOUT` and answers late, and Postgres sits at its CPU or memory limit
+   (`kubectl --context "$KUBE_CONTEXT" -n "$DATABASE_NAMESPACE" top pod "$DATABASE_POD"`). See what it runs, read
+   only, from a `psql` session as in the [README](README.md):
+
+   ```sql
+   SELECT pid, datname, usename, application_name, state, now() - query_start AS running_for, left(query, 100)
+   FROM pg_stat_activity WHERE state <> 'idle' AND pid <> pg_backend_pid() ORDER BY running_for DESC NULLS LAST;
+   ```
+
+   A query running for minutes can be stopped with `SELECT pg_cancel_backend(<pid>);`. Meanwhile the public site
+   keeps routing by its last table, and its pages serve their last copy once a refresh times out (PLAN R211). Don't
+   restart or roll out the web pods meanwhile: a restarted pod has no table until the API answers, and answers 503.
+
+4. A runtime role refused (`password authentication failed`) after a secret changed: the role's password in the
    cluster's Postgres provisioning and the app's connection secret must be sealed from the same value
    (`scripts/seal-gitops-secrets.sh`; the rotation steps are in gitops).
-4. Data lost or damaged: [restoring-the-database.md](restoring-the-database.md).
+5. Data lost or damaged: [restoring-the-database.md](restoring-the-database.md).
 
 ## 5. An admin account is compromised
 

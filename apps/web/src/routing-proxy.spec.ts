@@ -95,6 +95,21 @@ describe('the routing proxy', () => {
     expect(response.headers.get('x-middleware-next')).toBe('1');
   });
 
+  it('answers system paths without waiting for the routing table, so a slow API never fails the probe (R211)', async () => {
+    const stuck = createRoutingProxy(() => new Promise<never>(() => undefined), {});
+    for (const path of ['/healthz', '/_relay/errors', '/_relay/views']) {
+      const response = await stuck(request('ejemplo-a.example.test', path));
+      expect(response.headers.get('x-middleware-next'), path).toBe('1');
+    }
+    const fromOutside = await stuck(
+      new NextRequest('http://127.0.0.1:3000/_internal/revalidate', {
+        method: 'POST',
+        headers: { host: 'ejemplo-a.example.test' },
+      }),
+    );
+    expect(fromOutside.status).toBe(404);
+  });
+
   it('answers 503 without routing data, never serving a default tenant, but keeps the health probe up', async () => {
     const unavailable = createRoutingProxy(async () => undefined, {});
     expect((await unavailable(request('ejemplo-a.example.test'))).status).toBe(503);

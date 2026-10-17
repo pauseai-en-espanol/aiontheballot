@@ -81,6 +81,30 @@ describe('the routing table loader', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('serves a table past its age at once and refreshes it behind, so a slow API holds no request (R211)', async () => {
+    let now = 0;
+    const { fetch, answer } = byHand();
+    const load = createRoutingTableLoader({
+      apiUrl: 'http://api.example.test:3001',
+      config: {},
+      maxAgeMs: 1_000,
+      fetch,
+      now: () => now,
+    });
+    const first = load();
+    answer(data('antes'));
+    expect((await first)?.tenantsBySlug.has('antes')).toBe(true);
+    now = 1_000;
+    // The API hasn't answered the refresh: the last table comes back without waiting for it, one refresh for all.
+    expect((await load())?.tenantsBySlug.has('antes')).toBe(true);
+    expect((await load())?.tenantsBySlug.has('antes')).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    answer(data('despues'));
+    await settle();
+    expect((await load())?.tenantsBySlug.has('despues')).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("reads an older API's data, without the public settings, as their defaults: never hidden by mistake", async () => {
     const old = {
       tenants: [
@@ -105,16 +129,21 @@ describe('the routing table loader', () => {
   it('keeps the last good table when a refresh fails', async () => {
     let now = 0;
     const responses = [respond(data('ejemplo-a')), respond({ error: 'down' }, 503)];
+    const fetch = vi.fn(async () => responses.shift() ?? respond({}, 500));
     const load = createRoutingTableLoader({
       apiUrl: 'http://api.example.test:3001',
       config: {},
       maxAgeMs: 1,
-      fetch: async () => responses.shift() ?? respond({}, 500),
+      fetch,
       now: () => now,
     });
     await load();
     now = 10;
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await load();
+    // The failed refresh has run its course behind that load: the table it couldn't replace is still served.
+    await settle();
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect((await load())?.tenantsBySlug.has('ejemplo-a')).toBe(true);
   });
 

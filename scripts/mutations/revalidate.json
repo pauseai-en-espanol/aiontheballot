@@ -67,8 +67,8 @@
   {
     "name": "web: the proxy lets a public host reach it",
     "file": "apps/web/src/routing-proxy.ts",
-    "old": "        return request.nextUrl.pathname === REVALIDATE_PATH &&",
-    "new": "        return request.nextUrl.pathname === `${REVALIDATE_PATH}-never` &&",
+    "old": "  request.nextUrl.pathname === REVALIDATE_PATH && !isInternalHost(request.headers.get('host'))",
+    "new": "  request.nextUrl.pathname === `${REVALIDATE_PATH}-never` && !isInternalHost(request.headers.get('host'))",
     "cmd": "npx vitest run src/routing-proxy.spec.ts",
     "cwd": "apps/web"
   },
