@@ -3039,10 +3039,12 @@ private.file_sweep_list()`, both to `aiontheballot_sweeper`), then the secret's 
   restarted history shares no commit with; the tree had passed `pnpm verify`, and the private-terms check passed on
   the root commit with the list required. The release tags (markers only: the release reads versions from the
   umbrella chart) were deleted, not recreated, and the Actions caches cleared; Argo CD synced the root with nothing to
-  change. Left to the operator: deleting the old workflow runs, and asking GitHub Support to purge the unreachable
-  commits, their cached views, commit search and the closed pull requests' refs. The changelogs' short SHAs and the
-  chart's image tags name commits of the old history and stay as labels. The release now running has no tag commit
-  to revert, so rolling it back means setting the previous image tags by hand (incidents runbook §3); later releases
+  change. Left to the operator: deleting the old workflow runs. GitHub still serves the old commits by SHA, reachable
+  from the closed pull requests, the Activity view and the changelogs' short SHAs; Dani chose not to ask GitHub
+  Support to purge them, since a scan of the whole old history for keys, tokens, credentials and committed `.env`
+  files found none, only the details R205 removed. The changelogs' short SHAs and the chart's image tags name commits of
+  the old history and stay as labels. The release now running has no tag commit to revert, so rolling it back means
+  setting the previous image tags by hand (incidents runbook §3); later releases
   revert as before. An old clone must be cloned again: `git pull --rebase` would replay the old history onto the new.
   Fixed: `scripts/check-migrations-append-only.sh` passed without comparing anything when the base shares no history
   with HEAD, and `scripts/renovate-changeset.sh` went on without the PR's paths; both now fail. Decided (low impact):
