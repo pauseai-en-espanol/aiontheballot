@@ -1,5 +1,12 @@
 # @aiontheballot/db
 
+## 0.17.0
+
+### Minor Changes
+
+- edaadc3: The demo content can fill a demo site's draft election of fictional parties: invented programmes, every cell rated
+  and published through the real triggers, and the election live.
+
 ## 0.16.2
 
 ### Patch Changes

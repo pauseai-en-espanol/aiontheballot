@@ -1,5 +1,14 @@
 # @aiontheballot/api
 
+## 0.31.1
+
+### Patch Changes
+
+- edaadc3: The demo content can fill a demo site's draft election of fictional parties: invented programmes, every cell rated
+  and published through the real triggers, and the election live.
+- Updated dependencies [edaadc3]
+  - @aiontheballot/db@0.17.0
+
 ## 0.31.0
 
 ### Minor Changes
