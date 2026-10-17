@@ -1,5 +1,20 @@
 # @aiontheballot/api
 
+## 0.30.0
+
+### Minor Changes
+
+- cc0b07b: Platform admins can delete an election permanently, whatever its status, with everything in it and its audit trail,
+  after typing its address name; a record of the purge stays. The web app only picks up the admin's new texts.
+
+### Patch Changes
+
+- e5142df: The generated database types include the purge log's columns for an election's purge.
+- Updated dependencies [e5142df]
+- Updated dependencies [cc0b07b]
+  - @aiontheballot/db@0.16.2
+  - @aiontheballot/i18n@0.29.0
+
 ## 0.29.3
 
 ### Patch Changes

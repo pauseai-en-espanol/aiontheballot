@@ -1,5 +1,12 @@
 # @aiontheballot/i18n
 
+## 0.29.0
+
+### Minor Changes
+
+- cc0b07b: Platform admins can delete an election permanently, whatever its status, with everything in it and its audit trail,
+  after typing its address name; a record of the purge stays. The web app only picks up the admin's new texts.
+
 ## 0.28.0
 
 ### Minor Changes

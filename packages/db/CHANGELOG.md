@@ -1,5 +1,11 @@
 # @aiontheballot/db
 
+## 0.16.2
+
+### Patch Changes
+
+- e5142df: The generated database types include the purge log's columns for an election's purge.
+
 ## 0.16.1
 
 ### Patch Changes
