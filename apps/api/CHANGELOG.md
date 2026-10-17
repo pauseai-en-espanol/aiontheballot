@@ -1,5 +1,12 @@
 # @aiontheballot/api
 
+## 0.31.0
+
+### Minor Changes
+
+- 6df3e0a: A member's token may add, edit and order an election's criteria while it is edited directly, never delete one nor
+  link one to a core criterion; the MCP server has tools for them, carrying only wording a person approved.
+
 ## 0.30.0
 
 ### Minor Changes
