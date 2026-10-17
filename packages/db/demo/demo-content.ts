@@ -40,11 +40,11 @@ export type DemoProgramme = keyof typeof DEMO_PROGRAMMES;
 export const programmeText = (key: DemoProgramme): string =>
   DEMO_PROGRAMMES[key].sections.join('\n\n');
 
-const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 /** A SQL string literal: the content here is ours, but quoting it properly costs nothing. */
-const literal = (value: string): string => `'${value.replaceAll("'", "''")}'`;
-const json = (value: unknown): string => `${literal(JSON.stringify(value))}::jsonb`;
+export const literal = (value: string): string => `'${value.replaceAll("'", "''")}'`;
+export const json = (value: unknown): string => `${literal(JSON.stringify(value))}::jsonb`;
 
 const PARTIES = [
   { slug: 'partido-ejemplo-a', name: 'Partido Ejemplo A', short: 'PEA', colour: '#2f6db5' },
@@ -115,8 +115,14 @@ const PUBLISHED = [
   },
 ] as const;
 
+/** The demonstration methodology: everything it covers is invented. */
+export const DEMO_METHODOLOGY = {
+  es: '## Metodología de demostración\n\nTodo en esta elección es **inventado**: los partidos, sus programas, los criterios y las valoraciones. Sirve para ver cómo funciona la plataforma.\n\n- Cada valoración enlaza a sus fuentes.\n- Cada cita se comprueba contra el texto guardado.',
+  en: '## Demonstration methodology\n\nEverything in this election is **invented**: the parties, their programmes, the criteria and the ratings. It shows how the platform works.\n\n- Every rating links to its sources.\n- Every quote is checked against the stored text.',
+} as const;
+
 /** The same place on the scale for a site whose methodology is descriptive (BRIEF §3). */
-const DESCRIPTIVE = {
+export const DESCRIPTIVE = {
   meets: 'green',
   partially_meets: 'yellow',
   does_not_meet: 'red',
@@ -124,7 +130,7 @@ const DESCRIPTIVE = {
 } as const;
 
 /** Fictional members, only for the triggers to act as; removed at the end. */
-const ACTORS = {
+export const ACTORS = {
   countryAdmin: '0190f8c4-de70-7000-8000-0000000000a1',
   editor: '0190f8c4-de70-7000-8000-0000000000a2',
   reviewer: '0190f8c4-de70-7000-8000-0000000000a3',
@@ -248,10 +254,7 @@ BEGIN
   RETURNING id INTO d_election;
   INSERT INTO app.methodologies (tenant_id, election_id, kind, demands_owner_id, body)
   VALUES (d_tenant, d_election, d_kind, CASE WHEN d_kind = 'demands' THEN d_operator END,
-          ${json({
-            es: '## Metodología de demostración\n\nTodo en esta elección es **inventado**: los partidos, sus programas, los criterios y las valoraciones. Sirve para ver cómo funciona la plataforma.\n\n- Cada valoración enlaza a sus fuentes.\n- Cada cita se comprueba contra el texto guardado.',
-            en: '## Demonstration methodology\n\nEverything in this election is **invented**: the parties, their programmes, the criteria and the ratings. It shows how the platform works.\n\n- Every rating links to its sources.\n- Every quote is checked against the stored text.',
-          })})
+          ${json(DEMO_METHODOLOGY)})
   RETURNING id INTO d_methodology;
   INSERT INTO app.methodology_reviewers (tenant_id, methodology_id, name, affiliation)
   VALUES (d_tenant, d_methodology, 'Persona Revisora de Ejemplo', 'Universidad de Ejemplo');

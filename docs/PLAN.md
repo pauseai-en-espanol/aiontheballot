@@ -3113,6 +3113,19 @@ private.file_sweep_list()`, both to `aiontheballot_sweeper`), then the secret's 
   fixed. Decided (low impact): the API keeps answering a direct write to a live election's structure as stale, as for
   people; the tool's reasons now say what that means.
 
+- **R214. A demo site's draft election, filled with invented content** (Dani: use the demo site as a full demo). `node
+packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fills a demo site's untouched draft
+  election: the demonstration methodology and reviewer (R130's), an invented programme for each of its 11 parties
+  (`print.ts programme <n>` prints its bytes for `put-file`, as R130's), every party's programme published, and all
+  110 cells rated, quoted, reviewed and published through the real triggers (four-eyes, verbatim match, evidence),
+  spread over the four ratings, as R130's fictional members, removed at the end; then the election goes live. It knows
+  the demo's 10 criteria only by their slugs, with invented programme wording on each topic: the criteria's words are
+  the site's, entered by a person (R213), never in this repository. It refuses a site not in a user-assigned country,
+  an election that isn't an untouched draft, another number of parties, other criteria, and any party not named
+  "Partido Ejemplo …" in every language, so invented ratings never go to a real party. Decided with Dani: a
+  recognisable knock-off of a real party (a test election's earlier names) gets no invented rating, since it would
+  read as a claim about the real one; the demo's parties are "Partido Ejemplo A" to "K". Tests first.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,
