@@ -22,6 +22,17 @@ const query = (params: Record<string, string>): string =>
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join('&');
 
+/**
+ * A page's address as shared and as its link preview names it (og:url; PLAN R215): the canonical address with its link
+ * preview's content hash as `v`. A network keeps a link's preview by its address (Facebook and LinkedIn by og:url), so
+ * it fetches a fresh one once the preview changes, and keeps the one it has until then. Search engines read the
+ * canonical address, which stays without it (`<link rel="canonical">`), and the page answers the same with or without.
+ */
+export const sharedUrl = (canonical: string, previewPath: string): string => {
+  const hash = /\.([0-9a-f]{12})\.png$/u.exec(previewPath)?.[1];
+  return hash ? `${canonical}?v=${hash}` : canonical;
+};
+
 export const shareLinks = ({
   url,
   text,

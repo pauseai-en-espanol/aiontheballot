@@ -18,7 +18,8 @@ test.describe('link previews (fictional seeds)', () => {
 
     const title = `Inquilino de ejemplo A · ${messages.es.home.comingSoon}`;
     expect(await meta(page, 'og:type')).toBe('website');
-    expect(await meta(page, 'og:url')).toBe(CANONICAL_A);
+    // og:url is the shared address: the canonical one with the preview's content hash, checked below (R215).
+    const shared = await meta(page, 'og:url');
     expect(await meta(page, 'og:site_name')).toBe('Inquilino de ejemplo A');
     expect(await meta(page, 'og:title')).toBe(title);
     expect(await meta(page, 'og:description')).toContain('Organización de ejemplo A');
@@ -33,6 +34,8 @@ test.describe('link previews (fictional seeds)', () => {
     expect(await meta(page, 'og:image:height')).toBe('630');
     expect(await meta(page, 'og:image:alt')).toContain('Inquilino de ejemplo A');
     expect(await meta(page, 'twitter:image')).toBe(image);
+    const hash = /\.([0-9a-f]{12})\.png$/.exec(image ?? '')?.[1];
+    expect(shared).toBe(`${CANONICAL_A}?v=${hash}`);
   });
 
   test("put the tags in <head> for any crawler, even one Next doesn't know", async () => {
@@ -107,7 +110,12 @@ test.describe('link previews (fictional seeds)', () => {
   test("describe a locale's page in that locale, with its alternates", async ({ page }) => {
     await page.goto(`http://${PLATFORM_HOST}:${PORTS.web}/ejemplo-b/en`);
 
-    expect(await meta(page, 'og:url')).toBe(`${CANONICAL_B}/en`);
+    expect(await meta(page, 'og:url')).toMatch(
+      new RegExp(`^${CANONICAL_B.replaceAll('.', '\\.')}/en\\?v=[0-9a-f]{12}$`),
+    );
+    expect(await page.locator('link[rel="canonical"]').getAttribute('href')).toBe(
+      `${CANONICAL_B}/en`,
+    );
     // og:locale only names the tenant's own language; there's no og:locale:alternate for separate pages.
     expect(await page.locator('meta[property="og:locale"]').count()).toBe(0);
     expect(await page.locator('meta[property="og:locale:alternate"]').count()).toBe(0);
@@ -253,7 +261,12 @@ test.describe("election pages' own share images (R148)", () => {
     for (const view of VIEWS) {
       await page.goto(`${PREVIEW_SITE}${ELECTION}${view.page}`);
       const url = (await meta(page, 'og:url')) ?? '';
-      expect(url, view.page).toBe(`${CANONICAL_A}${ELECTION}${view.page}`);
+      // The shared address: the canonical one, with its preview's content hash (R215).
+      expect(url, view.page).toMatch(
+        new RegExp(
+          `^${`${CANONICAL_A}${ELECTION}${view.page}`.replaceAll('.', '\\.')}\\?v=[0-9a-f]{12}$`,
+        ),
+      );
       const title = await page.title();
       const text = encodeURIComponent(title);
       const address = encodeURIComponent(url);
@@ -300,16 +313,21 @@ test.describe("election pages' own share images (R148)", () => {
     expect([...new Set(requested)]).toEqual([new URL(PREVIEW_URL).host]);
   });
 
-  test("copy the page's canonical address, and say so", async ({ context, page }) => {
+  test("copy the page's shared address, and say so (R215)", async ({ context, page }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(`${PREVIEW_SITE}${ELECTION}/partidos/partido-ejemplo-a`);
     const panel = page.locator('details[data-share-panel]');
     await panel.locator('summary').click();
     await panel.getByRole('button', { name: messages.es.share.links.copy }).click();
     await expect(panel.getByRole('status')).toHaveText(messages.es.share.links.copied);
-    expect(await page.evaluate('navigator.clipboard.readText()')).toBe(
-      `${CANONICAL_A}${ELECTION}/partidos/partido-ejemplo-a`,
+    // The canonical address with its preview's hash: the same address its link preview names (og:url).
+    const copied = await page.evaluate('navigator.clipboard.readText()');
+    expect(copied).toMatch(
+      new RegExp(
+        `^${`${CANONICAL_A}${ELECTION}/partidos/partido-ejemplo-a`.replaceAll('.', '\\.')}\\?v=[0-9a-f]{12}$`,
+      ),
     );
+    expect(copied).toBe(await meta(page, 'og:url'));
   });
 
   test('need no script: the links are in the page as served', async () => {

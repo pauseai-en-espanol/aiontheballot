@@ -3126,6 +3126,18 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   recognisable knock-off of a real party (a test election's earlier names) gets no invented rating, since it would
   read as a claim about the real one; the demo's parties are "Partido Ejemplo A" to "K". Tests first.
 
+- **R215. The scorecard fits wide screens, and shared links refresh their preview.** Dani: the demo's scorecard (10
+  criteria) scrolled sideways on every screen, a 1920-px one included, as the table kept to the text's column. Now it
+  widens past that column when it needs to, centred on it, up to the window less 16 px a side, and each rating in it
+  stacks its icon above its words (14 px), so a criterion's column takes 104 px: 10 criteria fit from about 1,280 px,
+  and the region's sideways scroll stays for narrower windows or more criteria; phones keep their cards. Icon, words
+  and colour stay together (the ratings' rule). Dani also asked for a query on shared links so networks don't keep
+  showing an old preview: the shared address (the share links, "copy the link" and `og:url`) is the canonical one with
+  `?v=` and the link preview's content hash, the one its image's address already carries, so a preview refreshes
+  exactly when it changes, two changes in a day included, and not otherwise. `og:url` carries it because Facebook and
+  LinkedIn keep a preview by it; `rel=canonical` stays without, for search engines; the page answers the same with or
+  without. Tests first for the shared address (unit, and the end-to-end checks that `v` is the image's hash).
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

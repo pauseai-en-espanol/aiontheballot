@@ -11,6 +11,7 @@ import type { TenantPage } from './tenant-data';
 
 import { warmHomeImage } from './home-image';
 import { homeCardContent, homeCardHash, imagePath, ogLocale, pageUrl } from './share';
+import { sharedUrl } from './share-links';
 import { pageCanonical } from './site';
 import { siteIconPath, siteIconSource } from './site-icon';
 
@@ -112,7 +113,7 @@ export const pageMetadata = async ({
     },
     openGraph: {
       type: 'website',
-      url,
+      url: sharedUrl(url, preview.path),
       siteName: name,
       title: fullTitle,
       description: shareDescription,

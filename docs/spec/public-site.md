@@ -158,8 +158,10 @@ Shared by all of them:
   Answered: scorecard orientation). Criteria headers use the short title and link to the criterion page; party headers
   show the party's mark (§4), the short name (the full name in an `abbr` title and, after it, in text only screen
   readers read) and the programme status, and link to the party page. Each cell is a link to the cell page with the
-  rating's icon and words. Past about 8 criteria the party column stays fixed and the table scrolls sideways inside
-  its own region (with a visible focus and a label), never the page. It is a real `<table>`, with `<th scope>` headers
+  rating's icon and words, the icon above the words so a column takes a short label's width (PLAN R215). When the table
+  is wider than the text's column, it widens past it, centred on it, up to the window less its margins (10 criteria
+  fit from about 1,280 px); only past that does the party column stay fixed and the table scroll sideways inside its
+  own region (with a visible focus and a label), never the page. It is a real `<table>`, with `<th scope>` headers
   and a caption.
 - **Mobile:** one card per party, in the parties' order, each listing every criterion with the party's rating, and a
   second view, one card per criterion listing every party. Both are server-rendered; a two-link switch above them
@@ -206,8 +208,10 @@ no script, opening a panel. First the data image: the page's own card, the whole
 square, portrait and story shapes, a thumbnail beside them; each downloadable, and where the device can take a file
 (phones), "Compartir la imagen", which hands the picture itself to its apps. Then the link (PLAN R177): "copy the link"
 and the device's share sheet where the browser has them, then WhatsApp, Telegram, X, Facebook, Bluesky, LinkedIn and
-email, each a plain link to the network's own share address with the page's canonical address and title, its icon
-beside its name. Nothing loads from any network until a link is followed.
+email, each a plain link to the network's own share address with the page's shared address and title, its icon
+beside its name. The shared address is the canonical one with the link preview's content hash as `v` (PLAN R215), so
+a network that keeps a link's preview fetches a fresh one once it changes. Nothing loads from any network until a link
+is followed.
 
 ### 5.5 Report an error or reply (PLAN R149)
 
@@ -280,7 +284,8 @@ An e2e test checks the headers on a page, an image and a route handler, and that
 ## 8. Canonical URLs, sitemaps and robots
 
 - `rel=canonical`, `og:url` and `hreflang` alternates (every enabled locale plus `x-default`) on every page, from the
-  routing table.
+  routing table. `og:url` is the shared address (§5.4: the canonical one with the preview's `v`), the key Facebook and
+  LinkedIn keep a preview under; `rel=canonical` stays without it.
 - `/sitemap.xml` per tenant, at its root in its default locale, on its canonical base: every page the site serves
   in its mode, in each language, with its `hreflang` alternates and, where known, the date of its latest change. A
   coming-soon site lists its home and its always-on pages.

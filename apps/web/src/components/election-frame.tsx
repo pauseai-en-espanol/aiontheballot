@@ -7,7 +7,7 @@ import type { PageShare } from '../election-images';
 import type { LoadedElectionPage } from '../election-page';
 
 import { localText } from '../local-text';
-import { shareLinks } from '../share-links';
+import { sharedUrl, shareLinks } from '../share-links';
 import { pageCanonical } from '../site';
 import { focusRing, pageTitle } from '../styles';
 import { PageViews } from './page-views';
@@ -105,8 +105,8 @@ export const ElectionFrame = ({
       {subtitle}
       {share && (
         <SharePanel
-          links={shareLinks({ url, text: share.text })}
-          url={url}
+          links={shareLinks({ url: sharedUrl(url, share.preview.path), text: share.text })}
+          url={sharedUrl(url, share.preview.path)}
           text={share.text}
           image={{
             alt: share.image.alt,

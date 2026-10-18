@@ -75,9 +75,20 @@ const Scorecard = async (props: ScorecardProps) => {
   const scorecard = href({ page: 'election', election: election.slug });
   const cellHref = (party: PublicParty, criterion: PublicCriterion) =>
     href({ page: 'cell', election: election.slug, party: party.slug, criterion: criterion.slug });
-  const badge = (party: PublicParty, criterion: PublicCriterion) => {
+  const badge = (party: PublicParty, criterion: PublicCriterion, stacked = false) => {
     const { display } = page.cell(party, criterion);
-    return <RatingBadge rating={display} label={ratingLabel(locale, display)} />;
+    return (
+      <RatingBadge
+        rating={display}
+        label={ratingLabel(locale, display)}
+        // In the table, the icon above its words, so a column takes a short label's width (R215).
+        className={
+          stacked
+            ? css({ flexDirection: 'column', textAlign: 'center', gap: '4px', fontSize: '14px' })
+            : undefined
+        }
+      />
+    );
   };
   const header = (criterion: PublicCriterion) => text(criterion.shortTitle ?? criterion.title);
   const rated = page.updatedAt !== undefined;
@@ -118,7 +129,8 @@ const Scorecard = async (props: ScorecardProps) => {
         </p>
       ) : (
         <>
-          {/* Desktop: the table, sideways scroll inside its own region past about eight criteria. */}
+          {/* Desktop: the table, as wide as it needs past the text's column, centred on it and up to the window less
+              its margins (R215); sideways scroll inside its own region only past that. */}
           <div
             role="region"
             aria-label={t('election.tableRegion')}
@@ -127,7 +139,16 @@ const Scorecard = async (props: ScorecardProps) => {
             tabIndex={0}
             className={cx(
               focusRing,
-              css({ display: { base: 'none', lg: 'block' }, overflowX: 'auto', maxWidth: '100%' }),
+              css({
+                display: { base: 'none', lg: 'block' },
+                overflowX: 'auto',
+                position: 'relative',
+                width: 'max-content',
+                minWidth: '100%',
+                maxWidth: 'calc(100vw - 32px)',
+                insetInlineStart: '50%',
+                transform: 'translateX(-50%)',
+              }),
             )}
           >
             <table
@@ -169,10 +190,10 @@ const Scorecard = async (props: ScorecardProps) => {
                         key={criterion.id}
                         scope="col"
                         className={css({
-                          textAlign: 'start',
+                          textAlign: 'center',
                           verticalAlign: 'bottom',
-                          padding: '12px',
-                          minWidth: '150px',
+                          padding: '8px',
+                          minWidth: '104px',
                           borderBottom: '3px solid',
                           borderColor: 'border.default',
                         })}
@@ -210,7 +231,7 @@ const Scorecard = async (props: ScorecardProps) => {
                           bg: 'bg.canvas',
                           textAlign: 'start',
                           padding: '12px',
-                          minWidth: '180px',
+                          minWidth: '150px',
                         })}
                       >
                         <a
@@ -240,7 +261,11 @@ const Scorecard = async (props: ScorecardProps) => {
                       {criteria.map((criterion) => (
                         <td
                           key={criterion.id}
-                          className={css({ padding: '12px', verticalAlign: 'top' })}
+                          className={css({
+                            padding: '8px',
+                            verticalAlign: 'top',
+                            textAlign: 'center',
+                          })}
                         >
                           <a
                             href={cellHref(party, criterion)}
@@ -252,7 +277,7 @@ const Scorecard = async (props: ScorecardProps) => {
                               }),
                             )}
                           >
-                            {badge(party, criterion)}
+                            {badge(party, criterion, true)}
                           </a>
                         </td>
                       ))}

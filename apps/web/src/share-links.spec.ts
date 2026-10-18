@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { SHARE_NETWORKS, shareLinks } from './share-links';
+import { SHARE_NETWORKS, sharedUrl, shareLinks } from './share-links';
 
 const page = {
   url: 'https://ejemplo.example.test/generales/partidos/partido-ejemplo-a',
@@ -35,5 +35,22 @@ describe("a page's share links (R177)", () => {
       }
       expect(values, network).toContain(page.url);
     }
+  });
+});
+
+describe("a page's shared address (R215)", () => {
+  const canonical = 'https://ejemplo.example.test/generales';
+  it("carries its link preview's content hash, so a network fetches a fresh preview once it changes", () => {
+    expect(sharedUrl(canonical, '/generales/og/overview/1200x630.0123456789ab.png')).toBe(
+      `${canonical}?v=0123456789ab`,
+    );
+    expect(sharedUrl(`${canonical}/en`, '/en/og/home.1200x630.ba9876543210.png')).toBe(
+      `${canonical}/en?v=ba9876543210`,
+    );
+  });
+
+  it('is the canonical address itself when the preview names no hash', () => {
+    expect(sharedUrl(canonical, '/brand/logo.png')).toBe(canonical);
+    expect(sharedUrl(canonical, '/generales/og/overview/1200x630.png')).toBe(canonical);
   });
 });
