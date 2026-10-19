@@ -23,7 +23,7 @@ overrides:
   'better-auth>vitest': '-'
   # satori pins fflate 0.7.3, which has a loop in unzipSync on a malformed ZIP64 archive (GHSA-px8p-9vwx-vf98). Nothing
   # calls unzipSync, but 0.7.5, the fix, is a patch release of the same line (PLAN R208).
-  'fflate@<0.8': '0.7.5'
+  'fflate@<0.8': '0.8.3'
 
 injectWorkspacePackages: true
 linkWorkspacePackages: true
