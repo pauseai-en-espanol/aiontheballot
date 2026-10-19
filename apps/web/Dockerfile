@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # Build context: the repository root. See package.json "docker:build".
-ARG NODE_IMAGE=node:26.11.1-alpine@sha256:143494b1da2945f061539253adc65e4f1569ddf07da2d384c022c791a9d90a4a
-ARG PNPM_VERSION=12.10.1
-ARG TURBO_VERSION=2.11.7
+ARG NODE_IMAGE=node:26.12.0-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5
+ARG PNPM_VERSION=12.14.0
+ARG TURBO_VERSION=2.11.9
 
 # ------ pnpm: shared by the stages below (npm/npx refuse the repo's pnpm-only devEngines) ------
 FROM ${NODE_IMAGE} AS pnpm
