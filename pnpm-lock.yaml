@@ -758,8 +758,8 @@ importers:
         specifier: 2.6.2
         version: 2.6.2
       satori:
-        specifier: 0.47.1
-        version: 0.47.1
+        specifier: 0.60.0
+        version: 0.60.0
     devDependencies:
       '@slango.configs/lint-staged':
         specifier: 2.0.8
@@ -4979,8 +4979,8 @@ packages:
   safer-buffer@2.1.2:
     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
 
-  satori@0.47.1:
-    resolution: {integrity: sha512-hoRMFMXQ9o4VvcOZ+5pXKRAuWJkjvUzRz3fZJoFrAT3MVfuUvMWROe50lB7AREI1m9a0FAlEMDdQ3WPvHLm7FA==}
+  satori@0.60.0:
+    resolution: {integrity: sha512-OSnpxSr166mj2M9i6Cm3kFWYG6i36FnYDfQU0SR8nsZe5zgp/PskLkyfNAqV8phdGkDfQdFHyJZvrtdss3HAVw==}
     engines: {node: '>=16'}
 
   saxes@6.0.0:
@@ -9797,7 +9797,7 @@ snapshots:
 
   safer-buffer@2.1.2: {}
 
-  satori@0.47.1:
+  satori@0.60.0:
     dependencies:
       '@shuding/opentype.js': 1.4.0-beta.0
       css-background-parser: 0.1.0
