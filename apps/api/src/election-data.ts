@@ -67,6 +67,7 @@ const readElection = async (
       'e.id',
       'e.slug',
       'e.name',
+      'e.intro',
       'e.status',
       // A date as text: pg would turn it into a Date at local midnight, which can shift the day.
       sql<string | null>`e.election_date::text`.as('date'),
@@ -286,6 +287,7 @@ const readElection = async (
       name: localized(election.name, 'elections.name'),
       date: election.date,
       status,
+      intro: optionalLocalized(election.intro, 'elections.intro'),
     },
     methodology:
       methodology && isMethodologyKind(methodology.kind)

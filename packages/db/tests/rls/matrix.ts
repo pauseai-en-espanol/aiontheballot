@@ -1307,11 +1307,13 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
               'update:frozen_from': '23001',
               'update:require_second_reviewer': '23001',
               'update:announced': '23001',
+              'update:intro': '23001',
             },
           }
-        : // Renaming a live election needs an approved change request; the announcement is fixed once live.
+        : // Renaming a live election, or changing its intro, needs an approved change request; the announcement is
+          // fixed once live.
           e.status === 'live'
-          ? { blocked: { update: '23001', 'update:announced': '23001' } }
+          ? { blocked: { update: '23001', 'update:announced': '23001', 'update:intro': '23001' } }
           : {}),
     })),
     inserts: TENANT_KEYS.map((key) => ({
@@ -1331,6 +1333,7 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       frozen_until: MEMBERS,
     },
     columnUpdates: {
+      intro: { set: `intro = '{"es": "Introducción de ejemplo"}'`, rule: EDITORS },
       frozen_from: { set: 'frozen_from = now()', rule: COUNTRY_ADMINS },
       announced: { set: 'announced = NOT announced', rule: COUNTRY_ADMINS },
       require_second_reviewer: {

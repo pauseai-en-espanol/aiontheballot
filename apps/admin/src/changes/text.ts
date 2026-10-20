@@ -12,6 +12,7 @@ type Translator = ReturnType<typeof getTranslator>;
 const FIELD_LABELS = [
   'name',
   'election_date',
+  'intro',
   'body',
   'admissible_source_kinds',
   'not_mentioned_source_kinds',

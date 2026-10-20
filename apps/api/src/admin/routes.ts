@@ -645,6 +645,7 @@ interface ElectionBody {
   territoryCode?: string | null;
   name?: Record<string, string>;
   date?: string | null;
+  intro?: Record<string, string>;
   announced?: boolean;
   requireSecondReviewer?: boolean;
   status?: 'preview' | 'live' | 'archived';
@@ -668,6 +669,7 @@ const ELECTION_BODY = {
     territoryCode: { type: ['string', 'null'], maxLength: 10 },
     name: localizedSchema(200),
     date: DAY,
+    intro: localizedSchema(10_000),
     announced: { type: 'boolean' },
     requireSecondReviewer: { type: 'boolean' },
     status: { type: 'string', enum: ['preview', 'live', 'archived'] },
@@ -1061,7 +1063,12 @@ const sourceKindList: ColumnRule = (value) => {
  * JavaScript's, a public text without the default language). The database checks the rest when it is approved.
  */
 const COLUMN_RULES: Readonly<Record<ChangeTarget, Readonly<Record<string, ColumnRule>>>> = {
-  election: { name: publicLocalized(200), election_date: dayOrNone },
+  // The intro can be reworded once live, never removed: the database takes no null for a public text (PLAN R217).
+  election: {
+    name: publicLocalized(200),
+    election_date: dayOrNone,
+    intro: publicLocalized(10_000),
+  },
   methodology: {
     demands_owner_id: idOrNone,
     body: publicLocalized(100_000),
@@ -3555,6 +3562,10 @@ export const adminDataRoutes =
               territoryCode: request.body.territoryCode ?? null,
               name: requiredLocalized(name, access),
               date: request.body.date ?? null,
+              intro:
+                request.body.intro === undefined
+                  ? null
+                  : optionalLocalized(request.body.intro, access),
             });
           });
           return reply.code(201).send({ slug: created.slug });
@@ -3587,12 +3598,13 @@ export const adminDataRoutes =
             if (Object.keys(request.body).length === 0) {
               throw new Refusal(400, 'invalid');
             }
-            const { name, territoryCode, ...rest } = request.body;
+            const { name, territoryCode, intro, ...rest } = request.body;
             refuseUnless(
               await updateElection(trx, access.tenantId, election.id, {
                 ...rest,
                 ...(territoryCode === undefined ? {} : { territoryCode }),
                 ...(name === undefined ? {} : { name: requiredLocalized(name, access) }),
+                ...(intro === undefined ? {} : { intro: optionalLocalized(intro, access) }),
               }),
             );
             return request.body.slug ?? election.slug;

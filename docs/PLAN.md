@@ -3149,6 +3149,24 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   table's references were accepted again, the other templates' untouched. Tests first; the mutation list
   `election-intro` clamps the words to one line again, and is caught.
 
+- **R217. An election's intro, written by its editors.** The same first look asked for an introductory page; Dani:
+  "if we are going to allow some explanation it should be configurable in the backend", and chose one per election
+  over one per site. Migration `election_intro` adds `elections.intro`, localized Markdown, nullable: none shows none.
+  Editors write it as they write the name (the election form gains it, with the methodology's write and preview
+  views); once the election is in preview or live it needs the default locale (`intro_rules`, its own trigger, so
+  `election_rules` stays as it was), and once live it is change-controlled like the name (`change_control` and
+  `change_request_rules` replaced with it among an election's controlled, updatable and localized columns; the admin's
+  change requests and the public corrections log name it). The public and preview roles read it by a column grant
+  (ADR-0002 §7 and §12 amended); the public API reads it only for the elections whose pages it serves. Decided with
+  Dani (low impact): the public role reads an announced draft's row, so it can read that draft's intro before it goes
+  live; keeping it hidden would have needed another table or a view for one column. Decided (low impact): a live
+  election's intro can be reworded through a change request, not removed, since a request's localized value needs the
+  default locale. Tests first: the RLS matrix (editors write it, blocked once live and archived), change control (a
+  direct write refused, a request approved only with default-locale text), going to preview or live with an
+  untranslated one refused, the API's routes and public read model, and a change request through the API; the mutation
+  list `election-intro` breaks each rule (two equivalents, each with its reason). Specs: data model, editorial
+  workflow E1 and CR1, admin forms.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

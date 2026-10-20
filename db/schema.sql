@@ -1041,7 +1041,7 @@ CREATE FUNCTION private.change_control() RETURNS trigger
       WHEN 'elections' THEN 'election' WHEN 'methodologies' THEN 'methodology'
       WHEN 'methodology_reviewers' THEN 'methodology_reviewer' WHEN 'parties' THEN 'party' ELSE 'criterion' END;
     controlled text[] := CASE kind
-      WHEN 'election' THEN ARRAY['name', 'election_date']
+      WHEN 'election' THEN ARRAY['name', 'election_date', 'intro']
       WHEN 'methodology' THEN ARRAY['demands_owner_id', 'body', 'admissible_source_kinds', 'not_mentioned_source_kinds']
       WHEN 'methodology_reviewer' THEN ARRAY['name', 'affiliation', 'display_order']
       WHEN 'party' THEN ARRAY['name', 'short_name', 'logo_file_id', 'colour', 'display_order', 'website', 'territory_codes']
@@ -1110,7 +1110,7 @@ CREATE FUNCTION private.change_request_rules() RETURNS trigger
       WHEN 'election' THEN 'elections' WHEN 'methodology' THEN 'methodologies'
       WHEN 'methodology_reviewer' THEN 'methodology_reviewers' WHEN 'party' THEN 'parties' ELSE 'criteria' END;
     updatable text[] := CASE NEW.target_kind
-      WHEN 'election' THEN ARRAY['name', 'election_date']
+      WHEN 'election' THEN ARRAY['name', 'election_date', 'intro']
       WHEN 'methodology' THEN ARRAY['demands_owner_id', 'body', 'admissible_source_kinds', 'not_mentioned_source_kinds']
       WHEN 'methodology_reviewer' THEN ARRAY['name', 'affiliation', 'display_order']
       WHEN 'party' THEN ARRAY['name', 'short_name', 'logo_file_id', 'colour', 'display_order', 'website', 'territory_codes']
@@ -1123,7 +1123,7 @@ CREATE FUNCTION private.change_request_rules() RETURNS trigger
       WHEN 'criterion' THEN ARRAY['slug', 'title', 'short_title', 'description', 'display_order', 'core_criterion_id']
         END;
     localized text[] := CASE NEW.target_kind
-      WHEN 'election' THEN ARRAY['name'] WHEN 'methodology' THEN ARRAY['body'] WHEN 'party' THEN ARRAY['name', 'short_name']
+      WHEN 'election' THEN ARRAY['name', 'intro'] WHEN 'methodology' THEN ARRAY['body'] WHEN 'party' THEN ARRAY['name', 'short_name']
       WHEN 'criterion' THEN ARRAY['title', 'short_title', 'description'] ELSE '{}' END;
     -- The target, read as the writer: it must be in the request's election.
     find_target text := format('SELECT to_jsonb(x) FROM app.%I x WHERE x.id = $1 AND %s', tbl, CASE NEW.target_kind
@@ -1780,6 +1780,28 @@ CREATE FUNCTION private.forbid_tenant_change() RETURNS trigger
 
 
 ALTER FUNCTION private.forbid_tenant_change() OWNER TO aiontheballot_owner;
+
+--
+-- Name: intro_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.intro_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    -- A tenant the writer can't see leaves the locale null and passes here: RLS refuses that write itself.
+    IF NEW.status <> 'draft' AND NEW.intro IS NOT NULL
+       AND NOT NEW.intro ? (SELECT t.default_locale FROM app.tenants t WHERE t.id = NEW.tenant_id) THEN
+      RAISE EXCEPTION 'election % needs its intro in the default locale once it is in preview or public', NEW.id
+        USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.intro_rules() OWNER TO aiontheballot_owner;
 
 --
 -- Name: invitation_transition(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -3782,6 +3804,7 @@ CREATE TABLE app.elections (
     frozen_until timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     announced boolean DEFAULT false NOT NULL,
+    intro app.localized,
     CONSTRAINT elections_check CHECK (((type <> ALL (ARRAY['general'::app.election_type, 'european'::app.election_type])) OR (territory_code IS NULL))),
     CONSTRAINT elections_check1 CHECK (((type <> 'regional'::app.election_type) OR (territory_code IS NOT NULL))),
     CONSTRAINT elections_check2 CHECK (((frozen_until IS NULL) OR ((frozen_from IS NOT NULL) AND (frozen_until > frozen_from)))),
@@ -6762,6 +6785,13 @@ CREATE TRIGGER forbid_update BEFORE UPDATE ON app.assessment_contributors FOR EA
 --
 
 CREATE TRIGGER forbid_update BEFORE UPDATE ON app.files FOR EACH ROW EXECUTE FUNCTION private.forbid_mutation();
+
+
+--
+-- Name: elections intro_rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER intro_rules BEFORE INSERT OR UPDATE OF intro, status ON app.elections FOR EACH ROW EXECUTE FUNCTION private.intro_rules();
 
 
 --
@@ -10145,6 +10175,13 @@ REVOKE ALL ON FUNCTION private.forbid_tenant_change() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION intro_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.intro_rules() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION invitation_transition(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -11174,6 +11211,15 @@ GRANT SELECT(created_at) ON TABLE app.elections TO aiontheballot_preview;
 --
 
 GRANT UPDATE(announced) ON TABLE app.elections TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN elections.intro; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT(intro) ON TABLE app.elections TO aiontheballot_web;
+GRANT SELECT(intro) ON TABLE app.elections TO aiontheballot_preview;
+GRANT INSERT(intro),UPDATE(intro) ON TABLE app.elections TO aiontheballot_admin;
 
 
 --

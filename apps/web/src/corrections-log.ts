@@ -90,6 +90,7 @@ export const FIELD_ORDER = [
   'website',
   'territory_codes',
   'election_date',
+  'intro',
   'body',
   'admissible_source_kinds',
   'not_mentioned_source_kinds',

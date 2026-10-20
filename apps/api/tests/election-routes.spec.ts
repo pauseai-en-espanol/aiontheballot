@@ -156,6 +156,33 @@ describe('election routes (editorial workflow §6)', () => {
         }
       }
 
+      // The intro (PLAN R217): Markdown per language, stored as typed; blank in every language, none.
+      const intro = { es: 'Una introducción de ejemplo.\n\nCon **Markdown**.' };
+      expect(
+        (await send('PATCH', '/api/t/test-a/e/elecciones-de-ruta', USERS.editorA, { intro }))
+          .statusCode,
+      ).toBe(200);
+      expect(
+        (await send('GET', '/api/t/test-a/e/elecciones-de-ruta', USERS.editorA)).json(),
+      ).toMatchObject({ election: { intro } });
+      expect(
+        (
+          await send('PATCH', '/api/t/test-a/e/elecciones-de-ruta', USERS.editorA, {
+            intro: { en: 'Not a language of the site' },
+          })
+        ).statusCode,
+      ).toBe(400);
+      expect(
+        (
+          await send('PATCH', '/api/t/test-a/e/elecciones-de-ruta', USERS.editorA, {
+            intro: { es: ' ' },
+          })
+        ).statusCode,
+      ).toBe(200);
+      expect(
+        (await send('GET', '/api/t/test-a/e/elecciones-de-ruta', USERS.editorA)).json(),
+      ).toMatchObject({ election: { intro: null } });
+
       const renamed = await send('PATCH', '/api/t/test-a/e/elecciones-de-ruta', USERS.editorA, {
         slug: 'elecciones-renombradas',
         date: null,
@@ -250,6 +277,15 @@ describe('election routes (editorial workflow §6)', () => {
       );
       expect(live.statusCode).toBe(409);
       expect(live.json()).toEqual({ error: 'stale' });
+      // Its intro too: once live, it changes through a change request (CR1).
+      const liveIntro = await send(
+        'PATCH',
+        `/api/t/test-a/e/${ELECTIONS_A.live.slug}`,
+        USERS.countryAdminA,
+        { intro: { es: 'Otra introducción' } },
+      );
+      expect(liveIntro.statusCode).toBe(409);
+      expect(liveIntro.json()).toEqual({ error: 'stale' });
       expect(
         (await send('GET', `/api/t/test-a/e/${ELECTIONS_A.live.slug}`, USERS.countryAdminB))
           .statusCode,

@@ -1,0 +1,84 @@
+[
+  {
+    "name": "migration: a live election's intro is written directly",
+    "file": "db/migrations/20261020180423_election_intro.sql",
+    "old": "    controlled text[] := CASE kind\n      WHEN 'election' THEN ARRAY['name', 'election_date', 'intro']",
+    "new": "    controlled text[] := CASE kind\n      WHEN 'election' THEN ARRAY['name', 'election_date']",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-control.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a change request can't change the intro",
+    "file": "db/migrations/20261020180423_election_intro.sql",
+    "old": "    updatable text[] := CASE NEW.target_kind\n      WHEN 'election' THEN ARRAY['name', 'election_date', 'intro']",
+    "new": "    updatable text[] := CASE NEW.target_kind\n      WHEN 'election' THEN ARRAY['name', 'election_date']",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-control.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: a request's intro needs no default locale",
+    "file": "db/migrations/20261020180423_election_intro.sql",
+    "old": "      WHEN 'election' THEN ARRAY['name', 'intro'] WHEN 'methodology'",
+    "new": "      WHEN 'election' THEN ARRAY['name'] WHEN 'methodology'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/change-control.spec.ts",
+    "cwd": "packages/db",
+    "equivalent": "intro_rules refuses the approved write itself, a live election's intro without the default locale, with the same check_violation"
+  },
+  {
+    "name": "migration: an untranslated intro goes public",
+    "file": "db/migrations/20261020180423_election_intro.sql",
+    "old": "    IF NEW.status <> 'draft' AND NEW.intro IS NOT NULL",
+    "new": "    IF false AND NEW.intro IS NOT NULL",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/lifecycle.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the rule checks only the drafts' going live, not preview",
+    "file": "db/migrations/20261020180423_election_intro.sql",
+    "old": "CREATE TRIGGER intro_rules BEFORE INSERT OR UPDATE OF intro, status ON app.elections",
+    "new": "CREATE TRIGGER intro_rules BEFORE INSERT OR UPDATE OF intro ON app.elections",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/lifecycle.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: editors can't write the intro",
+    "file": "db/migrations/20261020180423_election_intro.sql",
+    "old": "GRANT INSERT (intro), UPDATE (intro) ON app.elections TO aiontheballot_admin;",
+    "new": "GRANT INSERT (intro) ON app.elections TO aiontheballot_admin;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/rls/matrix.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "migration: the public can't read the intro",
+    "file": "db/migrations/20261020180423_election_intro.sql",
+    "old": "GRANT SELECT (intro) ON app.elections TO aiontheballot_web, aiontheballot_preview;",
+    "new": "GRANT SELECT (intro) ON app.elections TO aiontheballot_preview;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "cwd": "packages/db"
+  },
+  {
+    "name": "api: the public read model leaves the intro out",
+    "file": "apps/api/src/election-data.ts",
+    "old": "      intro: optionalLocalized(election.intro, 'elections.intro'),\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/election-data.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "og: the words' size ignores the longest word",
+    "file": "packages/og/src/data-cards.ts",
+    "old": "    Math.min(l.small, columnWidth / 6.5, wordWidth / (longestWord * TEXT_EM)),",
+    "new": "    Math.min(l.small, columnWidth / 6.5),",
+    "cmd": "npx vitest run src/invariants.spec.ts",
+    "cwd": "packages/og",
+    "equivalent": "linesOf then finds a word wider than its column, and the card leaves every word to the legend: never cut"
+  },
+  {
+    "name": "og: the words are clamped to one line, cut (the demo's \"No lo…\")",
+    "file": "packages/og/src/data-cards.ts",
+    "old": "                  cell.label,\n                  wordLines,",
+    "new": "                  cell.label,\n                  1,",
+    "cmd": "npx vitest run src/invariants.spec.ts",
+    "cwd": "packages/og"
+  }
+]

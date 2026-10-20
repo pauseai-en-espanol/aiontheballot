@@ -15,7 +15,8 @@ describe('a public election', () => {
     await inRolledBackTransaction(async (trx) => {
       await asPublic(trx);
       const data = await createElectionSource(trx)('test-a', LIVE_A.slug);
-      expect(data?.election).toMatchObject({ slug: LIVE_A.slug, status: 'live' });
+      // No intro written (PLAN R217): none, never a placeholder.
+      expect(data?.election).toMatchObject({ slug: LIVE_A.slug, status: 'live', intro: null });
       expect(data?.parties.map((p) => p.id)).toEqual(ELECTIONS_A.live.parties);
       expect(data?.criteria.map((c) => c.id)).toEqual(ELECTIONS_A.live.criteria);
       expect(data?.methodology).toMatchObject({ kind: 'demands', reviewers: [expect.any(Object)] });
@@ -277,9 +278,16 @@ describe('an election in preview (PLAN R181)', () => {
 
   it("is served, as live, only by the preview's source and only to the preview's role", async () => {
     await inRolledBackTransaction(async (trx) => {
+      await sql`UPDATE app.elections SET intro = '{"es": "Una introducción de ejemplo."}' WHERE id = ${preview.id}`.execute(
+        trx,
+      );
       await sql`SET LOCAL ROLE aiontheballot_preview`.execute(trx);
       const data = await createElectionSource(trx, { preview: true })('test-a', preview.slug);
-      expect(data?.election).toMatchObject({ slug: preview.slug, status: 'live' });
+      expect(data?.election).toMatchObject({
+        slug: preview.slug,
+        status: 'live',
+        intro: { es: 'Una introducción de ejemplo.' },
+      });
       expect(data?.parties.map((p) => p.id)).toEqual(preview.parties);
       // Its first party's logo, which the preview's role reads as a previewed party's.
       expect(data?.parties[0]?.logo).toEqual({

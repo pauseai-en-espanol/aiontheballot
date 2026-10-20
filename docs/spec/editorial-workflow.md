@@ -262,9 +262,12 @@ _As an editor, I set up an election so we can start preparing it in private._
 2. Fields: name (per locale), slug, type, territory and date. A general or European election has no territory; a
    regional one needs one, inside the tenant's country. A slug can't look like a locale code. [DB: checks,
    `election_rules`]
+   - And an optional introduction, Markdown per locale with a preview, which opens the election's public page above
+     its summary (PLAN R217): what is compared and how to read it, in the editors' own words. It needs the default
+     locale once the election is in preview or live. [DB: `intro_rules`; UI; web]
 3. While it is a draft, editors and country admins change any of these. [DB: RLS]
-4. Once live, the slug, type and territory are fixed, and the name and date change only through a change request
-   (CR1). [DB: `election_rules`, change control]
+4. Once live, the slug, type and territory are fixed, and the name, date and intro change only through a change
+   request (CR1); the intro can then be reworded, not removed. [DB: `election_rules`, change control]
 
 ### E2. Methodology
 
@@ -599,9 +602,9 @@ _As an editor, I propose a fix to a live election's structure; the change and it
    each field beside what it is now, and one public note; the fields that differ are proposed, reviewed and applied
    as one request (PLAN R183). A party's new logo is uploaded first, to the site's images, and is public only once a
    request naming it is approved. [UI; DB: change control]
-2. Change-controlled are the election's name and date; the methodology's demands owner, body and source kinds; and
-   every column of external reviewers, parties and criteria except slugs and the programme status. Parties, criteria
-   and reviewers are added and retired the same way. [DB: `change_request_rules`]
+2. Change-controlled are the election's name, date and intro; the methodology's demands owner, body and source
+   kinds; and every column of external reviewers, parties and criteria except slugs and the programme status.
+   Parties, criteria and reviewers are added and retired the same way. [DB: `change_request_rules`]
 3. Editors and country admins propose. The previous value is read from the target, never from the client. [DB]
 4. Country admins and platform admins approve. Approving applies the change in the same transaction and writes its
    public record. Reviewers may reject but are not offered Approve, since they can't write structure (PLAN R24, W16).

@@ -33,7 +33,7 @@ export type ChangeState = 'pending' | 'approved' | 'rejected';
 export const CHANGEABLE: Readonly<
   Record<ChangeTarget, { update: readonly string[]; add: readonly string[] | null }>
 > = {
-  election: { update: ['name', 'election_date'], add: null },
+  election: { update: ['name', 'election_date', 'intro'], add: null },
   methodology: {
     update: ['demands_owner_id', 'body', 'admissible_source_kinds', 'not_mentioned_source_kinds'],
     add: null,

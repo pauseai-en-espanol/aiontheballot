@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react';
 
 import type { SlugField } from '@/ui/SlugField';
 
-import { problemText, template, territoryPickerText, writeErrors } from '@/ui/text';
+import { markdownText, problemText, template, territoryPickerText, writeErrors } from '@/ui/text';
 
 import type { ElectionFormText } from './ElectionForm';
 
@@ -44,6 +44,9 @@ export const electionFormText = (
   territoryNone: t('admin.elections.form.territoryNone'),
   date: t('admin.elections.form.date'),
   dateHint: t('admin.elections.form.dateHint'),
+  intro: t('admin.elections.form.intro'),
+  introHint: t('admin.elections.form.introHint'),
+  markdown: markdownText(t),
   save,
   saved: t('admin.elections.form.saved'),
   created: t('admin.elections.form.created'),

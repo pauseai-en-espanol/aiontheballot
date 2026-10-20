@@ -86,6 +86,8 @@ The work is in PLAN's [queued work](PLAN.md#queued-work), in the order of §3. E
   inputs are in browser time while its status says UTC; show the zone in both, behind "Programar congelación".
 - **Low:** archiving (irreversible) asks no typed confirmation while going live does; the go-live dialog's slug in a
   copyable code style.
+- **Added (PLAN R217):** the details form's optional introduction, Markdown per language with the write and preview
+  views of §1.9, which the public page opens with; shown as written once live, when a change request changes it.
 
 ### Methodology
 

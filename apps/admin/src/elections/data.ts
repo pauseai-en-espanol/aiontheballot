@@ -32,6 +32,8 @@ export interface ElectionSummary {
 }
 
 export interface Election extends ElectionSummary {
+  /** The introduction on its public page (PLAN R217), Markdown per language, or none. */
+  intro: Localized | null;
   requireSecondReviewer: boolean;
   frozenFrom: string | null;
   frozenUntil: string | null;

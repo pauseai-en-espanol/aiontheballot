@@ -180,6 +180,7 @@ const ElectionPage = async ({ params }: Params) => {
               territoryCode: election.territoryCode,
               name: election.name,
               date: election.date,
+              intro: election.intro,
             }}
             slugAddress={sitePath(tenant.defaultLocale, { page: 'election', election: '{slug}' })}
             text={{
@@ -200,6 +201,17 @@ const ElectionPage = async ({ params }: Params) => {
             </dd>
             <dt>{t('admin.elections.form.date')}</dt>
             <dd>{electionDate(t, election.date)}</dd>
+            {/* As written: once live, it changes through a change request (PLAN R217). */}
+            <dt>{t('admin.elections.form.intro')}</dt>
+            <dd>
+              {election.intro
+                ? Object.entries(election.intro).map(([code, intro]) => (
+                    <div key={code} className={styles.prose} lang={code}>
+                      {intro}
+                    </div>
+                  ))
+                : t('admin.elections.form.noIntro')}
+            </dd>
           </dl>
         )}
       </FormSection>

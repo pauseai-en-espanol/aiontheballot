@@ -29,6 +29,8 @@ export interface ElectionSummary {
 }
 
 export interface Election extends ElectionSummary {
+  /** The editors' introduction on the election's page (PLAN R217), Markdown per language, or none. */
+  intro: Localized | null;
   requireSecondReviewer: boolean;
   frozenFrom: string | null;
   frozenUntil: string | null;
@@ -102,6 +104,7 @@ export const getElection = async (
 ): Promise<Election | undefined> => {
   const row = await electionColumns(trx)
     .select([
+      'e.intro',
       'e.require_second_reviewer',
       'e.frozen_from',
       'e.frozen_until',
@@ -143,6 +146,7 @@ export const getElection = async (
   }
   return {
     ...summary(row),
+    intro: row.intro === null ? null : localized(row.intro, 'elections.intro'),
     requireSecondReviewer: row.require_second_reviewer,
     frozenFrom: row.frozen_from?.toISOString() ?? null,
     frozenUntil: row.frozen_until?.toISOString() ?? null,
@@ -162,6 +166,8 @@ export interface ElectionFields {
   territoryCode: string | null;
   name: Localized;
   date: string | null;
+  /** Optional: an election may have no introduction (PLAN R217). */
+  intro?: Localized | null;
 }
 
 /**
@@ -184,6 +190,7 @@ export const createElection = async (
       territory_code: fields.territoryCode,
       name: JSON.stringify(fields.name),
       election_date: fields.date,
+      intro: fields.intro ? JSON.stringify(fields.intro) : null,
     })
     .returning(['id', 'slug'])
     .executeTakeFirstOrThrow();
@@ -202,7 +209,8 @@ export interface ElectionChange extends Partial<ElectionFields> {
 
 /**
  * Changes an election (E1.3, E5–E7, P1). The database decides: editors and country admins write the fields while it is
- * a draft (`election_rules` fixes the slug, type and territory once live, and change control the name and date);
+ * a draft (`election_rules` fixes the slug, type and territory once live, and change control the name, date and
+ * intro);
  * country admins the announcement, the status (draft to preview or live, preview to live, each once everything public
  * has its default-language text, then archived) and the freeze window; platform admins four-eyes; all audited.
  */
@@ -218,6 +226,9 @@ export const updateElection = async (
     ...(change.territoryCode === undefined ? {} : { territory_code: change.territoryCode }),
     ...(change.name === undefined ? {} : { name: JSON.stringify(change.name) }),
     ...(change.date === undefined ? {} : { election_date: change.date }),
+    ...(change.intro === undefined
+      ? {}
+      : { intro: change.intro === null ? null : JSON.stringify(change.intro) }),
     ...(change.announced === undefined ? {} : { announced: change.announced }),
     ...(change.requireSecondReviewer === undefined
       ? {}

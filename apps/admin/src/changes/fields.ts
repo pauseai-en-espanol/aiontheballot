@@ -19,7 +19,7 @@ export type FieldKind =
   | 'logo';
 
 export const UPDATE_FIELDS: Readonly<Record<ChangeTarget, Readonly<Record<string, FieldKind>>>> = {
-  election: { name: 'localized', election_date: 'date' },
+  election: { name: 'localized', election_date: 'date', intro: 'localizedLong' },
   methodology: {
     body: 'localizedLong',
     admissible_source_kinds: 'sourceKinds',

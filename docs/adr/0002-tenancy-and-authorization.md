@@ -196,6 +196,11 @@ DEFINER`, on the allowlist above).
   revisions and what those cite, and their parties' logos. It executes none of the four functions (the preview strips
   forms) and writes nothing. The public role's policy on `elections` now admits an announced election's own row while
   it is in preview, as while it is a draft.
+- Amended (PLAN R217): the public and preview roles read `elections.intro`, the editors' introduction on an
+  election's page, by a column grant; the admin role inserts and updates it. Because the public role reads an
+  announced election's own row (the public-visibility rule), it can read that election's intro before it goes live:
+  accepted, since the intro is the editors' own framing, and the public API reads it only for the elections whose
+  pages it serves. Keeping it hidden would have needed another table or a view for one column.
 
 ### 8. Authorization comes from memberships
 
@@ -294,8 +299,8 @@ expires_at)`, under RLS.
 
 ### 12. Live elections are change-controlled
 
-- Once an election is `live`, editing criteria text, party name or short name, or the methodology body goes
-  through `change_requests`, always with a public note.
+- Once an election is `live`, editing criteria text, party name or short name, the election's name, date or intro
+  (amended, PLAN R217), or the methodology body goes through `change_requests`, always with a public note.
 - **Who approves is a per-tenant setting** (`tenants.live_edits_need_second_approver`, set only by platform admins).
   Off by default: with one or two maintainers, one member may propose and approve their own change. On: a different
   member must approve. The approver always holds `reviewer` or `country_admin`.
@@ -401,12 +406,12 @@ A row is world-readable only when all of these hold:
 - Its election's `status` is `live` or `archived`.
 - Its tenant is active.
 
-**Announced elections** (amended for the coming-soon page, PLAN R51). A country admin may announce a draft election,
-so the tenant's coming-soon page can give its name and date. The public then sees that election's own row (name,
-date, type, territory, slug) and nothing under it: its methodology, parties, criteria, cells and sources still follow
-the rule above, because each of their policies checks the election's status itself, never the election's visibility.
-Nobody creates an election already announced, an announced election keeps its name in the default locale, and the
-announcement is fixed once the election goes live.
+**Announced elections** (amended for the coming-soon page, PLAN R51). A country admin may announce a draft election, so
+the tenant's coming-soon page can give its name and date. The public then sees that election's own row (name, date,
+type, territory, slug and, since PLAN R217, its intro; §7) and nothing under it: its methodology, parties, criteria,
+cells and sources still follow the rule above, because each of their policies checks the election's status itself, never
+the election's visibility. Nobody creates an election already announced, an announced election keeps its name in the
+default locale, and the announcement is fixed once the election goes live.
 
 **Elections in preview** (amended, PLAN R181) follow the rule above for the public: only an announced one's own row
 is public, as an announced draft's. The preview's role (§7) also reads their content, as the public will once they

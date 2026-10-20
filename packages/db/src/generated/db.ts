@@ -275,6 +275,7 @@ export interface AppElections {
   frozen_from: Timestamp | null;
   frozen_until: Timestamp | null;
   id: Generated<string>;
+  intro: Json | null;
   name: Json;
   require_second_reviewer: Generated<boolean>;
   slug: string;

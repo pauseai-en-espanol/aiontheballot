@@ -128,6 +128,13 @@ describe('going live', () => {
       ELECTIONS.draftA.id,
     ],
     [
+      'with an untranslated intro',
+      [
+        `UPDATE app.elections SET intro = '{"en": "Example intro"}' WHERE id = '${ELECTIONS.draftA.id}'`,
+      ],
+      ELECTIONS.draftA.id,
+    ],
+    [
       'with an untranslated methodology',
       [
         `UPDATE app.methodologies SET body = '{"en": "Example"}' WHERE id = '${ELECTIONS.draftA.methodology}'`,
@@ -178,6 +185,33 @@ describe('going live', () => {
         errorCode(c, status(ELECTIONS.draftInactive.id, 'live')),
       ),
     ).toBe(CHECK_VIOLATION);
+  });
+});
+
+describe("an election's intro (PLAN R217)", () => {
+  it('keeps the default locale once the election is public, whoever writes (it changes through a change request)', async () => {
+    expect(
+      await inRolledBackTransaction((client) =>
+        errorCode(
+          client,
+          `UPDATE app.elections SET intro = '{"en": "Example"}' WHERE id = '${ELECTIONS.liveA.id}'`,
+        ),
+      ),
+    ).toBe(CHECK_VIOLATION);
+  });
+
+  it('may be untranslated, or left out, while the election is a draft, but not to go to preview', async () => {
+    const codes = await asCountryAdminA(async (client) => [
+      await errorCode(
+        client,
+        `UPDATE app.elections SET intro = '{"en": "Example"}' WHERE id = '${ELECTIONS.draftA.id}'`,
+      ),
+      await errorCode(client, status(ELECTIONS.draftA.id, 'preview')),
+    ]);
+    expect(codes).toEqual([null, CHECK_VIOLATION]);
+    expect(
+      await asCountryAdminA((client) => errorCode(client, status(ELECTIONS.draftA.id, 'preview'))),
+    ).toBeNull();
   });
 });
 

@@ -312,6 +312,7 @@ create table app.elections (
   territory_code     text check (territory_code ~ '^[A-Z]{2}-[A-Z0-9]{1,3}$'),  -- ISO 3166-2; null = whole country
   name               jsonb not null,
   election_date      date,
+  intro              jsonb,                            -- localized Markdown above its summary (PLAN R217); editors
   status             app.election_status not null default 'draft',
   announced          boolean not null default false,   -- a draft whose row is public (PLAN R51); country admins
   went_live_at       timestamptz,                      -- set by trigger
@@ -378,8 +379,9 @@ create table app.parties (
 ```
 
 **Who writes the structure** (PLAN, Answered: election structure). Editors and country admins write elections (name,
-date, slug, type, territory), parties and criteria; country admins set the status, the announcement and the freeze
-window and write the methodology and its external reviewers; only platform admins change `require_second_reviewer`.
+date, intro, slug, type, territory), parties and criteria; country admins set the status, the announcement and the
+freeze window and write the methodology and its external reviewers; only platform admins change
+`require_second_reviewer`.
 Column grants make every new election an unannounced draft with four-eyes on and no freeze;
 `private.restrict_columns(roles, columns…)` guards the rest. Structure is deleted only while its election is a draft.
 A party's logo must be an image in the `public_assets` bucket, so no source document can become public through it.
@@ -792,7 +794,7 @@ desc`). A cell with no revision is _pending_; one whose latest revision is a wit
 ### 3.7 Change control for live elections
 
 Once an election is `live`, everything public about its structure changes only through an approved change request:
-the election's name and date; every methodology column (the kind and the territory never change once live);
+the election's name, date and intro; every methodology column (the kind and the territory never change once live);
 methodology reviewers; every party column except the programme status; every criterion column. Parties, criteria
 and reviewers are added or retired through change requests too, never deleted. Adding parties is for appeals and
 late candidacies (PLAN Q5).
@@ -869,10 +871,11 @@ window.
 approval; `private.change_control()` after any write to the five structure tables):
 
 - Proposals are for live elections only (a draft's structure is edited directly). The target must be in the request's
-  election; `update` names a change-controlled column (the election's name and date; the methodology's demands owner,
-  body and source kinds; every reviewer, party and criterion column but slugs and the programme status); `add` and
-  `retire` are for reviewers, parties and criteria only. Proposed values are normalized to how the column stores them,
-  and `previous_value` is read from the target.
+  election; `update` names a change-controlled column (the election's name, date and intro; the methodology's demands
+  owner, body and source kinds; every reviewer, party and criterion column but slugs and the programme status); `add`
+  and `retire` are for reviewers, parties and criteria only. Proposed values are normalized to how the column stores
+  them, and `previous_value` is read from the target. A localized value needs the default locale, so a live
+  election's intro can be reworded through a request but not removed (PLAN R217).
 - A decision sets the state once, with `decided_by`, `decided_at` and, for an approval, `decided_txid`. An approval
   also needs the target unchanged since the proposal (otherwise propose again), default-locale text in the note and in
   any localized value, no freeze, and (with `live_edits_need_second_approver`) an approver other than the proposer.
@@ -1192,7 +1195,10 @@ purge moves it to `hostname_tombstones`.
 Column-level grants restrict `aiontheballot_web` further: on `source_documents` it reads only `id`, `election_id`,
 `party_id`, `kind`, `title`, `url`, `language`, `is_programme`, `sha256`, `retrieved_at` and `archive_url`; on
 `tenants` and `elections`, not the settings columns; on `tenant_documents`, only `id`, `tenant_id`, `kind`, `version`,
-`body` and `published_at`, never who wrote it (PLAN R169). It has no `USAGE` on `private`.
+`body` and `published_at`, never who wrote it (PLAN R169). It has no `USAGE` on `private`. An election's `intro` is
+among the public columns (PLAN R217); since the role reads an announced draft's row, it can read that draft's intro
+before it goes live, an exposure accepted with the column: the public API reads it only for the elections whose pages
+it serves.
 
 **Never readable by `aiontheballot_web`:**
 

@@ -51,6 +51,10 @@ export interface ElectionFormText {
   territoryNone: string;
   date: string;
   dateHint: string;
+  /** The introduction on the election's page (PLAN R217), and its Markdown views. */
+  intro: string;
+  introHint: string;
+  markdown: { write: string; preview: string; empty: string };
   save: string;
   saved: string;
   /** Said on the new election's page, once it is created. */
@@ -67,9 +71,10 @@ export interface ElectionValues {
   territoryCode: string | null;
   name: Readonly<Record<string, string>>;
   date: string | null;
+  intro: Readonly<Record<string, string>> | null;
 }
 
-type ElectionField = 'name' | 'slug' | 'type' | 'territory' | 'date';
+type ElectionField = 'name' | 'slug' | 'type' | 'territory' | 'date' | 'intro';
 
 const ERROR_ID = 'election-error';
 
@@ -93,10 +98,12 @@ const BODY_FIELDS: Readonly<Record<string, ElectionField>> = {
   type: 'type',
   territoryCode: 'territory',
   date: 'date',
+  intro: 'intro',
 };
 
 /**
- * An election's fields (editorial workflow E1.2): its name per language, slug, type, territory and date. A new one is
+ * An election's fields (editorial workflow E1.2): its name per language, slug, type, territory, date and the optional
+ * introduction its public page opens with (PLAN R217), Markdown with a preview. A new one is
  * created as a draft; an existing draft is changed in place. The territory is the subdivision part of an ISO 3166-2
  * code, after the tenant's country, which the database checks again (`election_rules`), as it does everything here.
  * What is wrong shows at its field, in words, and the first takes focus (admin forms §1.2). Its slug follows the name
@@ -167,6 +174,8 @@ export const ElectionForm = ({
       type,
       territoryCode: territory === 'none' || suffix === '' ? null : `${prefix}${suffix}`,
       date: formText(form, 'date') || null,
+      // Blank in every language, none: the API stores no empty text.
+      intro: localizedFromForm(form, 'intro', locales),
     };
     const answer = await run(
       () =>
@@ -286,6 +295,19 @@ export const ElectionForm = ({
           defaultValue={election?.date ?? ''}
         />
       </Field>
+      <LocalizedField
+        name="intro"
+        label={text.intro}
+        hint={text.introHint}
+        locales={locales}
+        values={election?.intro ?? undefined}
+        multiline
+        maxLength={10_000}
+        requiredLabel={text.needed}
+        optional={text.optional}
+        error={problems.intro}
+        markdown={text.markdown}
+      />
       <FormMessages id={ERROR_ID} error={error} errors={text.errors} />
       <FormActions label={text.save} pending={pending} status={status} statusRef={statusLine} />
     </form>

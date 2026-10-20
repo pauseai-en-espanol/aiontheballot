@@ -514,6 +514,8 @@ describe('change requests (editorial workflow CR1)', () => {
     const answers = await Promise.all([
       send('POST', base, USERS.countryAdminA, election('election_date', 'infinity')),
       send('POST', base, USERS.countryAdminA, election('election_date', '5874897-12-31')),
+      // A live election's intro is reworded, never removed (PLAN R217).
+      send('POST', base, USERS.editorA, election('intro', null)),
       send('POST', base, USERS.editorA, partyUpdate('territory_codes', [['XA-M', 'XA-B']])),
       send('POST', base, USERS.editorA, partyUpdate('short_name', { es: 'x'.repeat(61) })),
       send('POST', base, USERS.editorA, partyUpdate('display_order', null)),
@@ -547,7 +549,7 @@ describe('change requests (editorial workflow CR1)', () => {
       send('POST', base, USERS.editorA, reviewer({ name: 'x'.repeat(201), affiliation: '' })),
     ]);
     expect(answers.map((answer) => answer.statusCode)).toEqual([
-      400, 400, 400, 400, 400, 400, 400, 400, 422, 422, 422, 400,
+      400, 400, 400, 400, 400, 400, 400, 400, 400, 422, 422, 422, 400,
     ]);
     // What the columns' own checks would refuse at approval, refused now, naming the check as the database would.
     const methodology = (field: string, value: unknown) => ({
@@ -592,14 +594,20 @@ describe('change requests (editorial workflow CR1)', () => {
       USERS.editorA,
       partyUpdate('territory_codes', [' xa-m ', 'XA-M']),
     );
-    expect([day.statusCode, codes.statusCode]).toEqual([201, 201]);
+    const intro = await send(
+      'POST',
+      base,
+      USERS.editorA,
+      election('intro', { es: 'Una introducción de ejemplo, revisada.' }),
+    );
+    expect([day.statusCode, codes.statusCode, intro.statusCode]).toEqual([201, 201, 201]);
     const stored = await sql<{ value: unknown }>`
       SELECT proposed_value AS value FROM app.change_requests
        WHERE id IN (${day.json<{ id: string }>().id}, ${codes.json<{ id: string }>().id}) ORDER BY field`.execute(
       owner,
     );
     expect(stored.rows).toEqual([{ value: '2031-05-25' }, { value: ['XA-M'] }]);
-    for (const answer of [day, codes]) {
+    for (const answer of [day, codes, intro]) {
       expect(
         (await send('DELETE', `${base}/${answer.json<{ id: string }>().id}`, USERS.countryAdminA))
           .statusCode,

@@ -11,6 +11,7 @@ export const MAX_LENGTH: Readonly<Record<string, number>> = {
   title: 300,
   short_title: 40,
   description: 5_000,
+  intro: 10_000,
   body: 100_000,
   affiliation: 300,
   slug: 200,

@@ -79,6 +79,10 @@ describe('a live election', () => {
       `UPDATE app.elections SET name = '{"es": "Otro nombre"}' WHERE id = '${live.id}'`,
     ],
     [
+      "the election's intro",
+      `UPDATE app.elections SET intro = '{"es": "Otra introducción"}' WHERE id = '${live.id}'`,
+    ],
+    [
       'the methodology',
       `UPDATE app.methodologies SET body = '{"es": "Otra metodología"}' WHERE id = '${live.methodology}'`,
     ],
@@ -356,6 +360,33 @@ describe('approving a change', () => {
         (await client.query('SELECT short_title FROM app.criteria WHERE id = $1', [live.criterion]))
           .rows,
       ).toEqual([{ short_title: { es: 'Ejemplo revisado' } }]);
+    });
+  });
+
+  it("changes an election's intro through a change request, only with text in the default locale", async () => {
+    const approving = (value: string) =>
+      actingAs(USERS.countryAdminA, async (client) => {
+        await setActor(client, USERS.editorA);
+        const id = await propose(client, {
+          kind: 'election',
+          target: live.id,
+          field: 'intro',
+          value,
+        });
+        await setActor(client, USERS.countryAdminA);
+        const code = await errorCode(client, decide(id));
+        const { rows } = await client.query('SELECT intro FROM app.elections WHERE id = $1', [
+          live.id,
+        ]);
+        return { code, intro: rows[0]?.intro };
+      });
+    expect(await approving(`'{"en": "Example intro"}'`)).toEqual({
+      code: CHECK_VIOLATION,
+      intro: null,
+    });
+    expect(await approving(`'{"es": "Introducción revisada"}'`)).toEqual({
+      code: null,
+      intro: { es: 'Introducción revisada' },
     });
   });
 

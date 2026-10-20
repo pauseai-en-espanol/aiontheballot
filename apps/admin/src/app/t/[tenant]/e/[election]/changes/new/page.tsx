@@ -88,7 +88,7 @@ const NewChangePage = async ({ params, searchParams }: Params) => {
       notFound();
     }
     targetId = election.id;
-    current = { name: election.name, election_date: election.date };
+    current = { name: election.name, election_date: election.date, intro: election.intro };
   } else if (target === 'methodology') {
     if (action !== 'update' || !methodology.methodology) {
       notFound();

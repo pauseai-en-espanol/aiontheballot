@@ -13,6 +13,11 @@ export interface PublicElection {
     /** `YYYY-MM-DD`, a day, not an instant. */
     date: string | null;
     status: 'live' | 'archived';
+    /**
+     * The editors' introduction above the summary (PLAN R217): Markdown, sanitized on render. Optional, so an answer
+     * from an API that predates it still reads; null, or absent, when there is none.
+     */
+    intro?: Localized | null;
   };
   methodology: PublicMethodology | null;
   /** In display order; parties that left the election are left out. */
