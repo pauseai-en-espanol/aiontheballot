@@ -66,31 +66,33 @@ export const SiteFooter = ({ home, locale, logo, links, languages }: SiteFooterP
     ...(links.privacy ? [{ href: links.privacy, label: t('layout.privacy') }] : []),
   ];
   return (
-    <footer className={css({ bg: 'bg.canvas', color: 'fg.default' })}>
+    // A band of its own, set off from the page by a rule (PLAN R218): who runs the site on one side, the site's pages on
+    // the other, the languages under both.
+    <footer
+      className={css({
+        bg: 'bg.subtle',
+        color: 'fg.default',
+        borderTop: '3px solid',
+        borderColor: 'border.default',
+        marginTop: '48px',
+      })}
+    >
       <div
         className={css({
           width: '100%',
           maxWidth: '1200px',
           marginInline: 'auto',
           paddingInline: 'clamp(16px, 4vw, 56px)',
-          paddingBlock: '40px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '24px',
+          paddingBlock: '40px 48px',
+          display: 'grid',
+          gridTemplateColumns: { base: '1fr', md: 'minmax(0, 1fr) minmax(0, 1fr)' },
+          gap: '28px 48px',
           fontSize: '16px',
           '& a': { textDecoration: 'underline', textUnderlineOffset: '3px' },
         })}
       >
-        <div
-          className={css({
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '16px 48px',
-          })}
-        >
-          <p data-invariant="operator-line">
+        <div className={css({ display: 'grid', gap: '12px', alignContent: 'start' })}>
+          <p data-invariant="operator-line" className={css({ fontSize: '17px' })}>
             {operatorUrl ? (
               <a className={focusRing} href={operatorUrl}>
                 {line}
@@ -111,9 +113,9 @@ export const SiteFooter = ({ home, locale, logo, links, languages }: SiteFooterP
         <nav aria-label={t('layout.siteLinks')}>
           <ul
             className={css({
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px 24px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(12rem, 1fr))',
+              gap: '10px 24px',
               listStyle: 'none',
             })}
           >
@@ -127,7 +129,15 @@ export const SiteFooter = ({ home, locale, logo, links, languages }: SiteFooterP
           </ul>
         </nav>
         {languages.length > 1 && (
-          <nav aria-label={t('layout.language')}>
+          <nav
+            aria-label={t('layout.language')}
+            className={css({
+              gridColumn: '1 / -1',
+              paddingTop: '20px',
+              borderTop: '1px solid',
+              borderColor: 'border.subtle',
+            })}
+          >
             <ul
               className={css({
                 display: 'flex',

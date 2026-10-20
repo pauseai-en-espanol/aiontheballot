@@ -16,6 +16,7 @@ export const SITE_WORDS = {
     unsubscribe: 'unsubscribe',
     parties: 'parties',
     criteria: 'criteria',
+    table: 'table',
     methodology: 'methodology',
     report: 'report',
     send: 'send',
@@ -30,6 +31,7 @@ export const SITE_WORDS = {
     unsubscribe: 'baja',
     parties: 'partidos',
     criteria: 'criterios',
+    table: 'tabla',
     methodology: 'metodologia',
     report: 'informar',
     send: 'enviar',
@@ -44,7 +46,14 @@ export const TENANT_LEVEL_WORDS = ['legalNotice', 'privacy', 'about', 'updates']
 /** What follows `updates`. */
 const UPDATES_WORDS = ['confirm', 'unsubscribe'] as const;
 /** What follows an election's slug. */
-const ELECTION_WORDS = ['parties', 'criteria', 'methodology', 'report', 'corrections'] as const;
+const ELECTION_WORDS = [
+  'parties',
+  'criteria',
+  'table',
+  'methodology',
+  'report',
+  'corrections',
+] as const;
 /** What follows `report`: where its form posts. */
 const REPORT_WORDS = ['send'] as const;
 
@@ -129,6 +138,8 @@ export type SitePage =
   | { page: 'legalNotice' | 'privacy' | 'about' | 'updates' }
   | { page: 'confirm' | 'unsubscribe' }
   | { page: 'election'; election: string }
+  /** The detailed table, every rating in words (PLAN R218); the election's own page is its summary. */
+  | { page: 'table'; election: string }
   | { page: 'methodology'; election: string }
   | { page: 'party'; election: string; party: string }
   | { page: 'cell'; election: string; party: string; criterion: string }
@@ -157,6 +168,8 @@ export const sitePath = (defaultLocale: string, target: SitePage): string => {
       return `/${w.updates}/${w[target.page]}`;
     case 'election':
       return `/${target.election}`;
+    case 'table':
+      return `/${target.election}/${w.table}`;
     case 'methodology':
       return `/${target.election}/${w.methodology}`;
     case 'party':

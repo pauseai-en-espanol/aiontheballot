@@ -10,10 +10,9 @@ import { ElectionFrame } from '@/components/election-frame';
 import { InLanguage, Message } from '@/components/message';
 import { ProgrammeStatus } from '@/components/programme-status';
 import { RatingBadge } from '@/components/rating';
-import { RatingLegend } from '@/components/rating-legend';
+import { MethodologyLink } from '@/components/rating-legend';
 import { electionPageShare } from '@/election-images';
 import { type ElectionPageParams, loadElectionPage } from '@/election-page';
-import { methodologyOf } from '@/election-view';
 import { localText } from '@/local-text';
 import { pageMetadata } from '@/page-metadata';
 import { ratingLabel } from '@/rating-label';
@@ -126,7 +125,6 @@ const Cell = async (props: CellProps) => {
   const defaultLocale = page.page.home.tenant.defaultLocale;
   const text = (value: Parameters<typeof localText>[0]) => localText(value, locale, defaultLocale);
   const { election } = page.election;
-  const { kind } = methodologyOf(page.election, page.page.home.tenant.methodologyKind);
   const party = text(cell.party.shortName);
   const criterion = text(cell.criterion.title);
   const { current } = cell;
@@ -182,11 +180,12 @@ const Cell = async (props: CellProps) => {
           {t('cellPage.withdrawnLead')}
         </p>
       )}
-      <RatingLegend
-        locale={locale}
-        kind={kind}
-        methodologyHref={href({ page: 'methodology', election: election.slug })}
-      />
+      <p className={css({ marginBlock: '20px 32px', fontSize: '16px' })}>
+        <MethodologyLink
+          locale={locale}
+          href={href({ page: 'methodology', election: election.slug })}
+        />
+      </p>
       {summary && (
         <section
           aria-labelledby="por-que"

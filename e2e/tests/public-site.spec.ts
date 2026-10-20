@@ -14,6 +14,7 @@ const CANONICAL = 'https://ejemplo-a.localhost';
 /** Every page of the seeded election, by its path under the tenant's root. */
 const ELECTION_PAGES = [
   '/generales-de-ejemplo',
+  '/generales-de-ejemplo/tabla',
   '/generales-de-ejemplo/metodologia',
   '/generales-de-ejemplo/partidos/partido-ejemplo-a',
   '/generales-de-ejemplo/partidos/partido-ejemplo-b',
@@ -47,7 +48,7 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'es');
   });
 
-  test('shows the scorecard on a desktop: parties down the side, criteria across, every rating in words', async ({
+  test("opens on the election's summary: every rating as an icon, its words for screen readers and in the legend below (PLAN R218)", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -56,7 +57,10 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
       'Elecciones generales de ejemplo',
     );
     await expect(
-      page.getByText('¿Cumple cada partido las demandas de Organización de ejemplo A?'),
+      page.getByRole('heading', {
+        level: 2,
+        name: '¿Cumple cada partido las demandas de Organización de ejemplo A?',
+      }),
     ).toBeVisible();
     const table = page.getByRole('table');
     await expect(table.getByRole('columnheader')).toHaveText([
@@ -79,7 +83,52 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     expect(logo.headers['content-type']).toBe('image/png');
     // A made-up hash is no logo.
     expect((await get(`${SITE}/brand/${'0'.repeat(64)}.png`)).status).toBe(404);
-    // The one published cell, and the pending others: icon, words and colour, never colour alone.
+    // The one published cell, and the pending others: each an icon, its words its link's name and its tooltip, and
+    // the legend right under the table giving every icon's words (BRIEF §6).
+    const cells = table.getByRole('cell').getByRole('link');
+    await expect(cells).toHaveCount(4);
+    for (const [index, name] of [
+      es.rating.meets,
+      es.cell.pending,
+      es.cell.pending,
+      es.cell.pending,
+    ].entries()) {
+      await expect(cells.nth(index)).toHaveAccessibleName(name);
+    }
+    await expect(cells.first()).toHaveAttribute('title', `PEA · Ejemplo 1: ${es.rating.meets}`);
+    await expect(cells.first().locator('svg')).toHaveCount(1);
+    const legend = page.getByRole('region', { name: es.election.legend });
+    await expect(legend.getByRole('listitem')).toContainText([es.rating.meets, es.cell.pending]);
+    await expect(page.locator('[data-invariant="methodology-link"]')).toHaveAttribute(
+      'href',
+      '/ejemplo-a/generales-de-ejemplo/metodologia',
+    );
+    await expectAccessible(page);
+    // On to the detailed table.
+    await page.getByRole('link', { name: es.election.summary.tableLink }).click();
+    await expect(page).toHaveURL(`${ELECTION}/tabla`);
+  });
+
+  test('shows the detailed table on a desktop: every rating in words, and no legend to say them again', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${ELECTION}/tabla`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(es.election.table.title);
+    await expect(
+      page.getByText('¿Cumple cada partido las demandas de Organización de ejemplo A?'),
+    ).toBeVisible();
+    // Back to the election's summary.
+    await expect(
+      page.getByRole('navigation', { name: es.election.breadcrumb }).getByRole('link'),
+    ).toHaveText(['Elecciones generales de ejemplo']);
+    const table = page.getByRole('table');
+    await expect(table.getByRole('columnheader')).toHaveText([
+      es.election.party,
+      'Ejemplo 1',
+      'Ejemplo 2',
+    ]);
+    // Icon, words and colour, never colour alone.
     const cells = table.getByRole('cell');
     await expect(cells).toHaveText([
       es.rating.meets,
@@ -88,6 +137,7 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
       es.cell.pending,
     ]);
     await expect(cells.first().locator('svg')).toHaveCount(1);
+    await expect(page.getByRole('region', { name: es.election.legend })).toHaveCount(0);
     await expect(page.locator('[data-invariant="methodology-link"]')).toHaveAttribute(
       'href',
       '/ejemplo-a/generales-de-ejemplo/metodologia',
@@ -103,11 +153,11 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
       javaScriptEnabled: false,
     });
     const page = await context.newPage();
-    await page.goto(ELECTION);
+    await page.goto(`${ELECTION}/tabla`);
     await expect(page.getByRole('table')).toBeHidden();
     await expect(page.getByRole('heading', { level: 2, name: 'Partido Ejemplo A' })).toBeVisible();
     await page.getByRole('link', { name: es.election.byCriterion }).click();
-    await expect(page).toHaveURL(`${ELECTION}?vista=criterios`);
+    await expect(page).toHaveURL(`${ELECTION}/tabla?vista=criterios`);
     await expect(
       page.getByRole('heading', { level: 2, name: 'Criterio de ejemplo 1' }),
     ).toBeVisible();
@@ -115,6 +165,9 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
       'aria-current',
       'page',
     );
+    // The summary, on a phone too: its table scrolls inside its own region.
+    await page.goto(ELECTION);
+    await expect(page.getByRole('region', { name: es.election.summary.region })).toBeVisible();
     await context.close();
   });
 
@@ -174,7 +227,7 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     page,
   }) => {
     // The corrections log and the report form are the election's pages too, though no scorecard: the operator line,
-    // and the methodology in the footer, but no legend of their own.
+    // and the methodology in the footer, but no link of their own beside their content.
     const paths = [
       '/aviso-legal',
       '/privacidad',

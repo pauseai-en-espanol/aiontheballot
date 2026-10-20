@@ -9,7 +9,7 @@ import type { LoadedElectionPage } from '../election-page';
 import { localText } from '../local-text';
 import { sharedUrl, shareLinks } from '../share-links';
 import { pageCanonical } from '../site';
-import { focusRing, pageTitle } from '../styles';
+import { focusRing, pageTitleText } from '../styles';
 import { PageViews } from './page-views';
 import { SharePanel } from './share-panel';
 import { SiteFrame } from './site-frame';
@@ -101,47 +101,62 @@ export const ElectionFrame = ({
           </ol>
         </nav>
       )}
-      <h1 className={pageTitle}>{title}</h1>
-      {subtitle}
-      {share && (
-        <SharePanel
-          links={shareLinks({ url: sharedUrl(url, share.preview.path), text: share.text })}
-          url={sharedUrl(url, share.preview.path)}
-          text={share.text}
-          image={{
-            alt: share.image.alt,
-            downloads: share.image.downloads.map(({ size, href }) => ({
-              size,
-              href,
-              fileName: `${[
-                page.slug,
-                election.slug,
-                ...(share.image.table ? ['table'] : shareFileWords(target)),
-              ].join('-')}-${size}.png`,
-            })),
-          }}
-          words={{
-            button: t('share.panel.button'),
-            image: t('share.panel.image'),
-            imageLead: t('share.panel.imageLead'),
-            sizes: {
-              '1080x1080': t('share.download.1080x1080'),
-              '1080x1350': t('share.download.1080x1350'),
-              '1080x1920': t('share.download.1080x1920'),
-            },
-            shareImage: t('share.panel.shareImage'),
-            download: t('share.panel.download'),
-            imageFailed: t('share.panel.imageFailed'),
-            link: t('share.panel.link'),
-            email: t('share.links.email'),
-            native: t('share.links.native'),
-            copy: t('share.links.copy'),
-            copied: t('share.links.copied'),
-            copyFailed: t('share.links.copyFailed'),
-            newTab: t('share.links.newTab'),
-          }}
-        />
-      )}
+      {/* The title and its line, and beside them on a wide screen the page's one share button (PLAN R218). */}
+      <div
+        className={css({
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: '16px 32px',
+          marginBottom: '40px',
+        })}
+      >
+        <div className={css({ display: 'grid', gap: '12px', flex: '1 1 30rem', minWidth: '0' })}>
+          <h1 className={pageTitleText}>{title}</h1>
+          {subtitle}
+        </div>
+        {share && (
+          <SharePanel
+            links={shareLinks({ url: sharedUrl(url, share.preview.path), text: share.text })}
+            url={sharedUrl(url, share.preview.path)}
+            text={share.text}
+            image={{
+              alt: share.image.alt,
+              downloads: share.image.downloads.map(({ size, href }) => ({
+                size,
+                href,
+                fileName: `${[
+                  page.slug,
+                  election.slug,
+                  ...(share.image.table ? ['table'] : shareFileWords(target)),
+                ].join('-')}-${size}.png`,
+              })),
+            }}
+            words={{
+              button: t('share.panel.button'),
+              image: t('share.panel.image'),
+              imageLead: t('share.panel.imageLead'),
+              sizes: {
+                '1080x1080': t('share.download.1080x1080'),
+                '1080x1350': t('share.download.1080x1350'),
+                '1080x1920': t('share.download.1080x1920'),
+              },
+              shareImage: t('share.panel.shareImage'),
+              download: t('share.panel.download'),
+              imageFailed: t('share.panel.imageFailed'),
+              link: t('share.panel.link'),
+              email: t('share.links.email'),
+              native: t('share.links.native'),
+              copy: t('share.links.copy'),
+              copied: t('share.links.copied'),
+              copyFailed: t('share.links.copyFailed'),
+              newTab: t('share.links.newTab'),
+              close: t('share.panel.close'),
+            }}
+          />
+        )}
+      </div>
       {children}
       {target.page !== 'report' && (
         <p className={css({ marginTop: '40px', fontSize: '17px' })}>

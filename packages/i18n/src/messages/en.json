@@ -28,7 +28,8 @@
     "withdrawn": "Rating withdrawn"
   },
   "party": {
-    "programmePending": "Programme not yet published (checked on {checkedAt, date, long})"
+    "programmePending": "Programme not yet published (checked on {checkedAt, date, long})",
+    "programmePendingShort": "Programme not yet published"
   },
   "home": {
     "comingSoon": "Coming soon",
@@ -1699,7 +1700,15 @@
     "view": "Show the ratings",
     "noParties": "No parties yet.",
     "noCriteria": "No criteria yet.",
-    "breadcrumb": "You are here"
+    "breadcrumb": "You are here",
+    "summary": {
+      "region": "The summary table, which scrolls sideways",
+      "cellTitle": "{party} · {criterion}: {rating}",
+      "tableLink": "See every rating in words"
+    },
+    "table": {
+      "title": "The detailed table"
+    }
   },
   "partyPage": {
     "website": "Website",
@@ -1786,7 +1795,8 @@
       "shareImage": "Share the image",
       "download": "Download",
       "imageFailed": "The image couldn’t be passed to another app: download it and post it from there.",
-      "link": "The link"
+      "link": "The link",
+      "close": "Close"
     }
   },
   "reportPage": {

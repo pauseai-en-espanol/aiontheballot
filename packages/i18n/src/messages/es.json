@@ -28,7 +28,8 @@
     "withdrawn": "Valoración retirada"
   },
   "party": {
-    "programmePending": "Programa aún no publicado (comprobado el {checkedAt, date, long})"
+    "programmePending": "Programa aún no publicado (comprobado el {checkedAt, date, long})",
+    "programmePendingShort": "Programa aún no publicado"
   },
   "home": {
     "comingSoon": "Próximamente",
@@ -1699,7 +1700,15 @@
     "view": "Ver las valoraciones",
     "noParties": "Aún no hay partidos.",
     "noCriteria": "Aún no hay criterios.",
-    "breadcrumb": "Estás aquí"
+    "breadcrumb": "Estás aquí",
+    "summary": {
+      "region": "La tabla resumen, que se desplaza en horizontal",
+      "cellTitle": "{party} · {criterion}: {rating}",
+      "tableLink": "Ver cada valoración en palabras"
+    },
+    "table": {
+      "title": "La tabla detallada"
+    }
   },
   "partyPage": {
     "website": "Sitio web",
@@ -1786,7 +1795,8 @@
       "shareImage": "Compartir la imagen",
       "download": "Descargar",
       "imageFailed": "No se pudo pasar la imagen a otra aplicación: descárgala y súbela desde allí.",
-      "link": "El enlace"
+      "link": "El enlace",
+      "close": "Cerrar"
     }
   },
   "reportPage": {

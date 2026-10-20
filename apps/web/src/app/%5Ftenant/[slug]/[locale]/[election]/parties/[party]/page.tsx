@@ -8,10 +8,9 @@ import { ElectionFrame } from '@/components/election-frame';
 import { PartyMark, PartyName } from '@/components/party-identity';
 import { ProgrammeStatus } from '@/components/programme-status';
 import { RatingBadge } from '@/components/rating';
-import { RatingLegend } from '@/components/rating-legend';
+import { MethodologyLink } from '@/components/rating-legend';
 import { electionPageShare } from '@/election-images';
 import { type ElectionPageParams, loadElectionPage } from '@/election-page';
-import { methodologyOf } from '@/election-view';
 import { localText } from '@/local-text';
 import { pageMetadata } from '@/page-metadata';
 import { ratingLabel } from '@/rating-label';
@@ -83,11 +82,12 @@ const Party = async (props: PartyProps) => {
           </a>
         </p>
       )}
-      <RatingLegend
-        locale={locale}
-        kind={methodologyOf(page.election, page.page.home.tenant.methodologyKind).kind}
-        methodologyHref={href({ page: 'methodology', election: election.slug })}
-      />
+      <p className={css({ marginBlock: '20px 32px', fontSize: '16px' })}>
+        <MethodologyLink
+          locale={locale}
+          href={href({ page: 'methodology', election: election.slug })}
+        />
+      </p>
       <h2 className={css({ fontSize: '24px', fontWeight: '700', marginBottom: '12px' })}>
         {t('partyPage.ratings')}
       </h2>

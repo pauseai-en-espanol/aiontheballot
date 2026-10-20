@@ -49,6 +49,7 @@ describe('sitePath', () => {
     [{ page: 'confirm' } as const, '/avisos/confirmar', '/updates/confirm'],
     [{ page: 'unsubscribe' } as const, '/avisos/baja', '/updates/unsubscribe'],
     [{ page: 'election', election: 'e' } as const, '/e', '/e'],
+    [{ page: 'table', election: 'e' } as const, '/e/tabla', '/e/table'],
     [{ page: 'methodology', election: 'e' } as const, '/e/metodologia', '/e/methodology'],
     [{ page: 'party', election: 'e', party: 'p' } as const, '/e/partidos/p', '/e/parties/p'],
     [
@@ -73,6 +74,7 @@ describe('sitePath', () => {
     for (const target of [
       { page: 'legalNotice' },
       { page: 'confirm' },
+      { page: 'table', election: 'e' },
       { page: 'cell', election: 'e', party: 'p', criterion: 'c' },
       { page: 'criterion', election: 'e', criterion: 'c' },
       { page: 'report', election: 'e' },
@@ -93,6 +95,7 @@ describe('toInternalPath', () => {
     ['/avisos/otra-cosa', '/updates/otra-cosa'],
     ['/generales-2026', '/generales-2026'],
     ['/generales-2026/metodologia', '/generales-2026/methodology'],
+    ['/generales-2026/tabla', '/generales-2026/table'],
     ['/generales-2026/partidos/p/c', '/generales-2026/parties/p/c'],
     ['/generales-2026/informar/enviar', '/generales-2026/report/send'],
     ['/brand/icon/32.abc.png', '/brand/icon/32.abc.png'],
@@ -110,6 +113,7 @@ describe('toInternalPath', () => {
     '/avisos/confirm',
     '/e/parties/p',
     '/e/methodology',
+    '/e/table',
     '/e/report',
     '/e/informar/send',
     '/e/corrections',

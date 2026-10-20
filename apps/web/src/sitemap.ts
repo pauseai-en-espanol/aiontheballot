@@ -17,7 +17,10 @@ const escapeXml = (value: string): string =>
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
 
-/** Every page of an election (public-site spec §8): the scorecard, the methodology, each party, criterion and cell. */
+/**
+ * Every page of an election (public-site spec §8): its summary and detailed table, the methodology, each party,
+ * criterion and cell.
+ */
 export const electionEntries = (election: PublicElection): SitemapEntry[] => {
   const { parties, criteria, cells } = election;
   const latest = (partyId?: string, criterionId?: string) =>
@@ -33,6 +36,7 @@ export const electionEntries = (election: PublicElection): SitemapEntry[] => {
   const slug = election.election.slug;
   return [
     { target: { page: 'election', election: slug }, lastModified: latest() },
+    { target: { page: 'table', election: slug }, lastModified: latest() },
     { target: { page: 'methodology', election: slug } },
     // Its lastModified is its newest entry's, if any.
     {

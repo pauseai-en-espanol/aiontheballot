@@ -64,13 +64,14 @@ page keeps one address.
 
 ### 3.1 Election pages (open and preview)
 
-| Page        | Path (`es`)                                | Path (`en`)                               |
-| ----------- | ------------------------------------------ | ----------------------------------------- |
-| Scorecard   | `/{election}`                              | `/{election}`                             |
-| Party       | `/{election}/partidos/{party}`             | `/{election}/parties/{party}`             |
-| Cell        | `/{election}/partidos/{party}/{criterion}` | `/{election}/parties/{party}/{criterion}` |
-| Criterion   | `/{election}/criterios/{criterion}`        | `/{election}/criteria/{criterion}`        |
-| Methodology | `/{election}/metodologia`                  | `/{election}/methodology`                 |
+| Page           | Path (`es`)                                | Path (`en`)                               |
+| -------------- | ------------------------------------------ | ----------------------------------------- |
+| Scorecard      | `/{election}`                              | `/{election}`                             |
+| Detailed table | `/{election}/tabla`                        | `/{election}/table`                       |
+| Party          | `/{election}/partidos/{party}`             | `/{election}/parties/{party}`             |
+| Cell           | `/{election}/partidos/{party}/{criterion}` | `/{election}/parties/{party}/{criterion}` |
+| Criterion      | `/{election}/criterios/{criterion}`        | `/{election}/criteria/{criterion}`        |
+| Methodology    | `/{election}/metodologia`                  | `/{election}/methodology`                 |
 
 The words under an election can't collide with anything, since parties and criteria sit under their own word.
 
@@ -110,9 +111,11 @@ Every page, in every mode, renders in one layout that no tenant setting can chan
 - a header with the tenant's name (and its operator mark, when uploaded), linking to the home;
 - a footer with **"Una iniciativa de {operator}"** linking to the operator's site (BRIEF invariant 1), in words or
   with the operator's logo; links to the legal notice, the privacy policy (when published) and about the operator;
-  and, on election pages, the methodology;
-- on every scorecard, party, criterion and cell page, **a link to the election's methodology** next to the rating
-  legend (invariant 2);
+  and, on election pages, the methodology; a band of its own (PLAN R218), set off by a rule, the operator on one side
+  and the links on the other, the languages under both;
+- on every scorecard, detailed table, party, criterion and cell page, **a link to the election's methodology**
+  (invariant 2): beside the rating legend on the scorecard, on its own on the pages whose ratings show their words
+  (PLAN R218);
 - a language switch when the tenant has more than one locale, each language named in itself, linking to the same
   page in that locale.
 
@@ -134,7 +137,10 @@ its logo where the name is an underlined link, so it never reads as a second und
 Shared by all of them:
 
 - **Rating legend:** each rating of the methodology's kind, with its icon, its words and its colour, plus _pending_.
-  Icons come from `packages/ui` (fixed rating visuals); colours pass the contrast test against their background.
+  Icons come from `packages/ui` (fixed rating visuals); colours pass the contrast test against their background. Only
+  the scorecard, whose summary draws ratings as icons alone, shows it, right under the summary (PLAN R218): on the
+  detailed table and the party, criterion and cell pages every rating shows its words beside its icon, where a
+  legend would only say them again.
 - **A cell's display states,** from the public data (data model §3.6, ADR-0002 "Pending is not not mentioned"):
   - _rated_: its current revision has a rating;
   - _pending_ (provisional "Pendiente de evaluar"): no published revision; shown with its own neutral icon (three
@@ -152,23 +158,37 @@ Shared by all of them:
 - **A party's programme status:** "Programa aún no publicado (comprobado el {date})" while pending, with the date of
   the last check; nothing while published (its sources show on cells). A status never set shows nothing.
 
-### 5.1 Scorecard
+### 5.1 Scorecard and detailed table
 
-- **Desktop (≥ 1024 px, Panda's `lg`):** a table, parties down the side and criteria across the top, always (PLAN,
-  Answered: scorecard orientation). Criteria headers use the short title and link to the criterion page; party headers
-  show the party's mark (§4), the short name (the full name in an `abbr` title and, after it, in text only screen
-  readers read) and the programme status, and link to the party page. Each cell is a link to the cell page with the
-  rating's icon and words, the icon above the words so a column takes a short label's width (PLAN R215). When the table
-  is wider than the text's column, it widens past it, centred on it, up to the window less its margins (10 criteria
-  fit from about 1,280 px); only past that does the party column stay fixed and the table scroll sideways inside its
-  own region (with a visible focus and a label), never the page. It is a real `<table>`, with `<th scope>` headers
-  and a caption.
-- **Mobile:** one card per party, in the parties' order, each listing every criterion with the party's rating, and a
-  second view, one card per criterion listing every party. Both are server-rendered; a two-link switch above them
-  picks one (`?vista=criterios`, plain links, so it works without scripts; the canonical address has no query).
-- Above the table: the election's name and date, the legend with the methodology link, and the date of the latest
-  change on the page.
-- With no criteria or no parties yet, the page says so in words rather than drawing an empty table.
+The election's own page opens on its summary (PLAN R218, after the chapter's first look at the demo, which asked for
+an introductory page with a summary table and a link to the details); the table with every rating in words is a page
+of its own.
+
+- **Scorecard** (`/{election}`): the election's name and date, the share button beside them; the editors'
+  introduction when they wrote one (`elections.intro`, Markdown, sanitized as the methodology's body, in its own
+  `lang`); the question its ratings answer and the date of the latest change; then the **summary**: parties down the
+  side and criteria across the top (always), each cell the rating's icon alone, so a whole election fits one screen.
+  Criteria headers are their short titles, upright, read from the bottom up, wrapping onto a second line rather than
+  ever being cut, each a link to the criterion page; party headers show the party's mark (§4) and short name (the full
+  name in an `abbr` title and in text only screen readers read), linking to the party page, and under it, while its
+  programme isn't published, "Programa aún no publicado" (the full status, with its date, as its tooltip), which says
+  why its row is pending. Each cell links to its
+  page, its rating's words its link's name and its tooltip ("PEA · Criterio: Cumple"). The legend, with the
+  methodology link, is right under it. On a phone the summary scrolls sideways inside its own region (with a visible
+  focus and a label), the party column fixed, never the page. A real `<table>`, with `<th scope>` headers and a
+  caption for screen readers. Below, a link to the detailed table.
+- **Detailed table** (`/{election}/tabla`), the scorecard's earlier page: a breadcrumb back to the election, the
+  question, the date of the latest change and the methodology link, and no legend. On a desktop (≥ 1024 px, Panda's
+  `lg`), a table, parties down the side and criteria across the top, always (PLAN, Answered: scorecard orientation).
+  Party headers also show the programme status. Each cell is a link to the cell page with the rating's icon and words,
+  the icon above the words so a column takes a short label's width (PLAN R215). When the table is wider than the
+  text's column, it widens past it, centred on it, up to the window less its margins (10 criteria fit from about
+  1,280 px); only past that does the party column stay fixed and the table scroll sideways inside its own region,
+  never the page. On a phone, one card per party, in the parties' order, each listing every criterion with the party's
+  rating, and a second view, one card per criterion listing every party. Both are server-rendered; a two-link switch
+  above them picks one (`?vista=criterios`, plain links, so it works without scripts; the canonical address has no
+  query). It shares the scorecard's images.
+- With no criteria or no parties yet, both say so in words rather than drawing an empty table.
 
 ### 5.2 Party, criterion and cell pages
 
@@ -203,15 +223,17 @@ serves none. When the web app's copy of an election changes, it renders the link
 changed; a page renders its own when it is served. The whole table (`/{election}/og/table/…`) is never a page's link
 preview: it comes only in the shapes people post.
 
-Below the title of every election page with a card, **one "Compartir" button** (PLAN R185): a disclosure that needs
-no script, opening a panel. First the data image: the page's own card, the whole table on the scorecard, in the
-square, portrait and story shapes, a thumbnail beside them; each downloadable, and where the device can take a file
-(phones), "Compartir la imagen", which hands the picture itself to its apps. Then the link (PLAN R177): "copy the link"
-and the device's share sheet where the browser has them, then WhatsApp, Telegram, X, Facebook, Bluesky, LinkedIn and
-email, each a plain link to the network's own share address with the page's shared address and title, its icon
-beside its name. The shared address is the canonical one with the link preview's content hash as `v` (PLAN R215), so
-a network that keeps a link's preview fetches a fresh one once it changes. Nothing loads from any network until a link
-is followed.
+Beside the title of every election page with a card (below it on a phone), **one "Compartir" button** (PLAN R185, R218):
+it opens a dialog with no script (the `popover` attribute), centred over the dimmed page or, on a phone, a sheet up from
+the bottom edge; its close button, Escape or a click outside closes it, and its close button takes the focus when it
+opens, where scripts run. First the link, what most people send, whose preview is itself the page's data card (PLAN
+R177, R218): "copy the link" and the device's share sheet where the browser has them, then WhatsApp, Telegram, X,
+Facebook, Bluesky, LinkedIn and email, each a plain link to the network's own share address with the page's shared
+address and title, its icon beside its name. Then the data image: the page's own card, the whole table on the scorecard,
+in the square, portrait and story shapes, a thumbnail beside them; each downloadable, and where the device can take a
+file (phones), "Compartir la imagen", which hands the picture itself to its apps. The shared address is the canonical
+one with the link preview's content hash as `v` (PLAN R215), so a network that keeps a link's preview fetches a fresh
+one once it changes. Nothing loads from any network until a link is followed.
 
 ### 5.5 Report an error or reply (PLAN R149)
 

@@ -7,10 +7,9 @@ import { notFound } from 'next/navigation';
 import { ElectionFrame } from '@/components/election-frame';
 import { PartyMark } from '@/components/party-identity';
 import { RatingBadge } from '@/components/rating';
-import { RatingLegend } from '@/components/rating-legend';
+import { MethodologyLink } from '@/components/rating-legend';
 import { electionPageShare } from '@/election-images';
 import { type ElectionPageParams, loadElectionPage } from '@/election-page';
-import { methodologyOf } from '@/election-view';
 import { localText } from '@/local-text';
 import { pageMetadata } from '@/page-metadata';
 import { ratingLabel } from '@/rating-label';
@@ -67,11 +66,12 @@ const Criterion = async (props: CriterionProps) => {
       >
         {description.text}
       </p>
-      <RatingLegend
-        locale={locale}
-        kind={methodologyOf(page.election, page.page.home.tenant.methodologyKind).kind}
-        methodologyHref={href({ page: 'methodology', election: election.slug })}
-      />
+      <p className={css({ marginBlock: '20px 32px', fontSize: '16px' })}>
+        <MethodologyLink
+          locale={locale}
+          href={href({ page: 'methodology', election: election.slug })}
+        />
+      </p>
       <h2 className={css({ fontSize: '24px', fontWeight: '700', marginBottom: '12px' })}>
         {t('criterionPage.ratings')}
       </h2>

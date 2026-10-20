@@ -3167,6 +3167,32 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   list `election-intro` breaks each rule (two equivalents, each with its reason). Specs: data model, editorial
   workflow E1 and CR1, admin forms.
 
+- **R218. The election opens on its summary; sharing is a dialog.** Following the same first look (a summary table with
+  icons only and the legend below, an introductory page linking to the details), and Dani ("the compartir UX is not
+  great … a modal or something, improve in general the UX of the site/election"), who chose an intro page and a detail
+  page over one long page. The election's page now shows its name and date, the editors' intro (R217), the question with
+  the latest change, and the summary: every party's rating on every criterion as its icon alone, the criteria's short
+  titles upright over columns of 44 px (38 on a phone), so 17 criteria fit about 900 px; each cell links to its page,
+  its rating's words its link's name and tooltip; the legend and the methodology link right under it; then "Ver cada
+  valoración en palabras", to the detailed table, the earlier scorecard, at `/{election}/tabla` (`SITE_WORDS.table`,
+  `tabla`/`table`; in the sitemap; sharing the summary's images). On a phone the summary scrolls sideways in its own
+  region, the party column fixed, and the detailed table keeps its cards. The ratings' rule holds: a shape per rating,
+  its words in the legend beside it, for screen readers and on hover, and in full one click away. Dani also noted the
+  legend repeated what every cell of the detailed table already says: only the summary has it now; the detailed table,
+  party, criterion and cell pages keep the methodology link alone (BRIEF §3 invariant 2 is the link; the crawler still
+  checks it on every scorecard page), and the detailed table's caption, which repeated the question, is for screen
+  readers only. "Compartir" sits beside the title, a solid button opening a dialog by the `popover` attribute, so it
+  needs no script: centred over the dimmed page, a sheet from the bottom edge on a phone, closed by its button, Escape
+  or a click outside. Asked to decide as a product owner would, Claude put the link first and the image second,
+  reversing R185's order inside the panel: the link is what most people send (the chapter shares by WhatsApp), on a
+  phone the image pushed the networks below the fold, and the link's preview is itself the data card, so sharing stays
+  data first. The networks are even tiles. A party whose programme isn't published shows "Programa aún no publicado"
+  under its name in the summary (the full status, with its date, as the tooltip), so a row of pending icons says why.
+  The footer is a band of its own, the operator on one side and the links on the other. Not changed: the demo site's
+  green header, which is that site's own accent (data), orange on the production site; the number of criteria, the
+  chapter's to decide. E2e tests rewritten for the summary, the detailed table, the phone's cards at their new address
+  and the dialog (with scripts off too); specs: public site §3.1, §4, §5, §5.1 and §5.4.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

@@ -63,6 +63,8 @@ describe('electionEntries', () => {
     });
     expect(entries.map((entry) => entry.target.page)).toEqual([
       'election',
+      // Its detailed table (PLAN R218), as new as the summary.
+      'table',
       'methodology',
       'corrections',
       'party',

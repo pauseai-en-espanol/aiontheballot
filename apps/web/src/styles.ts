@@ -41,8 +41,11 @@ export const prose = css({
   '& code': { fontFamily: 'monospace' },
 });
 
-/** A page's title, in the site's display face. */
-export const pageTitle = cx(
+/** A page's title's letters, in the site's display face, for a title that sets its own spacing. */
+export const pageTitleText = cx(
   display,
-  css({ fontSize: 'clamp(36px, 5vw, 56px)', lineHeight: '1', marginBottom: '32px' }),
+  css({ fontSize: 'clamp(36px, 5vw, 56px)', lineHeight: '1' }),
 );
+
+/** A page's title, in the site's display face. */
+export const pageTitle = cx(pageTitleText, css({ marginBottom: '32px' }));

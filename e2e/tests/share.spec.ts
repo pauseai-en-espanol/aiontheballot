@@ -181,9 +181,19 @@ test.describe("tenants' own logos (fictional seeds)", () => {
 const PREVIEW_SITE = `${PREVIEW_URL}/ejemplo-a`;
 const ELECTION = '/generales-de-ejemplo';
 
+/** Opens the page's share dialog with its one button, as a person does, and returns it. */
+const openSharing = async (page: Page) => {
+  await page.getByRole('button', { name: messages.es.share.panel.button }).click();
+  const dialog = page.getByRole('dialog', { name: messages.es.share.panel.button });
+  await expect(dialog).toBeVisible();
+  return dialog;
+};
+
 /** Each election page with a card of its own, and the image path its card lives at (R148). */
 const VIEWS = [
   { page: '', image: 'overview' },
+  // The detailed table shares the summary's image (PLAN R218).
+  { page: '/tabla', image: 'overview' },
   { page: '/metodologia', image: 'methodology' },
   { page: '/correcciones', image: 'corrections' },
   { page: '/partidos/partido-ejemplo-a', image: 'party/partido-ejemplo-a' },
@@ -216,11 +226,10 @@ test.describe("election pages' own share images (R148)", () => {
       expect(pngSize(preview.body)).toEqual({ width: 1200, height: 630 });
       expect(preview.body.byteLength).toBeLessThan(300 * 1024);
 
-      // The share panel (PLAN R185): one button, a disclosure that needs no script, opening on the data image first,
-      // in the three shapes people post, each a PNG of its size on this host; on the scorecard, the whole table.
-      const panel = page.locator('h1 ~ details[data-share-panel]');
-      await expect(panel).toHaveCount(1);
-      await panel.locator('summary').click();
+      // The share panel (PLAN R185, R218): one button, opening a dialog that needs no script; its data image in the
+      // three shapes people post, each a PNG of its size on this host; on the scorecard, the whole table.
+      await expect(page.locator('[data-share-panel]')).toHaveCount(1);
+      const panel = await openSharing(page);
       const posted = panel.getByRole('group', { name: messages.es.share.panel.image });
       const downloads = posted.getByRole('link');
       await expect(downloads).toHaveCount(3);
@@ -243,8 +252,10 @@ test.describe("election pages' own share images (R148)", () => {
         expect(file.headers['content-type']).toBe('image/png');
         expect(pngSize(file.body)).toEqual({ width, height });
       }
-      // Its link second.
-      await expect(panel.getByRole('group', { name: messages.es.share.panel.link })).toBeVisible();
+      // Its link too, first (PLAN R218): what most people send.
+      const groups = panel.getByRole('group');
+      await expect(groups.first()).toHaveAccessibleName(messages.es.share.panel.link);
+      await expect(groups.nth(1)).toHaveAccessibleName(messages.es.share.panel.image);
       if (view.image === 'overview') {
         // The whole table is never a link preview: too low for it.
         const low = await get(`${PREVIEW_SITE}${ELECTION}/og/table/1200x630.000000000000.png`);
@@ -271,9 +282,8 @@ test.describe("election pages' own share images (R148)", () => {
       const text = encodeURIComponent(title);
       const address = encodeURIComponent(url);
 
-      // In the one share panel below the title, before the page's content (PLAN R185).
-      const panel = page.locator('h1 ~ details[data-share-panel]');
-      await panel.locator('summary').click();
+      // In the one share dialog beside the title, before the page's content (PLAN R185, R218).
+      const panel = await openSharing(page);
       const bar = panel.getByRole('group', { name: messages.es.share.panel.link });
       await expect(bar).toBeVisible();
       const href = async (network: string) =>
@@ -316,8 +326,7 @@ test.describe("election pages' own share images (R148)", () => {
   test("copy the page's shared address, and say so (R215)", async ({ context, page }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.goto(`${PREVIEW_SITE}${ELECTION}/partidos/partido-ejemplo-a`);
-    const panel = page.locator('details[data-share-panel]');
-    await panel.locator('summary').click();
+    const panel = await openSharing(page);
     await panel.getByRole('button', { name: messages.es.share.links.copy }).click();
     await expect(panel.getByRole('status')).toHaveText(messages.es.share.links.copied);
     // The canonical address with its preview's hash: the same address its link preview names (og:url).
@@ -334,6 +343,22 @@ test.describe("election pages' own share images (R148)", () => {
     const html = (await get(`${PREVIEW_SITE}${ELECTION}`)).body.toString();
     expect(html).toContain('data-share-panel');
     expect(html).toContain(`href="https://wa.me/?text=`);
+  });
+
+  test('open and close as a dialog without scripts: its button, Escape or its own close button (PLAN R218)', async ({
+    newContext,
+  }) => {
+    const context = await newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto(`${PREVIEW_SITE}${ELECTION}`);
+    const dialog = await openSharing(page);
+    await expect(dialog.getByRole('link', { name: /^WhatsApp/ })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await openSharing(page);
+    await dialog.getByRole('button', { name: messages.es.share.panel.close }).click();
+    await expect(dialog).toBeHidden();
+    await context.close();
   });
 
   test("a cell's card says its rating in words for those who can't see it", async ({ page }) => {

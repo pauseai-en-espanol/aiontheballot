@@ -57,3 +57,18 @@ export const RatingLegend = ({
     </section>
   );
 };
+
+/**
+ * The link to the election's methodology on its own (BRIEF §3 invariant 2), on the pages whose every rating shows its
+ * words beside its icon, where a legend would only say them again (PLAN R218): the detailed table, a party's, a
+ * criterion's and a cell's pages. Only the summary, whose ratings are icons alone, has the legend.
+ */
+export const MethodologyLink = ({ locale, href }: { locale: Locale; href: string }) => (
+  <a
+    href={href}
+    data-invariant="methodology-link"
+    className={`${focusRing} ${css({ textDecoration: 'underline', textUnderlineOffset: '3px', fontWeight: '700' })}`}
+  >
+    {getTranslator(locale)('election.methodologyLink')}
+  </a>
+);
