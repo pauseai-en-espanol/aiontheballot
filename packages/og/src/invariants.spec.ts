@@ -1,9 +1,13 @@
+import type { RatingDisplay } from '@aiontheballot/ui/ratings';
+
 import { describe, expect, it } from 'vitest';
 
+import { tableCard } from './data-cards.js';
 import { PROBES } from './probes.js';
 import { renderPng, renderSvg } from './render.js';
 import { SHARE_SIZES, type ShareSize } from './sizes.js';
 import { TEMPLATE_NAMES } from './templates.js';
+import { DEFAULT_CARD_THEME } from './theme.js';
 
 const SIZES = Object.keys(SHARE_SIZES) as ShareSize[];
 
@@ -66,5 +70,78 @@ describe('a rating on a card', () => {
     const party = PROBES.party.find(({ id }) => id === 'many-logos');
     const text = svgText(await renderSvg(party!.node('1200x630'), '1200x630', { text: true }));
     expect(text).toMatch(/y \d+ más en la web/);
+  });
+});
+
+/** The probes' words for each display state. */
+const WORDS: Partial<Record<RatingDisplay, string>> = {
+  meets: 'Cumple',
+  partially_meets: 'Cumple parcialmente',
+  does_not_meet: 'No cumple',
+  not_mentioned: 'No lo menciona',
+  pending: 'Pendiente de evaluar',
+  withdrawn: 'Valoración retirada',
+};
+const STATES = Object.keys(WORDS) as RatingDisplay[];
+
+/** The whole table of so many parties and criteria, every state in turn, with names and titles too short to cut. */
+const wholeTable = (parties: number, criteria: number, size: ShareSize) =>
+  tableCard(
+    {
+      theme: DEFAULT_CARD_THEME,
+      site: 'Inquilino de ejemplo A',
+      election: 'Elecciones de ejemplo',
+      address: 'ejemplo-a.example.test',
+      methodology: 'Metodología: ejemplo-a.example.test/x',
+      initiative: 'Una iniciativa de Organización de ejemplo A',
+      initiativeLead: 'Una iniciativa de',
+      dataDate: 'Datos del 1 de enero',
+      title: '¿Cumplen los partidos de ejemplo?',
+      subtitle: 'Elecciones de ejemplo',
+      parties: Array.from({ length: parties }, (_, i) => {
+        const short = `PE${String.fromCharCode(65 + i)}`;
+        return { short, name: short, colour: null };
+      }),
+      criteria: Array.from({ length: criteria }, (_, j) => `Ejemplo ${j + 1}`),
+      cells: Array.from({ length: parties }, (_, i) =>
+        Array.from({ length: criteria }, (__, j) => {
+          const rating = STATES[(i + j) % STATES.length] ?? 'pending';
+          return { rating, label: WORDS[rating] ?? '' };
+        }),
+      ),
+      legend: STATES.slice(0, 5).map((rating) => ({ rating, label: WORDS[rating] ?? '' })),
+    },
+    size,
+  );
+
+describe("the whole table's words", () => {
+  // Arturo, on the demo's table (11 parties, 10 criteria): it read "No lo" and "Cumple", cut (PLAN R216).
+  it.each([
+    [3, 4],
+    [5, 6],
+    [11, 10],
+    [11, 17],
+    [20, 12],
+  ])(
+    'are whole under each icon, or left to the legend, never cut: %i parties, %i criteria',
+    async (parties, criteria) => {
+      for (const size of SIZES) {
+        const text = svgText(
+          await renderSvg(wholeTable(parties, criteria, size), size, { text: true }),
+        );
+        expect(text, size).not.toContain('…');
+      }
+    },
+    30_000,
+  );
+
+  it('are written where they fit', async () => {
+    const text = svgText(
+      await renderSvg(wholeTable(3, 4, '1080x1350'), '1080x1350', { text: true }),
+    );
+    for (const words of ['No lo menciona', 'Cumple parcialmente', 'Pendiente de evaluar']) {
+      // A line break between two words leaves no space in the SVG's text.
+      expect(text).toMatch(new RegExp(words.replaceAll(' ', ' ?')));
+    }
   });
 });

@@ -417,11 +417,39 @@ const partyNames = (party: CardParty, font: number, withFull: boolean, theme: Ca
     font * 0.9,
   );
 
+/** Roboto Slab's characters average about 0.55 em, as DISPLAY_EM's note says: an estimate on the safe side. */
+const TEXT_EM = 0.55;
+/** The smallest icon above a rating's words, as a share of the words' size. */
+const MIN_ICON_WITH_WORDS = 1.6;
+
+/**
+ * How many lines `text` takes at `font` in `width`, broken at spaces as satori breaks it; `Infinity` when one of its
+ * words is wider than the width alone, which only an ellipsis would fit.
+ */
+const linesOf = (text: string, font: number, width: number): number => {
+  const perLine = Math.floor(width / (font * TEXT_EM));
+  let lines = 0;
+  let used = 0;
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (word.length > perLine) {
+      return Infinity;
+    }
+    if (lines === 0 || used + 1 + word.length > perLine) {
+      lines += 1;
+      used = word.length;
+    } else {
+      used += 1 + word.length;
+    }
+  }
+  return Math.max(1, lines);
+};
+
 /**
  * Parties down the side and criteria across (A and B): each party's mark and names, then a rating's icon per
- * criterion, and with `words`, its words under it where they fit. The criteria's short titles head their columns, or
- * their numbers where columns are narrow, the numbers then keyed below the table. Rows grow into the room, within
- * limits; past the smallest, with `more`, the parties that fit and "and # more".
+ * criterion, and with `words`, its words under it where every rating's words fit whole: never cut, else left to the
+ * legend (PLAN R216). The criteria's short titles head their columns, or their numbers where columns are narrow, the
+ * numbers then keyed below the table. Rows grow into the room, within limits; past the smallest, with `more`, the
+ * parties that fit and "and # more".
  */
 const ratingGrid = (
   parties: CardParty[],
@@ -456,7 +484,21 @@ const ratingGrid = (
   const keyHeight = across ? 0 : Math.round(l.small * 1.45 * 3 + l.small * 0.5);
   const rule = 1;
   const available = space.height - headHeight - legendHeight - keyHeight;
-  const maxRow = nameFont * (words ? 3.6 : 2.7);
+  // The words under each icon: at a size where every rating's longest word fits the column, on as many lines as the
+  // longest words need, or none (the legend gives them).
+  const wordWidth = columnWidth - 6;
+  const labels = [...new Set(cells.flat().map((cell) => cell.label ?? ''))].filter(Boolean);
+  const longestWord = Math.max(
+    1,
+    ...labels.flatMap((label) => label.split(/\s+/).map((word) => word.length)),
+  );
+  const wordFont = Math.floor(
+    Math.min(l.small, columnWidth / 6.5, wordWidth / (longestWord * TEXT_EM)),
+  );
+  const wordLines = Math.max(1, ...labels.map((label) => linesOf(label, wordFont, wordWidth)));
+  const wordsFit = words && labels.length > 0 && wordFont >= 11 && wordLines <= 3;
+  const wordsHeight = wordLines * wordFont * 1.1 + Math.round(wordFont * 0.25);
+  const maxRow = nameFont * (wordsFit ? 3.6 : 2.7);
   const minRow = nameFont * (more ? 1.5 : 1.05);
   let shown = parties.length;
   let rowHeight = Math.min(maxRow, available / Math.max(1, shown) - rule);
@@ -467,13 +509,11 @@ const ratingGrid = (
   }
   rowHeight = Math.max(8, Math.floor(rowHeight));
   const hidden = parties.length - shown;
-  const icon = Math.round(
-    Math.max(8, Math.min(rowHeight * (words ? 0.55 : 0.74), columnWidth * 0.72, nameFont * 2.3)),
-  );
-  const wordFont = Math.round(Math.min(l.small, columnWidth / 6.5));
-  // Two lines for the longer words ("Cumple parcialmente"), where the row has room for them.
-  const wordLines = rowHeight >= icon + wordFont * 2.6 ? 2 : 1;
-  const showWords = words && rowHeight >= icon + wordFont * 1.5 && wordFont >= 11;
+  const largest = Math.min(columnWidth * 0.72, nameFont * 2.3);
+  // Above the words, the icon takes what the row leaves them; the words only where that still reads as an icon.
+  const iconAbove = Math.min(rowHeight - wordsHeight - 4, largest);
+  const showWords = wordsFit && iconAbove >= wordFont * MIN_ICON_WITH_WORDS;
+  const icon = Math.round(Math.max(8, showWords ? iconAbove : Math.min(rowHeight * 0.74, largest)));
   const showFull = rowHeight >= nameFont * 1.85;
   const font = Math.round(Math.min(nameFont, rowHeight * 0.55));
 

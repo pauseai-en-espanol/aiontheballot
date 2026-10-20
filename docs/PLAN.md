@@ -3138,6 +3138,17 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   LinkedIn keep a preview by it; `rel=canonical` stays without, for search engines; the page answers the same with or
   without. Tests first for the shared address (unit, and the end-to-end checks that `v` is the image's hash).
 
+- **R216. The whole table's words are whole, or left to the legend.** The chapter's first look at the demo (11
+  parties, 10 criteria): the downloadable whole-table image read "No lo" and "Cumple", cut. The grid gave each
+  rating's words one line once rows were short, and clamped them with an ellipsis. Now the words take a size at which
+  every rating's longest word fits its column, on as many lines as the longest words need (up to three), and the icon
+  above them takes what the row leaves; where that size would be under 11 px, or the icon too small, the card draws
+  icons only and its legend gives the words, as the link preview already did. Never cut: a test draws the whole table
+  in five shapes (3×4 to 20×12, the demo's 11×10 and 11×17 among them) at every size and finds no ellipsis, and another
+  that the words are written where they fit. A probe of the demo's shape (`eleven`) joins the reference pictures; the
+  table's references were accepted again, the other templates' untouched. Tests first; the mutation list
+  `election-intro` clamps the words to one line again, and is caught.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

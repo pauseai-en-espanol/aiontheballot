@@ -508,6 +508,28 @@ export const PROBES: Readonly<Record<TemplateName, readonly Probe[]>> = {
         ),
     },
     {
+      // The demo's shape (PLAN R216): eleven parties and ten criteria, where the words no longer fit whole under
+      // their icons, so the legend gives them; never cut.
+      id: 'eleven',
+      node: (size) =>
+        tableCard(
+          {
+            ...DATA,
+            title: QUESTION,
+            subtitle: 'Elecciones de ejemplo · cada valoración, con sus citas en la web',
+            parties: MANY_PARTIES.slice(0, 11),
+            criteria: MANY_CRITERIA.slice(0, 10),
+            cells: labelled(
+              MANY_PARTIES.slice(0, 11).map((_, i) =>
+                MANY_CRITERIA.slice(0, 10).map((__, j) => DISPLAYS[(i + j) % 5] ?? 'pending'),
+              ),
+            ),
+            legend: LEGEND,
+          },
+          size,
+        ),
+    },
+    {
       // A crowded election: twenty parties and twelve criteria, numbered and keyed below.
       id: 'large',
       node: (size) =>
