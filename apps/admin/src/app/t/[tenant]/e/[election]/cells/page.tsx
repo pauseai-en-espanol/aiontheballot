@@ -108,6 +108,7 @@ const CellsPage = async ({ params }: CellsParams) => {
                         >
                           <span className={styles.gridCell}>
                             <RatingBadge rating={rating.rating} label={rating.label} />
+                            {/* Apart, as its name says them (WCAG 2.5.3); the layout ignores the space. */}{' '}
                             <span>{state}</span>
                           </span>
                         </Link>

@@ -3193,6 +3193,16 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   chapter's to decide. E2e tests rewritten for the summary, the detailed table, the phone's cards at their new address
   and the dialog (with scripts off too); specs: public site §3.1, §4, §5, §5.1 and §5.4.
 
+- **R219. The admin's buttons and links say their visible words in their names.** The dependency bump before R216
+  took `@axe-core/playwright` to 4.14, whose `label-content-name-mismatch` (WCAG 2.5.3, Label in Name) failed four
+  e2e tests on main: an accessible name must hold a control's visible words, in order. "Edit roles" was named "Edit
+  {name}'s roles", "Reset password" "Send {name} a password reset email", and a quote's "Save the times" "Times for
+  the quote: …"; now "Edit roles for {name}", "Reset password for {name}: send them an email" and "Save the times for
+  the quote: …" (and the same in Spanish), so a person who speaks to their screen reader can say what they see. The
+  cells grid's links held the right words, but the rating's and the state's spans touched, so their words ran
+  together; a space between them, which the flex layout ignores, keeps them apart. The e2e tests name the controls
+  from the same messages, so they follow.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,
