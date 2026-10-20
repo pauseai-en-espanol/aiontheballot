@@ -1,5 +1,28 @@
 # @aiontheballot/web
 
+## 0.21.0
+
+### Minor Changes
+
+- c7a7105: An election's page opens on its summary: the editors' introduction, every party's rating on every criterion as an
+  icon, the legend right under it, and a link to the detailed table, now at /{election}/tabla. Only the summary keeps the
+  legend; the pages whose ratings show their words keep the methodology link. A party whose programme isn't published
+  says so under its name in the summary. "Compartir" opens a dialog that needs no script, the link first and the image
+  second, and the footer is a band of its own.
+
+### Patch Changes
+
+- 9da550c: Dependencies bump: Node 26.12.0 (images on node:26.12.0-alpine) and pnpm 12.14.0.
+- 0894c19: The whole-table image never cuts a rating's words: they are written whole under each icon, on as many lines as the
+  longest words need, or left to the legend where they no longer fit, as on the demo's 11 parties and 10 criteria.
+- Updated dependencies [2e930bb]
+- Updated dependencies [bda934d]
+- Updated dependencies [c7a7105]
+- Updated dependencies [0894c19]
+  - @aiontheballot/i18n@0.30.0
+  - @aiontheballot/domain@0.15.0
+  - @aiontheballot/og@0.7.4
+
 ## 0.20.0
 
 ### Minor Changes

@@ -1,5 +1,16 @@
 # @aiontheballot/og
 
+## 0.7.4
+
+### Patch Changes
+
+- 0894c19: The whole-table image never cuts a rating's words: they are written whole under each icon, on as many lines as the
+  longest words need, or left to the legend where they no longer fit, as on the demo's 11 parties and 10 criteria.
+- Updated dependencies [bda934d]
+- Updated dependencies [c7a7105]
+  - @aiontheballot/domain@0.15.0
+  - @aiontheballot/ui@0.4.5
+
 ## 0.7.3
 
 ### Patch Changes

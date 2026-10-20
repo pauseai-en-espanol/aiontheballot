@@ -1,5 +1,23 @@
 # @aiontheballot/api
 
+## 0.32.0
+
+### Minor Changes
+
+- bda934d: An election has an optional introduction, Markdown per language, written by its editors on the election form and
+  shown above its summary; it needs the default language once in preview or live, and once live it changes only through
+  a change request. The public and preview roles read it by a column grant.
+
+### Patch Changes
+
+- 9da550c: Dependencies bump: Node 26.12.0 (images on node:26.12.0-alpine) and pnpm 12.14.0.
+- Updated dependencies [2e930bb]
+- Updated dependencies [bda934d]
+- Updated dependencies [c7a7105]
+  - @aiontheballot/i18n@0.30.0
+  - @aiontheballot/db@0.18.0
+  - @aiontheballot/domain@0.15.0
+
 ## 0.31.1
 
 ### Patch Changes

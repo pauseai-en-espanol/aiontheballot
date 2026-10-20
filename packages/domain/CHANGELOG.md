@@ -1,5 +1,18 @@
 # @aiontheballot/domain
 
+## 0.15.0
+
+### Minor Changes
+
+- bda934d: An election has an optional introduction, Markdown per language, written by its editors on the election form and
+  shown above its summary; it needs the default language once in preview or live, and once live it changes only through
+  a change request. The public and preview roles read it by a column grant.
+- c7a7105: An election's page opens on its summary: the editors' introduction, every party's rating on every criterion as an
+  icon, the legend right under it, and a link to the detailed table, now at /{election}/tabla. Only the summary keeps the
+  legend; the pages whose ratings show their words keep the methodology link. A party whose programme isn't published
+  says so under its name in the summary. "Compartir" opens a dialog that needs no script, the link first and the image
+  second, and the footer is a band of its own.
+
 ## 0.14.1
 
 ### Patch Changes
