@@ -132,7 +132,9 @@ const ElectionSummary = async (props: ElectionPageParams) => {
                 href: href({ page: 'party', election: slug, party: party.slug }),
                 short: text(party.shortName),
                 full: text(party.name),
-                mark: marked ? <PartyMark party={party} root={page.site.root} line /> : undefined,
+                // No colour line under it here: in a table this tight it reads as a second underline (R184's line
+                // stays on the party's page and in the detailed table).
+                mark: marked ? <PartyMark party={party} root={page.site.root} /> : undefined,
                 // Why its row is pending, while its programme isn't out (ProgrammeStatus says it in full elsewhere).
                 note:
                   party.programmeStatus === 'pending' && party.programmeCheckedAt

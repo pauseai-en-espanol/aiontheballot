@@ -164,19 +164,20 @@ The election's own page opens on its summary (PLAN R218, after the chapter's fir
 an introductory page with a summary table and a link to the details); the table with every rating in words is a page
 of its own.
 
-- **Scorecard** (`/{election}`): the election's name and date, the share button beside them; the editors'
-  introduction when they wrote one (`elections.intro`, Markdown, sanitized as the methodology's body, in its own
-  `lang`); the question its ratings answer and the date of the latest change; then the **summary**: parties down the
-  side and criteria across the top (always), each cell the rating's icon alone, so a whole election fits one screen.
-  Criteria headers are their short titles, upright, read from the bottom up, wrapping onto a second line rather than
-  ever being cut, each a link to the criterion page; party headers show the party's mark (§4) and short name (the full
-  name in an `abbr` title and in text only screen readers read), linking to the party page, and under it, while its
-  programme isn't published, "Programa aún no publicado" (the full status, with its date, as its tooltip), which says
-  why its row is pending. Each cell links to its
-  page, its rating's words its link's name and its tooltip ("PEA · Criterio: Cumple"). The legend, with the
-  methodology link, is right under it. On a phone the summary scrolls sideways inside its own region (with a visible
-  focus and a label), the party column fixed, never the page. A real `<table>`, with `<th scope>` headers and a
-  caption for screen readers. Below, a link to the detailed table.
+- **Scorecard** (`/{election}`): the election's name and date, the share button beside them; the editors' introduction
+  when they wrote one (`elections.intro`, Markdown, sanitized as the methodology's body, in its own `lang`); the
+  question its ratings answer and the date of the latest change; then the **summary**: parties down the side and
+  criteria across the top (always), each cell the rating's icon alone, so a whole election fits one screen. Criteria
+  headers are their short titles, upright, read from the bottom up, wrapping onto a second line rather than ever being
+  cut, each a link to the criterion page; party headers show the party's mark (§4) and short name (the full name in an
+  `abbr` title and in text only screen readers read), linking to the party page, and under it, while its programme isn't
+  published, "Programa aún no publicado" (the full status, with its date, as its tooltip), which says why its row is
+  pending. Each cell links to its page, its rating's words its link's name and its tooltip ("PEA · Criterio: Cumple"), a
+  ring around its icon under the pointer or the keyboard. The legend, with the methodology link, is right under it. On a
+  wide screen (`lg`) the summary takes the text column's width, its columns shared out evenly, each title over the
+  middle of its icons, and its parties' marks go without their colour line (PLAN R220). On a phone it scrolls sideways
+  inside its own region (with a visible focus and a label), the party column fixed, never the page. A real `<table>`,
+  with `<th scope>` headers and a caption for screen readers. Below, a link to the detailed table.
 - **Detailed table** (`/{election}/tabla`), the scorecard's earlier page: a breadcrumb back to the election, the
   question, the date of the latest change and the methodology link, and no legend. On a desktop (≥ 1024 px, Panda's
   `lg`), a table, parties down the side and criteria across the top, always (PLAN, Answered: scorecard orientation).

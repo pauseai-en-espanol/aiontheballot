@@ -3203,6 +3203,16 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   together; a space between them, which the flex layout ignores, keeps them apart. The e2e tests name the controls
   from the same messages, so they follow.
 
+- **R220. The summary takes the page's width, its marks without their line.** Dani, on the live demo's summary:
+  "better but a bit weird". It sat in the left half of the page under a legend as wide as the column; the colour line
+  under each party's logo, beside an underlined name, read as a second underline and pushed the logo above the row's
+  middle; and the outline of the cell under the pointer was half hidden by the fixed party column. On a wide screen
+  the summary now takes the text column's width, its columns shared out evenly (a fixed layout, the party column
+  11 rem), each upright title over the middle of its icons; the marks go without the line here (R184's stays on the
+  party's page and in the detailed table); and a cell under the pointer or the keyboard gets a ring around its icon,
+  inside the cell. Phones keep the compact table that scrolls sideways. The titles stay upright at every width, so a
+  summary reads the same whatever the number of criteria.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

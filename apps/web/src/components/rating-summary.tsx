@@ -43,8 +43,12 @@ export interface SummaryCell {
 
 const link = cx(focusRing, css({ textDecoration: 'underline', textUnderlineOffset: '3px' }));
 
-/** Each cell's side: a target of at least 24 px (WCAG 2.5.8), the icon in the middle. */
-const cellSide = css({ width: { base: '38px', md: '44px' }, height: { base: '38px', md: '44px' } });
+/** Each cell's link: a round target of at least 24 px (WCAG 2.5.8), the icon in the middle. */
+const cellSide = css({
+  width: { base: '38px', md: '44px' },
+  height: { base: '38px', md: '44px' },
+  borderRadius: 'full',
+});
 
 /**
  * An election's summary (PLAN R218; the chapter's first look at the demo asked for "a summary table with icons, no
@@ -52,7 +56,9 @@ const cellSide = css({ width: { base: '38px', md: '44px' }, height: { base: '38p
  * a whole election on one screen, the criteria's short titles standing upright over them. A rating is never its colour
  * alone (BRIEF §6): each icon's shape says it, the legend right under the table gives every icon's words, each cell's
  * words are its link's name for screen readers and its tooltip, and each cell opens its page. A real table, with its
- * headers' scopes and a caption; on a phone it scrolls sideways inside its own region, the party column fixed.
+ * headers' scopes and a caption. On a wide screen it takes the page's width, its columns shared out evenly, so a short
+ * election doesn't sit in a corner; on a phone each column keeps its icon's width and the table scrolls sideways
+ * inside its own region, the party column fixed.
  */
 export const RatingSummary = ({
   caption,
@@ -85,6 +91,8 @@ export const RatingSummary = ({
         borderCollapse: 'separate',
         borderSpacing: '0',
         fontSize: '16px',
+        width: { base: 'auto', lg: '100%' },
+        tableLayout: { base: 'auto', lg: 'fixed' },
         // A row lights up under the pointer, its party's name included, so a rating is easy to follow across.
         '& tbody tr:hover > *': { bg: 'bg.subtle' },
       })}
@@ -106,6 +114,8 @@ export const RatingSummary = ({
               borderBottom: '3px solid',
               borderColor: 'border.default',
               fontSize: '15px',
+              // The fixed layout's party column; the criteria share the rest.
+              width: { lg: '11rem' },
             })}
           >
             {partyHeader}
@@ -116,13 +126,16 @@ export const RatingSummary = ({
               scope="col"
               className={css({
                 verticalAlign: 'bottom',
+                textAlign: 'center',
                 paddingBlockEnd: '10px',
+                paddingInline: '2px',
                 borderBottom: '3px solid',
                 borderColor: 'border.default',
               })}
             >
-              {/* Upright, read from the bottom up, wrapping onto a second line rather than ever being cut; no underline,
-                  which would stand beside the letters as a stray line, until pointed at. */}
+              {/* Upright, read from the bottom up, over the middle of its icons, wrapping onto a second line rather
+                  than ever being cut; no underline, which would stand beside the letters as a stray line, until pointed
+                  at. */}
               <a
                 href={criterion.href}
                 lang={criterion.title.lang}
@@ -138,7 +151,6 @@ export const RatingSummary = ({
                     fontWeight: '600',
                     lineHeight: '1.15',
                     textAlign: 'start',
-                    marginInline: 'auto',
                   }),
                 )}
               >
@@ -223,17 +235,19 @@ export const RatingSummary = ({
                       href={cell.href}
                       title={cell.title}
                       data-rating={cell.rating}
+                      // A ring around the icon under the pointer, and a thicker one for the keyboard, both inside the
+                      // cell, where the fixed party column never covers them.
                       className={cx(
-                        focusRing,
                         cellSide,
                         css({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           marginInline: 'auto',
-                          _hover: {
-                            outline: '2px solid',
-                            outlineColor: 'border.default',
+                          _hover: { boxShadow: 'inset 0 0 0 2px {colors.border.default}' },
+                          _focusVisible: {
+                            outline: '3px solid',
+                            outlineColor: 'currentColor',
                             outlineOffset: '-3px',
                           },
                         }),
