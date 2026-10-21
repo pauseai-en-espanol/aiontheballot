@@ -1,5 +1,15 @@
 # @aiontheballot/og
 
+## 0.7.5
+
+### Patch Changes
+
+- 3859ae8: Share images never cut the criteria's key or a title: the legend and the key take the lines they need, and titles go
+  across their columns only where all fit whole. The go-live checklist warns past 16 parties or 12 criteria.
+- Updated dependencies [3859ae8]
+  - @aiontheballot/domain@0.16.0
+  - @aiontheballot/ui@0.4.6
+
 ## 0.7.4
 
 ### Patch Changes

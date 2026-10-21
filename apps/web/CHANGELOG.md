@@ -1,5 +1,19 @@
 # @aiontheballot/web
 
+## 0.21.1
+
+### Patch Changes
+
+- ef3626d: Node.js 26.12.1 (images on node:26.12.1-alpine), the October 21 security release.
+- 3859ae8: Share images never cut the criteria's key or a title: the legend and the key take the lines they need, and titles go
+  across their columns only where all fit whole. The go-live checklist warns past 16 parties or 12 criteria.
+- c062409: The summary takes the page's width on a wide screen, its columns shared out evenly and each title over its icons; its
+  parties' marks go without their colour line, and a cell under the pointer or the keyboard gets a ring around its icon.
+- Updated dependencies [3859ae8]
+  - @aiontheballot/og@0.7.5
+  - @aiontheballot/domain@0.16.0
+  - @aiontheballot/i18n@0.31.0
+
 ## 0.21.0
 
 ### Minor Changes

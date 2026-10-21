@@ -1,5 +1,20 @@
 # @aiontheballot/api
 
+## 0.33.0
+
+### Minor Changes
+
+- 3859ae8: Share images never cut the criteria's key or a title: the legend and the key take the lines they need, and titles go
+  across their columns only where all fit whole. The go-live checklist warns past 16 parties or 12 criteria.
+
+### Patch Changes
+
+- ef3626d: Node.js 26.12.1 (images on node:26.12.1-alpine), the October 21 security release.
+- Updated dependencies [3859ae8]
+  - @aiontheballot/domain@0.16.0
+  - @aiontheballot/i18n@0.31.0
+  - @aiontheballot/db@0.18.0
+
 ## 0.32.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # @aiontheballot/i18n
 
+## 0.31.0
+
+### Minor Changes
+
+- 3859ae8: Share images never cut the criteria's key or a title: the legend and the key take the lines they need, and titles go
+  across their columns only where all fit whole. The go-live checklist warns past 16 parties or 12 criteria.
+
 ## 0.30.0
 
 ### Minor Changes

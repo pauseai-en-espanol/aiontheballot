@@ -1,5 +1,11 @@
 # @aiontheballot/migrations
 
+## 0.28.1
+
+### Patch Changes
+
+- ef3626d: Node.js 26.12.1 (images on node:26.12.1-alpine), the October 21 security release.
+
 ## 0.28.0
 
 ### Minor Changes
