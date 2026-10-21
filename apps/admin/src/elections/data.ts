@@ -189,6 +189,8 @@ export interface GoLiveChecklist {
     noParties: boolean;
     noCriteria: boolean;
     noReviewers: boolean;
+    manyParties: boolean;
+    manyCriteria: boolean;
     unpublishedTexts: ('privacy_policy' | 'right_of_reply_policy' | 'about_operator')[];
   };
   ready: boolean;

@@ -698,6 +698,8 @@
         "noParties": "La elección no tiene partidos.",
         "noCriteria": "La elección no tiene criterios.",
         "noReviewers": "La metodología no nombra a nadie de revisión externa.",
+        "manyParties": "Tiene más de {limit} partidos: la tabla resumen y las imágenes para compartir están pensadas para {limit} como mucho. Con más se ven apretadas, y la vista previa de un enlace muestra solo los primeros.",
+        "manyCriteria": "Tiene más de {limit} criterios: la tabla resumen y las imágenes para compartir están pensadas para {limit} como mucho. Con más se ven apretadas.",
         "unpublishedTexts": "Aún sin publicar: {texts}."
       },
       "notReady": "Podrás hacerla pública cuando no falte nada de lo anterior.",

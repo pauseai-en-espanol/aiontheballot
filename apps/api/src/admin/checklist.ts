@@ -1,5 +1,6 @@
 import type { DB } from '@aiontheballot/db/generated/db';
 
+import { DISPLAY_LIMITS } from '@aiontheballot/domain/display-limits';
 import { sql, type Transaction } from 'kysely';
 
 import type { Access } from './access.js';
@@ -30,6 +31,9 @@ export interface GoLiveChecklist {
     noParties: boolean;
     noCriteria: boolean;
     noReviewers: boolean;
+    /** More parties, or criteria, than the summary and the share images are made for (PLAN R221). */
+    manyParties: boolean;
+    manyCriteria: boolean;
     unpublishedTexts: DocumentKind[];
   };
   ready: boolean;
@@ -114,6 +118,8 @@ export const goLiveChecklist = async (
       noParties: parties.length === 0,
       noCriteria: criteria.length === 0,
       noReviewers: reviewers.length === 0,
+      manyParties: parties.length > DISPLAY_LIMITS.parties,
+      manyCriteria: criteria.length > DISPLAY_LIMITS.criteria,
       unpublishedTexts: DOCUMENT_KINDS.filter((kind) => !published.some((d) => d.kind === kind)),
     },
     ready:

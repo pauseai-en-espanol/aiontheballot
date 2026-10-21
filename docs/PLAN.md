@@ -3213,6 +3213,19 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   inside the cell. Phones keep the compact table that scrolls sideways. The titles stay upright at every width, so a
   summary reads the same whatever the number of criteria.
 
+- **R221. Nothing on a share image is cut; past 16 parties or 12 criteria, the admin warns.** The demo's portrait
+  table cut its criteria's key after the eighth of ten: the legend took more room than the grid gave it (two lines,
+  counted as one and a half), and the key, the only part allowed to shrink, gave its last line up. Testing it found
+  a second cut: titles across their columns were clamped to two lines. Now the legend's and the key's lines are
+  measured (the legend's entries packed into the width, the key broken as the text will be), neither ever shrinks,
+  and titles go across only where every one fits whole on two lines, else the columns are numbered and keyed. A test
+  draws both data cards with long titles (11×10, 11×17, 5×12) at every size and finds every key entry whole and no
+  ellipsis; the overview's and the table's references are accepted again. Dani: "limit parties and/or criteria to
+  guarantee proper display". Decided, as D20 did: a warning, not a rule, since an election may need more and every
+  view still draws them all. The go-live checklist warns past `DISPLAY_LIMITS` (16 parties, 12 criteria, in
+  `packages/domain`), saying the summary and the images get crowded and a link's preview shows only the first
+  parties. Tests first (the checklist's API test). Editorial workflow E5.3.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

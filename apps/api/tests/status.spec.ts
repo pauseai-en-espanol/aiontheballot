@@ -64,8 +64,31 @@ describe('going live (editorial workflow E5)', () => {
         noParties: false,
         noCriteria: false,
         noReviewers: false,
+        manyParties: false,
+        manyCriteria: false,
         unpublishedTexts: ['right_of_reply_policy', 'about_operator'],
       },
+      ready: true,
+    });
+  });
+
+  it('warns of more parties or criteria than the summary and the share images are made for, and allows them (PLAN R221)', async () => {
+    const crowded = await checklist(USERS.countryAdminA, ELECTIONS_A.draft.id, async (trx) => {
+      // The draft has two of each: fifteen more parties make 17, eleven more criteria 13.
+      await sql`
+        INSERT INTO app.parties (tenant_id, election_id, slug, name, short_name, display_order)
+        SELECT ${TENANT_A}, ${ELECTIONS_A.draft.id}, 'partido-de-ejemplo-extra-' || n,
+               jsonb_build_object('es', 'Partido de ejemplo extra ' || n), jsonb_build_object('es', 'PX' || n), 100 + n
+          FROM generate_series(1, 15) n`.execute(trx);
+      await sql`
+        INSERT INTO app.criteria (tenant_id, election_id, slug, title, short_title, description, display_order)
+        SELECT ${TENANT_A}, ${ELECTIONS_A.draft.id}, 'criterio-de-ejemplo-extra-' || n,
+               jsonb_build_object('es', 'Criterio de ejemplo extra ' || n), jsonb_build_object('es', 'Extra ' || n),
+               '{"es": "Descripción de ejemplo"}', 100 + n
+          FROM generate_series(1, 11) n`.execute(trx);
+    });
+    expect(crowded).toMatchObject({
+      warnings: { manyParties: true, manyCriteria: true },
       ready: true,
     });
   });

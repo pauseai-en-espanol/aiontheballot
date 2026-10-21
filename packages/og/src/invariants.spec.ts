@@ -2,7 +2,7 @@ import type { RatingDisplay } from '@aiontheballot/ui/ratings';
 
 import { describe, expect, it } from 'vitest';
 
-import { tableCard } from './data-cards.js';
+import { overviewCard, type TableCard, tableCard } from './data-cards.js';
 import { PROBES } from './probes.js';
 import { renderPng, renderSvg } from './render.js';
 import { SHARE_SIZES, type ShareSize } from './sizes.js';
@@ -84,35 +84,53 @@ const WORDS: Partial<Record<RatingDisplay, string>> = {
 };
 const STATES = Object.keys(WORDS) as RatingDisplay[];
 
-/** The whole table of so many parties and criteria, every state in turn, with names and titles too short to cut. */
+/** Long, invented short titles, as a chapter's may be: the criteria's key must still be whole. */
+const LONG_TITLES = [
+  'Criterio de ejemplo uno',
+  'Segundo criterio inventado',
+  'Ejemplo de criterio tres',
+  'Cuarto criterio de prueba',
+  'Criterio inventado número cinco',
+  'Sexto ejemplo',
+  'Séptimo criterio de ejemplo',
+  'Ocho',
+  'Noveno criterio inventado',
+  'Décimo criterio de prueba',
+];
+
+/**
+ * The whole table's data for so many parties and criteria, every state in turn, with names too short to cut, and the
+ * criteria short or, with `long`, as long as a chapter's may be.
+ */
+const tableData = (parties: number, criteria: number, long = false): TableCard => ({
+  theme: DEFAULT_CARD_THEME,
+  site: 'Inquilino de ejemplo A',
+  election: 'Elecciones de ejemplo',
+  address: 'ejemplo-a.example.test',
+  methodology: 'Metodología: ejemplo-a.example.test/x',
+  initiative: 'Una iniciativa de Organización de ejemplo A',
+  initiativeLead: 'Una iniciativa de',
+  dataDate: 'Datos del 1 de enero',
+  title: '¿Cumplen los partidos de ejemplo?',
+  subtitle: 'Elecciones de ejemplo',
+  parties: Array.from({ length: parties }, (_, i) => {
+    const short = `PE${String.fromCharCode(65 + i)}`;
+    return { short, name: short, colour: null };
+  }),
+  criteria: Array.from({ length: criteria }, (_, j) =>
+    long ? `${LONG_TITLES[j % LONG_TITLES.length]} ${j + 1}` : `Ejemplo ${j + 1}`,
+  ),
+  cells: Array.from({ length: parties }, (_, i) =>
+    Array.from({ length: criteria }, (__, j) => {
+      const rating = STATES[(i + j) % STATES.length] ?? 'pending';
+      return { rating, label: WORDS[rating] ?? '' };
+    }),
+  ),
+  legend: STATES.slice(0, 5).map((rating) => ({ rating, label: WORDS[rating] ?? '' })),
+});
+
 const wholeTable = (parties: number, criteria: number, size: ShareSize) =>
-  tableCard(
-    {
-      theme: DEFAULT_CARD_THEME,
-      site: 'Inquilino de ejemplo A',
-      election: 'Elecciones de ejemplo',
-      address: 'ejemplo-a.example.test',
-      methodology: 'Metodología: ejemplo-a.example.test/x',
-      initiative: 'Una iniciativa de Organización de ejemplo A',
-      initiativeLead: 'Una iniciativa de',
-      dataDate: 'Datos del 1 de enero',
-      title: '¿Cumplen los partidos de ejemplo?',
-      subtitle: 'Elecciones de ejemplo',
-      parties: Array.from({ length: parties }, (_, i) => {
-        const short = `PE${String.fromCharCode(65 + i)}`;
-        return { short, name: short, colour: null };
-      }),
-      criteria: Array.from({ length: criteria }, (_, j) => `Ejemplo ${j + 1}`),
-      cells: Array.from({ length: parties }, (_, i) =>
-        Array.from({ length: criteria }, (__, j) => {
-          const rating = STATES[(i + j) % STATES.length] ?? 'pending';
-          return { rating, label: WORDS[rating] ?? '' };
-        }),
-      ),
-      legend: STATES.slice(0, 5).map((rating) => ({ rating, label: WORDS[rating] ?? '' })),
-    },
-    size,
-  );
+  tableCard(tableData(parties, criteria), size);
 
 describe("the whole table's words", () => {
   // Arturo, on the demo's table (11 parties, 10 criteria): it read "No lo" and "Cumple", cut (PLAN R216).
@@ -130,6 +148,46 @@ describe("the whole table's words", () => {
           await renderSvg(wholeTable(parties, criteria, size), size, { text: true }),
         );
         expect(text, size).not.toContain('…');
+      }
+    },
+    30_000,
+  );
+
+  // The demo's portrait table cut its key after the eighth criterion of ten (PLAN R221): the legend took more room
+  // than it was given, and the key gave it up.
+  it.each([
+    [11, 10],
+    [11, 17],
+    [5, 12],
+  ])(
+    "leave the criteria's key whole, however long their titles: %i parties, %i criteria",
+    async (parties, criteria) => {
+      for (const size of SIZES) {
+        const data = tableData(parties, criteria, true);
+        const preview = overviewCard(
+          {
+            ...data,
+            cells: data.cells.map((row) => row.map(({ rating }) => rating)),
+            more: 'y # más en la web',
+          },
+          size,
+        );
+        for (const [kind, node] of [
+          ['table', tableCard(data, size)],
+          ['preview', preview],
+        ] as const) {
+          const text = svgText(await renderSvg(node, size, { text: true }));
+          expect(text, `${kind} ${size}`).not.toContain('…');
+          // Numbered columns are keyed below; columns wide enough say their titles themselves.
+          if (/\d+\. /.test(text)) {
+            for (let j = 0; j < criteria; j += 1) {
+              const entry = `${j + 1}. ${LONG_TITLES[j % LONG_TITLES.length]} ${j + 1}`;
+              expect(text, `${kind} ${size}: ${entry}`).toMatch(
+                new RegExp(entry.replaceAll('.', '\\.').replaceAll(' ', ' ?')),
+              );
+            }
+          }
+        }
       }
     },
     30_000,

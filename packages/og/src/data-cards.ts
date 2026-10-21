@@ -422,12 +422,16 @@ const TEXT_EM = 0.55;
 /** The smallest icon above a rating's words, as a share of the words' size. */
 const MIN_ICON_WITH_WORDS = 1.6;
 
+/** Saira Condensed's capitals, as the legend writes its words: wider than its letters' average. */
+const CAPITALS_EM = 0.56;
+
 /**
- * How many lines `text` takes at `font` in `width`, broken at spaces as satori breaks it; `Infinity` when one of its
- * words is wider than the width alone, which only an ellipsis would fit.
+ * How many lines `text` takes at `font` in `width`, broken at spaces as satori breaks it, its characters `em` wide on
+ * average (Roboto Slab's by default); `Infinity` when one of its words is wider than the width alone, which only an
+ * ellipsis would fit.
  */
-const linesOf = (text: string, font: number, width: number): number => {
-  const perLine = Math.floor(width / (font * TEXT_EM));
+const linesOf = (text: string, font: number, width: number, em = TEXT_EM): number => {
+  const perLine = Math.floor(width / (font * em));
   let lines = 0;
   let used = 0;
   for (const word of text.split(/\s+/).filter(Boolean)) {
@@ -477,11 +481,35 @@ const ratingGrid = (
   );
   const columnWidth = (space.width - partyWidth) / columns;
   const headFont = Math.round(Math.min(l.small * 1.15, columnWidth * 0.2 + 6));
-  const across = columnWidth >= headFont * 4.2;
+  const headPad = Math.round(headFont * 0.2);
+  // The titles across their columns only where every one fits whole on two lines; else the columns' numbers, the
+  // titles keyed below. Never cut (PLAN R221).
+  const across =
+    columnWidth >= headFont * 4.2 &&
+    criteria.every(
+      (criterion) => linesOf(criterion, headFont, columnWidth - 2 * headPad, DISPLAY_EM) <= 2,
+    );
   const headHeight = Math.round(across ? headFont * 1.2 * 2 + headFont * 0.6 : headFont * 1.6);
+  // The legend and the key take the lines they need, measured, and never give any up to the rows.
   const legendFont = Math.round(l.small * 1.05);
-  const legendHeight = Math.round(legendFont * 1.4 * (l.wide ? 1 : 2) + legendFont * 0.8);
-  const keyHeight = across ? 0 : Math.round(l.small * 1.45 * 3 + l.small * 0.5);
+  const legendLines = legendEntries.reduce(
+    (state, entry) => {
+      const width = legendFont * (1.35 + 0.45 + entry.label.length * CAPITALS_EM);
+      return state.used === 0 || state.used + legendFont * 1.4 + width <= space.width
+        ? {
+            lines: Math.max(1, state.lines),
+            used: state.used + (state.used ? legendFont * 1.4 : 0) + width,
+          }
+        : { lines: state.lines + 1, used: width };
+    },
+    { lines: 0, used: 0 },
+  ).lines;
+  const legendHeight = Math.ceil(
+    legendFont * (1.35 * legendLines + 0.7 * Math.max(0, legendLines - 1) + 0.8),
+  );
+  const key = criteria.map((criterion, index) => `${index + 1}. ${criterion}`).join(' · ');
+  const keyLines = across ? 0 : linesOf(key, l.small, space.width);
+  const keyHeight = across ? 0 : Math.ceil(l.small * (1.45 * keyLines + 0.5));
   const rule = 1;
   const available = space.height - headHeight - legendHeight - keyHeight;
   // The words under each icon: at a size where every rating's longest word fits the column, on as many lines as the
@@ -536,7 +564,7 @@ const ratingGrid = (
           justifyContent: 'center',
           width: columnWidth,
           flexShrink: 0,
-          padding: `0 ${Math.round(headFont * 0.2)}px`,
+          padding: `0 ${headPad}px`,
         },
         across
           ? clamped(
@@ -632,9 +660,15 @@ const ratingGrid = (
       ? []
       : [
           clamped(
-            { fontSize: l.small, lineHeight: 1.45, color: theme.muted, marginTop: l.small * 0.5 },
-            criteria.map((criterion, index) => `${index + 1}. ${criterion}`).join(' · '),
-            3,
+            {
+              fontSize: l.small,
+              lineHeight: 1.45,
+              color: theme.muted,
+              marginTop: l.small * 0.5,
+              flexShrink: 0,
+            },
+            key,
+            keyLines,
           ),
         ]),
     h(

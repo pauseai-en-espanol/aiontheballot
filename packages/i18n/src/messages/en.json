@@ -698,6 +698,8 @@
         "noParties": "The election has no parties.",
         "noCriteria": "The election has no criteria.",
         "noReviewers": "The methodology names no external reviewers.",
+        "manyParties": "It has more than {limit} parties: the summary table and the share images are made for {limit} at most. With more they get crowded, and a link's preview shows only the first ones.",
+        "manyCriteria": "It has more than {limit} criteria: the summary table and the share images are made for {limit} at most. With more they get crowded.",
         "unpublishedTexts": "Not published yet: {texts}."
       },
       "notReady": "Going live is offered once nothing above is missing.",

@@ -317,7 +317,8 @@ also go live straight from draft. [DB: transitions, `election_rules`, change con
    text for the election's name, the methodology, every party's names and every criterion, short title included.
    [UI; DB: `election_rules`]
 3. It also warns, without blocking, about an election with no parties or no criteria, a methodology with no external
-   reviewers, and unpublished policy texts (W9, O3). [UI]
+   reviewers, and unpublished policy texts (W9, O3); and about more than 16 parties or 12 criteria, past what the
+   summary and the share images are made for, which still draw them all (PLAN R221). [UI]
 4. Going live can't be undone, so the dialog asks the user to type the election's slug. [UI; DB: transitions]
 5. `went_live_at` is stamped, and the election, its structure and its published revisions become public. A cell
    republished in preview shows publicly as the version last published there, its first. [DB; API]

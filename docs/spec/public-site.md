@@ -209,15 +209,17 @@ external reviewers with their affiliations.
 
 ### 5.4 Share images (PLAN R148, R185)
 
-Every election page has a card of its own, drawn by `packages/og` from the theme passed in and the page's data. The
-data cards (PLAN R185, "data first") put the data on the card: the scorecard's link preview is every party's rating
-on every criterion (icons, with the legend giving their words); the whole table, to download, writes each rating's
-words under its icon; a party's card gives each criterion's rating as a large icon and its words; a criterion's card
-gives each party's mark, names and rating. Parties in the site's order, never ranked or totalled; "and # more" past
-what fits. Each data card says its data's date ("Datos del …", the newest rating it shows, or that none is published
-yet), so a picture cached by a crawler or posted long ago says how old it is. A cell's card gives its rating, summary
-and first source; the methodology's, its lead and legend. Every card shows the site's name, the canonical address
-large, the methodology's short address and the operator small (BRIEF §3, invariant 4). Its link preview is the
+Every election page has a card of its own, drawn by `packages/og` from the theme passed in and the page's data. The data
+cards (PLAN R185, "data first") put the data on the card: the scorecard's link preview is every party's rating on every
+criterion (icons, with the legend giving their words); the whole table, to download, writes each rating's words under
+its icon; a party's card gives each criterion's rating as a large icon and its words; a criterion's card gives each
+party's mark, names and rating. Parties in the site's order, never ranked or totalled; "and # more" past what fits.
+Nothing on a card is cut (PLAN R216, R221): a rating's words are whole or left to the legend; the criteria's titles head
+their columns only where every one fits whole, else their numbers do, keyed below in full; the key and the legend take
+the lines they need. Each data card says its data's date ("Datos del …", the newest rating it shows, or that none is
+published yet), so a picture cached by a crawler or posted long ago says how old it is. A cell's card gives its rating,
+summary and first source; the methodology's, its lead and legend. Every card shows the site's name, the canonical
+address large, the methodology's short address and the operator small (BRIEF §3, invariant 4). Its link preview is the
 page's `og:image`, with alt text that says the ratings in words. Images live under the election,
 `/{election}/og/{view}/…/{size}.{hash}.png`, and like the home's only the current hash renders; a site coming soon
 serves none. When the web app's copy of an election changes, it renders the link previews of the views whose cards

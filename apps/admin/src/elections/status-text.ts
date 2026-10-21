@@ -1,5 +1,7 @@
 import type { getTranslator } from '@aiontheballot/i18n/messages';
 
+import { DISPLAY_LIMITS } from '@aiontheballot/domain/display-limits';
+
 import type { GoLiveChecklist } from './data';
 import type { ChecklistItem } from './GoLivePanel';
 
@@ -53,6 +55,12 @@ export const goLiveWarnings = (t: Translator, list: GoLiveChecklist): string[] =
   ...(list.warnings.noParties ? [t('admin.status.warnings.noParties')] : []),
   ...(list.warnings.noCriteria ? [t('admin.status.warnings.noCriteria')] : []),
   ...(list.warnings.noReviewers ? [t('admin.status.warnings.noReviewers')] : []),
+  ...(list.warnings.manyParties
+    ? [t('admin.status.warnings.manyParties', { limit: DISPLAY_LIMITS.parties })]
+    : []),
+  ...(list.warnings.manyCriteria
+    ? [t('admin.status.warnings.manyCriteria', { limit: DISPLAY_LIMITS.criteria })]
+    : []),
   ...(list.warnings.unpublishedTexts.length > 0
     ? [
         t('admin.status.warnings.unpublishedTexts', {
