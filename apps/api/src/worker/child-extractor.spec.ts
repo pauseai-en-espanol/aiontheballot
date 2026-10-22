@@ -75,7 +75,8 @@ const pdfWithDeflatedContent = (content: Buffer): Uint8Array => {
   return new Uint8Array(Buffer.concat(parts));
 };
 
-describe('the child extractor (PLAN R133)', () => {
+// Each test starts a child process: seconds on a busy CI runner, past vitest's default 5.
+describe('the child extractor (PLAN R133)', { timeout: 30_000 }, () => {
   it('extracts a copy in a child process', async () => {
     expect(
       await extractor('text/plain', new TextEncoder().encode('Un bloque inventado.\n\nOtro.')),

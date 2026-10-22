@@ -3226,6 +3226,12 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   `packages/domain`), saying the summary and the images get crowded and a link's preview shows only the first
   parties. Tests first (the checklist's API test). Editorial workflow E5.3.
 
+- **R222. The child-process test suites get 30 seconds a test.** R221's CI timed out twice, in different tests of
+  `sweep-files.spec.ts` and `worker/child-extractor.spec.ts` (and the Node 26.12.1 update's once), each past vitest's
+  default 5 seconds: every test there starts a process, and on a busy runner that took about three times as long as
+  on a laptop. Both suites now set 30 seconds, as the other heavy suites set their own; the third attempt passed and
+  released R220 and R221. Nothing the code does changes.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

@@ -42,7 +42,8 @@ const list = (lines: string[], auditSequence = 100, incarnation = DATABASE) =>
 const NAMED = `${TENANT} sources ${sha('nombrado')}`;
 const ORPHAN = `${TENANT}/sources/${sha('huerfano')}`;
 
-describe('sweep-files', () => {
+// Each test runs the script in a process of its own: seconds on a busy CI runner, past vitest's default 5.
+describe('sweep-files', { timeout: 30_000 }, () => {
   let root: string;
   let env: Record<string, string>;
   const store = () => createFileStore(root);
