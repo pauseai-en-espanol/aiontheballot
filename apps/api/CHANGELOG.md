@@ -1,5 +1,12 @@
 # @aiontheballot/api
 
+## 0.33.1
+
+### Patch Changes
+
+- 232dad6: The two test suites that start child processes (the file sweep and the child extractor) get 30 seconds a test, so a
+  busy CI runner doesn't fail them; nothing the API does changes.
+
 ## 0.33.0
 
 ### Minor Changes
