@@ -344,8 +344,8 @@ importers:
         specifier: 0.29.6
         version: 0.29.6
       nodemailer:
-        specifier: 10.1.2
-        version: 10.1.2
+        specifier: 10.1.4
+        version: 10.1.4
       pdfjs-dist:
         specifier: 6.4.299
         version: 6.4.299
@@ -4616,8 +4616,8 @@ packages:
   node-addon-api@7.1.1:
     resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
 
-  nodemailer@10.1.2:
-    resolution: {integrity: sha512-rnQn9Rzh8RAwcp42MVsIvxbsv6YZ2a2/av+uyJ/LPU1+2QSlrRgFsWWZTKenyRUqkIl8urOI0c4+CEcmFdsvQw==}
+  nodemailer@10.1.4:
+    resolution: {integrity: sha512-EsMnOR2oRv4LGnWvHgcVYkkQ4O2j8KO4WTw6l+PHR4sOXo8SAgIraxtEnGDmotjbhv0hDsu3IuDIFZm8iXwO4A==}
     engines: {node: '>=20.0.0'}
 
   object-assign@4.1.1:
@@ -9305,7 +9305,7 @@ snapshots:
 
   node-addon-api@7.1.1: {}
 
-  nodemailer@10.1.2: {}
+  nodemailer@10.1.4: {}
 
   object-assign@4.1.1: {}
 
