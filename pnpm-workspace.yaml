@@ -11,6 +11,8 @@ minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
   - '@slango/*'
   - '@slango.configs/*'
+  # Renovate security update: nodemailer@10.1.4
+  - nodemailer@10.1.4
 
 # better-auth lists framework integrations as optional peers, and pnpm fills them from the workspace (the web and
 # admin apps' Next.js and React, the test runner), so `pnpm deploy --prod` put Next.js, Playwright and Vitest in the
