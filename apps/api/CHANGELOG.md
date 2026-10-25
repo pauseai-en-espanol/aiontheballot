@@ -1,5 +1,11 @@
 # @aiontheballot/api
 
+## 0.33.2
+
+### Patch Changes
+
+- 828a208: Dependencies bump
+
 ## 0.33.1
 
 ### Patch Changes
