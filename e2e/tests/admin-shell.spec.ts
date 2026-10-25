@@ -81,6 +81,7 @@ test.describe('choosing a site (editorial workflow A6)', () => {
 
     await page.getByRole('link', { name: 'Example tenant A' }).click();
     await expect(page).toHaveURL(`${ADMIN_URL}/t/ejemplo-a`);
+    await expectAccessible(page);
     const switcher = page.getByRole('button', { name: en.admin.shell.switchSite });
     // By keyboard: the arrow opens it on its first item, the next one is the other site, Enter follows it.
     await switcher.focus();
@@ -92,7 +93,8 @@ test.describe('choosing a site (editorial workflow A6)', () => {
       en.admin.shell.allSites,
     ]);
     await expect(items.first()).toHaveAttribute('data-highlighted', '');
-    await expectAccessible(page);
+    // The page under it was checked above, with the menu shut.
+    await expectAccessible(page, '[role="menu"]');
     await page.keyboard.press('ArrowDown');
     await expect(items.nth(1)).toHaveAttribute('data-highlighted', '');
     await page.keyboard.press('Enter');
