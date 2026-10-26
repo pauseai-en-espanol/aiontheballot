@@ -3,16 +3,16 @@
 aiontheballot-migrations:
   nameOverride: migrations
   image:
-    tag: '0.28.1.bee1a6b'
+    tag: '0.28.2.b8f6a21'
 aiontheballot-api:
   nameOverride: api
   image:
-    tag: '0.33.2.cc4b90f'
+    tag: '0.33.3.b8f6a21'
 aiontheballot-web:
   nameOverride: web
   image:
-    tag: '0.21.1.bee1a6b'
+    tag: '0.21.2.b8f6a21'
 aiontheballot-admin:
   nameOverride: admin
   image:
-    tag: '0.33.0.bee1a6b'
+    tag: '0.33.1.b8f6a21'
