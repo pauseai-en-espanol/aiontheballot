@@ -24,8 +24,9 @@ overrides:
   'better-auth>react-dom': '-'
   'better-auth>vitest': '-'
   # satori pins fflate 0.7.3, which has a loop in unzipSync on a malformed ZIP64 archive (GHSA-px8p-9vwx-vf98). Nothing
-  # calls unzipSync, but 0.7.5, the fix, is a patch release of the same line (PLAN R208).
-  'fflate@<0.8': '0.8.3'
+  # calls unzipSync, but 0.7.5, the fix, is a patch release of the same line (PLAN R208). Not 0.8: satori's font
+  # parser can't inflate WOFF with it (renovate.json5 holds the override below 0.8).
+  'fflate@<0.8': '0.7.5'
 
 injectWorkspacePackages: true
 linkWorkspacePackages: true
