@@ -1,55 +1,19 @@
 {
+  // slango's shared preset for an application: one weekly window early on Monday (ADR-0001), every non-major update
+  // in one PR, a 3-day supply-chain delay (keep in sync with minimumReleaseAge in pnpm-workspace.yaml), @slango/* as
+  // soon as it's released. Only this repository's own rules go here.
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
-  extends: ['config:best-practices'],
-  rangeStrategy: 'bump',
-  dependencyDashboard: true,
-  timezone: 'Europe/Madrid',
-  // One weekly window, early on Monday (ADR-0001), and open PRs aren't updated outside it either. Security fixes
-  // ignore it: Renovate always raises vulnerability PRs at once, whatever the schedule. Lock-file maintenance
-  // (config:best-practices) keeps its own PR, before 4am the same Monday.
-  schedule: ['* 0-5 * * 1'],
-  updateNotScheduled: false,
-  // The window has one or two of the hosted app's runs: no hourly cap, so every PR due is opened in them.
-  prHourlyLimit: 0,
-  // Rebase only when a PR can no longer merge, not after every push to main.
-  rebaseWhen: 'conflicted',
-  // Supply-chain delay: keep in sync with minimumReleaseAge in pnpm-workspace.yaml
-  minimumReleaseAge: '3 days',
-  internalChecksFilter: 'strict',
-  // Security fixes bypass this minimumReleaseAge and are raised immediately (pnpm's own minimum in
-  // pnpm-workspace.yaml may still hold a fix younger than 3 days out of the lockfile); OSV scanning broadens
-  // vulnerability detection beyond the platform's native alerts.
-  osvVulnerabilityAlerts: true,
+  extends: ['github>danilupion/slango//renovate/app.json5'],
   packageRules: [
-    {
-      // Every non-major update in one PR a week. Listed after the presets' groups (monorepos and the like), so
-      // their non-major updates join it too.
-      groupName: 'Non-major updates',
-      matchUpdateTypes: ['patch', 'pin', 'minor', 'digest', 'pinDigest'],
-      automerge: false,
-      groupSlug: 'non-major-updates',
-      // Again here: Renovate's own defaults for pin updates would otherwise rebase the group on every push.
-      rebaseWhen: 'conflicted',
-      labels: ['dependencies', 'non-major'],
-    },
-    {
-      matchUpdateTypes: ['major'],
-      automerge: false,
-      labels: ['dependencies', 'major'],
-    },
     {
       // The share images' renderer (PLAN R147): an update may change every picture, so it gets a PR of its own,
       // whatever the update's type, where the reference test shows old, new and diff and `pnpm cards:accept` takes the
-      // change. Listed after the groups above, so it takes these two out of them.
+      // change. Listed after the preset's groups, so it takes these two out of them.
       matchPackageNames: ['satori', '@resvg/resvg-js'],
       groupName: 'Share-image renderer',
       groupSlug: 'share-image-renderer',
       automerge: false,
       labels: ['dependencies', 'share-images'],
-    },
-    {
-      matchManagers: ['github-actions'],
-      labels: ['github-actions'],
     },
   ],
 }
