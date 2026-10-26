@@ -359,7 +359,7 @@ describe('a password reset email from the members page (PLAN R170)', () => {
       heldBackPasswordLink(pool, id, one),
       heldBackPasswordLink(pool, id, other),
     ]);
-    expect(held.sort()).toEqual([false, true]);
+    expect(held.sort((a, b) => Number(a) - Number(b))).toEqual([false, true]);
     expect(await linksOf(id)).toHaveLength(1);
   });
 

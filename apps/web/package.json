@@ -25,8 +25,8 @@
     "@fontsource/montserrat": "5.3.0",
     "@fontsource/roboto-slab": "5.3.0",
     "@fontsource/saira-condensed": "5.3.0",
-    "@sentry/browser": "11.8.0",
-    "@sentry/nextjs": "11.8.0",
+    "@sentry/browser": "11.9.0",
+    "@sentry/nextjs": "11.9.0",
     "next": "16.4.2",
     "react": "19.3.1",
     "react-dom": "19.3.1"
