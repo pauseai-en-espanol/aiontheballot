@@ -37,10 +37,10 @@
   },
   "devDependencies": {
     "@sentry/core": "11.8.0",
-    "@slango.configs/lint-staged": "2.0.9",
-    "@slango.configs/oxlint": "0.1.14",
+    "@slango.configs/lint-staged": "2.0.11",
+    "@slango.configs/oxlint": "0.1.16",
     "@slango.configs/typescript": "3.0.1",
-    "@slango.configs/vitest": "2.1.3",
+    "@slango.configs/vitest": "2.1.5",
     "@types/jsdom": "30.0.0",
     "@types/node": "26.6.5",
     "@types/pg": "8.23.1",

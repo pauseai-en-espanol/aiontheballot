@@ -178,17 +178,17 @@ importers:
         specifier: 3.0.3
         version: 3.0.3
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@6.0.3)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@6.0.3)
       '@slango.configs/prettier':
-        specifier: 1.0.37
-        version: 1.0.37(prettier@3.9.10)
+        specifier: 1.0.38
+        version: 1.0.38(prettier@3.9.10)
       '@slango.configs/scripts':
-        specifier: 1.2.8
-        version: 1.2.8
+        specifier: 1.2.9
+        version: 1.2.9
       dbmate:
         specifier: 2.36.0
         version: 2.36.0
@@ -263,17 +263,17 @@ importers:
         specifier: 2.2.0
         version: 2.2.0
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
@@ -357,17 +357,17 @@ importers:
         specifier: 11.8.0
         version: 11.8.0
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@types/jsdom':
         specifier: 30.0.0
         version: 30.0.0
@@ -451,17 +451,17 @@ importers:
         specifier: 2.2.0
         version: 2.2.0
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
@@ -513,11 +513,11 @@ importers:
         specifier: 1.64.1
         version: 1.64.1
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
@@ -556,17 +556,17 @@ importers:
         specifier: workspace:*
         version: link:../domain
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
@@ -605,17 +605,17 @@ importers:
         version: 15.0.3
     devDependencies:
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@vitest/coverage-v8':
         specifier: 5.0.5
         version: 5.0.5(vitest@5.0.5)
@@ -642,17 +642,17 @@ importers:
         version: 4.14.9(@types/react@19.3.0)(react@19.3.1)
     devDependencies:
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@vitest/coverage-v8':
         specifier: 5.0.5
         version: 5.0.5(vitest@5.0.5)
@@ -682,17 +682,17 @@ importers:
         version: 4.6.7
     devDependencies:
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@types/node':
         specifier: 26.6.5
         version: 26.6.5
@@ -716,17 +716,17 @@ importers:
         version: 11.8.0
     devDependencies:
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@vitest/coverage-v8':
         specifier: 5.0.5
         version: 5.0.5(vitest@5.0.5)
@@ -762,17 +762,17 @@ importers:
         version: 0.47.1
     devDependencies:
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@types/pngjs':
         specifier: 6.0.5
         version: 6.0.5
@@ -814,17 +814,17 @@ importers:
         version: 2.2.0(@emnapi/core@1.11.3)(@emnapi/runtime@1.11.3)(postcss@8.5.30)
     devDependencies:
       '@slango.configs/lint-staged':
-        specifier: 2.0.9
-        version: 2.0.9(lint-staged@17.6.0)
+        specifier: 2.0.11
+        version: 2.0.11(lint-staged@17.6.0)
       '@slango.configs/oxlint':
-        specifier: 0.1.14
-        version: 0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
+        specifier: 0.1.16
+        version: 0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)
       '@slango.configs/typescript':
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.3
-        version: 2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
+        specifier: 2.1.5
+        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)
       '@vitest/coverage-v8':
         specifier: 5.0.5
         version: 5.0.5(vitest@5.0.5)
@@ -2673,24 +2673,24 @@ packages:
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
 
-  '@slango.configs/lint-staged@2.0.9':
-    resolution: {integrity: sha512-2ft0e5Tnq0yRxWcFpJLRd5IY55SlF+XYhyZg5osL+xm8RiEBN+y3QbxwqWDBA+sE3DZzqLH8T94furoiT8mIFQ==}
+  '@slango.configs/lint-staged@2.0.11':
+    resolution: {integrity: sha512-LPTU3gcI0DMx9Z3IH136LnVXQYa1mDI83Q8ZaCcWtkWzTpFDEzvAaGrYNHHrwAq5Daso+r63Cq8aAtWUMnk7Mw==}
     peerDependencies:
       lint-staged: ^17.6.0
 
-  '@slango.configs/oxlint@0.1.14':
-    resolution: {integrity: sha512-8c/jXPfPXxagSFr4ldnb6n7EdnhI9pxqNE65NPiqHnw6a2ajbiOrY0jdjRbnSDVzoexHhOscWKEJHCKHeyQ+0g==}
+  '@slango.configs/oxlint@0.1.16':
+    resolution: {integrity: sha512-gB/yAc/eUyfSa1SL4qSji6F/Sz+FmO41COPJhY/+k3jMWXo+2YOpUtDgGJrlqTOOAOC9t89pnP3wbuj+RKq7KQ==}
     peerDependencies:
       oxlint: ^1.88.0
       oxlint-tsgolint: ^7.0.2004
 
-  '@slango.configs/prettier@1.0.37':
-    resolution: {integrity: sha512-ccImGNsYfgufkV7gft5wOC3SGAFQ9PKy5YTG0gg64216E/mYVUvq4VGVl8fB5CGdWiQQ1JqoisTA790uSvnNbw==}
+  '@slango.configs/prettier@1.0.38':
+    resolution: {integrity: sha512-l5jYSloNCXsGjiKsB3h8MfJMmoLpQzSBhQ3oBDXB0vWk9PFVJUztCMZk3eXMDfjoz6V7g3ckE6AC5wLkQqX5lg==}
     peerDependencies:
       prettier: ^3.9.10
 
-  '@slango.configs/scripts@1.2.8':
-    resolution: {integrity: sha512-iU0Nd2llNaylDOYQ67ApYvqcRp1hSXq0AmVCN1G6MtHZzKqqq+CRYLUGwtHn36nzDzeovcQoxv885gnmt4pWJg==}
+  '@slango.configs/scripts@1.2.9':
+    resolution: {integrity: sha512-uZ2WAt/SbBGe8DmskRdYu7Wzv2cY02sx85Cw4AQEpWomYJqLDoK5Uv6gzuAWX7dLGGNG/co5ze1k59yLYT1Q5g==}
     hasBin: true
 
   '@slango.configs/typescript@3.0.1':
@@ -2698,8 +2698,8 @@ packages:
     peerDependencies:
       typescript: ^7.0.2
 
-  '@slango.configs/vitest@2.1.3':
-    resolution: {integrity: sha512-Rcyb5/Tf9OQEPKtjPBFl+aF93Zi05YIEGNmo190bz+DOKcMI99hQGXL769sOScqy8UqAdzePNc+rRrBryKzOlg==}
+  '@slango.configs/vitest@2.1.5':
+    resolution: {integrity: sha512-V4yj99r5+DXnk5G1T6tb5Sk4XGgpDMyWOFFoOwlaNlLB1qRvh0mtZnxgoMMPmMwJFDCFw11KYnAGK/1qN3TtRw==}
     peerDependencies:
       '@vitest/coverage-v8': ^5.0.5
       '@vitest/ui': ^5.0.5
@@ -3818,8 +3818,8 @@ packages:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
     engines: {node: '>=10'}
 
-  eslint-plugin-perfectionist@5.12.1:
-    resolution: {integrity: sha512-krdSE7Dz+TCtcVr2+rfNhlOIFFBJcUdoRvjaN7JQnsaVnxJw+BZh9wMkY3MSLCJat+yW+UPTQLKS82Epc7MGZA==}
+  eslint-plugin-perfectionist@5.13.0:
+    resolution: {integrity: sha512-kPlqE2Kdh0njsad9S9xL/xnq+NNVUsga/uS3yf6axE0RddACM3Q+idJyethC7R+C9b73+NRhAWvKyXPrkl0nFA==}
     engines: {node: ^20.0.0 || >=22.0.0}
     peerDependencies:
       eslint: ^8.45.0 || ^9.0.0 || ^10.0.0
@@ -6946,14 +6946,14 @@ snapshots:
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
-  '@slango.configs/lint-staged@2.0.9(lint-staged@17.6.0)':
+  '@slango.configs/lint-staged@2.0.11(lint-staged@17.6.0)':
     dependencies:
       deepmerge: 4.3.1
       lint-staged: 17.6.0
 
-  '@slango.configs/oxlint@0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@6.0.3)':
+  '@slango.configs/oxlint@0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@6.0.3)':
     dependencies:
-      eslint-plugin-perfectionist: 5.12.1(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
+      eslint-plugin-perfectionist: 5.13.0(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
       eslint-plugin-regexp: 3.3.1(eslint@10.13.0(supports-color@10.2.2))
       oxlint: 1.88.0(oxlint-tsgolint@7.0.2004)
       oxlint-tsgolint: 7.0.2004
@@ -6962,9 +6962,9 @@ snapshots:
       - supports-color
       - typescript
 
-  '@slango.configs/oxlint@0.1.14(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)':
+  '@slango.configs/oxlint@0.1.16(eslint@10.13.0(supports-color@10.2.2))(oxlint-tsgolint@7.0.2004)(oxlint@1.88.0(oxlint-tsgolint@7.0.2004))(supports-color@10.2.2)(typescript@7.0.2)':
     dependencies:
-      eslint-plugin-perfectionist: 5.12.1(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
+      eslint-plugin-perfectionist: 5.13.0(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
       eslint-plugin-regexp: 3.3.1(eslint@10.13.0(supports-color@10.2.2))
       oxlint: 1.88.0(oxlint-tsgolint@7.0.2004)
       oxlint-tsgolint: 7.0.2004
@@ -6973,17 +6973,17 @@ snapshots:
       - supports-color
       - typescript
 
-  '@slango.configs/prettier@1.0.37(prettier@3.9.10)':
+  '@slango.configs/prettier@1.0.38(prettier@3.9.10)':
     dependencies:
       prettier: 3.9.10
 
-  '@slango.configs/scripts@1.2.8': {}
+  '@slango.configs/scripts@1.2.9': {}
 
   '@slango.configs/typescript@3.0.1(typescript@7.0.2)':
     dependencies:
       typescript: 7.0.2
 
-  '@slango.configs/vitest@2.1.3(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)':
+  '@slango.configs/vitest@2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.0.5)(@vitest/ui@5.0.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.14)(rollup@4.64.7)(vite@8.3.4(@types/node@26.6.5)(yaml@2.9.1))(vitest@5.0.5)':
     dependencies:
       '@swc/core': 1.16.18(@swc/helpers@0.5.23)
       '@testing-library/dom': 10.4.2
@@ -8352,7 +8352,7 @@ snapshots:
 
   escape-string-regexp@4.0.0: {}
 
-  eslint-plugin-perfectionist@5.12.1(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3):
+  eslint-plugin-perfectionist@5.13.0(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3):
     dependencies:
       '@typescript-eslint/types': 8.71.2
       '@typescript-eslint/utils': 8.71.2(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
@@ -8363,7 +8363,7 @@ snapshots:
       - supports-color
       - typescript
 
-  eslint-plugin-perfectionist@5.12.1(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2):
+  eslint-plugin-perfectionist@5.13.0(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2):
     dependencies:
       '@typescript-eslint/types': 8.71.2
       '@typescript-eslint/utils': 8.71.2(eslint@10.13.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@7.0.2)
