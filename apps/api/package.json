@@ -25,7 +25,7 @@
     "@aiontheballot/i18n": "workspace:*",
     "@aiontheballot/observability": "workspace:*",
     "@mozilla/readability": "0.6.0",
-    "@sentry/node": "11.8.0",
+    "@sentry/node": "11.9.0",
     "better-auth": "1.7.12",
     "fastify": "5.12.7",
     "html-encoding-sniffer": "7.0.0",
