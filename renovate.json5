@@ -15,5 +15,11 @@
       automerge: false,
       labels: ['dependencies', 'share-images'],
     },
+    {
+      // The fflate override in pnpm-workspace.yaml keeps satori's font parser on the patched 0.7 line. 0.8 can't
+      // inflate the cards' WOFF fonts (every glyph comes out as a box), so the override's value never leaves 0.7.
+      matchPackageNames: ['fflate'],
+      allowedVersions: '<0.8',
+    },
   ],
 }
