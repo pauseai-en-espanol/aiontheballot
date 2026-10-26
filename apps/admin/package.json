@@ -31,9 +31,9 @@
   },
   "devDependencies": {
     "@aiontheballot/ui": "workspace:*",
-    "@pandacss/dev": "2.2.0",
-    "@pandacss/preset-base": "2.2.0",
-    "@pandacss/preset-panda": "2.2.0",
+    "@pandacss/dev": "2.4.0",
+    "@pandacss/preset-base": "2.4.0",
+    "@pandacss/preset-panda": "2.4.0",
     "@slango.configs/lint-staged": "2.0.9",
     "@slango.configs/oxlint": "0.1.14",
     "@slango.configs/typescript": "3.0.1",
@@ -44,9 +44,9 @@
     "@vitest/coverage-v8": "5.0.5",
     "@vitest/ui": "5.0.5",
     "concurrently": "10.0.6",
-    "oxlint": "1.88.0",
-    "oxlint-tsgolint": "7.0.2004",
-    "postcss": "8.5.30",
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2005",
+    "postcss": "8.5.31",
     "typescript": "7.0.2",
     "vitest": "5.0.5"
   }

@@ -21,9 +21,9 @@
     "@slango.configs/typescript": "3.0.1",
     "@types/node": "26.6.5",
     "@types/pg": "8.23.1",
-    "better-auth": "1.7.10",
-    "oxlint": "1.88.0",
-    "oxlint-tsgolint": "7.0.2004",
+    "better-auth": "1.7.12",
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2005",
     "pg": "8.23.1",
     "typescript": "7.0.2"
   }
