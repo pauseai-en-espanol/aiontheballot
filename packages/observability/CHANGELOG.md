@@ -1,5 +1,11 @@
 # @aiontheballot/observability
 
+## 0.2.9
+
+### Patch Changes
+
+- 705210c: Dependencies bump
+
 ## 0.2.8
 
 ### Patch Changes

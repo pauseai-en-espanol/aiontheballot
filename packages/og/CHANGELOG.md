@@ -1,5 +1,14 @@
 # @aiontheballot/og
 
+## 0.7.7
+
+### Patch Changes
+
+- 705210c: Dependencies bump
+- Updated dependencies [705210c]
+  - @aiontheballot/domain@0.16.2
+  - @aiontheballot/ui@0.4.8
+
 ## 0.7.6
 
 ### Patch Changes
