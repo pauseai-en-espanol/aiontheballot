@@ -22,10 +22,11 @@ const HINT_ID = 'passkey-hint';
 
 /**
  * "Use a passkey" (PLAN D22): the device offers the passkeys it holds for this host, checks who holds it, and the
- * sign-in is done, second factor and all. Beside the password, never instead of it. While a request is out the button
- * is marked busy rather than disabled, so keyboard focus stays on it.
+ * sign-in is done, second factor and all. Beside the password, never instead of it. Also how a passkey confirms it's
+ * you (PLAN D23): a sign-in afresh, then back to `next`. While a request is out the button is marked busy rather than
+ * disabled, so keyboard focus stays on it.
  */
-export const PasskeySignIn = ({ text }: { text: PasskeySignInText }) => {
+export const PasskeySignIn = ({ next = '/', text }: { next?: string; text: PasskeySignInText }) => {
   const [error, setError] = useState<AuthError>();
   const [pending, setPending] = useState(false);
 
@@ -41,7 +42,7 @@ export const PasskeySignIn = ({ text }: { text: PasskeySignInText }) => {
       setError(failed);
       return;
     }
-    window.location.assign('/');
+    window.location.assign(next);
   };
 
   return (

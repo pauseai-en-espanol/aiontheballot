@@ -131,17 +131,15 @@ describe("a member's tokens, minted in the admin and used by a tool (ADR-0008, P
     const { who } = await signedIn();
     const token = await minted(who);
     expect((await asTool(token.token, '/api/tokens')).statusCode).toBe(401);
-    // Nor from the member's own session when the request carries a token too.
-    expect(
-      (
-        await who.send(
-          'POST',
-          '/api/tokens',
-          { name: 'Otra', days: 30 },
-          { authorization: `Bearer ${token.token}` },
-        )
-      ).statusCode,
-    ).toBe(401);
+    // Nor from the member's own session when the request carries a token too: minting is among the riskiest actions,
+    // which no token runs (PLAN D23).
+    const beside = await who.send(
+      'POST',
+      '/api/tokens',
+      { name: 'Otra', days: 30 },
+      { authorization: `Bearer ${token.token}` },
+    );
+    expect([beside.statusCode, beside.json()]).toEqual([403, { error: 'notForTokens' }]);
     expect(
       (
         await who.send(

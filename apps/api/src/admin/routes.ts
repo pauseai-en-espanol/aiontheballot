@@ -31,6 +31,11 @@ import type { FetcherClient } from '../fetcher-client.js';
 import type { ProfileSource } from './profiles.js';
 
 import { PasswordMailFailed } from '../auth/password-links.js';
+import {
+  RECENT_SECOND_FACTOR,
+  recentSecondFactorFor,
+  recentSecondFactorIf,
+} from '../auth/step-up.js';
 import { COPY_TYPES, isCopyType } from '../copy-types.js';
 import { databaseRefusal } from '../database-errors.js';
 import { mailFailure } from '../mail/mailer.js';
@@ -1311,6 +1316,23 @@ const siteFor = async (trx: Transaction<DB>, slug: string) => {
   return site;
 };
 
+/**
+ * The riskiest actions (PLAN D23) want a second factor of the last 12 hours (auth/step-up.ts): who has access to a
+ * site, a site's settings and the platform's sites and organizations, going live and the review rules, a programme's
+ * status, deciding a change, erasure, and the audit logs. Each such route says so in its `config`; these two only for
+ * some bodies. An election's PATCH when it changes whether or when the public sees it, or the review rule (the details
+ * form sends none of these).
+ */
+const ELECTION_SHOWN = recentSecondFactorFor(
+  'status',
+  'announced',
+  'requireSecondReviewer',
+  'frozenFrom',
+  'frozenUntil',
+);
+/** A change proposed and applied at once, which is approving it (CR1.5); only proposing one drafts. */
+const CHANGE_APPLIED = recentSecondFactorIf('apply');
+
 /** The methods that write: a HEAD (Fastify's own, for every GET) never does. */
 const WRITES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -1617,6 +1639,7 @@ export const adminDataRoutes =
     scope.post<{ Params: { tenant: string }; Body: { email: string; role: TenantRole } }>(
       '/t/:tenant/invitations',
       {
+        config: RECENT_SECOND_FACTOR,
         schema: {
           params: TENANT_PARAMS,
           body: {
@@ -1704,7 +1727,7 @@ export const adminDataRoutes =
     // Revokes a pending invitation (A2.6).
     scope.post<{ Params: { tenant: string; id: string } }>(
       '/t/:tenant/invitations/:id/revoke',
-      { schema: { params: INVITATION_PARAMS } },
+      { config: RECENT_SECOND_FACTOR, schema: { params: INVITATION_PARAMS } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           await withActor(db, actor, async (trx) => {
@@ -1720,7 +1743,7 @@ export const adminDataRoutes =
     // Deletes an accepted, revoked or expired invitation, so its email isn't kept (A2.6); a pending one is revoked first.
     scope.delete<{ Params: { tenant: string; id: string } }>(
       '/t/:tenant/invitations/:id',
-      { schema: { params: INVITATION_PARAMS } },
+      { config: RECENT_SECOND_FACTOR, schema: { params: INVITATION_PARAMS } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           await withActor(db, actor, async (trx) => {
@@ -1737,6 +1760,7 @@ export const adminDataRoutes =
     scope.post<{ Params: { tenant: string; userId: string }; Body: { role: TenantRole } }>(
       '/t/:tenant/members/:userId/roles',
       {
+        config: RECENT_SECOND_FACTOR,
         schema: {
           params: MEMBER_PARAMS,
           body: {
@@ -1765,7 +1789,7 @@ export const adminDataRoutes =
     // sent it. At most one every 15 minutes per account.
     scope.post<{ Params: { tenant: string; userId: string } }>(
       '/t/:tenant/members/:userId/password-reset',
-      { schema: { params: MEMBER_PARAMS } },
+      { config: RECENT_SECOND_FACTOR, schema: { params: MEMBER_PARAMS } },
       async (request, reply) =>
         signedIn(
           request,
@@ -1835,7 +1859,7 @@ export const adminDataRoutes =
     // Removes a role (A7.2), never the tenant's last country admin (A7.4).
     scope.delete<{ Params: { tenant: string; userId: string; role: TenantRole } }>(
       '/t/:tenant/members/:userId/roles/:role',
-      { schema: { params: MEMBER_ROLE_PARAMS } },
+      { config: RECENT_SECOND_FACTOR, schema: { params: MEMBER_ROLE_PARAMS } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           await withActor(db, actor, async (trx) => {
@@ -1872,6 +1896,7 @@ export const adminDataRoutes =
     }>(
       '/t/:tenant/settings',
       {
+        config: RECENT_SECOND_FACTOR,
         schema: {
           params: TENANT_PARAMS,
           body: {
@@ -2107,7 +2132,7 @@ export const adminDataRoutes =
     // A new organization (P2.1).
     scope.post<{ Body: OrganizationBody }>(
       '/organizations',
-      { schema: { body: ORGANIZATION_BODY } },
+      { config: RECENT_SECOND_FACTOR, schema: { body: ORGANIZATION_BODY } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           const id = await withActor(db, actor, async (trx) => {
@@ -2147,7 +2172,10 @@ export const adminDataRoutes =
     // Changes an organization (P2.1): every field at once, as the form shows them.
     scope.put<{ Params: { id: string }; Body: OrganizationBody }>(
       '/organizations/:id',
-      { schema: { params: ORGANIZATION_PARAMS, body: ORGANIZATION_BODY } },
+      {
+        config: RECENT_SECOND_FACTOR,
+        schema: { params: ORGANIZATION_PARAMS, body: ORGANIZATION_BODY },
+      },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           const sites = await withActor(db, actor, async (trx) => {
@@ -2197,7 +2225,7 @@ export const adminDataRoutes =
     // A new site, off until a platform admin turns it on (R129).
     scope.post<{ Body: SiteBody }>(
       '/sites',
-      { schema: { body: SITE_BODY } },
+      { config: RECENT_SECOND_FACTOR, schema: { body: SITE_BODY } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           const { slug } = await withActor(db, actor, async (trx) => {
@@ -2227,7 +2255,7 @@ export const adminDataRoutes =
     // Turns a site on or off; the database refuses it on without an operator.
     scope.put<{ Params: { site: string }; Body: { active: boolean } }>(
       '/sites/:site/active',
-      { schema: { params: SITE_PARAMS, body: SITE_ACTIVE_BODY } },
+      { config: RECENT_SECOND_FACTOR, schema: { params: SITE_PARAMS, body: SITE_ACTIVE_BODY } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           await withActor(db, actor, async (trx) => {
@@ -2248,7 +2276,7 @@ export const adminDataRoutes =
       Body: { name: Record<string, string>; enabledLocales: string[]; operatorId: string };
     }>(
       '/sites/:site',
-      { schema: { params: SITE_PARAMS, body: SITE_DETAILS_BODY } },
+      { config: RECENT_SECOND_FACTOR, schema: { params: SITE_PARAMS, body: SITE_DETAILS_BODY } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           await withActor(db, actor, async (trx) => {
@@ -2290,7 +2318,7 @@ export const adminDataRoutes =
     ) =>
       scope.put<{ Params: { site: string }; Body: Body }>(
         path,
-        { schema: { params: SITE_PARAMS, body } },
+        { config: RECENT_SECOND_FACTOR, schema: { params: SITE_PARAMS, body } },
         async (request, reply) =>
           signedIn(request, reply, async (db, actor) => {
             await withActor(db, actor, async (trx) => {
@@ -3588,7 +3616,10 @@ export const adminDataRoutes =
     // Changes an election's fields, announcement or four-eyes (E1.3, P1).
     scope.patch<{ Params: { tenant: string; election: string }; Body: ElectionBody }>(
       '/t/:tenant/e/:election',
-      { schema: { params: ELECTION_PARAMS, body: { ...ELECTION_BODY, minProperties: 1 } } },
+      {
+        config: ELECTION_SHOWN,
+        schema: { params: ELECTION_PARAMS, body: { ...ELECTION_BODY, minProperties: 1 } },
+      },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           const slug = await withActor(db, actor, async (trx) => {
@@ -3643,7 +3674,7 @@ export const adminDataRoutes =
     // Deletes a draft election (E8).
     scope.delete<{ Params: { tenant: string; election: string } }>(
       '/t/:tenant/e/:election',
-      { schema: { params: ELECTION_PARAMS } },
+      { config: RECENT_SECOND_FACTOR, schema: { params: ELECTION_PARAMS } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           await withActor(db, actor, async (trx) => {
@@ -3658,6 +3689,7 @@ export const adminDataRoutes =
     scope.post<{ Params: { tenant: string; election: string }; Body: { confirmation: string } }>(
       '/t/:tenant/e/:election/purge',
       {
+        config: RECENT_SECOND_FACTOR,
         schema: {
           params: ELECTION_PARAMS,
           body: {
@@ -3800,6 +3832,7 @@ export const adminDataRoutes =
     }>(
       '/t/:tenant/e/:election/parties/:id/programme',
       {
+        config: RECENT_SECOND_FACTOR,
         schema: {
           params: ELECTION_ID_PARAMS,
           body: {
@@ -4342,7 +4375,7 @@ export const adminDataRoutes =
     // Removes a report's personal data at once, on request (H2.5): country admins only, as the report rules say.
     scope.post<{ Params: { tenant: string; id: string } }>(
       '/t/:tenant/reports/:id/anonymize',
-      { schema: { params: ID_PARAMS } },
+      { config: RECENT_SECOND_FACTOR, schema: { params: ID_PARAMS } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           await withActor(db, actor, async (trx) => {
@@ -4388,7 +4421,7 @@ export const adminDataRoutes =
     };
     scope.get<{ Params: { tenant: string }; Querystring: AuditQuery }>(
       '/t/:tenant/audit',
-      { schema: { params: TENANT_PARAMS, querystring: AUDIT_QUERY } },
+      { config: RECENT_SECOND_FACTOR, schema: { params: TENANT_PARAMS, querystring: AUDIT_QUERY } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           const { page, memberIds } = await withActor(db, actor, async (trx) => {
@@ -4416,7 +4449,7 @@ export const adminDataRoutes =
     );
     scope.get<{ Querystring: AuditQuery }>(
       '/platform/audit',
-      { schema: { querystring: AUDIT_QUERY } },
+      { config: RECENT_SECOND_FACTOR, schema: { querystring: AUDIT_QUERY } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           const page = await withActor(db, actor, async (trx) => {
@@ -4495,7 +4528,7 @@ export const adminDataRoutes =
       Body: ChangeBody;
     }>(
       '/t/:tenant/e/:election/changes',
-      { schema: { params: ELECTION_PARAMS, body: CHANGE_BODY } },
+      { config: CHANGE_APPLIED, schema: { params: ELECTION_PARAMS, body: CHANGE_BODY } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           const id = await withActor(db, actor, async (trx) => {
@@ -4545,6 +4578,7 @@ export const adminDataRoutes =
     }>(
       '/t/:tenant/e/:election/changes/:id/decision',
       {
+        config: RECENT_SECOND_FACTOR,
         schema: {
           params: ELECTION_ID_PARAMS,
           body: {

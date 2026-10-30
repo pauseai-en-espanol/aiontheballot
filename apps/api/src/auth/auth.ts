@@ -10,15 +10,13 @@ import type { FoundSession } from './session.js';
 
 import { passwordLinkRow } from './password-link-rows.js';
 import { AUTH_MODELS, authSchemaOptions } from './schema.js';
+import { createStepUp, type StepUp } from './step-up.js';
 
 /** A session ends this long after sign-in at the latest, however much it is used (editorial workflow A4.4, D22). */
 export const SESSION_SECONDS = 7 * 24 * 60 * 60;
 
 /** And this long after it was last used: each use moves its end on, up to SESSION_SECONDS (PLAN D22). */
 export const SESSION_IDLE_SECONDS = 48 * 60 * 60;
-
-/** A passkey is added only from a session at most this old: a sign-in of the last 12 hours (PLAN D22). */
-export const FRESH_SESSION_SECONDS = 12 * 60 * 60;
 
 /**
  * What a passkey's answer must say for it to count as the second factor: that the device checked who holds it
@@ -172,10 +170,11 @@ export interface AuthOptions {
   onMailError?: ((error: unknown) => void) | undefined;
 }
 
-/** What the API uses of Better Auth: its endpoints, and reading a request's session. */
+/** What the API uses of Better Auth: its endpoints, and reading a request's session; and confirming it's you again. */
 export interface Auth {
   handler: (request: Request) => Promise<Response>;
   api: { getSession: (context: { headers: Headers }) => Promise<FoundSession | null> };
+  stepUp: StepUp;
 }
 
 /**
@@ -304,7 +303,9 @@ export const authOptions = ({
       // The cookie lasts the week; the row's end, which createAuth moves on as the session is used, decides.
       expiresIn: SESSION_SECONDS,
       disableSessionRefresh: true,
-      freshAge: FRESH_SESSION_SECONDS,
+      // Better Auth's own "fresh" counts from sign-in only; adding a passkey wants a recent second factor instead, a
+      // code typed again included, which routes.ts checks (step-up.ts).
+      freshAge: 0,
     },
     advanced: {
       ...schema.advanced,
@@ -353,9 +354,10 @@ export const keepSessionAlive = async (
 };
 
 export const createAuth = (options: AuthOptions): Auth => {
-  const auth: Auth = betterAuth(authOptions(options));
+  const auth = betterAuth(authOptions(options));
   return {
     handler: auth.handler,
+    stepUp: createStepUp(options.pool),
     api: {
       // Every request that finds its session (routes.ts) uses it. Better Auth's own refresh is off: it would move the
       // row's end but not the cookie's, which the API reads on the server, and never stop at a week.

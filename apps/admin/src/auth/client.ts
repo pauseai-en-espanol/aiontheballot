@@ -23,7 +23,7 @@ export type AuthError =
   | 'passkeyUnknown'
   | 'passkeyExists'
   | 'passkeyUnsupported'
-  | 'notFresh'
+  | 'stepUp'
   | 'unexpected';
 
 export interface AuthAnswer {
@@ -57,8 +57,6 @@ const ERRORS: Readonly<Record<string, AuthError>> = {
   AUTHENTICATION_FAILED: 'passkeyUnknown',
   PREVIOUSLY_REGISTERED: 'passkeyExists',
   CHALLENGE_NOT_FOUND: 'passkeyCancelled',
-  // Adding one more than 12 hours after signing in.
-  SESSION_NOT_FRESH: 'notFresh',
 };
 
 /** The errors after which only signing in again helps. */

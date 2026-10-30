@@ -56,6 +56,10 @@ export const addPasskey = async (name: string): Promise<AuthError | undefined> =
     return 'passkeyUnsupported';
   }
   const options = await getAuth('/passkey/generate-register-options');
+  if (options.status === 403 && options.body.error === 'stepUp') {
+    // Adding one is among the riskiest actions (PLAN D23): the caller asks to confirm it's you first.
+    return 'stepUp';
+  }
   const optionsJSON = challenged<PublicKeyCredentialCreationOptionsJSON>(options.body);
   if (!options.ok || !optionsJSON) {
     return authError(options);

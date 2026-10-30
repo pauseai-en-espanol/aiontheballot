@@ -1317,7 +1317,8 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
    `aal2_needs_second_factor`, PLAN R156). A passkey's sign-in is aal2 too, and a passkey is written only for an
    account with its second factor; removing one revokes its member's tokens and ends their sessions; a session's end
    is at most a week after its start (migrations `passkeys`, `sessions_within_a_week`, PLAN D22). `passkeys.name`,
-   what its owner called it, is personal data.
+   what its owner called it, is personal data. `auth.session_step_ups`, ours, records a code typed again to confirm
+   it's you and the wrong ones, only for an aal2 session, and goes with it (migration `session_step_ups`, PLAN D23).
 3. **The descriptive scale** (PLAN P6): define `red` versus `not_mentioned`.
 4. **Admissible sources** (PLAN Q9): both methodology lists default to `{pdf, web_page}` until the chapter decides.
 5. **Party names localized?** They're assumed to be `jsonb`, because some coalitions use different names in

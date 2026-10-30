@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useId, useRef, useState } from 'react';
 
 import { type AuthError } from '@/auth/client';
+import { confirmPath, here } from '@/auth/confirm';
 import { FormAlert } from '@/auth/FormAlert';
 import { addPasskey } from '@/auth/passkey-ceremonies';
 import { fill } from '@/fill';
@@ -74,6 +75,10 @@ export const PasskeysPanel = ({ rows, text }: { rows: PasskeyRow[]; text: Passke
     setStatus('');
     const failed = await addPasskey(formText(form, 'name'));
     setPending(false);
+    if (failed === 'stepUp') {
+      window.location.assign(confirmPath(here()));
+      return;
+    }
     if (failed) {
       setError(failed);
       return;

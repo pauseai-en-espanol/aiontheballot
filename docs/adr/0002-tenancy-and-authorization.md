@@ -62,6 +62,9 @@ so `auth.member_tokens` lives beside Better Auth's tables, under the same rule: 
 Amended (PLAN D22, R223): `auth.passkeys` is Better Auth's too, from its passkey plugin, granted to
 `aiontheballot_auth` alone like the other tables there. Removing one revokes its member's tokens and ends their
 sessions, as a changed password does (migration `passkeys`, reusing `revoke_member_tokens`: no new function to grant).
+Amended (PLAN D23, R224): `auth.session_step_ups`, ours, keeps a code typed again to confirm it's you, per session, and
+the wrong codes typed doing so; for `aiontheballot_auth` alone, under the same rule (no tenant data, a trigger letting
+only an aal2 session have one; no new definer function).
 Amended (PLAN R114): invitations also use Better Auth's pool to ask whether an invited email has an account, and to
 create an invited person's account with that email verified, as Better Auth's sign-up would.
 `private.pending_invitation` runs on the admin pool without an actor, since whoever holds the link is nobody yet; it
@@ -227,6 +230,13 @@ the device (WebAuthn's user verification, which the API requires at both ceremon
 way back in: only an account with it can hold a passkey (a trigger on `auth.passkeys`, locking the account's row as
 the reset does), and the reset removes them. A session now ends 48 hours after its last use and a week after sign-in
 at most, which a trigger on `auth.sessions` holds whatever writes it.
+
+Amended (PLAN D23, R224): since a session can last a week, the riskiest actions also want that second factor of the
+last 12 hours: who has access to a site, a site's settings, the platform's sites and organizations, going live and the
+review rules, a programme's status, deciding or applying a change, erasure, the audit logs, minting a member's token
+and adding a passkey. The API checks it before such a route runs (ADR-0003 §2), not the database: `app.aal` stays a
+level, and a policy can't tell an old second factor from a new one without the session (the later step above). A
+member's token never runs one (ADR-0008).
 
 What it rests on (PLAN R166, from the RLS review's D17): `app.user_id` and `app.aal` are the API's word. `withActor`
 sets them from the session it checked, and the database trusts them, so whoever holds the admin role's credential, or

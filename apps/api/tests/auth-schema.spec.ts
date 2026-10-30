@@ -28,8 +28,11 @@ afterAll(async () => {
   await Promise.all(pools.map((p) => p.end()));
 });
 
-/** Our own table in `auth`, beside Better Auth's: a member's tokens for tools (ADR-0008), tested in packages/db. */
-const OURS = 'member_tokens';
+/**
+ * Our own tables in `auth`, beside Better Auth's: a member's tokens for tools (ADR-0008), and sessions confirmed again
+ * (PLAN D23), tested in packages/db.
+ */
+const OURS = ['member_tokens', 'session_step_ups'];
 
 /**
  * A schema's tables as Postgres sees them, with the schema's name taken out so two schemas compare, and without ours
@@ -48,17 +51,18 @@ const describeSchema = async (
       JOIN pg_class c ON c.oid = a.attrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
       LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-     WHERE n.nspname = ${schema} AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped AND c.relname <> ${OURS}
+     WHERE n.nspname = ${schema} AND c.relkind = 'r' AND a.attnum > 0 AND NOT a.attisdropped
+       AND c.relname <> ALL(${OURS})
      ORDER BY 1`.execute(trx);
   const constraints = await sql<{ line: string }>`
     SELECT c.relname || ' ' || con.conname || ' ' || pg_get_constraintdef(con.oid) AS line
       FROM pg_constraint con
       JOIN pg_class c ON c.oid = con.conrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname = ${schema} AND c.relname <> ${OURS}
+     WHERE n.nspname = ${schema} AND c.relname <> ALL(${OURS})
      ORDER BY 1`.execute(trx);
   const indexes = await sql<{ line: string }>`
-    SELECT indexdef AS line FROM pg_indexes WHERE schemaname = ${schema} AND tablename <> ${OURS}
+    SELECT indexdef AS line FROM pg_indexes WHERE schemaname = ${schema} AND tablename <> ALL(${OURS})
      ORDER BY indexname`.execute(trx);
   return [...columns.rows, ...constraints.rows, ...indexes.rows].map((row) => strip(row.line));
 };

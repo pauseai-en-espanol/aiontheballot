@@ -7,7 +7,7 @@ import { AuditView } from '@/audit/AuditView';
 import { auditQuery, getAudit } from '@/audit/data';
 import { getTenant, mayAct } from '@/data';
 import { getLocale } from '@/locale';
-import { requireStage } from '@/session';
+import { requireRecentSecondFactor, requireStage } from '@/session';
 import * as styles from '@/ui/styles';
 
 type Params = {
@@ -32,6 +32,8 @@ const AuditPage = async ({ params, searchParams }: Params) => {
   }
   const query = auditQuery(await searchParams);
   const path = `/t/${overview.tenant.slug}/audit`;
+  // The log is among the riskiest actions (PLAN D23): asked to confirm first, then back here.
+  await requireRecentSecondFactor(path);
   const page = await getAudit(`/api${path}`, query);
   if (!page) {
     notFound();

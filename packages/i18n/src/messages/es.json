@@ -65,6 +65,7 @@
   "errors": {
     "tooManyTokens": "Ya tienes todas las claves que puedes tener a la vez. Revoca primero una que ya no uses.",
     "notForTokens": "Una clave de herramienta no puede hacer esto.",
+    "stepUp": "Para esto tienes que confirmar que eres tú: la última vez fue hace más de 12 horas.",
     "unexpected": "Algo ha fallado. Vuelve a intentarlo más tarde.",
     "forbidden": "No tienes permiso para hacer esto.",
     "stale": "Esto ha cambiado desde que lo abriste, o ahora no se puede hacer. Recarga y vuelve a intentarlo.",
@@ -126,6 +127,14 @@
       "backupCode": "Código de recuperación",
       "useAuthenticator": "Usar la aplicación de autenticación",
       "restart": "Volver a iniciar sesión"
+    },
+    "stepUp": {
+      "title": "Confirma que eres tú",
+      "intro": "Para esto tienes que haber confirmado que eres tú en las últimas 12 horas. Escribe el código de 6 cifras que muestra ahora tu aplicación de autenticación.",
+      "submit": "Confirmar",
+      "passkeyHint": "O confírmalo con la huella, la cara o el PIN de tu dispositivo.",
+      "noApp": "¿No tienes la aplicación a mano? Cierra la sesión y vuelve a iniciarla con un código de recuperación.",
+      "back": "Volver sin confirmar"
     },
     "enrol": {
       "title": "Configura la verificación en dos pasos",
@@ -192,7 +201,7 @@
       "passkeyUnknown": "Esa llave de acceso ya no sirve aquí: puede que la hayas quitado. Inicia sesión con tu contraseña y tu código.",
       "passkeyExists": "Esa llave de acceso ya está en tu cuenta.",
       "passkeyUnsupported": "Este navegador no admite llaves de acceso. Inicia sesión con tu contraseña y tu código.",
-      "notFresh": "Para añadir una llave tienes que haber iniciado sesión en las últimas 12 horas. Cierra la sesión, vuelve a iniciarla y añádela.",
+      "stepUp": "Antes tienes que confirmar que eres tú.",
       "unexpected": "Algo ha ido mal. Inténtalo de nuevo más tarde."
     },
     "invitation": {

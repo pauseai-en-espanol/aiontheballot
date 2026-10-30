@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { AuditView } from '@/audit/AuditView';
 import { auditQuery, getAudit } from '@/audit/data';
 import { getLocale } from '@/locale';
+import { requireRecentSecondFactor } from '@/session';
 import * as styles from '@/ui/styles';
 
 type Params = { searchParams: Promise<Record<string, string | string[] | undefined>> };
@@ -17,6 +18,8 @@ export const generateMetadata = async (): Promise<Metadata> => ({
 /** The platform's own audit entries, no site's (editorial workflow H3.1): platform admins only. */
 const PlatformAuditPage = async ({ searchParams }: Params) => {
   const query = auditQuery(await searchParams);
+  // The log is among the riskiest actions (PLAN D23): asked to confirm first, then back here.
+  await requireRecentSecondFactor('/platform/audit');
   const page = await getAudit('/api/platform/audit', query);
   if (!page) {
     notFound();

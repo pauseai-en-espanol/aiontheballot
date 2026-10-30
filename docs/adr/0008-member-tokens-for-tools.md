@@ -1,8 +1,9 @@
 # ADR-0008: A member's tokens for tools (an MCP server on their machine)
 
 - **Status:** Accepted (Dani, 2026-10-15: "i want to start now", choosing each recommendation below). Database part
-  built in PLAN R202; the API and the admin page in R203; the MCP server in R204.
-- **Date:** 2026-10-15
+  built in PLAN R202; the API and the admin page in R203; the MCP server in R204. **Amended 2026-10-30** (Dani, PLAN
+  D23): a token never reaches the riskiest actions, and minting one is one of them (the API, below).
+- **Date:** 2026-10-15; amended 2026-10-30
 - **Deciders:** Dani; drafted by Claude
 - **Relates to:** BRIEF §4 (four-eyes), §8 (least privilege); [ADR-0002](0002-tenancy-and-authorization.md) (§3 the
   actor, §6 definer functions, §9 MFA in the database, §12 change control); PLAN "Later: an MCP server for feeding
@@ -95,6 +96,12 @@ allowlist, with no new definer function or grant.
 - It carries no cookie and is never sent one, so the Origin check that stops cross-site writes doesn't apply to it; a
   request carrying both a cookie and a token is refused.
 - The member mints, lists and revokes their tokens in the admin, signed in with their second factor.
+- Amended (PLAN D23, R224): the riskiest actions want a second factor of the last 12 hours, which a token, acting at
+  aal2 with no session, has none of. A route marked as one refuses any request carrying a token (403 `notForTokens`)
+  before it runs, whatever the routes above let a token reach, and a test keeps every always-marked route off them.
+  The one marked for some bodies only, proposing a change, stays a token's, but not applying it as it is proposed.
+  Minting a token is itself one of the riskiest actions, since a token outlives the session it was minted from, as is
+  adding a passkey; and removing a passkey revokes its member's tokens, as a changed password does (PLAN D22).
 
 **The MCP server** (R204) runs on the member's machine, started by their AI tool, with the admin's address and the
 token in its environment. Its tools are the routes above, and it uploads logos from local files.

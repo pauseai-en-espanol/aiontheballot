@@ -25,6 +25,13 @@ const fakeAuth = (
       return respond(request);
     },
     api: { getSession: async () => session },
+    // A session found here passed its second factor just now.
+    stepUp: {
+      isRecent: async () => true,
+      begin: async () => true,
+      succeed: async () => undefined,
+      fail: async () => false,
+    },
   };
   return { auth, seen };
 };
@@ -278,7 +285,8 @@ describe('/api/session', () => {
       }).auth,
     );
     expect(signedIn.statusCode).toBe(200);
-    expect(signedIn.json()).toEqual({ stage: 'signed-in', user });
+    // And whether the riskiest actions would run now (PLAN D23): the stand-in's second factor is recent.
+    expect(signedIn.json()).toEqual({ stage: 'signed-in', user, recentSecondFactor: true });
     const enrol = await get(
       fakeAuth(undefined, {
         session: { id: SESSION_ID, aal: 1 },

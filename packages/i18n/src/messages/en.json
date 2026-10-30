@@ -65,6 +65,7 @@
   "errors": {
     "tooManyTokens": "You already have as many tokens as you can keep at once. Revoke one you no longer use first.",
     "notForTokens": "A tool's token can't do this.",
+    "stepUp": "For this you need to confirm it's you: your last check was over 12 hours ago.",
     "unexpected": "Something went wrong. Please try again later.",
     "forbidden": "You aren't allowed to do that.",
     "stale": "This has changed since you opened it, or can't be done right now. Reload and try again.",
@@ -126,6 +127,14 @@
       "backupCode": "Backup code",
       "useAuthenticator": "Use your authenticator app instead",
       "restart": "Sign in again"
+    },
+    "stepUp": {
+      "title": "Confirm it's you",
+      "intro": "For this you must have confirmed it's you in the last 12 hours. Enter the 6-digit code your authenticator app shows now.",
+      "submit": "Confirm",
+      "passkeyHint": "Or confirm it with your device's fingerprint, face or PIN.",
+      "noApp": "Don't have the app to hand? Sign out and sign in again with a backup code.",
+      "back": "Go back without confirming"
     },
     "enrol": {
       "title": "Set up two-step verification",
@@ -192,7 +201,7 @@
       "passkeyUnknown": "That passkey no longer works here: you may have removed it. Sign in with your password and your code.",
       "passkeyExists": "That passkey is already in your account.",
       "passkeyUnsupported": "This browser doesn't support passkeys. Sign in with your password and your code.",
-      "notFresh": "To add a passkey you must have signed in within the last 12 hours. Sign out, sign in again and add it.",
+      "stepUp": "First confirm it's you.",
       "unexpected": "Something went wrong. Please try again later."
     },
     "invitation": {

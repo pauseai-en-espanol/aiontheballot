@@ -4,6 +4,8 @@
  * comes back is a key the forms show in the page's language, never the database's own words.
  */
 
+import { confirmPath, here } from './auth/confirm';
+
 /** What can go wrong, each a key under `errors` in packages/i18n. */
 export const WRITE_ERRORS = [
   'forbidden',
@@ -42,6 +44,7 @@ export const WRITE_ERRORS = [
   'signedOut',
   'tooManyTokens',
   'notForTokens',
+  'stepUp',
   'unexpected',
 ] as const;
 export type WriteError = (typeof WRITE_ERRORS)[number];
@@ -89,6 +92,15 @@ export const answerOf = async (response: Response): Promise<WriteAnswer> => {
   }
   if (response.ok) {
     return { ok: true, body: parsed };
+  }
+  if (
+    response.status === 403 &&
+    typeof window !== 'undefined' &&
+    (parsed as { error?: unknown } | undefined)?.error === 'stepUp'
+  ) {
+    // One of the riskiest actions, with a second factor over 12 hours old (PLAN D23): every write's answer comes
+    // through here, so this is where the page goes to confirm it's you, and comes back after.
+    window.location.assign(confirmPath(here()));
   }
   const { constraint, field } =
     typeof parsed === 'object' && parsed !== null

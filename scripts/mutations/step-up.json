@@ -1,0 +1,445 @@
+[
+  {
+    "name": "/t/:tenant/invitations is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/invitations',\n      {\n        config: RECENT_SECOND_FACTOR,",
+    "new": "      '/t/:tenant/invitations',\n      {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/invitations/:id/revoke is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/invitations/:id/revoke',\n      { config: RECENT_SECOND_FACTOR, schema: { params: INVITATION_PARAMS } },",
+    "new": "      '/t/:tenant/invitations/:id/revoke',\n      { schema: { params: INVITATION_PARAMS } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/invitations/:id is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/invitations/:id',\n      { config: RECENT_SECOND_FACTOR, schema: { params: INVITATION_PARAMS } },",
+    "new": "      '/t/:tenant/invitations/:id',\n      { schema: { params: INVITATION_PARAMS } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/members/:userId/roles is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/members/:userId/roles',\n      {\n        config: RECENT_SECOND_FACTOR,",
+    "new": "      '/t/:tenant/members/:userId/roles',\n      {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/members/:userId/password-reset is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/members/:userId/password-reset',\n      { config: RECENT_SECOND_FACTOR, schema: { params: MEMBER_PARAMS } },",
+    "new": "      '/t/:tenant/members/:userId/password-reset',\n      { schema: { params: MEMBER_PARAMS } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/members/:userId/roles/:role is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/members/:userId/roles/:role',\n      { config: RECENT_SECOND_FACTOR, schema: { params: MEMBER_ROLE_PARAMS } },",
+    "new": "      '/t/:tenant/members/:userId/roles/:role',\n      { schema: { params: MEMBER_ROLE_PARAMS } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/settings is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/settings',\n      {\n        config: RECENT_SECOND_FACTOR,",
+    "new": "      '/t/:tenant/settings',\n      {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/organizations is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/organizations',\n      { config: RECENT_SECOND_FACTOR, schema: { body: ORGANIZATION_BODY } },",
+    "new": "      '/organizations',\n      { schema: { body: ORGANIZATION_BODY } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/organizations/:id is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/organizations/:id',\n      {\n        config: RECENT_SECOND_FACTOR,",
+    "new": "      '/organizations/:id',\n      {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/sites is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/sites',\n      { config: RECENT_SECOND_FACTOR, schema: { body: SITE_BODY } },",
+    "new": "      '/sites',\n      { schema: { body: SITE_BODY } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/sites/:site/active is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/sites/:site/active',\n      { config: RECENT_SECOND_FACTOR, schema: { params: SITE_PARAMS, body: SITE_ACTIVE_BODY } },",
+    "new": "      '/sites/:site/active',\n      { schema: { params: SITE_PARAMS, body: SITE_ACTIVE_BODY } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/sites/:site is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/sites/:site',\n      { config: RECENT_SECOND_FACTOR, schema: { params: SITE_PARAMS, body: SITE_DETAILS_BODY } },",
+    "new": "      '/sites/:site',\n      { schema: { params: SITE_PARAMS, body: SITE_DETAILS_BODY } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a site's public settings are not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/sites/:site',\n      { config: RECENT_SECOND_FACTOR, schema: { params: SITE_PARAMS, body: SITE_DETAILS_BODY } },\n      async (request, reply) =>\n        signedIn(request, reply, async (db, actor) => {\n          await withActor(db, actor, async (trx) => {\n            await platformOnly(trx, actor);\n            const site = await siteFor(trx, request.params.site);\n            const enabledLocales = [\n              ...new Set([site.defaultLocale, ...request.body.enabledLocales]),\n            ];\n            if (!enabledLocales.every(isLocale)) {\n              throw new Refusal(400, 'invalid', undefined, 'enabledLocales');\n            }\n            const name = localizedInput(request.body.name, enabledLocales);\n            if (name === 'invalid') {\n              throw new Refusal(400, 'invalid', undefined, 'name');\n            }\n            if (name === 'empty') {\n              throw new Refusal(422, 'incomplete', undefined, 'name');\n            }\n            refuseUnless(\n              (await setSiteDetails(trx, site.id, {\n                name,\n                enabledLocales,\n                operatorId: request.body.operatorId,\n              }))\n                ? 'changed'\n                : 'not-found',\n            );\n          });\n          return reply.code(204).send();\n        }),\n    );\n\n    // A site's public settings (PLAN R135): open or coming soon, indexed or not, its Plausible script. A platform\n    // admin's, as the database insists too.\n    const siteSetting = <Body>(\n      path: string,\n      body: object,\n      settings: (body: Body) => SiteSettings,\n    ) =>\n      scope.put<{ Params: { site: string }; Body: Body }>(\n        path,\n        { config: RECENT_SECOND_FACTOR, schema: { params: SITE_PARAMS, body } },",
+    "new": "      '/sites/:site',\n      { config: RECENT_SECOND_FACTOR, schema: { params: SITE_PARAMS, body: SITE_DETAILS_BODY } },\n      async (request, reply) =>\n        signedIn(request, reply, async (db, actor) => {\n          await withActor(db, actor, async (trx) => {\n            await platformOnly(trx, actor);\n            const site = await siteFor(trx, request.params.site);\n            const enabledLocales = [\n              ...new Set([site.defaultLocale, ...request.body.enabledLocales]),\n            ];\n            if (!enabledLocales.every(isLocale)) {\n              throw new Refusal(400, 'invalid', undefined, 'enabledLocales');\n            }\n            const name = localizedInput(request.body.name, enabledLocales);\n            if (name === 'invalid') {\n              throw new Refusal(400, 'invalid', undefined, 'name');\n            }\n            if (name === 'empty') {\n              throw new Refusal(422, 'incomplete', undefined, 'name');\n            }\n            refuseUnless(\n              (await setSiteDetails(trx, site.id, {\n                name,\n                enabledLocales,\n                operatorId: request.body.operatorId,\n              }))\n                ? 'changed'\n                : 'not-found',\n            );\n          });\n          return reply.code(204).send();\n        }),\n    );\n\n    // A site's public settings (PLAN R135): open or coming soon, indexed or not, its Plausible script. A platform\n    // admin's, as the database insists too.\n    const siteSetting = <Body>(\n      path: string,\n      body: object,\n      settings: (body: Body) => SiteSettings,\n    ) =>\n      scope.put<{ Params: { site: string }; Body: Body }>(\n        path,\n        { schema: { params: SITE_PARAMS, body } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/e/:election is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/e/:election',\n      {\n        config: ELECTION_SHOWN,",
+    "new": "      '/t/:tenant/e/:election',\n      {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/e/:election is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/e/:election',\n      { config: RECENT_SECOND_FACTOR, schema: { params: ELECTION_PARAMS } },",
+    "new": "      '/t/:tenant/e/:election',\n      { schema: { params: ELECTION_PARAMS } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/e/:election/purge is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/e/:election/purge',\n      {\n        config: RECENT_SECOND_FACTOR,",
+    "new": "      '/t/:tenant/e/:election/purge',\n      {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/e/:election/parties/:id/programme is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/e/:election/parties/:id/programme',\n      {\n        config: RECENT_SECOND_FACTOR,",
+    "new": "      '/t/:tenant/e/:election/parties/:id/programme',\n      {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/reports/:id/anonymize is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/reports/:id/anonymize',\n      { config: RECENT_SECOND_FACTOR, schema: { params: ID_PARAMS } },",
+    "new": "      '/t/:tenant/reports/:id/anonymize',\n      { schema: { params: ID_PARAMS } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/audit is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/audit',\n      { config: RECENT_SECOND_FACTOR, schema: { params: TENANT_PARAMS, querystring: AUDIT_QUERY } },",
+    "new": "      '/t/:tenant/audit',\n      { schema: { params: TENANT_PARAMS, querystring: AUDIT_QUERY } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/platform/audit is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/platform/audit',\n      { config: RECENT_SECOND_FACTOR, schema: { querystring: AUDIT_QUERY } },",
+    "new": "      '/platform/audit',\n      { schema: { querystring: AUDIT_QUERY } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/e/:election/changes is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/e/:election/changes',\n      { config: CHANGE_APPLIED, schema: { params: ELECTION_PARAMS, body: CHANGE_BODY } },",
+    "new": "      '/t/:tenant/e/:election/changes',\n      { schema: { params: ELECTION_PARAMS, body: CHANGE_BODY } },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "/t/:tenant/e/:election/changes/:id/decision is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "      '/t/:tenant/e/:election/changes/:id/decision',\n      {\n        config: RECENT_SECOND_FACTOR,",
+    "new": "      '/t/:tenant/e/:election/changes/:id/decision',\n      {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "an election's status changes without a recent second factor",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'status',\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "an election's announced changes without a recent second factor",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'announced',\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "an election's requireSecondReviewer changes without a recent second factor",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'requireSecondReviewer',\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "an election's frozenFrom changes without a recent second factor",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'frozenFrom',\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "an election's frozenUntil changes without a recent second factor",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'frozenUntil',\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a change proposed and applied at once is not among the riskiest actions",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "const CHANGE_APPLIED = recentSecondFactorIf('apply');",
+    "new": "const CHANGE_APPLIED = recentSecondFactorIf('never');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "proposing a change without applying it asks to confirm",
+    "file": "apps/api/src/auth/step-up.ts",
+    "old": "  recentSecondFactor: { when: (body) => isRecord(body) && body[field] === true },",
+    "new": "  recentSecondFactor: { when: (body) => isRecord(body) && body[field] !== undefined },",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a field set to null or false goes unnoticed",
+    "file": "apps/api/src/auth/step-up.ts",
+    "old": "    when: (body) => isRecord(body) && fields.some((field) => body[field] !== undefined),",
+    "new": "    when: (body) => isRecord(body) && fields.some((field) => Boolean(body[field])),",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a route marked always is let through",
+    "file": "apps/api/src/auth/step-up.ts",
+    "old": "): boolean => marked === true || (marked !== undefined && marked.when(body));",
+    "new": "): boolean => marked !== undefined && marked !== true && marked.when(body);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "minting a token is not among the riskiest actions",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "        config: RECENT_SECOND_FACTOR,\n        schema: {\n          body: {\n            type: 'object',\n            required: ['name', 'days'],",
+    "new": "        schema: {\n          body: {\n            type: 'object',\n            required: ['name', 'days'],",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "adding a passkey wants no recent second factor",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "  '/passkey/generate-register-options': 'recent',\n  '/passkey/verify-registration': 'recent',",
+    "new": "  '/passkey/generate-register-options': 'signed-in',\n  '/passkey/verify-registration': 'signed-in',",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a member's token reaches the riskiest actions",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "      if (request.headers.authorization !== undefined) {\n        return reply.code(403).send({ error: 'notForTokens' });",
+    "new": "      if (request.headers.authorization === 'never') {\n        return reply.code(403).send({ error: 'notForTokens' });",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "an old second factor runs the riskiest actions",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "      if (found && !(await auth.stepUp.isRecent(found.session.id))) {\n        return reply.code(403).send({ error: 'stepUp' });",
+    "new": "      if (found && (await auth.stepUp.isRecent('never'))) {\n        return reply.code(403).send({ error: 'stepUp' });",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the riskiest actions check their body before the second factor",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "    scope.addHook('preValidation', async (request, reply) => {",
+    "new": "    scope.addHook('preHandler', async (request, reply) => {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a signed-in session checks codes through Better Auth",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "const CHALLENGE_OR_ENROL_ONLY: ReadonlySet<string> = new Set([\n  '/two-factor/verify-totp',\n",
+    "new": "const CHALLENGE_OR_ENROL_ONLY: ReadonlySet<string> = new Set([\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a code is checked from another site's page",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "        if (request.headers.origin !== adminOrigin) {\n          return reply.code(403).send({ error: 'forbidden' });\n        }\n        const sessionId",
+    "new": "        if (request.headers.origin === 'never') {\n          return reply.code(403).send({ error: 'forbidden' });\n        }\n        const sessionId",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a code is checked beside a member's token",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "      async (request, reply) => {\n        const found = await signedInSession(request);\n        if (!found) {\n          return reply.code(401).send({ error: 'Sign in with your second factor first' });\n        }\n        // A write",
+    "new": "      async (request, reply) => {\n        const found = await findSession(request);\n        if (!found) {\n          return reply.code(401).send({ error: 'Sign in with your second factor first' });\n        }\n        // A write",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the session says its second factor is always recent",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "            recentSecondFactor: await auth.stepUp.isRecent(found.session.id),",
+    "new": "            recentSecondFactor: true,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a confirmation lasts longer than 12 hours",
+    "file": "apps/api/src/auth/step-up.ts",
+    "old": "export const STEP_UP_SECONDS = 12 * 60 * 60;",
+    "new": "export const STEP_UP_SECONDS = 14 * 60 * 60;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a code typed again never counts",
+    "file": "apps/api/src/auth/step-up.ts",
+    "old": "        `SELECT s.aal = 2 AND greatest(s.created_at, u.second_factor_at) > now() - make_interval(secs => $2)",
+    "new": "        `SELECT s.aal = 2 AND s.created_at > now() - make_interval(secs => $2)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a right code doesn't confirm",
+    "file": "apps/api/src/auth/step-up.ts",
+    "old": "        'UPDATE session_step_ups SET second_factor_at = now(), failures = 0 WHERE session_id = $1',",
+    "new": "        'UPDATE session_step_ups SET failures = 0 WHERE session_id = $1',",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the fifth wrong code leaves the session",
+    "file": "apps/api/src/auth/step-up.ts",
+    "old": "      if ((await attempts(sessionId)) >= STEP_UP_ATTEMPTS) {",
+    "new": "      if ((await attempts(sessionId)) > STEP_UP_ATTEMPTS) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "attempts sent at once are not counted before the check",
+    "file": "apps/api/src/auth/step-up.ts",
+    "old": "         ON CONFLICT (session_id) DO UPDATE SET failures = session_step_ups.failures + 1\n          WHERE session_step_ups.failures < $2`,",
+    "new": "         ON CONFLICT (session_id) DO UPDATE SET failures = session_step_ups.failures\n          WHERE session_step_ups.failures < $2`,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "Better Auth's own freshness decides whether a passkey is added",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "      freshAge: 0,\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "migration: a password-only session confirms",
+    "file": "db/migrations/20261030120000_session_step_ups.sql",
+    "old": "    PERFORM 1 FROM auth.sessions s WHERE s.id = NEW.session_id AND s.aal = 2 FOR KEY SHARE;",
+    "new": "    PERFORM 1 FROM auth.sessions s WHERE s.id = NEW.session_id FOR KEY SHARE;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: a confirmation is moved to a password-only session",
+    "file": "db/migrations/20261030120000_session_step_ups.sql",
+    "old": "CREATE TRIGGER step_up_needs_aal2 BEFORE INSERT OR UPDATE ON auth.session_step_ups",
+    "new": "CREATE TRIGGER step_up_needs_aal2 BEFORE INSERT ON auth.session_step_ups",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: more than five wrong codes are counted",
+    "file": "db/migrations/20261030120000_session_step_ups.sql",
+    "old": "CHECK (failures BETWEEN 0 AND 5)",
+    "new": "CHECK (failures BETWEEN 0 AND 6)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: a confirmation outlives its session",
+    "file": "db/migrations/20261030120000_session_step_ups.sql",
+    "old": "REFERENCES auth.sessions (id) ON DELETE CASCADE",
+    "new": "REFERENCES auth.sessions (id)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: another runtime role reads the confirmations",
+    "file": "db/migrations/20261030120000_session_step_ups.sql",
+    "old": "GRANT SELECT, INSERT, UPDATE, DELETE ON auth.session_step_ups TO aiontheballot_auth;",
+    "new": "GRANT SELECT, INSERT, UPDATE, DELETE ON auth.session_step_ups TO aiontheballot_auth;\nGRANT USAGE ON SCHEMA auth TO aiontheballot_admin;\nGRANT SELECT ON auth.session_step_ups TO aiontheballot_admin;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "end to end: a write among the riskiest actions just fails, never asking to confirm",
+    "file": "apps/admin/src/write.ts",
+    "old": "    window.location.assign(confirmPath(here()));\n  }\n  const { constraint",
+    "new": "  }\n  const { constraint",
+    "cwd": "e2e",
+    "before": "pnpm --filter @aiontheballot/admin build > /dev/null",
+    "after": "pnpm --filter @aiontheballot/admin build > /dev/null",
+    "cmd": "pnpm exec playwright test tests/step-up.spec.ts"
+  },
+  {
+    "name": "end to end: the audit log doesn't ask before it opens",
+    "file": "apps/admin/src/app/t/[tenant]/audit/page.tsx",
+    "old": "  await requireRecentSecondFactor(path);\n",
+    "new": "",
+    "cwd": "e2e",
+    "before": "pnpm --filter @aiontheballot/admin build > /dev/null",
+    "after": "pnpm --filter @aiontheballot/admin build > /dev/null",
+    "cmd": "pnpm exec playwright test tests/step-up.spec.ts"
+  },
+  {
+    "name": "end to end: a passkey confirms but doesn't come back",
+    "file": "apps/admin/src/auth/PasskeySignIn.tsx",
+    "old": "    window.location.assign(next);",
+    "new": "    window.location.assign('/');",
+    "cwd": "e2e",
+    "before": "pnpm --filter @aiontheballot/admin build > /dev/null",
+    "after": "pnpm --filter @aiontheballot/admin build > /dev/null",
+    "cmd": "pnpm exec playwright test tests/step-up.spec.ts"
+  }
+]

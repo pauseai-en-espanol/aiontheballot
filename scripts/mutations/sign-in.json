@@ -24,14 +24,6 @@
     "cwd": "apps/api"
   },
   {
-    "name": "a passkey is added from a session of any age",
-    "file": "apps/api/src/auth/auth.ts",
-    "old": "      freshAge: FRESH_SESSION_SECONDS,\n",
-    "new": "",
-    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
-    "cwd": "apps/api"
-  },
-  {
     "name": "a session starts with the whole week",
     "file": "apps/api/src/auth/auth.ts",
     "old": "                Math.min(session.expiresAt.getTime(), Date.now() + SESSION_IDLE_SECONDS * 1000),",
@@ -74,24 +66,24 @@
   {
     "name": "Better Auth refreshes sessions itself",
     "file": "apps/api/src/auth/auth.ts",
-    "old": "      disableSessionRefresh: true,\n      freshAge",
-    "new": "      disableSessionRefresh: false,\n      freshAge",
+    "old": "      disableSessionRefresh: true,\n",
+    "new": "      disableSessionRefresh: false,\n",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/auth.spec.ts",
     "cwd": "apps/api"
   },
   {
     "name": "a password alone adds a passkey",
     "file": "apps/api/src/auth/routes.ts",
-    "old": "const SIGNED_IN_ONLY: ReadonlySet<string> = new Set([\n  '/passkey/generate-register-options',\n",
-    "new": "const SIGNED_IN_ONLY: ReadonlySet<string> = new Set([\n",
+    "old": "  '/passkey/generate-register-options': 'recent',\n",
+    "new": "",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
     "cwd": "apps/api"
   },
   {
     "name": "a password alone removes a passkey",
     "file": "apps/api/src/auth/routes.ts",
-    "old": "  '/passkey/verify-registration',\n  '/passkey/delete-passkey',\n]);",
-    "new": "  '/passkey/verify-registration',\n]);",
+    "old": "  '/passkey/delete-passkey': 'signed-in',\n",
+    "new": "",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
     "cwd": "apps/api"
   },

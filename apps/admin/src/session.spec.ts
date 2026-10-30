@@ -8,7 +8,18 @@ const { sessionFrom } = await import('./session');
 describe('sessionFrom', () => {
   it("takes the API's stage, signed in or not", () => {
     const user = { id: 'u', name: 'Persona', email: 'p@example.org' };
-    expect(sessionFrom(200, { stage: 'signed-in', user })).toEqual({ stage: 'signed-in', user });
+    expect(sessionFrom(200, { stage: 'signed-in', user })).toEqual({
+      stage: 'signed-in',
+      user,
+      recentSecondFactor: false,
+    });
+    // Whether the riskiest actions would run now (PLAN D23): only when the API says so in as many words.
+    expect(sessionFrom(200, { stage: 'signed-in', user, recentSecondFactor: true })).toMatchObject({
+      recentSecondFactor: true,
+    });
+    expect(sessionFrom(200, { stage: 'signed-in', user, recentSecondFactor: 'yes' })).toMatchObject(
+      { recentSecondFactor: false },
+    );
     expect(sessionFrom(200, { stage: 'enrol', user })).toEqual({ stage: 'enrol', user });
     expect(sessionFrom(401, { stage: 'challenge' })).toEqual({ stage: 'challenge' });
     expect(sessionFrom(401, { stage: 'signed-out' })).toEqual({ stage: 'signed-out' });

@@ -296,7 +296,7 @@ describe('passkeys (PLAN D22)', () => {
     expect(await listed(account.who)).toHaveLength(1);
   });
 
-  it('are added only within 12 hours of signing in', async () => {
+  it('are added only within 12 hours of a second factor (PLAN D23)', async () => {
     const account = await enrolled();
     const [session] = await sessionsOf(account.id);
     await authPool.query(
@@ -306,7 +306,7 @@ describe('passkeys (PLAN D22)', () => {
     );
     const options = await account.who.send('GET', '/api/auth/passkey/generate-register-options');
     expect(options.statusCode).toBe(403);
-    expect(options.json()).toMatchObject({ code: 'SESSION_NOT_FRESH' });
+    expect(options.json()).toEqual({ error: 'stepUp' });
   });
 
   it('once removed, let nobody in, and end their member’s sessions and tokens, as a new password does', async () => {

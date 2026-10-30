@@ -125,6 +125,10 @@ _As a member, I sign in with a password and a second factor._
 7. A member with TOTP may add passkeys and then sign in with one alone, the device checking who holds it; the password
    and the code keep working (PLAN D22). Only an account with TOTP holds one, and removing one ends the member's
    sessions and revokes their tokens. [API; DB: triggers on `auth.passkeys`]
+8. The riskiest actions want a second factor of the last 12 hours (PLAN D23): who has access to a site, its settings,
+   going live and the review rules, deciding a change, erasure, the audit log, minting a token and adding a passkey.
+   Past that, the admin asks to confirm it's you (a code, or a passkey) and comes back; the fifth wrong code ends the
+   session. A member's token never runs them. [API: `recentSecondFactor` routes; DB: `auth.session_step_ups`]
 
 ### A5. Passwords and lost factors
 

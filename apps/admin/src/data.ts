@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 
 import { getFromApi } from './api';
+import { confirmPath } from './auth/confirm';
 import { forwardedRequest } from './session';
 
 /**
@@ -73,6 +74,11 @@ export const readApi = async (path: string): Promise<unknown> => {
   }
   if (status === 401) {
     redirect('/sign-in');
+  }
+  // One of the riskiest actions (PLAN D23) whose page didn't ask to confirm first, as an audit log's does: the
+  // second factor got older than 12 hours meanwhile. Confirmed, the person starts again from the home page.
+  if (status === 403 && isObject(body) && body.error === 'stepUp') {
+    redirect(confirmPath('/'));
   }
   throw new Error(`The API answered ${status} for ${path}`);
 };

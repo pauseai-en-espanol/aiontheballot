@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 
 import { getFromApi } from './api';
+import { confirmPath } from './auth/confirm';
 
 /**
  * Where a request stands in signing in, as the API decides it (apps/api/src/auth/session.ts), or `unavailable` while
@@ -19,6 +20,8 @@ export interface SignedInUser {
 export interface Session {
   stage: Stage;
   user?: SignedInUser;
+  /** Signed in, whether the riskiest actions would run now, or first ask to confirm it's you (PLAN D23). */
+  recentSecondFactor?: boolean;
 }
 
 const STAGES: readonly string[] = ['signed-in', 'enrol', 'challenge', 'signed-out'];
@@ -50,7 +53,10 @@ export const forwardedRequest = async () => {
 /** The session the API's answer describes; any answer but these is a fault. */
 export const sessionFrom = (status: number, body: unknown): Session => {
   if ((status === 200 || status === 401) && isSession(body)) {
-    return body;
+    // Recent only when the API says so in as many words (PLAN D23).
+    return body.stage === 'signed-in'
+      ? { ...body, recentSecondFactor: body.recentSecondFactor === true }
+      : body;
   }
   // 503: the API has no sign-in configured yet. 404: it doesn't know /api, as during a rollout that brings it, or it
   // doesn't take this host, which the log says. Either way nobody is signed in.
@@ -82,4 +88,15 @@ export const requireStage = async (...stages: Stage[]): Promise<Session> => {
     redirect(PAGE_OF[session.stage]);
   }
   return session;
+};
+
+/**
+ * A page that is all riskiest actions (an audit log; PLAN D23): when the second factor isn't of the last 12 hours, it
+ * asks to confirm first, then comes back to `next`. The API refuses the page's data anyway.
+ */
+export const requireRecentSecondFactor = async (next: string): Promise<void> => {
+  const session = await requireStage('signed-in');
+  if (session.recentSecondFactor !== true) {
+    redirect(confirmPath(next));
+  }
 };

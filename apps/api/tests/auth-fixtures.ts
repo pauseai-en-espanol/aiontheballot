@@ -90,7 +90,7 @@ export const limiterAddress = (address: string) => {
 export const browser = (app: FastifyInstance, address = testAddress()) => {
   const jar = new Map<string, string>();
   const send = async (
-    method: 'GET' | 'POST' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     url: string,
     body?: unknown,
     headers: Record<string, string> = {},

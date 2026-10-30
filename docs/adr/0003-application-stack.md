@@ -2,7 +2,8 @@
 
 - **Status:** Accepted. Smaller choices still open are listed under [Still open](#still-open). The job-queue default
   there is superseded by [ADR-0006](0006-extraction-jobs-over-http.md). **Amended 2026-10-30** (Dani, PLAN D22):
-  optional passkeys, and sessions that last while used, up to a week (§2).
+  optional passkeys, and sessions that last while used, up to a week; and (D23) the riskiest actions want a second
+  factor of the last 12 hours (§2).
 - **Date:** 2026-10-08; amended 2026-10-30
 - **Relates to:** BRIEF §2, §5, §6, §8; [ADR-0001](0001-hosting-and-delivery.md),
   [ADR-0002](0002-tenancy-and-authorization.md)
@@ -91,11 +92,24 @@ cross-country views and an open-data export.
   alone: the device holds the key and must check who holds it (fingerprint, face or PIN; WebAuthn's user
   verification, required at both ceremonies, which Better Auth's plugin asks for but doesn't require), so its session
   is aal2. TOTP stays mandatory and the way back in: only an account with it can have a passkey (a database trigger),
-  and the owner's reset of a lost authenticator removes them. Adding one needs a sign-in of the last 12 hours and an
-  aal2 session; removing one, an aal2 session, and it ends every session of the member's and revokes their tokens for
-  tools (ADR-0008), so nothing a lost device opened outlives it. Passkeys are discoverable, bound to the admin host
+  and the owner's reset of a lost authenticator removes them. Adding one is among the riskiest actions (below);
+  removing one needs an aal2 session, and ends every session of the member's and revokes their tokens for tools
+  (ADR-0008), so nothing a lost device opened outlives it. Passkeys are discoverable, bound to the admin host
   (§4), and kept wherever the person's device keeps them (a platform's or a password manager's store, which may sync
   them). The sign-in's answer reaches the browser without the session it carries.
+- **Confirming it's you again (D23).** A session lasts up to a week, but the riskiest actions want a second factor of
+  the last 12 hours, as every session had before D22: who has access to a site (invitations, roles, a member's
+  password reset email), a site's settings, the platform's sites and organizations, an election's going live,
+  announcement, freeze and review rule, a programme's status, deciding a change or applying one as it is proposed,
+  erasure (purging or deleting an election, anonymizing a report), the audit logs, minting a member's token and adding
+  a passkey. The API marks those routes (`recentSecondFactor` in their config, an election's PATCH and a proposed
+  change only for the bodies that are one) and answers 403 `stepUp` before the body is checked; the admin goes to
+  "Confirm it's you" and comes back. A code from the app counts for the session that typed it
+  (`auth.session_step_ups`; Better Auth's own check of a signed-in session's code counts no wrong ones, so the API
+  takes an attempt before each check and ends the session at the fifth, and no longer lets a signed-in session check
+  codes through Better Auth at all); a passkey signs in afresh. Only a session that passed a second factor can confirm
+  (a trigger). A member's token never runs one (403 `notForTokens`, ADR-0008). Exports aren't among them: the admin
+  has none, and a site's export is run outside the app (runbook: exporting a site).
 
 **Options considered:**
 

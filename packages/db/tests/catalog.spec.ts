@@ -242,10 +242,16 @@ describe('catalog: closed by default', () => {
       ...['accounts'].map((table) => `${table} DELETE,INSERT,SELECT,UPDATE`),
       // A member's tokens (ADR-0008): minted and read, then only marked used or revoked, never deleted.
       'member_tokens INSERT,SELECT',
-      // Passkeys (PLAN D22) are Better Auth's too, from its passkey plugin.
-      ...['passkeys', 'rate_limits', 'sessions', 'two_factors', 'users', 'verifications'].map(
-        (table) => `${table} DELETE,INSERT,SELECT,UPDATE`,
-      ),
+      // Passkeys (PLAN D22) are Better Auth's too, from its passkey plugin; sessions confirmed again (PLAN D23), ours.
+      ...[
+        'passkeys',
+        'rate_limits',
+        'session_step_ups',
+        'sessions',
+        'two_factors',
+        'users',
+        'verifications',
+      ].map((table) => `${table} DELETE,INSERT,SELECT,UPDATE`),
     ]);
     expect(
       await rows<{ column: string }>(

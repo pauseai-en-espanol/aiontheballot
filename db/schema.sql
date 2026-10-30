@@ -3199,6 +3199,26 @@ CREATE FUNCTION private.stamp() RETURNS trigger
 ALTER FUNCTION private.stamp() OWNER TO aiontheballot_owner;
 
 --
+-- Name: step_up_needs_aal2(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.step_up_needs_aal2() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    PERFORM 1 FROM auth.sessions s WHERE s.id = NEW.session_id AND s.aal = 2 FOR KEY SHARE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'only a second-factor session confirms again' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.step_up_needs_aal2() OWNER TO aiontheballot_owner;
+
+--
 -- Name: structure_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -4667,6 +4687,20 @@ COMMENT ON COLUMN auth.rate_limits.key IS 'personal data';
 
 
 --
+-- Name: session_step_ups; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TABLE auth.session_step_ups (
+    session_id uuid NOT NULL,
+    second_factor_at timestamp with time zone,
+    failures integer DEFAULT 0 NOT NULL,
+    CONSTRAINT session_step_ups_failures_check CHECK (((failures >= 0) AND (failures <= 5)))
+);
+
+
+ALTER TABLE auth.session_step_ups OWNER TO aiontheballot_owner;
+
+--
 -- Name: sessions; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
 --
 
@@ -5523,6 +5557,14 @@ ALTER TABLE ONLY auth.rate_limits
 
 ALTER TABLE ONLY auth.rate_limits
     ADD CONSTRAINT rate_limits_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: session_step_ups session_step_ups_pkey; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.session_step_ups
+    ADD CONSTRAINT session_step_ups_pkey PRIMARY KEY (session_id);
 
 
 --
@@ -7759,6 +7801,13 @@ CREATE TRIGGER session_within_a_week BEFORE INSERT OR UPDATE OF expires_at, crea
 
 
 --
+-- Name: session_step_ups step_up_needs_aal2; Type: TRIGGER; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER step_up_needs_aal2 BEFORE INSERT OR UPDATE ON auth.session_step_ups FOR EACH ROW EXECUTE FUNCTION private.step_up_needs_aal2();
+
+
+--
 -- Name: assessment_contributors assessment_contributors_tenant_id_assessment_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -8292,6 +8341,14 @@ ALTER TABLE ONLY auth.member_tokens
 
 ALTER TABLE ONLY auth.passkeys
     ADD CONSTRAINT passkeys_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: session_step_ups session_step_ups_session_id_fkey; Type: FK CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.session_step_ups
+    ADD CONSTRAINT session_step_ups_session_id_fkey FOREIGN KEY (session_id) REFERENCES auth.sessions(id) ON DELETE CASCADE;
 
 
 --
@@ -10551,6 +10608,13 @@ REVOKE ALL ON FUNCTION private.stamp() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION step_up_needs_aal2(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.step_up_needs_aal2() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION structure_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -12784,6 +12848,13 @@ GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.passkeys TO aiontheballot_auth;
 --
 
 GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.rate_limits TO aiontheballot_auth;
+
+
+--
+-- Name: TABLE session_step_ups; Type: ACL; Schema: auth; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.session_step_ups TO aiontheballot_auth;
 
 
 --

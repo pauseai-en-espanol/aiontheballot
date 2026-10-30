@@ -262,11 +262,12 @@ describe('sign-in under /api/auth (ADR-0003 §2, editorial workflow A4)', () => 
     const before = visitor();
     expect((await signIn(before, email)).statusCode).toBe(200);
     const { totpURI } = await enrol(visitor(), email);
-    // Not even with a valid code: verifying with a session in hand opens no new one.
+    // Not even with a valid code: a session that isn't enrolling checks no code at all (PLAN D23, where nothing would
+    // count its wrong ones), and so opens no new one.
     const verified = await before.send('POST', '/api/auth/two-factor/verify-totp', {
       code: totpCode(totpURI),
     });
-    expect(verified.statusCode).toBe(200);
+    expect([verified.statusCode, verified.json()]).toEqual([403, { error: 'forbidden' }]);
     expect((await sessionsOf(id)).map((s) => s.aal).sort((a, b) => a - b)).toEqual([1, 2]);
 
     const session = await before.send('GET', '/api/session');
