@@ -1,5 +1,21 @@
 # @aiontheballot/migrations
 
+## 0.29.0
+
+### Minor Changes
+
+- 449bc17: Confirming it's you again before the riskiest actions (PLAN D23). Sessions last up to a week now, so who has access to
+  a site, a site's settings, the platform's sites and organizations, going live and the review rules, a programme's
+  status, deciding or applying a change, erasure, the audit logs, minting a token for a tool and adding a passkey want a
+  code or a passkey of the last 12 hours: if it is older, the page goes to "Confirm it's you" and comes back once
+  confirmed. Five wrong codes there end the session. A tool's token never does any of these.
+- c71a938: Signing in less often (PLAN D22). A session now ends 48 hours after it was last used, and a week after sign-in at the
+  latest, instead of 12 hours after sign-in whatever happened. And passkeys, optional: the Passkeys page, beside Tokens,
+  adds one on this computer or phone (or in a password manager), and the sign-in page's "Use a passkey" then signs in with
+  it alone, the device checking the fingerprint, face or PIN. The password and the code keep working. Removing a passkey
+  signs its member out everywhere and revokes their tokens for tools; the owner's reset of a lost authenticator removes
+  the passkeys too.
+
 ## 0.28.3
 
 ### Patch Changes
