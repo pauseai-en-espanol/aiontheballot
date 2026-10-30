@@ -171,6 +171,12 @@ describe('passkeys (PLAN D22)', () => {
         },
       ],
     });
+    // Counted against the visitor's own address, as every request Better Auth limits: never a bucket all share.
+    const { rows } = await authPool.query<{ count: number }>(
+      'SELECT count FROM rate_limits WHERE key = $1',
+      [`${limiterAddress(account.who.address)}|/passkey/list-user-passkeys`],
+    );
+    expect(rows).toEqual([{ count: 1 }]);
 
     const elsewhere = visitor();
     const signedIn = await signInWith(elsewhere, device);

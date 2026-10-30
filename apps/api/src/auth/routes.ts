@@ -382,11 +382,7 @@ export const adminRoutes =
       if (!(await signedInSession(request))) {
         return reply.code(401).send({ error: 'Sign in with your second factor first' });
       }
-      const response = await auth.handler(
-        new Request(`${adminOrigin}${AUTH_BASE_PATH}/passkey/list-user-passkeys`, {
-          headers: cookieHeaders(request),
-        }),
-      );
+      const response = await toBetterAuth(request, '/passkey/list-user-passkeys');
       if (!response.ok) {
         return reply.code(502).send({ error: 'unexpected' });
       }

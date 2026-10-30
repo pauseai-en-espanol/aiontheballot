@@ -104,6 +104,14 @@
     "cwd": "apps/api"
   },
   {
+    "name": "the passkeys page's list shares one limit among everyone",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "      const response = await toBetterAuth(request, '/passkey/list-user-passkeys');",
+    "new": "      const response = await auth.handler(\n        new Request(`${adminOrigin}${AUTH_BASE_PATH}/passkey/list-user-passkeys`, {\n          headers: cookieHeaders(request),\n        }),\n      );",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
     "name": "a passkey's sign-in hands the page its session",
     "file": "apps/api/src/auth/routes.ts",
     "old": "      const { token, session, ...rest } = value as Record<string, unknown>;\n      return token === undefined && session === undefined ? body : JSON.stringify(rest);",
