@@ -40,8 +40,9 @@ const linkIn = async (address: string, subject: string) => {
   return link.replace(/^https?:\/\/[^/]+/u, ADMIN_URL);
 };
 
-/** The form's own alert: Next's route announcer is an alert too. */
-const formAlert = (page: Page) => page.locator('[role="alert"]:not(#__next-route-announcer__)');
+/** The form's own alert: Next's route announcer is an alert too, and so is the sign-in page's passkey section. */
+const formAlert = (page: Page) =>
+  page.locator('[role="alert"]:not(#__next-route-announcer__):not(#passkey-error)');
 
 test.describe('password recovery (editorial workflow A5, PLAN R170)', () => {
   test('"I forgot my password" emails a link that sets a new one; the second factor is still asked, every session ends, and the account is told', async ({

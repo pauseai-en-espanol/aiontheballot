@@ -7,9 +7,10 @@ type AuthPool = ReturnType<typeof createAuthPool>;
 /**
  * The owner's reset of a lost authenticator (editorial workflow A5.4, ADR-0002 §10): for a member who has lost both
  * their authenticator and their backup codes. It removes the account's second factor (its TOTP secret and backup
- * codes, with any lock from wrong codes) and ends every session it has, so the next sign-in with the password leads to
- * enrolment, as for a new account. The password, the account's memberships and a platform admin's row stay; every
- * policy gives the account nothing until it has enrolled again and signed in with a code (ADR-0002 §9).
+ * codes, with any lock from wrong codes) and its passkeys (PLAN D22), and ends every session it has, so the next
+ * sign-in with the password leads to enrolment, as for a new account. The password, the account's memberships and a
+ * platform admin's row stay; every policy gives the account nothing until it has enrolled again and signed in with a
+ * code (ADR-0002 §9).
  *
  * It runs as aiontheballot_auth, like Better Auth in the API (no new grant), and reads nothing about the account but
  * its id, whether it has a second factor and how many sessions it has, so the command prints no personal data.
@@ -84,6 +85,9 @@ export const resetAuthenticator = async (pool: AuthPool, userId: string): Promis
       [userId],
     );
     await client.query('DELETE FROM two_factors WHERE user_id = $1', [userId]);
+    // Its passkeys too: the lost phone may hold one, and a passkey needs the factor (migration passkeys), which is what
+    // a passkey added meanwhile, waiting on the account's row, now finds gone.
+    await client.query('DELETE FROM passkeys WHERE user_id = $1', [userId]);
     await client.query(
       'UPDATE users SET two_factor_enabled = false, updated_at = now() WHERE id = $1',
       [userId],

@@ -1314,7 +1314,10 @@ Each row has a matching test, either in the data-rule list or in the matrix (ADR
    is `auth`; only `aiontheballot_auth` reaches them (ADR-0002 §2; spec O2, decided; migration `auth_schema`, PLAN
    R81). `auth.sessions.aal` records whether a second factor opened the session (migration `auth_session_aal`, PLAN
    R84), and an aal2 session is written only while its account's second factor exists (migration
-   `aal2_needs_second_factor`, PLAN R156).
+   `aal2_needs_second_factor`, PLAN R156). A passkey's sign-in is aal2 too, and a passkey is written only for an
+   account with its second factor; removing one revokes its member's tokens and ends their sessions; a session's end
+   is at most a week after its start (migrations `passkeys`, `sessions_within_a_week`, PLAN D22). `passkeys.name`,
+   what its owner called it, is personal data.
 3. **The descriptive scale** (PLAN P6): define `red` versus `not_mentioned`.
 4. **Admissible sources** (PLAN Q9): both methodology lists default to `{pdf, web_page}` until the chapter decides.
 5. **Party names localized?** They're assumed to be `jsonb`, because some coalitions use different names in

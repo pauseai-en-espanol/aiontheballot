@@ -111,7 +111,10 @@
       "submit": "Iniciar sesión",
       "noAccount": "Las cuentas son solo por invitación. Si necesitas una, pídesela a quien coordina tu equipo.",
       "forgot": "He olvidado mi contraseña",
-      "unavailable": "Todavía no se puede iniciar sesión."
+      "unavailable": "Todavía no se puede iniciar sesión.",
+      "passkeyQuestion": "¿Tienes una llave de acceso?",
+      "passkey": "Usar una llave de acceso",
+      "passkeyHint": "Con la huella, la cara o el PIN de tu dispositivo, sin contraseña ni código."
     },
     "challenge": {
       "title": "Verificación en dos pasos",
@@ -184,6 +187,12 @@
       "passwordTooShort": "Usa al menos 12 caracteres.",
       "passwordTooLong": "Usa como mucho 128 caracteres.",
       "passwordsDiffer": "Las dos contraseñas no coinciden.",
+      "passkeyCancelled": "No se ha usado ninguna llave de acceso. Inténtalo de nuevo, o inicia sesión con tu contraseña.",
+      "passkeyUnverified": "Tu dispositivo no ha comprobado que eres tú con la huella, la cara o el PIN. Actívalo en él, o usa otra llave.",
+      "passkeyUnknown": "Esa llave de acceso ya no sirve aquí: puede que la hayas quitado. Inicia sesión con tu contraseña y tu código.",
+      "passkeyExists": "Esa llave de acceso ya está en tu cuenta.",
+      "passkeyUnsupported": "Este navegador no admite llaves de acceso. Inicia sesión con tu contraseña y tu código.",
+      "notFresh": "Para añadir una llave tienes que haber iniciado sesión en las últimas 12 horas. Cierra la sesión, vuelve a iniciarla y añádela.",
       "unexpected": "Algo ha ido mal. Inténtalo de nuevo más tarde."
     },
     "invitation": {
@@ -1606,6 +1615,38 @@
         "confirm": "Revocar",
         "cancel": "Cancelar",
         "done": "Clave revocada."
+      }
+    },
+    "passkeys": {
+      "title": "Llaves de acceso",
+      "navLink": "Llaves de acceso",
+      "intro": "Con una llave de acceso inicias sesión con la huella, la cara o el PIN de tu ordenador o de tu móvil, sin escribir la contraseña ni el código. Se guarda en el dispositivo o en tu gestor de contraseñas, que puede llevarla a tus otros dispositivos.",
+      "optional": "Es opcional: la contraseña y el código siguen sirviendo, y son la forma de volver a entrar si pierdes el dispositivo.",
+      "host": "Una llave de acceso solo sirve en esta dirección, {host}. Si la administración se muda a otra, tendrás que volver a añadir tus llaves.",
+      "add": "Nueva llave de acceso",
+      "name": "Nombre",
+      "nameHint": "Para reconocerla en esta lista, por ejemplo «Portátil» o «Móvil».",
+      "submit": "Añadir una llave de acceso",
+      "added": "Llave de acceso añadida.",
+      "list": "Tus llaves de acceso",
+      "none": "Aún no tienes ninguna llave de acceso.",
+      "unnamed": "Llave de acceso",
+      "thisDevice": "En el dispositivo",
+      "synced": "se sincroniza entre tus dispositivos",
+      "columns": {
+        "name": "Nombre",
+        "keptIn": "Guardada",
+        "added": "Añadida",
+        "actions": "Acciones"
+      },
+      "remove": {
+        "button": "Quitar",
+        "label": "Quitar la llave de acceso {name}",
+        "title": "¿Quitar esta llave de acceso?",
+        "body": "Ya no podrás iniciar sesión con ella. Se cerrarán todas tus sesiones, también la de este navegador, y se revocarán tus claves para herramientas, para que nadie conserve una sesión que ella abrió. La contraseña y el código siguen sirviendo.",
+        "confirm": "Quitar",
+        "cancel": "Cancelar",
+        "done": "Llave de acceso quitada. Vuelve a iniciar sesión."
       }
     }
   },

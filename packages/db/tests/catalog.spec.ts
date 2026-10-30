@@ -242,7 +242,8 @@ describe('catalog: closed by default', () => {
       ...['accounts'].map((table) => `${table} DELETE,INSERT,SELECT,UPDATE`),
       // A member's tokens (ADR-0008): minted and read, then only marked used or revoked, never deleted.
       'member_tokens INSERT,SELECT',
-      ...['rate_limits', 'sessions', 'two_factors', 'users', 'verifications'].map(
+      // Passkeys (PLAN D22) are Better Auth's too, from its passkey plugin.
+      ...['passkeys', 'rate_limits', 'sessions', 'two_factors', 'users', 'verifications'].map(
         (table) => `${table} DELETE,INSERT,SELECT,UPDATE`,
       ),
     ]);
@@ -753,6 +754,7 @@ const IMMUTABLE = [
 /** Columns commented `personal data` (spec §1), as `table.column`: the audit trigger never logs them. */
 /** Better Auth's, in `auth` (migration auth_schema): it has no audit trigger, but the marks still say what is. */
 const AUTH_PERSONAL_DATA: readonly string[] = [
+  'auth.passkeys.name',
   'auth.rate_limits.key',
   'auth.sessions.ip_address',
   'auth.sessions.user_agent',

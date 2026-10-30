@@ -18,6 +18,12 @@ export type AuthError =
   | 'passwordTooShort'
   | 'passwordTooLong'
   | 'passwordsDiffer'
+  | 'passkeyCancelled'
+  | 'passkeyUnverified'
+  | 'passkeyUnknown'
+  | 'passkeyExists'
+  | 'passkeyUnsupported'
+  | 'notFresh'
   | 'unexpected';
 
 export interface AuthAnswer {
@@ -44,6 +50,15 @@ const ERRORS: Readonly<Record<string, AuthError>> = {
   USER_NOT_FOUND: 'invalidLink',
   PASSWORD_TOO_SHORT: 'passwordTooShort',
   PASSWORD_TOO_LONG: 'passwordTooLong',
+  // Passkeys (PLAN D22): the device didn't check who holds it (the API's own code, auth.ts), or the key isn't one of
+  // an account here any more, or it is already this one's; the challenge's five minutes ran out.
+  PASSKEY_USER_NOT_VERIFIED: 'passkeyUnverified',
+  PASSKEY_NOT_FOUND: 'passkeyUnknown',
+  AUTHENTICATION_FAILED: 'passkeyUnknown',
+  PREVIOUSLY_REGISTERED: 'passkeyExists',
+  CHALLENGE_NOT_FOUND: 'passkeyCancelled',
+  // Adding one more than 12 hours after signing in.
+  SESSION_NOT_FRESH: 'notFresh',
 };
 
 /** The errors after which only signing in again helps. */
@@ -62,14 +77,20 @@ export const authError = ({ status, body }: AuthAnswer): AuthError => {
 export const describedBy = (...ids: (string | false | undefined)[]): string | undefined =>
   ids.filter(Boolean).join(' ') || undefined;
 
-export const postAuth = async (path: string, body: object): Promise<AuthAnswer> => {
+export const postAuth = (path: string, body: object): Promise<AuthAnswer> =>
+  callAuth(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+/** A GET of Better Auth's: a passkey's challenge. */
+export const getAuth = (path: string): Promise<AuthAnswer> => callAuth(path, { method: 'GET' });
+
+const callAuth = async (path: string, init: RequestInit): Promise<AuthAnswer> => {
   let response: Response;
   try {
-    response = await fetch(`/api/auth${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    response = await fetch(`/api/auth${path}`, init);
   } catch {
     return { ok: false, status: 0, body: {} };
   }

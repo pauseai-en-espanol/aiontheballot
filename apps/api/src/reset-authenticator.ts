@@ -14,8 +14,9 @@ import { loadConfig } from './config.js';
  * It asks for the account's email address twice, so it never appears in the command line (nor in the cluster's audit
  * log of it) and a slip in it is caught, shows the account's id, whether it has an authenticator and how many sessions
  * are open, and asks to confirm.
- * Then it removes the authenticator and its backup codes and ends every session: at their next sign-in, with their
- * password, the member enrols a new authenticator. It prints no personal data: never the address or the name.
+ * Then it removes the authenticator, its backup codes and the account's passkeys, and ends every session: at their next
+ * sign-in, with their password, the member enrols a new authenticator. It prints no personal data: never the address
+ * or the name.
  */
 const fail = (message: string): never => {
   console.error(message);
@@ -64,7 +65,7 @@ try {
       `Account ${account.userId} has an authenticator and ${account.sessions} open session(s).`,
     );
     const answer = await ask(
-      'Type "reset" to remove its authenticator and backup codes and end its sessions: ',
+      'Type "reset" to remove its authenticator, backup codes and passkeys and end its sessions: ',
     );
     if (answer !== 'reset') {
       fail('Not confirmed. Nothing was changed.');

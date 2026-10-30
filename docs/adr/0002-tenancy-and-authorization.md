@@ -59,6 +59,9 @@ verified email an invitation checks, comes through `private.accept_invitation` (
 Amended (PLAN R202, [ADR-0008](0008-member-tokens-for-tools.md)): a member's tokens for tools are credentials too,
 so `auth.member_tokens` lives beside Better Auth's tables, under the same rule: no tenant data, only
 `aiontheballot_auth` granted on it (minting and reading, then marking used or revoked).
+Amended (PLAN D22, R223): `auth.passkeys` is Better Auth's too, from its passkey plugin, granted to
+`aiontheballot_auth` alone like the other tables there. Removing one revokes its member's tokens and ends their
+sessions, as a changed password does (migration `passkeys`, reusing `revoke_member_tokens`: no new function to grant).
 Amended (PLAN R114): invitations also use Better Auth's pool to ask whether an invited email has an account, and to
 create an invited person's account with that email verified, as Better Auth's sign-up would.
 `private.pending_invitation` runs on the admin pool without an actor, since whoever holds the link is nobody yet; it
@@ -89,8 +92,8 @@ role, grant or definer function was added (threat T29).
   `withActor(actor, fn)`.
 - `withActor` sets `SET LOCAL app.user_id` and `SET LOCAL app.aal`.
 - `app.aal` is `'2'` only for a session a second factor created: Better Auth's database hook records it in
-  `auth.sessions.aal` when a TOTP or backup code opens the session, and a session a password alone opened stays at 1
-  for life (PLAN R84). The API gives any session short of aal2 no actor at all.
+  `auth.sessions.aal` when a TOTP code, a backup code or a passkey (PLAN D22) opens the session, and a session a
+  password alone opened stays at 1 for life (PLAN R84). The API gives any session short of aal2 no actor at all.
 - `private.current_user_id()` returns NULL when no actor is set, so every member policy **denies by default**.
 - `aiontheballot_web` never sets an actor.
 
@@ -219,6 +222,12 @@ completed TOTP. A stolen password alone cannot read private data or publish. Ame
 be written only for an account whose second factor exists, its row locked meanwhile (a trigger on `auth.sessions`,
 running as Better Auth's role), so the reset of a lost authenticator (§10) can't leave one behind.
 
+Amended (PLAN D22, R223): a passkey signs in alone, at aal2, because the device holds the key and must check who holds
+the device (WebAuthn's user verification, which the API requires at both ceremonies). TOTP stays mandatory and the
+way back in: only an account with it can hold a passkey (a trigger on `auth.passkeys`, locking the account's row as
+the reset does), and the reset removes them. A session now ends 48 hours after its last use and a week after sign-in
+at most, which a trigger on `auth.sessions` holds whatever writes it.
+
 What it rests on (PLAN R166, from the RLS review's D17): `app.user_id` and `app.aal` are the API's word. `withActor`
 sets them from the session it checked, and the database trusts them, so whoever holds the admin role's credential, or
 an injection in an admin route, could act as any user at aal2: an accepted risk (T23). The database enforces that
@@ -255,9 +264,10 @@ expires_at)`, under RLS.
   are rate-limited per visitor, and every token that names no pending invitation gets one answer.
 - Self sign-up is off.
 - Resetting a user's MFA is an owner-run command (amended, PLAN R156): `reset-authenticator.js`, in an API pod, as
-  `aiontheballot_auth` with the grants it already has, removes the account's TOTP secret and backup codes, ends its
-  sessions and forgets its unused links to choose a password (which go only to an account with its second factor;
-  PLAN R179), once the operator has typed the account's address twice and confirmed; the next sign-in enrols again.
+  `aiontheballot_auth` with the grants it already has, removes the account's TOTP secret and backup codes and its
+  passkeys (PLAN D22), ends its sessions and forgets its unused links to choose a password (which go only to an
+  account with its second factor; PLAN R179), once the operator has typed the account's address twice and confirmed;
+  the next sign-in enrols again.
   No new role, grant or function to execute; its runbook is incidents §5a.
 - **Password recovery** (amended, PLAN R166, R170). Two ways to a link that sets a new password, both through Better
   Auth's own reset (`/request-password-reset`, `/reset-password`), as `aiontheballot_auth` with the grants it already

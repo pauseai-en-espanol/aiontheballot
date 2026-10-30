@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { getTranslator } from '@aiontheballot/i18n/messages';
 import Link from 'next/link';
 
+import { PasskeySignIn } from '@/auth/PasskeySignIn';
 import { SignInForm } from '@/auth/SignInForm';
 import * as styles from '@/auth/styles';
 import { authErrors } from '@/auth/text';
@@ -43,6 +44,15 @@ const SignInPage = async () => {
           {t('auth.signIn.forgot')}
         </Link>
       </p>
+      <PasskeySignIn
+        text={{
+          question: t('auth.signIn.passkeyQuestion'),
+          button: t('auth.signIn.passkey'),
+          hint: t('auth.signIn.passkeyHint'),
+          restart: t('auth.challenge.restart'),
+          errors: authErrors(t),
+        }}
+      />
       <p className={`${styles.hint} ${styles.footnote}`}>{t('auth.signIn.noAccount')}</p>
     </main>
   );

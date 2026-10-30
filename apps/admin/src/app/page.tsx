@@ -64,6 +64,11 @@ const Home = async () => {
           {t('admin.tokens.navLink')}
         </Link>
       </p>
+      <p className={styles.text}>
+        <Link className={styles.link} href="/passkeys">
+          {t('admin.passkeys.navLink')}
+        </Link>
+      </p>
       <SignOutButton label={t('auth.home.signOut')} />
     </main>
   );

@@ -2175,6 +2175,26 @@ CREATE FUNCTION private.party_logo_is_public_asset() RETURNS trigger
 ALTER FUNCTION private.party_logo_is_public_asset() OWNER TO aiontheballot_owner;
 
 --
+-- Name: passkey_needs_second_factor(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.passkey_needs_second_factor() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    PERFORM 1 FROM auth.users u WHERE u.id = NEW.user_id AND u.two_factor_enabled FOR SHARE;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'a passkey needs its account''s second factor' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.passkey_needs_second_factor() OWNER TO aiontheballot_owner;
+
+--
 -- Name: pending_invitation(text); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -2950,6 +2970,25 @@ CREATE FUNCTION private.session_needs_second_factor() RETURNS trigger
 
 
 ALTER FUNCTION private.session_needs_second_factor() OWNER TO aiontheballot_owner;
+
+--
+-- Name: session_within_a_week(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.session_within_a_week() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    IF NEW.expires_at > NEW.created_at + interval '7 days' THEN
+      RAISE EXCEPTION 'a session lasts at most a week' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.session_within_a_week() OWNER TO aiontheballot_owner;
 
 --
 -- Name: short_title_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -4579,6 +4618,34 @@ CREATE TABLE auth.member_tokens (
 ALTER TABLE auth.member_tokens OWNER TO aiontheballot_owner;
 
 --
+-- Name: passkeys; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TABLE auth.passkeys (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text,
+    public_key text NOT NULL,
+    user_id uuid NOT NULL,
+    credential_id text NOT NULL,
+    counter integer NOT NULL,
+    device_type text NOT NULL,
+    backed_up boolean NOT NULL,
+    transports text,
+    created_at timestamp with time zone,
+    aaguid text
+);
+
+
+ALTER TABLE auth.passkeys OWNER TO aiontheballot_owner;
+
+--
+-- Name: COLUMN passkeys.name; Type: COMMENT; Schema: auth; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN auth.passkeys.name IS 'personal data';
+
+
+--
 -- Name: rate_limits; Type: TABLE; Schema: auth; Owner: aiontheballot_owner
 --
 
@@ -5435,6 +5502,14 @@ ALTER TABLE ONLY auth.member_tokens
 
 
 --
+-- Name: passkeys passkeys_pkey; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.passkeys
+    ADD CONSTRAINT passkeys_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: rate_limits rate_limits_key_key; Type: CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
 --
 
@@ -5833,6 +5908,20 @@ CREATE INDEX accounts_user_id_idx ON auth.accounts USING btree (user_id);
 --
 
 CREATE INDEX member_tokens_user_id_idx ON auth.member_tokens USING btree (user_id);
+
+
+--
+-- Name: passkeys_credential_id_idx; Type: INDEX; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE INDEX passkeys_credential_id_idx ON auth.passkeys USING btree (credential_id);
+
+
+--
+-- Name: passkeys_user_id_idx; Type: INDEX; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE INDEX passkeys_user_id_idx ON auth.passkeys USING btree (user_id);
 
 
 --
@@ -7621,10 +7710,24 @@ CREATE TRIGGER minted BEFORE INSERT ON auth.member_tokens FOR EACH ROW EXECUTE F
 
 
 --
+-- Name: passkeys passkey_needs_second_factor; Type: TRIGGER; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER passkey_needs_second_factor BEFORE INSERT OR UPDATE OF user_id ON auth.passkeys FOR EACH ROW EXECUTE FUNCTION private.passkey_needs_second_factor();
+
+
+--
 -- Name: accounts revoke_member_tokens; Type: TRIGGER; Schema: auth; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER revoke_member_tokens AFTER UPDATE OF password ON auth.accounts FOR EACH ROW WHEN ((old.password IS DISTINCT FROM new.password)) EXECUTE FUNCTION private.revoke_member_tokens('sessions');
+
+
+--
+-- Name: passkeys revoke_member_tokens; Type: TRIGGER; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER revoke_member_tokens AFTER DELETE ON auth.passkeys FOR EACH ROW EXECUTE FUNCTION private.revoke_member_tokens('sessions');
 
 
 --
@@ -7646,6 +7749,13 @@ CREATE TRIGGER revoke_member_tokens_on_credential AFTER INSERT OR DELETE ON auth
 --
 
 CREATE TRIGGER revoke_member_tokens_on_enrolment AFTER UPDATE OF secret ON auth.two_factors FOR EACH ROW WHEN ((old.secret IS DISTINCT FROM new.secret)) EXECUTE FUNCTION private.revoke_member_tokens('tokens');
+
+
+--
+-- Name: sessions session_within_a_week; Type: TRIGGER; Schema: auth; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER session_within_a_week BEFORE INSERT OR UPDATE OF expires_at, created_at ON auth.sessions FOR EACH ROW EXECUTE FUNCTION private.session_within_a_week();
 
 
 --
@@ -8174,6 +8284,14 @@ ALTER TABLE ONLY auth.accounts
 
 ALTER TABLE ONLY auth.member_tokens
     ADD CONSTRAINT member_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: passkeys passkeys_user_id_fkey; Type: FK CONSTRAINT; Schema: auth; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY auth.passkeys
+    ADD CONSTRAINT passkeys_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -10270,6 +10388,13 @@ REVOKE ALL ON FUNCTION private.party_logo_is_public_asset() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION passkey_needs_second_factor(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.passkey_needs_second_factor() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION pending_invitation(token_hash text); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -10374,6 +10499,13 @@ REVOKE ALL ON FUNCTION private.revoke_member_tokens() FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.session_needs_second_factor() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION session_within_a_week(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.session_within_a_week() FROM PUBLIC;
 
 
 --
@@ -12638,6 +12770,13 @@ GRANT UPDATE(last_used_at) ON TABLE auth.member_tokens TO aiontheballot_auth;
 --
 
 GRANT UPDATE(revoked_at) ON TABLE auth.member_tokens TO aiontheballot_auth;
+
+
+--
+-- Name: TABLE passkeys; Type: ACL; Schema: auth; Owner: aiontheballot_owner
+--
+
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE auth.passkeys TO aiontheballot_auth;
 
 
 --

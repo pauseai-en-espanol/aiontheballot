@@ -1,8 +1,9 @@
 # ADR-0003: Application stack
 
 - **Status:** Accepted. Smaller choices still open are listed under [Still open](#still-open). The job-queue default
-  there is superseded by [ADR-0006](0006-extraction-jobs-over-http.md).
-- **Date:** 2026-10-08
+  there is superseded by [ADR-0006](0006-extraction-jobs-over-http.md). **Amended 2026-10-30** (Dani, PLAN D22):
+  optional passkeys, and sessions that last while used, up to a week (§2).
+- **Date:** 2026-10-08; amended 2026-10-30
 - **Relates to:** BRIEF §2, §5, §6, §8; [ADR-0001](0001-hosting-and-delivery.md),
   [ADR-0002](0002-tenancy-and-authorization.md)
 
@@ -78,15 +79,28 @@ cross-country views and an open-data export.
 - A user who hasn't enrolled TOTP can only reach the enrolment page. The API sets `app.aal = '2'` only for sessions
   that completed TOTP, and the database enforces that (ADR-0002 §9).
 - Only the endpoints the admin uses are reachable, each with only the body fields it needs: no "remember me", no
-  trusted devices, no sign-up (PLAN R85). Sessions last 12 hours and are never extended; attempts are limited per
-  address in the database, the address being the gateway's `X-Forwarded-For` entry (PLAN R87, R88). A CronJob from
-  the API's image deletes expired sessions daily (PLAN R90).
+  trusted devices, no sign-up (PLAN R85). Attempts are limited per address in the database, the address being the
+  gateway's `X-Forwarded-For` entry (PLAN R87, R88). A CronJob from the API's image deletes expired sessions daily
+  (PLAN R90).
 - Better Auth's tables are generated as SQL and committed as ordinary dbmate migrations.
+- **Sessions since D22 (2026-10-30)** end 48 hours after their last use, and a week after sign-in whatever happens
+  (before: 12 hours from sign-in, never extended; PLAN R87). The cookie lasts the week; the API moves the row's end on
+  as the session is used, at most once a minute, and the database refuses an end past the week. Better Auth's own
+  refresh stays off: it would move the row but not the cookie the API reads, and never stop at a week.
+- **Passkeys, optional (D22).** A member with TOTP adds them on their own Passkeys page, then signs in with one
+  alone: the device holds the key and must check who holds it (fingerprint, face or PIN; WebAuthn's user
+  verification, required at both ceremonies, which Better Auth's plugin asks for but doesn't require), so its session
+  is aal2. TOTP stays mandatory and the way back in: only an account with it can have a passkey (a database trigger),
+  and the owner's reset of a lost authenticator removes them. Adding one needs a sign-in of the last 12 hours and an
+  aal2 session; removing one, an aal2 session, and it ends every session of the member's and revokes their tokens for
+  tools (ADR-0008), so nothing a lost device opened outlives it. Passkeys are discoverable, bound to the admin host
+  (§4), and kept wherever the person's device keeps them (a platform's or a password manager's store, which may sync
+  them). The sign-in's answer reaches the browser without the session it carries.
 
 **Options considered:**
 
 - **Passkeys as the main factor:** deferred. Passkeys are bound to the admin domain, so we can add them once the
-  admin host is final.
+  admin host is final. Amended (D22): added beside TOTP, never instead of it (above).
 - **Custom auth:** rejected. We'd own all the security-critical code.
 - **External single sign-on:** not needed. The association doesn't run a central identity provider.
 
@@ -131,8 +145,9 @@ cross-country views and an open-data export.
   configuration plus DNS and TLS change.
 - **Platform admins only ever use the central host.** A tenant controls its own domain's DNS and could otherwise
   capture platform-admin credentials there.
-- Moving the central host later means everyone logs in again (and re-enrols passkeys, if those have been added
-  by then).
+- Moving the central host later means everyone logs in again and adds their passkeys again: a passkey is bound to
+  the host it was made on (its relying party is `ADMIN_ORIGIN`'s host, PLAN D22), and on the new one none is offered.
+  Password and TOTP keep working, so nobody is locked out; the Passkeys page says so.
 
 ### 5. Design system: Panda CSS plus Ark UI
 

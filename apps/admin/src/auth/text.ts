@@ -18,5 +18,11 @@ export const authErrors = (t: Translator): Record<AuthError, string> => ({
   passwordTooShort: t('auth.errors.passwordTooShort'),
   passwordTooLong: t('auth.errors.passwordTooLong'),
   passwordsDiffer: t('auth.errors.passwordsDiffer'),
+  passkeyCancelled: t('auth.errors.passkeyCancelled'),
+  passkeyUnverified: t('auth.errors.passkeyUnverified'),
+  passkeyUnknown: t('auth.errors.passkeyUnknown'),
+  passkeyExists: t('auth.errors.passkeyExists'),
+  passkeyUnsupported: t('auth.errors.passkeyUnsupported'),
+  notFresh: t('auth.errors.notFresh'),
   unexpected: t('auth.errors.unexpected'),
 });

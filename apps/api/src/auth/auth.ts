@@ -2,6 +2,7 @@ import type { createAuthPool } from '@aiontheballot/db/auth-pool';
 
 import { requestLocale } from '@aiontheballot/i18n/negotiate';
 import { betterAuth, type BetterAuthOptions } from 'better-auth';
+import { APIError } from 'better-auth/api';
 import { createHash } from 'node:crypto';
 
 import type { PasswordMail } from './password-mail.js';
@@ -10,8 +11,26 @@ import type { FoundSession } from './session.js';
 import { passwordLinkRow } from './password-link-rows.js';
 import { AUTH_MODELS, authSchemaOptions } from './schema.js';
 
-/** A session ends this long after sign-in, and is never extended (editorial workflow A4.4). */
-export const SESSION_SECONDS = 12 * 60 * 60;
+/** A session ends this long after sign-in at the latest, however much it is used (editorial workflow A4.4, D22). */
+export const SESSION_SECONDS = 7 * 24 * 60 * 60;
+
+/** And this long after it was last used: each use moves its end on, up to SESSION_SECONDS (PLAN D22). */
+export const SESSION_IDLE_SECONDS = 48 * 60 * 60;
+
+/** A passkey is added only from a session at most this old: a sign-in of the last 12 hours (PLAN D22). */
+export const FRESH_SESSION_SECONDS = 12 * 60 * 60;
+
+/**
+ * What a passkey's answer must say for it to count as the second factor: that the device checked who holds it
+ * (fingerprint, face or PIN), not only that someone touched it. Better Auth's plugin asks for that and then accepts
+ * either, so both ceremonies check it here.
+ */
+export const USER_NOT_VERIFIED = 'PASSKEY_USER_NOT_VERIFIED';
+const unverified = () =>
+  new APIError('UNAUTHORIZED', {
+    code: USER_NOT_VERIFIED,
+    message: 'The passkey did not check who holds the device',
+  });
 
 /** Shorter passwords are refused (editorial workflow A5.1). */
 export const MIN_PASSWORD_LENGTH = 12;
@@ -127,10 +146,15 @@ export const TWO_FACTOR_COOKIE = `${COOKIE_PREFIX}.two_factor`;
  */
 export const VISITOR_ADDRESS_HEADER = 'x-aiontheballot-visitor';
 
-/** The endpoints whose sessions passed a second factor: only their sessions are aal2 (ADR-0002 §9). */
+/**
+ * The endpoints whose sessions passed a second factor: only their sessions are aal2 (ADR-0002 §9). A passkey's sign-in
+ * is one (PLAN D22): the device holds the key and checked who holds the device (USER_NOT_VERIFIED), and only an
+ * account with TOTP has one (migration passkeys).
+ */
 const SECOND_FACTOR_PATHS: ReadonlySet<string> = new Set([
   '/two-factor/verify-totp',
   '/two-factor/verify-backup-code',
+  '/passkey/verify-authentication',
 ]);
 
 export interface AuthOptions {
@@ -160,13 +184,17 @@ export interface Auth {
  */
 export type AdminAuthOptions = Omit<BetterAuthOptions, 'session'> & {
   session: typeof AUTH_MODELS.session &
-    Pick<NonNullable<BetterAuthOptions['session']>, 'expiresIn' | 'disableSessionRefresh'>;
+    Pick<
+      NonNullable<BetterAuthOptions['session']>,
+      'expiresIn' | 'disableSessionRefresh' | 'freshAge'
+    >;
 };
 
 /**
  * Better Auth as the admin uses it (ADR-0003 §2; editorial workflow A4): email and password with no sign-up, then a
- * TOTP or backup code; sessions of 12 hours, never refreshed, with no "remember me"; attempts limited per address in
- * the database, so both API replicas share the counts. Only the endpoints routes.ts lets through are reachable.
+ * TOTP or backup code, or a passkey alone; sessions that end after 48 hours unused or a week after sign-in, with no
+ * "remember me"; attempts limited per address in the database, so both API replicas share the counts. Only the
+ * endpoints routes.ts lets through are reachable.
  */
 export const authOptions = ({
   pool,
@@ -176,7 +204,29 @@ export const authOptions = ({
   passwordMail,
   onMailError = () => undefined,
 }: AuthOptions): AdminAuthOptions => {
-  const schema = authSchemaOptions(totpIssuer);
+  // Passkeys belong to the admin host and nowhere else: its name, and its origin rather than whatever a request says.
+  // Moving the admin to another host means adding them again (ADR-0003 §4).
+  const schema = authSchemaOptions(totpIssuer, {
+    rpID: new URL(adminOrigin).hostname,
+    rpName: totpIssuer,
+    origin: adminOrigin,
+    // Discoverable, so the sign-in page needs no email first; and the device checks who holds it.
+    authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+    registration: {
+      afterVerification: async ({ verification }) => {
+        if (verification.registrationInfo?.userVerified !== true) {
+          throw unverified();
+        }
+      },
+    },
+    authentication: {
+      afterVerification: async ({ verification }) => {
+        if (!verification.authenticationInfo.userVerified) {
+          throw unverified();
+        }
+      },
+    },
+  });
   // Mail nobody waits for: an answer never says whether an address has an account by how long it took.
   const inBackground = (send: () => Promise<void>): void => {
     send().catch(onMailError);
@@ -251,8 +301,10 @@ export const authOptions = ({
     session: {
       // The models themselves rather than the schema options' copy, whose wider type loses the `aal` field's.
       ...AUTH_MODELS.session,
+      // The cookie lasts the week; the row's end, which createAuth moves on as the session is used, decides.
       expiresIn: SESSION_SECONDS,
       disableSessionRefresh: true,
+      freshAge: FRESH_SESSION_SECONDS,
     },
     advanced: {
       ...schema.advanced,
@@ -266,9 +318,15 @@ export const authOptions = ({
       session: {
         create: {
           // Whatever a session copies from the one it replaces, its level is decided here, from the endpoint that
-          // creates it: aal2 only behind a second factor.
+          // creates it: aal2 only behind a second factor. It starts with SESSION_IDLE_SECONDS to live.
           before: async (session, context) => ({
-            data: { ...session, aal: context && SECOND_FACTOR_PATHS.has(context.path) ? 2 : 1 },
+            data: {
+              ...session,
+              aal: context && SECOND_FACTOR_PATHS.has(context.path) ? 2 : 1,
+              expiresAt: new Date(
+                Math.min(session.expiresAt.getTime(), Date.now() + SESSION_IDLE_SECONDS * 1000),
+              ),
+            },
           }),
         },
       },
@@ -277,4 +335,37 @@ export const authOptions = ({
   };
 };
 
-export const createAuth = (options: AuthOptions): Auth => betterAuth(authOptions(options));
+/**
+ * A session in use lives on: its end moves to SESSION_IDLE_SECONDS from now, never past SESSION_SECONDS from sign-in
+ * (which migration sessions_within_a_week holds too). Written at most once a minute per session; one already ended
+ * stays ended.
+ */
+export const keepSessionAlive = async (
+  pool: ReturnType<typeof createAuthPool>,
+  sessionId: string,
+): Promise<void> => {
+  const until = 'least(created_at + make_interval(secs => $2), now() + make_interval(secs => $3))';
+  await pool.query(
+    `UPDATE sessions SET expires_at = ${until}
+      WHERE id = $1 AND expires_at > now() AND expires_at < ${until} - interval '1 minute'`,
+    [sessionId, SESSION_SECONDS, SESSION_IDLE_SECONDS],
+  );
+};
+
+export const createAuth = (options: AuthOptions): Auth => {
+  const auth: Auth = betterAuth(authOptions(options));
+  return {
+    handler: auth.handler,
+    api: {
+      // Every request that finds its session (routes.ts) uses it. Better Auth's own refresh is off: it would move the
+      // row's end but not the cookie's, which the API reads on the server, and never stop at a week.
+      getSession: async (context) => {
+        const found = await auth.api.getSession(context);
+        if (found) {
+          await keepSessionAlive(options.pool, found.session.id);
+        }
+        return found;
+      },
+    },
+  };
+};

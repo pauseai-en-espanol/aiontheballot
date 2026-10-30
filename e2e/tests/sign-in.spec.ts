@@ -35,8 +35,9 @@ test.afterAll(async () => {
   await deleteAccounts(created.splice(0));
 });
 
-/** The form's own alert: Next's route announcer is an alert too. */
-const formAlert = (page: Page) => page.locator('[role="alert"]:not(#__next-route-announcer__)');
+/** The form's own alert: Next's route announcer is an alert too, and so is the sign-in page's passkey section. */
+const formAlert = (page: Page) =>
+  page.locator('[role="alert"]:not(#__next-route-announcer__):not(#passkey-error)');
 
 const signIn = async (page: Page, email: string, password = PASSWORD) => {
   await page.goto(`${ADMIN_URL}/sign-in`);

@@ -109,6 +109,25 @@ export const getTokens = cache(async (): Promise<TokenList | undefined> => {
     : expect(body, ['tokens', 'maxDays', 'maxActive'], 'the tokens');
 });
 
+/** One of the member's passkeys (PLAN D22), as the passkeys page lists it: never its key. */
+export interface Passkey {
+  id: string;
+  name: string | null;
+  /** Where it is kept ("1Password"), when the device said and the API knows it. */
+  provider: string | null;
+  /** Whether it travels between the person's devices (a password manager's or a platform's sync). */
+  synced: boolean;
+  createdAt: string | null;
+}
+
+/** The member's passkeys; undefined from an API that has none yet. */
+export const getPasskeys = cache(async (): Promise<Passkey[] | undefined> => {
+  const body = await readApi('/api/passkeys');
+  return body === undefined
+    ? undefined
+    : expect<{ passkeys: Passkey[] }>(body, ['passkeys'], 'the passkeys').passkeys;
+});
+
 /** The tenants the user may open (A6), and whether they are a platform admin. */
 export const getTenants = cache(
   async (): Promise<{ tenants: TenantSummary[]; platformAdmin: boolean }> =>

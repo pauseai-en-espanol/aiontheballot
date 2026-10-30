@@ -1,5 +1,6 @@
 import type { BetterAuthOptions } from 'better-auth';
 
+import { passkey } from '@better-auth/passkey';
 import { twoFactor } from 'better-auth/plugins/two-factor';
 
 /**
@@ -25,9 +26,10 @@ export const AUTH_MODELS = {
     },
     additionalFields: {
       /**
-       * 2 only for a session that a TOTP or backup code created (ADR-0002 §9): the API sets app.aal from it. Every
-       * other session, such as the one a password alone opens for enrolment, stays 1 for life, so a session opened
-       * before its user enrolled can't become aal2 when they enrol elsewhere. Set by the API (`input: false`).
+       * 2 only for a session that a TOTP code, a backup code or a passkey created (ADR-0002 §9, PLAN D22): the API sets
+       * app.aal from it. Every other session, such as the one a password alone opens for enrolment, stays 1 for life,
+       * so a session opened before its user enrolled can't become aal2 when they enrol elsewhere. Set by the API
+       * (`input: false`).
        */
       aal: { type: 'number', required: true, defaultValue: 1, input: false },
     },
@@ -79,19 +81,46 @@ export const twoFactorPlugin = (options: { issuer?: string } = {}): TwoFactorPlu
     },
   });
 
-/** Everything that decides the tables: what the migration was generated from. */
+type PasskeyPlugin = ReturnType<typeof passkey>;
+
+/** What decides a passkey's ceremonies, beside the table: auth.ts sets them; the schema test needs none. */
+export type PasskeyCeremonyOptions = Omit<NonNullable<Parameters<typeof passkey>[0]>, 'schema'>;
+
+/** The passkey plugin (PLAN D22), its table named like the others. */
+export const passkeyPlugin = (options: PasskeyCeremonyOptions = {}): PasskeyPlugin =>
+  passkey({
+    ...options,
+    schema: {
+      passkey: {
+        modelName: 'passkeys',
+        fields: {
+          publicKey: 'public_key',
+          userId: 'user_id',
+          credentialID: 'credential_id',
+          deviceType: 'device_type',
+          backedUp: 'backed_up',
+          createdAt: 'created_at',
+        },
+      },
+    },
+  });
+
+/** Everything that decides the tables: what the migrations were generated from. */
 export interface AuthSchemaOptions extends Pick<
   BetterAuthOptions,
   'user' | 'session' | 'account' | 'verification' | 'emailAndPassword' | 'rateLimit' | 'advanced'
 > {
-  plugins: [TwoFactorPlugin];
+  plugins: [TwoFactorPlugin, PasskeyPlugin];
 }
 
-export const authSchemaOptions = (issuer?: string): AuthSchemaOptions =>
+export const authSchemaOptions = (
+  issuer?: string,
+  ceremonies: PasskeyCeremonyOptions = {},
+): AuthSchemaOptions =>
   ({
     ...AUTH_MODELS,
     emailAndPassword: { enabled: true },
-    plugins: [twoFactorPlugin(issuer === undefined ? {} : { issuer })],
+    plugins: [twoFactorPlugin(issuer === undefined ? {} : { issuer }), passkeyPlugin(ceremonies)],
     rateLimit: { enabled: true, ...AUTH_RATE_LIMIT_STORAGE },
     advanced: { database: { generateId: 'uuid' } },
   }) satisfies BetterAuthOptions;

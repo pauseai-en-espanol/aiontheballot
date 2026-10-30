@@ -4,7 +4,14 @@ import { betterAuth } from 'better-auth';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
-import { authOptions, createAuth, SESSION_COOKIE, TWO_FACTOR_COOKIE } from '../src/auth/auth.js';
+import {
+  authOptions,
+  createAuth,
+  SESSION_COOKIE,
+  SESSION_IDLE_SECONDS,
+  SESSION_SECONDS,
+  TWO_FACTOR_COOKIE,
+} from '../src/auth/auth.js';
 import { deleteExpiredAuthRows, RATE_LIMIT_KEEP_MS } from '../src/auth/cleanup.js';
 import {
   ADMIN_ORIGIN,
@@ -173,7 +180,7 @@ describe('sign-in under /api/auth (ADR-0003 §2, editorial workflow A4)', () => 
     expect(rows).toHaveLength(0);
   });
 
-  it('opens a 12-hour aal1 session in a __Host- cookie for an account still to enrol', async () => {
+  it('opens a 48-hour aal1 session in a week-long __Host- cookie for an account still to enrol', async () => {
     const { id, email } = await account();
     const who = visitor();
     const response = await signIn(who, email);
@@ -186,11 +193,13 @@ describe('sign-in under /api/auth (ADR-0003 §2, editorial workflow A4)', () => 
       secure: true,
       httpOnly: true,
       sameSite: 'Lax',
-      maxAge: 43_200,
+      maxAge: SESSION_SECONDS,
     });
     expect(cookie).not.toHaveProperty('domain');
     expect(SESSION_COOKIE.startsWith('__Host-')).toBe(true);
-    expect(await sessionsOf(id)).toEqual([expect.objectContaining({ aal: 1, seconds: 43_200 })]);
+    expect(await sessionsOf(id)).toEqual([
+      expect.objectContaining({ aal: 1, seconds: SESSION_IDLE_SECONDS }),
+    ]);
 
     const session = await who.send('GET', '/api/session');
     expect(session.statusCode).toBe(200);
@@ -202,14 +211,16 @@ describe('sign-in under /api/auth (ADR-0003 §2, editorial workflow A4)', () => 
     expect((await who.send('GET', '/api/tenants')).statusCode).toBe(401);
   });
 
-  it('has no "remember me": rememberMe false still gives a 12-hour session in a lasting cookie', async () => {
+  it('has no "remember me": rememberMe false still gives a 48-hour session in a lasting cookie', async () => {
     const { id, email } = await account();
     const who = visitor();
     const response = await signIn(who, email, PASSWORD, { rememberMe: false });
     expect(response.statusCode).toBe(200);
-    expect(response.cookies.find((c) => c.name === SESSION_COOKIE)?.maxAge).toBe(43_200);
+    expect(response.cookies.find((c) => c.name === SESSION_COOKIE)?.maxAge).toBe(SESSION_SECONDS);
     expect(response.cookies.map((c) => c.name)).toEqual([SESSION_COOKIE]);
-    expect(await sessionsOf(id)).toEqual([expect.objectContaining({ seconds: 43_200 })]);
+    expect(await sessionsOf(id)).toEqual([
+      expect.objectContaining({ seconds: SESSION_IDLE_SECONDS }),
+    ]);
   });
 
   it('enrols TOTP under the configured issuer, and reaches aal2 only with a valid code', async () => {
@@ -337,24 +348,20 @@ describe('sign-in under /api/auth (ADR-0003 §2, editorial workflow A4)', () => 
     expect(reused.statusCode).toBe(401);
   });
 
-  it('never extends a session', async () => {
+  // The API moves a session's row on as it is used (passkeys.spec.ts); Better Auth's own refresh would also set a new
+  // cookie, and never stop at the week (PLAN D22).
+  it("never refreshes a session the way Better Auth would: no new cookie, whatever the row's end", async () => {
     const { id, email } = await account();
     const who = visitor();
     await enrol(who, email);
     await authPool.query(
-      `UPDATE sessions SET expires_at = now() + interval '1 minute' WHERE user_id = $1`,
+      `UPDATE sessions SET expires_at = now() + interval '1 minute', updated_at = now() - interval '2 days'
+        WHERE user_id = $1`,
       [id],
     );
-    const before = await authPool.query<{ expires_at: Date }>(
-      'SELECT expires_at FROM sessions WHERE user_id = $1',
-      [id],
-    );
-    expect((await who.send('GET', '/api/session')).statusCode).toBe(200);
-    const after = await authPool.query<{ expires_at: Date }>(
-      'SELECT expires_at FROM sessions WHERE user_id = $1',
-      [id],
-    );
-    expect(after.rows).toEqual(before.rows);
+    const used = await who.send('GET', '/api/session');
+    expect(used.statusCode).toBe(200);
+    expect(used.headers['set-cookie']).toBeUndefined();
   });
 
   it("limits attempts by the gateway's address, the last X-Forwarded-For entry", async () => {

@@ -115,12 +115,16 @@ _As a member, I sign in with a password and a second factor._
    DB: `aal`, recorded per session, PLAN R84]
 3. Enrolment shows a QR code and the secret, needs one valid code to finish, and then shows ten backup codes once.
    [API]
-4. TOTP is asked at every sign-in; there are no remembered devices. A session ends 12 hours after sign-in, or at
-   sign-out. [API]
+4. TOTP is asked at every sign-in; there are no remembered devices. A session ends 48 hours after it was last used,
+   a week after sign-in at most, or at sign-out (PLAN D22; before, 12 hours after sign-in). [API; DB: trigger on
+   `auth.sessions`]
 5. Failed attempts are rate limited. [API: Better Auth's limiter, PLAN R88]
 6. The session cookie is host-only (`__Host-`), `Secure`, `HttpOnly` and `SameSite=Lax`, on the admin host only. The
    public site never sets a cookie. [API; ADR-0002 §15] The admin's only other cookie, the language chosen with the
    switch (§2.7), has the same attributes and grants nothing (PLAN R108).
+7. A member with TOTP may add passkeys and then sign in with one alone, the device checking who holds it; the password
+   and the code keep working (PLAN D22). Only an account with TOTP holds one, and removing one ends the member's
+   sessions and revokes their tokens. [API; DB: triggers on `auth.passkeys`]
 
 ### A5. Passwords and lost factors
 
@@ -686,7 +690,7 @@ _As a member, I triage what the public reports, and link the corrections it lead
   tenants came later (P4, PLAN R129), and changing their name, languages and operator (PLAN R195); hostnames stay a
   runbook.
 - Bulk editing and theming beyond logo and colours (PLAN, cut list 5).
-- Notification emails (W17), passkeys (ADR-0003 §2) and changing a user's email.
+- Notification emails (W17) and changing a user's email. Passkeys came later (A4.7, PLAN D22).
 
 ## 15. How the M2 demo maps to this spec
 
@@ -717,7 +721,8 @@ Taken while drafting; each can be changed before M2 starts.
 - **W2. Invitations expire after 7 days** (the database allows up to 30). Inviting again replaces the pending one.
 - **W3. A new account accepts its invitation when it is created,** before TOTP enrolment. That is safe because a
   membership grants nothing until the session has completed TOTP.
-- **W4. Sessions:** TOTP at every sign-in, no remembered devices, 12 hours at most.
+- **W4. Sessions:** TOTP at every sign-in, no remembered devices, 12 hours at most. Superseded by PLAN D22: 48 hours
+  from the last use, a week at most.
 - **W5. Passwords** of at least 12 characters; a reset keeps TOTP and revokes other sessions.
 - **W6. Platform-admin screens in M2** cover review settings, organizations, brand assets and grants, and members in
   any tenant. Hostnames, core criteria and platform admins stay runbooks: rare for the pilot, and hostnames need a

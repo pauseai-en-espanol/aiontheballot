@@ -111,7 +111,10 @@
       "submit": "Sign in",
       "noAccount": "Accounts are by invitation only. If you need one, ask your team's coordinator.",
       "forgot": "I forgot my password",
-      "unavailable": "Signing in isn't available yet."
+      "unavailable": "Signing in isn't available yet.",
+      "passkeyQuestion": "Do you have a passkey?",
+      "passkey": "Use a passkey",
+      "passkeyHint": "With your device's fingerprint, face or PIN: no password or code."
     },
     "challenge": {
       "title": "Two-step verification",
@@ -184,6 +187,12 @@
       "passwordTooShort": "Use at least 12 characters.",
       "passwordTooLong": "Use at most 128 characters.",
       "passwordsDiffer": "The two passwords are not the same.",
+      "passkeyCancelled": "No passkey was used. Try again, or sign in with your password.",
+      "passkeyUnverified": "Your device didn't check it's you with a fingerprint, face or PIN. Turn that on in it, or use another passkey.",
+      "passkeyUnknown": "That passkey no longer works here: you may have removed it. Sign in with your password and your code.",
+      "passkeyExists": "That passkey is already in your account.",
+      "passkeyUnsupported": "This browser doesn't support passkeys. Sign in with your password and your code.",
+      "notFresh": "To add a passkey you must have signed in within the last 12 hours. Sign out, sign in again and add it.",
       "unexpected": "Something went wrong. Please try again later."
     },
     "invitation": {
@@ -1606,6 +1615,38 @@
         "confirm": "Revoke",
         "cancel": "Cancel",
         "done": "Token revoked."
+      }
+    },
+    "passkeys": {
+      "title": "Passkeys",
+      "navLink": "Passkeys",
+      "intro": "With a passkey you sign in with your computer's or phone's fingerprint, face or PIN, without typing your password or code. It is kept on the device or in your password manager, which may carry it to your other devices.",
+      "optional": "It is optional: your password and your code keep working, and they are still how you get back in if you lose the device.",
+      "host": "A passkey works only on this address, {host}. If the admin ever moves to another one, you add your passkeys again.",
+      "add": "New passkey",
+      "name": "Name",
+      "nameHint": "To recognise it in this list, such as \"Laptop\" or \"Phone\".",
+      "submit": "Add a passkey",
+      "added": "Passkey added.",
+      "list": "Your passkeys",
+      "none": "You don't have any passkeys yet.",
+      "unnamed": "Passkey",
+      "thisDevice": "On the device",
+      "synced": "synced between your devices",
+      "columns": {
+        "name": "Name",
+        "keptIn": "Kept",
+        "added": "Added",
+        "actions": "Actions"
+      },
+      "remove": {
+        "button": "Remove",
+        "label": "Remove the passkey {name}",
+        "title": "Remove this passkey?",
+        "body": "You can no longer sign in with it. You'll be signed out everywhere, this browser too, and your tokens for tools are revoked, so nobody keeps a session it opened. Your password and your code keep working.",
+        "confirm": "Remove",
+        "cancel": "Cancel",
+        "done": "Passkey removed. Sign in again."
       }
     }
   },

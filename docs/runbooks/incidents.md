@@ -155,8 +155,9 @@ Image tags live in this repository (`helm-charts/aiontheballot/values.yaml`), wr
 
 The person's authenticator app is gone (a lost or reset phone). With backup codes left, they sign in with one (each
 works once) and nothing is urgent; without, they can't sign in at all. Either way the fix is the owner-run reset
-(editorial workflow A5.4, PLAN R156): it removes the account's authenticator and backup codes, ends its sessions and
-forgets any unused password reset link (PLAN R179), and the next sign-in with the password enrols a new one. The
+(editorial workflow A5.4, PLAN R156): it removes the account's authenticator and backup codes and its passkeys (the lost
+phone may hold one; PLAN D22), ends its sessions and forgets any unused password reset link (PLAN R179), and the next
+sign-in with the password enrols a new one. They can add passkeys again once enrolled. The
 password, roles and any platform-admin row stay, and give nothing until the new enrolment (ADR-0002 §9). Never
 improvise it in SQL.
 

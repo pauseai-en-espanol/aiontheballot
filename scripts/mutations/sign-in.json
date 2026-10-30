@@ -1,0 +1,201 @@
+[
+  {
+    "name": "a passkey's sign-in is not the second factor's level",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "  '/two-factor/verify-backup-code',\n  '/passkey/verify-authentication',\n",
+    "new": "  '/two-factor/verify-backup-code',\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a passkey that didn't check who holds the device is added",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "        if (verification.registrationInfo?.userVerified !== true) {",
+    "new": "        if (verification.registrationInfo === undefined) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a passkey that didn't check who holds the device signs in",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "        if (!verification.authenticationInfo.userVerified) {",
+    "new": "        if (!verification.authenticationInfo) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a passkey is added from a session of any age",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "      freshAge: FRESH_SESSION_SECONDS,\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a session starts with the whole week",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "                Math.min(session.expiresAt.getTime(), Date.now() + SESSION_IDLE_SECONDS * 1000),",
+    "new": "                session.expiresAt.getTime(),",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a session in use is never moved on",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "          await keepSessionAlive(options.pool, found.session.id);\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a session in use is moved on past its week",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "  const until = 'least(created_at + make_interval(secs => $2), now() + make_interval(secs => $3))';",
+    "new": "  const until = 'now() + make_interval(secs => $3)';",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a session is written on every request",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "      WHERE id = $1 AND expires_at > now() AND expires_at < ${until} - interval '1 minute'`,",
+    "new": "      WHERE id = $1 AND expires_at > now()`,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "an ended session is brought back",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "      WHERE id = $1 AND expires_at > now() AND expires_at < ${until} - interval '1 minute'`,",
+    "new": "      WHERE id = $1 AND expires_at < ${until} - interval '1 minute'`,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "Better Auth refreshes sessions itself",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "      disableSessionRefresh: true,\n      freshAge",
+    "new": "      disableSessionRefresh: false,\n      freshAge",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/auth.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a password alone adds a passkey",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "const SIGNED_IN_ONLY: ReadonlySet<string> = new Set([\n  '/passkey/generate-register-options',\n",
+    "new": "const SIGNED_IN_ONLY: ReadonlySet<string> = new Set([\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a password alone removes a passkey",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "  '/passkey/verify-registration',\n  '/passkey/delete-passkey',\n]);",
+    "new": "  '/passkey/verify-registration',\n]);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a session beside a member's token reaches the passkeys",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "    const signedInSession = async (request: FastifyRequest): Promise<FoundSession | undefined> => {\n      if (request.headers.authorization !== undefined) {",
+    "new": "    const signedInSession = async (request: FastifyRequest): Promise<FoundSession | undefined> => {\n      if (request.headers.authorization === 'never') {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "anyone with a session lists an account's passkeys",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "    scope.get('/passkeys', async (request, reply) => {\n      if (!(await signedInSession(request))) {",
+    "new": "    scope.get('/passkeys', async (request, reply) => {\n      if (!(await findSession(request))) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "a passkey's sign-in hands the page its session",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "      const { token, session, ...rest } = value as Record<string, unknown>;\n      return token === undefined && session === undefined ? body : JSON.stringify(rest);",
+    "new": "      const { token, ...rest } = value as Record<string, unknown>;\n      return token === undefined ? body : JSON.stringify(rest);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the passkeys page is shown a passkey's key",
+    "file": "apps/api/src/auth/routes.ts",
+    "old": "        passkeys: listed.map((passkey) => ({\n          id: passkey.id,",
+    "new": "        passkeys: listed.map((passkey) => ({\n          ...passkey,\n          id: passkey.id,",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "the owner's reset keeps the passkeys",
+    "file": "apps/api/src/auth/reset-authenticator.ts",
+    "old": "    await client.query('DELETE FROM passkeys WHERE user_id = $1', [userId]);\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "migration: an account without its second factor gets a passkey",
+    "file": "db/migrations/20261030100000_passkeys.sql",
+    "old": "    PERFORM 1 FROM auth.users u WHERE u.id = NEW.user_id AND u.two_factor_enabled FOR SHARE;",
+    "new": "    PERFORM 1 FROM auth.users u WHERE u.id = NEW.user_id FOR SHARE;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: a passkey is moved to an account without its second factor",
+    "file": "db/migrations/20261030100000_passkeys.sql",
+    "old": "CREATE TRIGGER passkey_needs_second_factor BEFORE INSERT OR UPDATE OF user_id ON auth.passkeys",
+    "new": "CREATE TRIGGER passkey_needs_second_factor BEFORE INSERT ON auth.passkeys",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: a passkey removed leaves its member's sessions and tokens",
+    "file": "db/migrations/20261030100000_passkeys.sql",
+    "old": "CREATE TRIGGER revoke_member_tokens AFTER DELETE ON auth.passkeys",
+    "new": "CREATE TRIGGER revoke_member_tokens AFTER INSERT ON auth.passkeys",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: a passkey removed leaves its member's sessions",
+    "file": "db/migrations/20261030100000_passkeys.sql",
+    "old": "  FOR EACH ROW EXECUTE FUNCTION private.revoke_member_tokens('sessions');\n\nGRANT",
+    "new": "  FOR EACH ROW EXECUTE FUNCTION private.revoke_member_tokens('tokens');\n\nGRANT",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: another runtime role reads passkeys",
+    "file": "db/migrations/20261030100000_passkeys.sql",
+    "old": "GRANT SELECT, INSERT, UPDATE, DELETE ON auth.passkeys TO aiontheballot_auth;",
+    "new": "GRANT SELECT, INSERT, UPDATE, DELETE ON auth.passkeys TO aiontheballot_auth;\nGRANT USAGE ON SCHEMA auth TO aiontheballot_admin;\nGRANT SELECT ON auth.passkeys TO aiontheballot_admin;",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: a session lasts more than a week",
+    "file": "db/migrations/20261030100100_sessions_within_a_week.sql",
+    "old": "    IF NEW.expires_at > NEW.created_at + interval '7 days' THEN",
+    "new": "    IF NEW.expires_at > NEW.created_at + interval '8 days' THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  },
+  {
+    "name": "migration: a session's start is moved back past its week",
+    "file": "db/migrations/20261030100100_sessions_within_a_week.sql",
+    "old": "CREATE TRIGGER session_within_a_week BEFORE INSERT OR UPDATE OF expires_at, created_at ON auth.sessions",
+    "new": "CREATE TRIGGER session_within_a_week BEFORE INSERT OR UPDATE OF expires_at ON auth.sessions",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sign-in.spec.ts",
+    "cwd": "packages/db",
+    "after": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts > /dev/null"
+  }
+]

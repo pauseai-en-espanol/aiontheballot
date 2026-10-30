@@ -75,6 +75,9 @@ const TenantLayout = async ({
           <Link className={styles.link} href="/tokens">
             {t('admin.tokens.navLink')}
           </Link>
+          <Link className={styles.link} href="/passkeys">
+            {t('admin.passkeys.navLink')}
+          </Link>
           <SignOutButton label={t('auth.home.signOut')} />
         </div>
       </header>
