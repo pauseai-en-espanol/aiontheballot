@@ -54,20 +54,20 @@
     "kysely-codegen": "0.20.0",
     "lint-staged": "17.6.0",
     "markdownlint-cli2": "0.24.0",
-    "oxlint": "1.89.0",
+    "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
     "prettier": "3.9.10",
     "turbo": "2.11.10"
   },
   "engines": {
     "node": "^26.12.1",
-    "pnpm": "^12.15.0"
+    "pnpm": "^12.16.0"
   },
-  "packageManager": "pnpm@12.15.0",
+  "packageManager": "pnpm@12.16.0",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "12.15.0",
+      "version": "12.16.0",
       "onFail": "download"
     }
   }
