@@ -61,13 +61,13 @@
   },
   "engines": {
     "node": "^26.13.0",
-    "pnpm": "^12.16.0"
+    "pnpm": "^12.16.1"
   },
-  "packageManager": "pnpm@12.16.0",
+  "packageManager": "pnpm@12.16.1",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "12.16.0",
+      "version": "12.16.1",
       "onFail": "download"
     }
   }
