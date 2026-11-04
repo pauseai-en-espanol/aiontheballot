@@ -1,5 +1,20 @@
 # @aiontheballot/admin
 
+## 0.34.1
+
+### Patch Changes
+
+- 8a14730: Dependencies bump
+- fafe5e7: Dependencies bump
+- 5475128: Dependencies bump
+- Updated dependencies [1c23724]
+- Updated dependencies [8a14730]
+- Updated dependencies [5475128]
+  - @aiontheballot/i18n@0.32.1
+  - @aiontheballot/domain@0.16.3
+  - @aiontheballot/observability@0.2.10
+  - @aiontheballot/og@0.7.8
+
 ## 0.34.0
 
 ### Minor Changes

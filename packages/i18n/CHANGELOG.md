@@ -1,5 +1,14 @@
 # @aiontheballot/i18n
 
+## 0.32.1
+
+### Patch Changes
+
+- 1c23724: The summary's criteria titles tilt at 45° instead of standing upright, and are never cut. The detailed table is now
+  an index and a section per criterion, each a small table of every party's rating with why, a list on a phone.
+- 8a14730: Dependencies bump
+- 5475128: Dependencies bump
+
 ## 0.32.0
 
 ### Minor Changes
