@@ -1745,11 +1745,7 @@
     "lastChange": "Último cambio: {date, date, long}",
     "noRatingsYet": "Aún no se ha publicado ninguna valoración: todas las celdas están pendientes.",
     "tableCaption": "{election}: la valoración de cada partido en cada criterio",
-    "tableRegion": "La tabla, que se desplaza en horizontal",
     "party": "Partido",
-    "byParty": "Por partido",
-    "byCriterion": "Por criterio",
-    "view": "Ver las valoraciones",
     "noParties": "Aún no hay partidos.",
     "noCriteria": "Aún no hay criterios.",
     "breadcrumb": "Estás aquí",
@@ -1759,7 +1755,12 @@
       "tableLink": "Ver cada valoración en palabras"
     },
     "table": {
-      "title": "La tabla detallada"
+      "title": "La tabla detallada",
+      "index": "Ir a un criterio",
+      "backToIndex": "Volver a la lista de criterios",
+      "sectionCaption": "{criterion}: la valoración de cada partido",
+      "rating": "Valoración",
+      "why": "Por qué"
     }
   },
   "partyPage": {

@@ -1745,11 +1745,7 @@
     "lastChange": "Latest change: {date, date, long}",
     "noRatingsYet": "No rating has been published yet: every cell is pending.",
     "tableCaption": "{election}: each party’s rating on each criterion",
-    "tableRegion": "The scorecard, which scrolls sideways",
     "party": "Party",
-    "byParty": "By party",
-    "byCriterion": "By criterion",
-    "view": "Show the ratings",
     "noParties": "No parties yet.",
     "noCriteria": "No criteria yet.",
     "breadcrumb": "You are here",
@@ -1759,7 +1755,12 @@
       "tableLink": "See every rating in words"
     },
     "table": {
-      "title": "The detailed table"
+      "title": "The detailed table",
+      "index": "Go to a criterion",
+      "backToIndex": "Back to the list of criteria",
+      "sectionCaption": "{criterion}: each party’s rating",
+      "rating": "Rating",
+      "why": "Why"
     }
   },
   "partyPage": {

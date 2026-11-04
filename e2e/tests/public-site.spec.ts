@@ -109,7 +109,7 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     await expect(page).toHaveURL(`${ELECTION}/tabla`);
   });
 
-  test('shows the detailed table on a desktop: every rating in words, and no legend to say them again', async ({
+  test('shows the detailed table on a desktop: a section per criterion, every rating in words with why, under an index (PLAN R225)', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -122,21 +122,49 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     await expect(
       page.getByRole('navigation', { name: es.election.breadcrumb }).getByRole('link'),
     ).toHaveText(['Elecciones generales de ejemplo']);
-    const table = page.getByRole('table');
-    await expect(table.getByRole('columnheader')).toHaveText([
-      es.election.party,
+    // The index, in the criteria's order, straight to each one's section.
+    const index = page.getByRole('navigation', { name: es.election.table.index });
+    await expect(index.getByRole('link')).toHaveText(['Ejemplo 1', 'Ejemplo 2']);
+    await index.getByRole('link', { name: 'Ejemplo 2' }).click();
+    await expect(page).toHaveURL(`${ELECTION}/tabla#criterio-criterio-de-ejemplo-2`);
+    // A section per criterion, its short title linking to its page, its full title under it, and a small table.
+    await expect(page.getByRole('heading', { level: 2 })).toHaveText([
+      es.election.table.index,
       'Ejemplo 1',
       'Ejemplo 2',
     ]);
-    // Icon, words and colour, never colour alone.
-    const cells = table.getByRole('cell');
-    await expect(cells).toHaveText([
-      es.rating.meets,
-      es.cell.pending,
-      es.cell.pending,
-      es.cell.pending,
+    const first = page.getByRole('region', { name: 'Ejemplo 1' });
+    await expect(first.getByRole('heading', { level: 2 }).getByRole('link')).toHaveAttribute(
+      'href',
+      '/ejemplo-a/generales-de-ejemplo/criterios/criterio-de-ejemplo-1',
+    );
+    await expect(first.getByText('Criterio de ejemplo 1', { exact: true })).toBeVisible();
+    await expect(page.getByRole('table')).toHaveCount(2);
+    const table = first.getByRole('table', { name: 'Ejemplo 1: la valoración de cada partido' });
+    await expect(table.getByRole('columnheader')).toHaveText([
+      es.election.party,
+      es.election.table.rating,
+      es.election.table.why,
     ]);
-    await expect(cells.first().locator('svg')).toHaveCount(1);
+    await expect(table.getByRole('rowheader')).toHaveText([/PEA/, /PEB/]);
+    // Icon, words and colour, never colour alone; then why, where there is one.
+    await expect(table.getByRole('cell')).toHaveText([
+      es.rating.meets,
+      'Resumen inventado: propone una moratoria de ejemplo.',
+      es.cell.pending,
+      '',
+    ]);
+    await expect(table.getByRole('cell').first().locator('svg')).toHaveCount(1);
+    await expect(table.getByRole('link', { name: es.rating.meets })).toHaveAttribute(
+      'href',
+      '/ejemplo-a/generales-de-ejemplo/partidos/partido-ejemplo-a/criterio-de-ejemplo-1',
+    );
+    // Each section a way back to the index.
+    await expect(page.getByRole('link', { name: es.election.table.backToIndex })).toHaveCount(2);
+    await expect(first.getByRole('link', { name: es.election.table.backToIndex })).toHaveAttribute(
+      'href',
+      '#indice',
+    );
     await expect(page.getByRole('region', { name: es.election.legend })).toHaveCount(0);
     await expect(page.locator('[data-invariant="methodology-link"]')).toHaveAttribute(
       'href',
@@ -145,7 +173,7 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     await expectAccessible(page);
   });
 
-  test('shows a card per party on a phone, and a card per criterion on request, without scripts', async ({
+  test('shows the same sections on a phone, a party a row in place of each table, without scripts', async ({
     newContext,
   }) => {
     const context = await newContext({
@@ -154,17 +182,25 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     });
     const page = await context.newPage();
     await page.goto(`${ELECTION}/tabla`);
-    await expect(page.getByRole('table')).toBeHidden();
-    await expect(page.getByRole('heading', { level: 2, name: 'Partido Ejemplo A' })).toBeVisible();
-    await page.getByRole('link', { name: es.election.byCriterion }).click();
-    await expect(page).toHaveURL(`${ELECTION}/tabla?vista=criterios`);
-    await expect(
-      page.getByRole('heading', { level: 2, name: 'Criterio de ejemplo 1' }),
-    ).toBeVisible();
-    await expect(page.getByRole('link', { name: es.election.byCriterion })).toHaveAttribute(
-      'aria-current',
-      'page',
+    await expect(page.getByRole('table')).toHaveCount(0);
+    const first = page.getByRole('region', { name: 'Ejemplo 1' });
+    await expect(first.getByRole('heading', { level: 2 })).toBeVisible();
+    const rows = first.getByRole('listitem');
+    await expect(rows).toHaveCount(2);
+    // The party and its rating in words, one link to the cell, and why under them.
+    const cell = rows.first().getByRole('link');
+    await expect(cell).toHaveAccessibleName(new RegExp(`PEA.*${es.rating.meets}`));
+    await expect(cell).toHaveAttribute(
+      'href',
+      '/ejemplo-a/generales-de-ejemplo/partidos/partido-ejemplo-a/criterio-de-ejemplo-1',
     );
+    await expect(rows.first()).toContainText(
+      'Resumen inventado: propone una moratoria de ejemplo.',
+    );
+    await expect(rows.nth(1).getByRole('link')).toHaveAccessibleName(
+      new RegExp(`PEB.*${es.cell.pending}`),
+    );
+    // No axe here: it runs as a script, and this page has none (the next test checks it on a phone).
     // The summary, on a phone too: its table scrolls inside its own region.
     await page.goto(ELECTION);
     await expect(page.getByRole('region', { name: es.election.summary.region })).toBeVisible();
@@ -174,6 +210,8 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
   test('passes axe on a phone too', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(ELECTION);
+    await expectAccessible(page);
+    await page.goto(`${ELECTION}/tabla`);
     await expectAccessible(page);
   });
 

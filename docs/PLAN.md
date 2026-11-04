@@ -3284,6 +3284,24 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   was typed in a form is lost on the way (an invitation's address, say). ADR-0002 §2, §9, ADR-0003 §2 and ADR-0008
   amended. Mutation list `step-up`; `sign-in` updated.
 
+- **R225. The summary's titles tilt; the detailed table goes by criterion.** Feedback from the chapter on the live
+  demo. One member: the detailed table is "a bit overwhelming"; as a summary the election's own is better, and for
+  the details "no more than 4 columns together … a format by sections", a section per criterion listing each party,
+  its rating and its comments, "with an index on top to jump straight to the cause you care about"; thematic blocks
+  maybe, though they weren't sure they are needed. Earlier, someone asked for the summary's criteria titles tilted
+  rather than upright. The summary's titles now rise at 45° to the right from the middle of their column, on one
+  line, read without turning the head; nothing is cut: `tiltedHeaderRoom` (apps/web, with its tests) sizes the
+  header row from the longest title and the room left past the last column from the titles that reach beyond it, in
+  `ch` of the titles' type, which a zero's width keeps a little generous. The detailed table at `/{election}/tabla`
+  is now an index ("Ir a un criterio") and a section per criterion, in the criteria's order: its short title linking
+  to its page, its full title, and a table of party, rating (icon and words, linking to the cell with its quotes and
+  sources) and why (the cell's summary, or that the programme isn't published yet), with a way back to the index;
+  on a phone, a list, a party a row. The by-party view and its `?vista=criterios` switch are gone: each party's page
+  already lists its ratings. Not done: thematic blocks (no grouping in the data, and they weren't sure). The
+  summary and the share images keep their orientation (Answered: scorecard orientation); only the detailed page
+  changed. E2e tests rewritten for the detailed table on a desktop and a phone (without scripts); spec: public site
+  §5.1.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

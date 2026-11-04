@@ -168,8 +168,10 @@ of its own.
   when they wrote one (`elections.intro`, Markdown, sanitized as the methodology's body, in its own `lang`); the
   question its ratings answer and the date of the latest change; then the **summary**: parties down the side and
   criteria across the top (always), each cell the rating's icon alone, so a whole election fits one screen. Criteria
-  headers are their short titles, upright, read from the bottom up, wrapping onto a second line rather than ever being
-  cut, each a link to the criterion page; party headers show the party's mark (§4) and short name (the full name in an
+  headers are their short titles, tilted at 45° and rising to the right from the middle of their column, on one line,
+  so they read without turning the head (PLAN R225); never cut: the header row is as tall as the longest title rises,
+  and the table leaves free at its end as much as a title reaches past its last column. Each is a link to the
+  criterion page; party headers show the party's mark (§4) and short name (the full name in an
   `abbr` title and in text only screen readers read), linking to the party page, and under it, while its programme isn't
   published, "Programa aún no publicado" (the full status, with its date, as its tooltip), which says why its row is
   pending. Each cell links to its page, its rating's words its link's name and its tooltip ("PEA · Criterio: Cumple"), a
@@ -178,17 +180,18 @@ of its own.
   middle of its icons, and its parties' marks go without their colour line (PLAN R220). On a phone it scrolls sideways
   inside its own region (with a visible focus and a label), the party column fixed, never the page. A real `<table>`,
   with `<th scope>` headers and a caption for screen readers. Below, a link to the detailed table.
-- **Detailed table** (`/{election}/tabla`), the scorecard's earlier page: a breadcrumb back to the election, the
-  question, the date of the latest change and the methodology link, and no legend. On a desktop (≥ 1024 px, Panda's
-  `lg`), a table, parties down the side and criteria across the top, always (PLAN, Answered: scorecard orientation).
-  Party headers also show the programme status. Each cell is a link to the cell page with the rating's icon and words,
-  the icon above the words so a column takes a short label's width (PLAN R215). When the table is wider than the
-  text's column, it widens past it, centred on it, up to the window less its margins (10 criteria fit from about
-  1,280 px); only past that does the party column stay fixed and the table scroll sideways inside its own region,
-  never the page. On a phone, one card per party, in the parties' order, each listing every criterion with the party's
-  rating, and a second view, one card per criterion listing every party. Both are server-rendered; a two-link switch
-  above them picks one (`?vista=criterios`, plain links, so it works without scripts; the canonical address has no
-  query). It shares the scorecard's images.
+- **Detailed table** (`/{election}/tabla`), every rating in words (PLAN R225, after a chapter member found the earlier
+  parties × criteria table "a bit overwhelming"): a breadcrumb back to the election, the question, the date of the
+  latest change and the methodology link, and no legend. Then an index, "Ir a un criterio", listing the criteria by
+  their short titles in their order, each a link to its section (`#criterio-{slug}`). A section per criterion: its short
+  title as a heading, a link to the criterion page, its full title under it, and a table of three columns, party, rating
+  and why, one row per party in the parties' order (the caption, for screen readers, says which criterion). The party
+  header shows its mark and short name (the full name as in the summary) and links to the party page; the rating, its
+  icon and words, links to the cell page, with its quotes and sources; "why" is the cell's summary, or, while the
+  party's programme isn't published, that it isn't (with the date it was checked). Each section ends with a way back to
+  the index. On a phone (below Panda's `md`), each table is a list instead, a party a row: its mark, short name and
+  rating as one link to the cell, why under it. A party's ratings across the criteria are on its own page.
+  Server-rendered, no scripts. It shares the scorecard's images.
 - With no criteria or no parties yet, both say so in words rather than drawing an empty table.
 
 ### 5.2 Party, criterion and cell pages
