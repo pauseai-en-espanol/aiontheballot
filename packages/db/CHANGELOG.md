@@ -1,5 +1,11 @@
 # @aiontheballot/db
 
+## 0.18.4
+
+### Patch Changes
+
+- bbc752a: Dependencies bump
+
 ## 0.18.3
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @aiontheballot/migrations
 
+## 0.29.2
+
+### Patch Changes
+
+- bbc752a: Dependencies bump
+
 ## 0.29.1
 
 ### Patch Changes
