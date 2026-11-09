@@ -35,8 +35,8 @@
     "@vitest/ui": "5.1.0",
     "dbmate": "2.37.0",
     "kysely-codegen": "0.20.0",
-    "oxlint": "1.90.0",
-    "oxlint-tsgolint": "7.0.2005",
+    "oxlint": "1.91.0",
+    "oxlint-tsgolint": "7.0.2006",
     "typescript": "7.0.2",
     "vitest": "5.1.0"
   }
