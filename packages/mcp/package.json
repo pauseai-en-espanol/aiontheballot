@@ -22,7 +22,7 @@
     "@slango.configs/lint-staged": "2.0.11",
     "@slango.configs/oxlint": "0.1.16",
     "@slango.configs/typescript": "3.0.1",
-    "@slango.configs/vitest": "2.1.5",
+    "@slango.configs/vitest": "2.1.6",
     "@types/node": "26.6.6",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",

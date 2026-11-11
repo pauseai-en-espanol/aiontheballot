@@ -28,7 +28,7 @@
     "@slango.configs/lint-staged": "2.0.11",
     "@slango.configs/oxlint": "0.1.16",
     "@slango.configs/typescript": "3.0.1",
-    "@slango.configs/vitest": "2.1.5",
+    "@slango.configs/vitest": "2.1.6",
     "@vitest/coverage-v8": "5.1.0",
     "@vitest/ui": "5.1.0",
     "oxlint": "1.90.0",
