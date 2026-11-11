@@ -275,8 +275,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
@@ -372,8 +372,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@types/jsdom':
         specifier: 30.0.0
         version: 30.0.0
@@ -466,8 +466,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
@@ -571,8 +571,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
@@ -620,8 +620,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@vitest/coverage-v8':
         specifier: 5.1.0
         version: 5.1.0(vitest@5.1.0)
@@ -657,8 +657,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@vitest/coverage-v8':
         specifier: 5.1.0
         version: 5.1.0(vitest@5.1.0)
@@ -697,8 +697,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
@@ -731,8 +731,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@vitest/coverage-v8':
         specifier: 5.1.0
         version: 5.1.0(vitest@5.1.0)
@@ -777,8 +777,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@types/pngjs':
         specifier: 6.0.5
         version: 6.0.5
@@ -829,8 +829,8 @@ importers:
         specifier: 3.0.1
         version: 3.0.1(typescript@7.0.2)
       '@slango.configs/vitest':
-        specifier: 2.1.5
-        version: 2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
+        specifier: 2.1.6
+        version: 2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)
       '@vitest/coverage-v8':
         specifier: 5.1.0
         version: 5.1.0(vitest@5.1.0)
@@ -2779,8 +2779,8 @@ packages:
     peerDependencies:
       typescript: ^7.0.2
 
-  '@slango.configs/vitest@2.1.5':
-    resolution: {integrity: sha512-V4yj99r5+DXnk5G1T6tb5Sk4XGgpDMyWOFFoOwlaNlLB1qRvh0mtZnxgoMMPmMwJFDCFw11KYnAGK/1qN3TtRw==}
+  '@slango.configs/vitest@2.1.6':
+    resolution: {integrity: sha512-elR1HE9SavIUWTJw4u1TQw2DJeMb4oJcXli5g4ACIGdClg+WSjFu0OqM8zjjVPx+uU2KaHjBsaSmfJaS4+zHyw==}
     peerDependencies:
       '@vitest/coverage-v8': ^5.0.5
       '@vitest/ui': ^5.0.5
@@ -3559,6 +3559,12 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
+  bcp-47-match@2.0.3:
+    resolution: {integrity: sha512-JtTezzbAibu8G0R9op9zb3vcWZd9JF6M0xOYGPn0fNCd7wOpRB1mU2mH9T8gaBGbAAyIIVgB2G7xG0GP98zMAQ==}
+
+  bcp-47@2.1.2:
+    resolution: {integrity: sha512-wsv86UuNFuPnVieKLyECTT+CP1WSAHeoIg5P3xu2kA9Z+7fVPoKt7dxzSeEhtJel0AI+NW3fIW3KtTKQKUCngg==}
+
   better-auth@1.7.15:
     resolution: {integrity: sha512-x2HmrQZy9yTG3H9iJ9pvaVGmLbI++ynOcJ3SGqFZnhEDscQSpG+1P9Xv41ceje2vw7dVE5+BbImDGneyhtW2Vg==}
     peerDependencies:
@@ -4316,6 +4322,15 @@ packages:
       canvas:
         optional: true
 
+  jsdom@31.0.0:
+    resolution: {integrity: sha512-xAkhD9z1eyFC5+QUi9K24CaZJgdCQ2GOGLW1GdVDoQvkp/AxEH9TQ0pAplPOlIiV92hfcgnFOADZypbjgbBT6Q==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
+    peerDependencies:
+      '@napi-rs/canvas': ^1.0.13
+    peerDependenciesMeta:
+      '@napi-rs/canvas':
+        optional: true
+
   json-parse-even-better-errors@2.3.1:
     resolution: {integrity: sha512-xyFwyhro/JEof6Ghe2iz2NcXoj2sloNsWr/XsERDK/oiPCfaNhl5ONfp+jQdAZRQQ0IJWNzH9zIZF7li91kh2w==}
 
@@ -4789,8 +4804,14 @@ packages:
     resolution: {integrity: sha512-ayCKvm/phCGxOkYRSCM82iDwct8/EonSEgCSxWxD7ve6jHggsFl4fZVQBPRNgQoKiuV/odhFrGzQXZwbifC8Rg==}
     engines: {node: '>=8'}
 
+  parse5-parser-stream@8.1.1:
+    resolution: {integrity: sha512-hMcVbbUJcQmP8rURWUdYrT1flRiBiBVjq/RYGguJpDUgIXSqdYKlE0CxthmdMWoSlBAuL5bUBa73g0pttSy7Hw==}
+
   parse5@8.1.0:
     resolution: {integrity: sha512-sq3qBFpee5jeocbFbO48VHlGr8sT7mbXS0vxlKN6sottBtJzrOG3998sr0llSZcQAGgfpdmEYAIZE0P9z0dE8w==}
+
+  parse5@8.1.1:
+    resolution: {integrity: sha512-EcR/6WDcU7b2N3vQSxKALCk9lXGtUMQxXio008OEMBE0kavu/7JLfBEeFPzi43nMqVDSbEn3QCK+BMCc9zO//w==}
 
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
@@ -5273,6 +5294,7 @@ packages:
 
   tldts-core@7.4.20:
     resolution: {integrity: sha512-C630TWXZCZmLq0F2bW4QqwnaaxCQ/svpAqvJwnC4JvgEM5ohhBnGsEzTLSOXcN+xjz+kEaHS5uoWIw2klnqd0A==}
+    deprecated: Partial release, see https://github.com/remusao/tldts/issues/2735. Use >=7.4.22.
 
   tldts@7.4.19:
     resolution: {integrity: sha512-48dH6aSpQnpbzDUc4vIQZ1VjB8tkK+e8c1yx05/SZK+rkssgjEOlxDd/yU8/a4vGYQ9vRgJr9dwMq9TJ0b3X2Q==}
@@ -7226,7 +7248,7 @@ snapshots:
     dependencies:
       typescript: 7.0.2
 
-  '@slango.configs/vitest@2.1.5(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)':
+  '@slango.configs/vitest@2.1.6(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)(@swc/helpers@0.5.23)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))(vitest@5.1.0)':
     dependencies:
       '@swc/core': 1.16.21(@swc/helpers@0.5.23)
       '@testing-library/dom': 10.4.2
@@ -7235,12 +7257,13 @@ snapshots:
       '@vitejs/plugin-react': 6.2.1(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))
       '@vitest/coverage-v8': 5.1.0(vitest@5.1.0)
       '@vitest/ui': 5.1.0(vitest@5.1.0)
-      jsdom: 30.1.3(@noble/hashes@2.4.0)
+      jsdom: 31.0.0(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0)
       unplugin-swc: 2.0.0(@swc/core@1.16.21(@swc/helpers@0.5.23))(rolldown@1.2.16)(rollup@4.67.4)(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))
       vite: 8.3.5(@types/node@26.6.6)(yaml@2.9.1)
       vitest: 5.1.0(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(@vitest/coverage-v8@5.1.0)(@vitest/ui@5.1.0)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.5(@types/node@26.6.6)(yaml@2.9.1))
     transitivePeerDependencies:
       - '@farmfe/core'
+      - '@napi-rs/canvas'
       - '@noble/hashes'
       - '@rolldown/plugin-babel'
       - '@rsbuild/core'
@@ -7250,7 +7273,6 @@ snapshots:
       - '@types/react-dom'
       - babel-plugin-react-compiler
       - bun-types-no-globals
-      - canvas
       - esbuild
       - oxc-transform-react
       - react
@@ -8305,6 +8327,14 @@ snapshots:
 
   baseline-browser-mapping@2.11.34: {}
 
+  bcp-47-match@2.0.3: {}
+
+  bcp-47@2.1.2:
+    dependencies:
+      is-alphabetical: 2.0.1
+      is-alphanumerical: 2.0.1
+      is-decimal: 2.0.1
+
   better-auth@1.7.15(@opentelemetry/api@1.10.0)(pg@8.23.1):
     dependencies:
       '@better-auth/core': 1.7.15(@better-auth/utils@0.5.1)(@better-fetch/fetch@1.3.3)(@opentelemetry/api@1.10.0)(better-call@1.4.4(zod@4.6.7))(jose@6.2.15)(kysely@0.29.8)(nanostores@1.5.5)
@@ -9083,6 +9113,31 @@ snapshots:
     transitivePeerDependencies:
       - '@noble/hashes'
 
+  jsdom@31.0.0(@napi-rs/canvas@1.1.0)(@noble/hashes@2.4.0):
+    dependencies:
+      '@exodus/bytes': 1.16.0(@noble/hashes@2.4.0)
+      bcp-47: 2.1.2
+      bcp-47-match: 2.0.3
+      data-urls: 8.0.0(@noble/hashes@2.4.0)
+      decimal.js: 10.6.0
+      html-encoding-sniffer: 7.0.0(@noble/hashes@2.4.0)
+      is-potential-custom-element-name: 1.0.1
+      lru-cache: 11.5.3
+      parse5: 8.1.0
+      parse5-parser-stream: 8.1.1
+      saxes: 6.0.0
+      tough-cookie: 6.0.2
+      undici: 8.12.3
+      w3c-xmlserializer: 6.0.0
+      webidl-conversions: 8.0.1
+      whatwg-mimetype: 5.0.0
+      whatwg-url: 17.3.0(@noble/hashes@2.4.0)
+      xml-name-validator: 5.0.0
+    optionalDependencies:
+      '@napi-rs/canvas': 1.1.0
+    transitivePeerDependencies:
+      - '@noble/hashes'
+
   json-parse-even-better-errors@2.3.1: {}
 
   json-schema-ref-resolver@3.0.1:
@@ -9675,7 +9730,15 @@ snapshots:
       json-parse-even-better-errors: 2.3.1
       lines-and-columns: 1.2.4
 
+  parse5-parser-stream@8.1.1:
+    dependencies:
+      parse5: 8.1.1
+
   parse5@8.1.0:
+    dependencies:
+      entities: 9.0.0
+
+  parse5@8.1.1:
     dependencies:
       entities: 9.0.0
 
