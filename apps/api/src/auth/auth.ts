@@ -1,8 +1,13 @@
 import type { createAuthPool } from '@aiontheballot/db/auth-pool';
 
 import { requestLocale } from '@aiontheballot/i18n/negotiate';
+import {
+  decodeAttestationObject,
+  isoBase64URL,
+  parseAuthenticatorData,
+} from '@simplewebauthn/server/helpers';
 import { betterAuth, type BetterAuthOptions } from 'better-auth';
-import { APIError } from 'better-auth/api';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { createHash } from 'node:crypto';
 
 import type { PasswordMail } from './password-mail.js';
@@ -20,8 +25,9 @@ export const SESSION_IDLE_SECONDS = 48 * 60 * 60;
 
 /**
  * What a passkey's answer must say for it to count as the second factor: that the device checked who holds it
- * (fingerprint, face or PIN), not only that someone touched it. Better Auth's plugin asks for that and then accepts
- * either, so both ceremonies check it here.
+ * (fingerprint, face or PIN), not only that someone touched it. Both ceremonies check it on the answer Better Auth
+ * verified. Its plugin refuses such an answer too (since 1.7.18), but as a ceremony that failed, which the admin can't
+ * tell from any other; so the answer is read first, as it came, and refused with this code (`holderChecked`).
  */
 export const USER_NOT_VERIFIED = 'PASSKEY_USER_NOT_VERIFIED';
 const unverified = () =>
@@ -29,6 +35,42 @@ const unverified = () =>
     code: USER_NOT_VERIFIED,
     message: 'The passkey did not check who holds the device',
   });
+
+const field = (value: unknown, key: string): unknown =>
+  typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined;
+
+/** Where each ceremony's answer has the device's flags: in its attestation when adding one, on their own to sign in. */
+const AUTHENTICATOR_DATA: Readonly<
+  Partial<Record<string, (answer: unknown) => Uint8Array<ArrayBuffer> | undefined>>
+> = {
+  '/passkey/verify-registration': (answer) => {
+    const encoded = field(answer, 'attestationObject');
+    return typeof encoded === 'string'
+      ? decodeAttestationObject(isoBase64URL.toBuffer(encoded)).get('authData')
+      : undefined;
+  },
+  '/passkey/verify-authentication': (answer) => {
+    const encoded = field(answer, 'authenticatorData');
+    return typeof encoded === 'string' ? isoBase64URL.toBuffer(encoded) : undefined;
+  },
+};
+
+/**
+ * Whether a passkey's answer, as the browser sent it, says the device checked who holds it (the UV flag); undefined
+ * for any other request, and for an answer that can't be read, which Better Auth then refuses on its own.
+ */
+const holderChecked = (path: string, body: unknown): boolean | undefined => {
+  const authenticatorData = AUTHENTICATOR_DATA[path];
+  if (!authenticatorData) {
+    return undefined;
+  }
+  try {
+    const data = authenticatorData(field(field(body, 'response'), 'response'));
+    return data && parseAuthenticatorData(data).flags.uv;
+  } catch {
+    return undefined;
+  }
+};
 
 /** Shorter passwords are refused (editorial workflow A5.1). */
 export const MIN_PASSWORD_LENGTH = 12;
@@ -238,6 +280,15 @@ export const authOptions = ({
     baseURL: adminOrigin,
     basePath: AUTH_BASE_PATH,
     trustedOrigins: [adminOrigin],
+    hooks: {
+      // Before Better Auth reads a passkey's answer: one whose device didn't check who holds it is refused with
+      // USER_NOT_VERIFIED, which the admin explains, rather than as a ceremony that failed.
+      before: createAuthMiddleware(async (ctx) => {
+        if (holderChecked(ctx.path, ctx.body) === false) {
+          throw unverified();
+        }
+      }),
+    },
     emailAndPassword: {
       enabled: true,
       // Accounts come only from invitations and the owner's command (editorial workflow A1, A3).

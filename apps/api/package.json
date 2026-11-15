@@ -27,6 +27,7 @@
     "@better-auth/passkey": "1.7.18",
     "@mozilla/readability": "0.6.0",
     "@sentry/node": "11.11.0",
+    "@simplewebauthn/server": "14.1.0",
     "better-auth": "1.7.18",
     "fastify": "5.12.8",
     "html-encoding-sniffer": "7.0.0",

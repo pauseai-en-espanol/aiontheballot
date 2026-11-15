@@ -13,13 +13,31 @@
     "old": "        if (verification.registrationInfo?.userVerified !== true) {",
     "new": "        if (verification.registrationInfo === undefined) {",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
-    "cwd": "apps/api"
+    "cwd": "apps/api",
+    "equivalent": "holderChecked refuses the same answer first, before Better Auth reads it, and the passkey plugin refuses it too (since 1.7.18)"
   },
   {
     "name": "a passkey that didn't check who holds the device signs in",
     "file": "apps/api/src/auth/auth.ts",
     "old": "        if (!verification.authenticationInfo.userVerified) {",
     "new": "        if (!verification.authenticationInfo) {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api",
+    "equivalent": "holderChecked refuses the same answer first, before Better Auth reads it, and the passkey plugin refuses it too (since 1.7.18)"
+  },
+  {
+    "name": "adding a passkey that didn't check who holds the device fails with no reason the admin can explain",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "  '/passkey/verify-registration': (answer) => {",
+    "new": "  '/passkey/verify-registration/never': (answer) => {",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "signing in with a passkey that didn't check who holds the device fails with no reason the admin can explain",
+    "file": "apps/api/src/auth/auth.ts",
+    "old": "  '/passkey/verify-authentication': (answer) => {",
+    "new": "  '/passkey/verify-authentication/never': (answer) => {",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/passkeys.spec.ts",
     "cwd": "apps/api"
   },
