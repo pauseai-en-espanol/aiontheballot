@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useRef, useState } from 'react';
 
 import type { SourceKind } from '@/elections/data';
 
@@ -22,7 +22,7 @@ import { LanguageSelect } from '@/ui/LanguageSelect';
 import * as styles from '@/ui/styles';
 import { useProblems } from '@/ui/useProblems';
 import { useWrite } from '@/ui/useWrite';
-import { sendToApi, uploadToApi, type WriteError } from '@/write';
+import { sendToApi, uploadToApi, type WriteAnswer, type WriteError } from '@/write';
 
 export interface SourceFormText {
   title: string;
@@ -64,6 +64,8 @@ export interface SourceCopyChoice {
     upload: string;
     fetch: string;
     needsUrl: string;
+    /** Said while the new source is added and its copy stored, which takes a while for a large file. */
+    storing: string;
     /** With `{error}`. */
     failed: string;
     file: string;
@@ -156,6 +158,9 @@ export const SourceForm = ({
   const [partyId, setPartyId] = useState(values?.partyId ?? '');
   const [copyChoice, setCopyChoice] = useState<'later' | 'upload' | 'fetch'>('later');
   const [file, setFile] = useState<File | null>(null);
+  // Once a new source is added, the form is done: its page opens, and until then the form sends nothing again.
+  const added = useRef(false);
+  const [leaving, setLeaving] = useState(false);
   const constraintMessage = (constraint: string, fallback: string) =>
     text.constraints[constraint] ?? fallback;
 
@@ -184,22 +189,44 @@ export const SourceForm = ({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (added.current) {
+      return;
+    }
     const form = event.currentTarget;
     if (show(check(form))) {
       setError(undefined);
       return;
     }
     const data = new FormData(form);
+    const idOf = (answer: WriteAnswer): unknown =>
+      typeof answer.body === 'object' && answer.body !== null
+        ? (answer.body as { id?: unknown }).id
+        : undefined;
+    // A new one's copy is stored within the same write, so the form stays busy, and says why, until both are done: a
+    // large file takes a while, and a second click meanwhile would add the source again.
+    let stored: WriteAnswer = { ok: true };
     const answer = await run(
-      () =>
-        sendToApi(method, path, {
+      async () => {
+        const sent = await sendToApi(method, path, {
           title: formText(form, 'title').trim(),
           kind: formText(form, 'kind'),
           url: formText(form, 'url').trim() || null,
           language: formText(form, 'language').trim().toLowerCase() || null,
           partyId: partyId || null,
           isProgramme: partyId !== '' && data.get('isProgramme') === 'on',
-        }),
+        });
+        const id = idOf(sent);
+        if (sent.ok && method === 'POST' && copy && typeof id === 'string') {
+          // Kept or not, the source is added, and its page says which.
+          stored =
+            copyChoice === 'upload' && file
+              ? await uploadToApi(`${path}/${id}/copy`, file)
+              : copyChoice === 'fetch'
+                ? await sendToApi('POST', `${path}/${id}/fetch`)
+                : { ok: true };
+        }
+        return sent;
+      },
       method === 'POST' ? () => undefined : text.saved,
     );
     if (answer && !answer.ok) {
@@ -224,19 +251,9 @@ export const SourceForm = ({
       return;
     }
     if (answer?.ok && method === 'POST' && then !== undefined) {
-      const id =
-        typeof answer.body === 'object' && answer.body !== null
-          ? (answer.body as { id?: unknown }).id
-          : undefined;
-      // Its copy, now that it exists: kept or not, the source is, and its page says which.
-      const stored =
-        typeof id !== 'string' || !copy || copyChoice === 'later'
-          ? { ok: true }
-          : copyChoice === 'upload' && file
-            ? await uploadToApi(`${path}/${id}/copy`, file)
-            : copyChoice === 'fetch'
-              ? await sendToApi('POST', `${path}/${id}/fetch`)
-              : { ok: true };
+      added.current = true;
+      setLeaving(true);
+      const id = idOf(answer);
       announce(
         stored.ok || !copy
           ? text.added
@@ -387,7 +404,12 @@ export const SourceForm = ({
         </fieldset>
       ) : null}
       <FormMessages id={ERROR_ID} error={error} errors={text.errors} />
-      <FormActions label={text.save} pending={pending} status={status} statusRef={statusLine} />
+      <FormActions
+        label={text.save}
+        pending={pending || leaving}
+        status={pending && copy && copyChoice !== 'later' ? copy.text.storing : status}
+        statusRef={statusLine}
+      />
     </form>
   );
 };

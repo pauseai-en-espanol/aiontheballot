@@ -1268,6 +1268,7 @@
         "upload": "Subir un archivo ahora",
         "fetch": "Obtenerla ahora desde su dirección",
         "needsUrl": "Para obtenerla hace falta la dirección de la fuente.",
+        "storing": "Añadiendo la fuente y guardando su copia… Un archivo grande puede tardar un minuto: espera aquí.",
         "failed": "La fuente está añadida, pero su copia no se ha guardado: {error}"
       },
       "technical": "Detalles técnicos"

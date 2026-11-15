@@ -66,6 +66,7 @@ export const sourceCopyChoice = (
     upload: t('admin.sources.copyChoice.upload'),
     fetch: t('admin.sources.copyChoice.fetch'),
     needsUrl: t('admin.sources.copyChoice.needsUrl'),
+    storing: t('admin.sources.copyChoice.storing'),
     failed: template(t, 'admin.sources.copyChoice.failed'),
     file: t('admin.sources.copy.file'),
     fileHint: t('admin.sources.copy.fileHint'),

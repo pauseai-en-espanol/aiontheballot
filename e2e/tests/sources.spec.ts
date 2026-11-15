@@ -150,6 +150,48 @@ test.describe('sources (editorial workflow §7)', () => {
     await expect(page.getByRole('link', { name: sources.copy.download })).toBeVisible();
   });
 
+  test('are added once, however many times "Save" is pressed while the copy goes up', async ({
+    page,
+  }) => {
+    const { id } = await signedInAccount(page, created, 'Persona que pulsa dos veces');
+    await addMembership(id, 'ejemplo-b', 'editor');
+    await page.goto(`${DRAFT_LIST}/new`);
+    const title = `Fuente de subida lenta ${crypto.randomUUID()}`;
+    await page.getByLabel(sources.fields.title).fill(title);
+    await page.getByLabel(sources.copyChoice.upload).check();
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'programa.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from(`Texto inventado de un programa de subida lenta: ${title}.`),
+    });
+    // The copy held back, as a large file's upload would be, until the second press is in.
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route(
+      (url) => url.pathname.endsWith('/copy'),
+      async (route) => {
+        await held;
+        await route.continue();
+      },
+    );
+    const save = page.getByRole('button', { name: sources.fields.save });
+    await save.click();
+    // Busy, and saying why, until the source and its copy are both stored.
+    await expect(
+      page.getByRole('status').filter({ hasText: sources.copyChoice.storing }),
+    ).toBeVisible();
+    await expect(save).toHaveAttribute('aria-disabled', 'true');
+    await save.click({ force: true });
+    release();
+    await expect(page.getByRole('heading', { level: 2, name: title })).toBeVisible();
+    made.push(new URL(page.url()).pathname.split('/').at(-1) ?? '');
+    await expect(page.getByRole('link', { name: sources.copy.download })).toBeVisible();
+    await page.goto(DRAFT_LIST);
+    await expect(page.getByRole('link', { name: title })).toHaveCount(1);
+  });
+
   test('are deleted while they have no copy, and refuse a file of a type no source has', async ({
     page,
   }) => {

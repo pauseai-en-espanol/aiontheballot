@@ -3322,6 +3322,13 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   of `source_document_rules` (`replaced-sources`, `rls-review`) now target this migration. Specs: data model §3.4,
   editorial workflow S1.2.
 
+- **R227. A new source is added once, however many times "Save" is pressed.** Loading SALF's 19 MB programme, the
+  form came back to life once the source was added, while its copy was still going up, with nothing said; a second
+  press added the source again. The copy is now stored within the same write (R194's form), so the form stays busy
+  through both, says it is storing the copy and that a large file can take a minute, and sends nothing more once the
+  source is added and its page is opening. E2e test first: the upload held back, a second press refused, one source
+  listed (it failed on the old form).
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

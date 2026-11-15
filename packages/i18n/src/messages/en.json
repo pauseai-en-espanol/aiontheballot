@@ -1268,6 +1268,7 @@
         "upload": "Upload a file now",
         "fetch": "Fetch it now from its address",
         "needsUrl": "Fetching it needs the source's address.",
+        "storing": "Adding the source and storing its copy… A large file can take a minute: wait here.",
         "failed": "The source is added, but its copy wasn't stored: {error}"
       },
       "technical": "Technical details"
