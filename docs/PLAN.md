@@ -3302,6 +3302,26 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   changed. E2e tests rewritten for the detailed table on a desktop and a phone (without scripts); spec: public site
   §5.1.
 
+- **R226. A stored source's description can be corrected until something rests on it.** Loading the first real
+  programmes, one was saved with no party and its PDF uploaded: from then on it could only be replaced, though its
+  election wasn't public and nothing cited it. Dani: for these cases "someone should be able to edit or remove". Now
+  (migration `correctable_sources`, `source_document_rules` replaced), once its copy is stored a source keeps its
+  kind, address and copy for good (the address is what a fetch and the archive took the copy from), and its title,
+  language, party and programme mark can still change while its election is a draft or in preview and no quote, "not
+  mentioned" check or LLM run, draft or published, rests on it; read as the writer, as RLS shows every member all of
+  their tenant's. Once the election is public or anything cites it, nothing changes, as before (R132, D14). Also, for
+  any source: a party whose programme is published keeps a source marked as its programme, so the mark leaves one
+  (unmarked, or moved with the source to another party) only once another carries it. The API tells the admin whether
+  a source can still change (`editable`, as the trigger decides it); the source page offers "Edit" then, without the
+  kind and address, and says they are kept. Not done: deleting a stored source nothing cites. Its extracted text is
+  never deleted except by a purge, as the owner, so that needs a new security-definer path (an ADR-0002 change), left
+  for when it's asked for; replacing the source covers it meanwhile. Tests first: the source rules (corrected in a
+  draft and in preview; never the kind, address or copy; refused once public, and once each of the five kinds of
+  citing row exists; the published programme's mark), the RLS matrix's stored draft source, the API's routes, and an
+  e2e test on B's draft; the mutation list `correctable-sources` breaks each rule (12 killed), and the older mutations
+  of `source_document_rules` (`replaced-sources`, `rls-review`) now target this migration. Specs: data model §3.4,
+  editorial workflow S1.2.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

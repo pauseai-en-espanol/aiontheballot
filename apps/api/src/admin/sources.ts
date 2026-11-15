@@ -29,6 +29,12 @@ export interface Source {
   units: number;
   /** Quotes and checked documents that cite it, drafts and published revisions alike: it is deleted only at 0. */
   citations: number;
+  /**
+   * Whether its description can still change (S1.2): always until its copy is stored; after that, its title, language,
+   * party and programme mark, while its election isn't public and no quote, check or suggestion run rests on it (PLAN
+   * R226). The database decides; this says what it will allow.
+   */
+  editable: boolean;
   /** Whether an extraction job is waiting to be done. */
   extractionRequested: boolean;
   /** Whether an archive job is waiting for its snapshot (S4; ADR-0007 §4). */
@@ -83,6 +89,16 @@ export const listSources = async (
         + (SELECT count(*) FROM app.draft_checked_documents c WHERE c.source_document_id = s.id)
         + (SELECT count(*) FROM app.revision_checked_documents c WHERE c.source_document_id = s.id)
       )::int`.as('citations'),
+      // As private.source_document_rules decides it (PLAN R226).
+      sql<boolean>`(s.file_id IS NULL OR (
+        EXISTS (SELECT 1 FROM app.elections e WHERE e.id = s.election_id AND e.status IN ('draft', 'preview'))
+        AND NOT EXISTS (SELECT 1 FROM app.draft_evidence x WHERE x.source_document_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM app.revision_evidence x WHERE x.source_document_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM app.draft_checked_documents x WHERE x.source_document_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM app.revision_checked_documents x WHERE x.source_document_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM app.llm_runs x WHERE x.source_document_id = s.id)))`.as(
+        'editable',
+      ),
       sql<boolean>`EXISTS (SELECT 1 FROM app.job_requests j
                             WHERE j.source_document_id = s.id AND j.kind = 'extract_source'
                               AND j.finished_at IS NULL)`.as('extraction_requested'),
@@ -121,6 +137,7 @@ export const listSources = async (
     archiveUrl: r.archive_url,
     units: r.units,
     citations: r.citations,
+    editable: r.editable,
     extractionRequested: r.extraction_requested,
     archiveRequested: r.archive_requested,
     // A replaced one takes no new quote or check (PLAN D14).
@@ -154,7 +171,10 @@ export const createSource = async (
   return row.id;
 };
 
-/** Changes a source's fields, which the database allows only until it has a stored copy (S1.2). */
+/**
+ * Changes a source's fields, which the database allows until it has a stored copy, and after that only its title,
+ * language, party and programme mark while nothing rests on it and its election isn't public (S1.2, PLAN R226).
+ */
 export const updateSource = async (
   trx: Transaction<DB>,
   electionId: string,

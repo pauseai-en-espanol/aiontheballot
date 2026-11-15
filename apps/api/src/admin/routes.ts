@@ -3162,7 +3162,8 @@ export const adminDataRoutes =
         }),
     );
 
-    // Changes a source's fields, until it has a stored copy (S1.2).
+    // Changes a source's fields, until it has a stored copy; after that, its description while nothing rests on it and
+    // its election isn't public (S1.2, PLAN R226).
     scope.put<{ Params: { tenant: string; election: string; id: string }; Body: SourceBody }>(
       '/t/:tenant/e/:election/sources/:id',
       { schema: { params: ELECTION_ID_PARAMS, body: SOURCE_BODY } },

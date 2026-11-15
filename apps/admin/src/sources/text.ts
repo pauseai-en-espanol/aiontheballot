@@ -33,6 +33,7 @@ export const sourceFormText = (t: Translator): SourceFormText => ({
   noParty: t('admin.sources.fields.noParty'),
   programme: t('admin.sources.fields.programme'),
   programmeHint: t('admin.sources.fields.programmeHint'),
+  fixed: t('admin.sources.fields.fixed'),
   optional: t('admin.form.optional'),
   save: t('admin.sources.fields.save'),
   saved: t('admin.sources.fields.saved'),

@@ -1,7 +1,7 @@
 [
   {
     "name": "migration: an editor's copy may be called fetched",
-    "file": "db/migrations/20261012175549_fetched_copies_from_jobs_only.sql",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
     "old": "    IF NEW.file_origin = 'fetched' AND current_user <> 'aiontheballot_worker'\n",
     "new": "    IF false AND NEW.file_origin = 'fetched' AND current_user <> 'aiontheballot_worker'\n",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
@@ -10,7 +10,7 @@
   },
   {
     "name": "migration: a copy may be called fetched once it is stored, by an update",
-    "file": "db/migrations/20261012175549_fetched_copies_from_jobs_only.sql",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
     "old": "       AND (TG_OP = 'INSERT' OR OLD.file_origin IS DISTINCT FROM 'fetched') THEN",
     "new": "       AND TG_OP = 'INSERT' THEN",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
@@ -19,7 +19,7 @@
   },
   {
     "name": "migration: the worker can't store a fetched copy either",
-    "file": "db/migrations/20261012175549_fetched_copies_from_jobs_only.sql",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
     "old": "current_user <> 'aiontheballot_worker'",
     "new": "current_user <> 'nobody'",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/jobs.spec.ts",

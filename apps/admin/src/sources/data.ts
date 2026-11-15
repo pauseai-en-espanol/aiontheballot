@@ -26,6 +26,11 @@ export interface Source {
   units: number;
   /** Quotes and checked documents citing it: it can be deleted only at 0 (S5.2). */
   citations: number;
+  /**
+   * Whether its fields can still change (S1.2): all of them until its copy is stored; after that its title, language,
+   * party and programme mark, while its election isn't public and nothing rests on it (PLAN R226).
+   */
+  editable: boolean;
   extractionRequested: boolean;
   /** Whether a snapshot of its URL has been asked for and is still awaited (S4). */
   archiveRequested?: boolean;

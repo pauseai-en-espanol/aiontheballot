@@ -35,9 +35,10 @@ export const generateMetadata = async ({ params }: Params): Promise<Metadata> =>
 };
 
 /**
- * One source (editorial workflow §7): its fields, which change until its copy is stored (S1.2); its copy, uploaded
- * here (S2.2) and downloaded, never opened on the admin's origin (S6); its extraction (S3) and the text quotes are
- * matched against, members only (S6.2); and its deletion while it has no copy, so nothing cites it (S5.2).
+ * One source (editorial workflow §7): its fields, which change until its copy is stored, and then its description
+ * while nothing rests on it and its election isn't public (S1.2, PLAN R226); its copy, uploaded here (S2.2) and
+ * downloaded, never opened on the admin's origin (S6); its extraction (S3) and the text quotes are matched against,
+ * members only (S6.2); and its deletion while it has no copy, so nothing cites it (S5.2).
  */
 const SourcePage = async ({ params }: Params) => {
   const { tenant: slug, election, id } = await params;
@@ -82,8 +83,8 @@ const SourcePage = async ({ params }: Params) => {
         <h3 id="source-details" className={styles.h3}>
           {t('admin.sources.details')}
         </h3>
-        {/* One view of its details: the facts, and while it has no copy, "Edit" to change them (PLAN R194). */}
-        {canEdit && !source.copy ? (
+        {/* One view of its details: the facts, and "Edit" while they can change (PLAN R194, R226). */}
+        {canEdit && source.editable ? (
           <EditToggle
             view={
               <dl className={styles.facts}>
@@ -130,6 +131,7 @@ const SourcePage = async ({ params }: Params) => {
                 path={api}
                 method="PUT"
                 values={source}
+                fixed={source.copy !== null}
                 parties={structure.parties
                   .filter((candidate) => !candidate.retired || candidate.id === source.partyId)
                   .map((candidate) => {

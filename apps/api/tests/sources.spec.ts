@@ -241,6 +241,8 @@ describe('sources (editorial workflow S1, S2, S5, S6)', () => {
         extractionRequested: true,
         // Not citable until its text is extracted (S3.4).
         citable: false,
+        // Nothing cites it and its election is a draft: its description may still be corrected (PLAN R226).
+        editable: true,
       });
       // The same bytes for another source are kept once: both name one file (S2.2).
       const { id: twin } = (await send('POST', base, USERS.editorA, FIELDS)).json<{ id: string }>();
@@ -266,11 +268,24 @@ describe('sources (editorial workflow S1, S2, S5, S6)', () => {
       });
       expect(otherType.statusCode).toBe(409);
       expect(otherType.json()).toEqual({ error: 'otherType' });
-      // The copy is the source now: its fields never change again (S1.2), nor its copy, refused before it is read.
+      // The copy is the source now (S1.2): its kind and address never change again, nor its copy, refused before it is
+      // read. Its description still may while nothing cites it and its election isn't public (PLAN R226).
+      for (const late of [
+        { kind: 'web_page' },
+        { url: 'https://example.org/otra-direccion.pdf' },
+      ]) {
+        expect(
+          (await send('PUT', `${base}/${id}`, USERS.editorA, { ...FIELDS, ...late })).statusCode,
+        ).toBe(409);
+      }
       expect(
-        (await send('PUT', `${base}/${id}`, USERS.editorA, { ...FIELDS, title: 'Cambio tardío' }))
-          .statusCode,
-      ).toBe(409);
+        (
+          await send('PUT', `${base}/${id}`, USERS.editorA, {
+            ...FIELDS,
+            title: 'Título corregido',
+          })
+        ).statusCode,
+      ).toBe(204);
       const before = streamed;
       const again = await send(
         'PUT',

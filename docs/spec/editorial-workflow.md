@@ -373,9 +373,13 @@ D12._
 1. Editors and country admins add a source: kind, title as published, URL, language, its party (or none, for a
    party-neutral document) and whether it is the party's programme. Only a party's source can be its programme. [DB:
    RLS, checks]
-2. Until a copy is stored, all of these can be edited. Afterwards the source never changes, except its extraction
-   status (once, from pending) and its archive URL (once). A wrong source is replaced, not edited (S5). [DB:
-   `source_document_rules`]
+2. Until a copy is stored, all of these can be edited. Afterwards its kind, URL and copy never change, and the rest
+   changes only while its election is a draft or in preview and no quote, "not mentioned" check or suggestion run
+   rests on it: its title, language, party and programme mark can still be corrected then (PLAN R226). Once the
+   election is public or anything cites it, the source never changes, except its extraction status (once, from
+   pending) and its archive URL (once), and a wrong one is replaced, not edited (S5). Whatever its copy, a party whose
+   programme is published keeps a source marked as its programme: the mark leaves one only once another carries it.
+   [DB: `source_document_rules`]
 3. Sources can still be added to an archived election, for corrections. [DB]
 
 ### S2. Store a copy

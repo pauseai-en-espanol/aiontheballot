@@ -37,7 +37,7 @@
   },
   {
     "name": "migration: a source with a stored copy can't be marked",
-    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
     "old": "    workflow text[] := ARRAY['extraction_status', 'archive_url', 'replaced_at'];",
     "new": "    workflow text[] := ARRAY['extraction_status', 'archive_url'];",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
@@ -46,7 +46,7 @@
   },
   {
     "name": "migration: the mark can be cleared or moved",
-    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
     "old": "      IF OLD.replaced_at IS NOT NULL AND NEW.replaced_at IS DISTINCT FROM OLD.replaced_at THEN\n        RAISE EXCEPTION 'source % is marked replaced once, for good'",
     "new": "      IF false AND NEW.replaced_at IS DISTINCT FROM OLD.replaced_at THEN\n        RAISE EXCEPTION 'source % is marked replaced once, for good'",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
@@ -55,7 +55,7 @@
   },
   {
     "name": "migration: the caller picks the mark's time",
-    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
     "old": "        NEW.replaced_at := now();",
     "new": "        NULL;",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
@@ -64,7 +64,7 @@
   },
   {
     "name": "migration: a new source may start replaced",
-    "file": "db/migrations/20261013112036_replaced_sources.sql",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
     "old": " OR NEW.replaced_at IS NOT NULL THEN",
     "new": " THEN",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",

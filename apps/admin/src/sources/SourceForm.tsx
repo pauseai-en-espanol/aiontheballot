@@ -37,6 +37,8 @@ export interface SourceFormText {
   noParty: string;
   programme: string;
   programmeHint: string;
+  /** Said where the kind and address would be, once the copy is stored and they no longer change. */
+  fixed: string;
   optional: string;
   save: string;
   saved: string;
@@ -105,11 +107,13 @@ const BODY_FIELDS: Readonly<Record<string, readonly [SourceField, string?]>> = {
 
 /**
  * A source's fields (editorial workflow S1.1): its kind, title as published, address, language, party (or none, for a
- * party-neutral document) and whether it is that party's programme. They change only until a copy is stored (S1.2),
- * which the database enforces; the page stops offering this form then. What is wrong shows at its field, in words, and
- * the first takes focus (admin forms §1.2). An edit stays on the page and says so beside the button; a new source's own
- * page opens and says it was added (§1.4). A new one's copy can be chosen with it, a file to upload or its address to
- * fetch, stored right after the source is (PLAN R194); if that fails, the source is kept and its page says why.
+ * party-neutral document) and whether it is that party's programme. They change until a copy is stored (S1.2); after
+ * that, with its kind and address `fixed`, the rest only while nothing rests on it and its election isn't public (PLAN
+ * R226), which the database enforces; the page stops offering this form then. What is wrong shows at its field, in
+ * words, and the first takes focus (admin forms §1.2). An edit stays on the page and says so beside the button; a new
+ * source's own page opens and says it was added (§1.4). A new one's copy can be chosen with it, a file to upload or its
+ * address to fetch, stored right after the source is (PLAN R194); if that fails, the source is kept and its page says
+ * why.
  */
 export const SourceForm = ({
   path,
@@ -120,6 +124,7 @@ export const SourceForm = ({
   siteLanguages,
   locale,
   copy,
+  fixed = false,
   text,
 }: {
   path: string;
@@ -141,6 +146,8 @@ export const SourceForm = ({
   locale: string;
   /** For a new source: its copy, chosen with it. */
   copy?: SourceCopyChoice;
+  /** Its copy is stored: its kind and address are sent as they are, and not offered (PLAN R226). */
+  fixed?: boolean;
   text: SourceFormText;
 }) => {
   const router = useRouter();
@@ -250,26 +257,36 @@ export const SourceForm = ({
           defaultValue={values?.title ?? ''}
         />
       </Field>
-      <Field label={text.kind} error={problems.kind}>
-        <FieldSelect className={styles.select} name="kind" defaultValue={values?.kind ?? 'pdf'}>
-          {KINDS.map((kind) => (
-            <option key={kind} value={kind}>
-              {text.kinds[kind]}
-            </option>
-          ))}
-        </FieldSelect>
-      </Field>
-      <Field label={text.url} hint={text.urlHint} optional={text.optional} error={problems.url}>
-        <FieldInput
-          className={styles.input}
-          name="url"
-          type="url"
-          maxLength={2048}
-          placeholder="https://"
-          autoComplete="off"
-          defaultValue={values?.url ?? ''}
-        />
-      </Field>
+      {fixed ? (
+        <>
+          <input type="hidden" name="kind" value={values?.kind ?? 'pdf'} />
+          <input type="hidden" name="url" value={values?.url ?? ''} />
+          <p className={styles.hint}>{text.fixed}</p>
+        </>
+      ) : (
+        <>
+          <Field label={text.kind} error={problems.kind}>
+            <FieldSelect className={styles.select} name="kind" defaultValue={values?.kind ?? 'pdf'}>
+              {KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {text.kinds[kind]}
+                </option>
+              ))}
+            </FieldSelect>
+          </Field>
+          <Field label={text.url} hint={text.urlHint} optional={text.optional} error={problems.url}>
+            <FieldInput
+              className={styles.input}
+              name="url"
+              type="url"
+              maxLength={2048}
+              placeholder="https://"
+              autoComplete="off"
+              defaultValue={values?.url ?? ''}
+            />
+          </Field>
+        </>
+      )}
       <LanguageSelect
         name="language"
         value={values ? (values.language ?? '') : (siteLanguages[0] ?? '')}

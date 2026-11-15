@@ -10,6 +10,8 @@ import { expect, test } from '../test.js';
 const en = messages.en;
 const sources = en.admin.sources;
 const LIST = `${ADMIN_URL}/t/ejemplo-a/e/generales-de-ejemplo/sources`;
+/** B's announced draft: no cell cites anything there. */
+const DRAFT_LIST = `${ADMIN_URL}/t/ejemplo-b/e/autonomicas-de-ejemplo/sources`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
 const created: string[] = [];
@@ -111,6 +113,41 @@ test.describe('sources (editorial workflow §7)', () => {
       page.getByRole('link', { name: sources.copy.download }).click(),
     ]);
     expect(await readFile(await download.path())).toEqual(bytes);
+  });
+
+  test('keep their description open to correction, copy stored, while nothing cites them in a draft (PLAN R226)', async ({
+    page,
+  }) => {
+    const { id } = await signedInAccount(page, created, 'Persona correctora de fuentes');
+    await addMembership(id, 'ejemplo-b', 'editor');
+    await page.goto(`${DRAFT_LIST}/new`);
+    const title = `Programa guardado sin partido ${crypto.randomUUID()}`;
+    await page.getByLabel(sources.fields.title).fill(title);
+    await page.getByLabel(sources.copyChoice.upload).check();
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'programa.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from(`Texto inventado de un programa de ejemplo: ${title}.`),
+    });
+    await page.getByRole('button', { name: sources.fields.save }).click();
+    await expect(page.getByRole('heading', { level: 2, name: title })).toBeVisible();
+    made.push(new URL(page.url()).pathname.split('/').at(-1) ?? '');
+    await expect(page.getByRole('link', { name: sources.copy.download })).toBeVisible();
+
+    // Stored, but cited by nothing in an election nobody sees yet: its title, language, party and programme mark can
+    // still be corrected; its kind and address are kept as they were, and said so.
+    await page.getByRole('button', { name: en.admin.form.edit }).click();
+    await expect(page.getByText(sources.fields.fixed)).toBeVisible();
+    await expect(page.getByLabel(sources.fields.kind)).toHaveCount(0);
+    await expectAccessible(page);
+    await page.getByLabel(sources.fields.title).fill(`${title} (corregido)`);
+    await page.getByRole('button', { name: sources.fields.save }).click();
+    await expect(page.getByRole('status').filter({ hasText: sources.fields.saved })).toBeVisible();
+    await page.getByRole('button', { name: en.admin.form.stopEditing }).click();
+    await expect(
+      page.getByRole('heading', { level: 2, name: `${title} (corregido)` }),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: sources.copy.download })).toBeVisible();
   });
 
   test('are deleted while they have no copy, and refuse a file of a type no source has', async ({

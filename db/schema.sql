@@ -3084,6 +3084,8 @@ CREATE FUNCTION private.source_document_rules() RETURNS trigger
     AS $$
   DECLARE
     workflow text[] := ARRAY['extraction_status', 'archive_url', 'replaced_at'];
+    -- What may still change once the copy is stored, until anything rests on the source or its election is public.
+    correctable text[] := ARRAY['title', 'language', 'party_id', 'is_programme'];
     copy record;
   BEGIN
     IF TG_OP = 'INSERT' THEN
@@ -3093,8 +3095,28 @@ CREATE FUNCTION private.source_document_rules() RETURNS trigger
       END IF;
     ELSE
       IF OLD.file_id IS NOT NULL AND (to_jsonb(NEW) - workflow) IS DISTINCT FROM (to_jsonb(OLD) - workflow) THEN
-        RAISE EXCEPTION 'source % has a stored copy, so it never changes: replace it instead', OLD.id
-          USING ERRCODE = 'restrict_violation';
+        IF (to_jsonb(NEW) - workflow - correctable) IS DISTINCT FROM (to_jsonb(OLD) - workflow - correctable) THEN
+          RAISE EXCEPTION 'source % has a stored copy, so its kind, address and copy never change: replace it instead',
+            OLD.id USING ERRCODE = 'restrict_violation';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM app.elections e
+                        WHERE e.id = OLD.election_id AND e.status IN ('draft', 'preview'))
+           OR EXISTS (SELECT 1 FROM app.draft_evidence x WHERE x.source_document_id = OLD.id)
+           OR EXISTS (SELECT 1 FROM app.revision_evidence x WHERE x.source_document_id = OLD.id)
+           OR EXISTS (SELECT 1 FROM app.draft_checked_documents x WHERE x.source_document_id = OLD.id)
+           OR EXISTS (SELECT 1 FROM app.revision_checked_documents x WHERE x.source_document_id = OLD.id)
+           OR EXISTS (SELECT 1 FROM app.llm_runs x WHERE x.source_document_id = OLD.id) THEN
+          RAISE EXCEPTION 'source % is cited, or its election is public, so it never changes: replace it instead',
+            OLD.id USING ERRCODE = 'restrict_violation';
+        END IF;
+      END IF;
+      -- A published programme keeps its source: the mark goes only once another of the party's sources carries it.
+      IF OLD.is_programme AND (NOT NEW.is_programme OR NEW.party_id IS DISTINCT FROM OLD.party_id)
+         AND EXISTS (SELECT 1 FROM app.parties p WHERE p.id = OLD.party_id AND p.programme_status = 'published')
+         AND NOT EXISTS (SELECT 1 FROM app.source_documents s
+                          WHERE s.party_id = OLD.party_id AND s.is_programme AND s.id <> OLD.id) THEN
+        RAISE EXCEPTION 'party %: its published programme needs a source marked as its programme: mark another first',
+          OLD.party_id USING ERRCODE = 'check_violation';
       END IF;
       IF NEW.extraction_status IS DISTINCT FROM OLD.extraction_status AND OLD.extraction_status <> 'pending' THEN
         RAISE EXCEPTION 'the extraction status of source % leaves pending only once', OLD.id

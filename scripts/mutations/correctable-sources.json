@@ -1,0 +1,110 @@
+[
+  {
+    "name": "migration: a stored source's kind and address may be corrected too",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "correctable text[] := ARRAY['title', 'language', 'party_id', 'is_programme'];",
+    "new": "correctable text[] := ARRAY['title', 'language', 'party_id', 'is_programme', 'kind', 'url'];",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a stored source stays fixed in a draft election too",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "    correctable text[] := ARRAY['title', 'language', 'party_id', 'is_programme'];",
+    "new": "    correctable text[] := ARRAY[]::text[];",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a public election's stored source may be corrected",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "WHERE e.id = OLD.election_id AND e.status IN ('draft', 'preview'))",
+    "new": "WHERE e.id = OLD.election_id)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a stored source in preview stays fixed",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "WHERE e.id = OLD.election_id AND e.status IN ('draft', 'preview'))",
+    "new": "WHERE e.id = OLD.election_id AND e.status IN ('draft'))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a source a draft quotes may be corrected",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "           OR EXISTS (SELECT 1 FROM app.draft_evidence x WHERE x.source_document_id = OLD.id)",
+    "new": "           OR false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a source a published rating quotes may be corrected",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "           OR EXISTS (SELECT 1 FROM app.revision_evidence x WHERE x.source_document_id = OLD.id)",
+    "new": "           OR false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a source a draft checked for \"not mentioned\" may be corrected",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "           OR EXISTS (SELECT 1 FROM app.draft_checked_documents x WHERE x.source_document_id = OLD.id)",
+    "new": "           OR false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a source a published rating checked for \"not mentioned\" may be corrected",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "           OR EXISTS (SELECT 1 FROM app.revision_checked_documents x WHERE x.source_document_id = OLD.id)",
+    "new": "           OR false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a source a suggestion run read may be corrected",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "           OR EXISTS (SELECT 1 FROM app.llm_runs x WHERE x.source_document_id = OLD.id)",
+    "new": "           OR false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a published programme's source may lose its mark",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "      IF OLD.is_programme AND (NOT NEW.is_programme OR NEW.party_id IS DISTINCT FROM OLD.party_id)",
+    "new": "      IF false AND (NOT NEW.is_programme OR NEW.party_id IS DISTINCT FROM OLD.party_id)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts tests/programme.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a published programme's source keeps its mark though another carries it",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "WHERE s.party_id = OLD.party_id AND s.is_programme AND s.id <> OLD.id) THEN",
+    "new": "WHERE s.party_id = OLD.party_id AND s.is_programme) THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a published programme's source may move to another party",
+    "file": "db/migrations/20261115173149_correctable_sources.sql",
+    "old": "(NOT NEW.is_programme OR NEW.party_id IS DISTINCT FROM OLD.party_id)",
+    "new": "(NOT NEW.is_programme)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  }
+]

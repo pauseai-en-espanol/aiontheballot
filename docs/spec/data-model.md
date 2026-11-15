@@ -445,9 +445,11 @@ create table app.files (
 
 -- A party's document (or a party-neutral one, party_id null). The stored copy is set once: by the fetch job from
 -- the URL (file_origin 'fetched', which only the worker writes), or by an upload (file_origin 'uploaded', whose
--- uploader then counts as a contributor of every cell citing it). After that only extraction_status (one way) and
--- archive_url (once) change, so a quote matched against a source stays matched against the same bytes. A wrong
--- source is replaced, not edited.
+-- uploader then counts as a contributor of every cell citing it). After that its kind, url and copy never change, so
+-- a quote matched against a source stays matched against the same bytes; its title, language, party and programme
+-- mark only while its election is a draft or in preview and no quote, check or LLM run rests on it (PLAN R226). Once
+-- the election is public or anything cites it, only extraction_status (one way) and archive_url (once) change, and a
+-- wrong source is replaced, not edited.
 create table app.source_documents (
   id                 uuid primary key default uuidv7(),
   tenant_id          uuid not null,

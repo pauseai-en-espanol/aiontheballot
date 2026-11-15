@@ -3,7 +3,7 @@ import type pg from 'pg';
 import { describe, expect, it } from 'vitest';
 
 import { errorCode, inRolledBackTransaction } from './db.js';
-import { ELECTIONS, FILES, SOURCES, TENANT_A, USERS } from './rls/matrix.js';
+import { CELLS, ELECTIONS, FILES, SOURCES, TENANT_A, USERS } from './rls/matrix.js';
 
 const CHECK_VIOLATION = '23514';
 const FOREIGN_KEY_VIOLATION = '23503';
@@ -44,7 +44,7 @@ describe('a source document', () => {
     expect(row).toEqual({ hash: true, now: true });
   });
 
-  it('keeps its copy, and everything about it, once stored', async () => {
+  it('keeps its copy, and everything about it, once stored in an election the public sees', async () => {
     await asEditorA(async (client) => {
       const live = SOURCES.liveA.id;
       for (const sql of [
@@ -112,6 +112,130 @@ describe('a source document', () => {
         ),
       ),
     ).toBeNull();
+  });
+});
+
+describe('a stored source nothing rests on, in an election not yet public (PLAN R226)', () => {
+  // SOURCES.pendingA: in a draft election, its copy stored, cited by nothing.
+  const pending = SOURCES.pendingA.id;
+  const set = (assignments: string, id = pending): string =>
+    `UPDATE app.source_documents SET ${assignments} WHERE id = '${id}'`;
+
+  /** A new source of `election`, its copy stored, for the editor of tenant A; its id. */
+  const storedIn = async (client: pg.Client, election: string): Promise<string> => {
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO app.source_documents (tenant_id, election_id, kind, title)
+       VALUES ($1, $2, 'pdf', 'Documento de ejemplo') RETURNING id`,
+      [TENANT_A, election],
+    );
+    const id = rows[0]?.id ?? '';
+    await client.query(attach(FILES.awaitingA.id, id));
+    return id;
+  };
+
+  it('can still have its title, language, party and programme mark corrected', async () => {
+    const [row] = await asEditorA(async (client) => {
+      await client.query(
+        set(
+          `title = 'Programa de ejemplo', language = 'es', party_id = '${ELECTIONS.draftA.party}', is_programme = true`,
+        ),
+      );
+      return (
+        await client.query(
+          `SELECT title, language, party_id, is_programme, file_id FROM app.source_documents WHERE id = $1`,
+          [pending],
+        )
+      ).rows;
+    });
+    expect(row).toEqual({
+      title: 'Programa de ejemplo',
+      language: 'es',
+      party_id: ELECTIONS.draftA.party,
+      is_programme: true,
+      file_id: FILES.awaitingA.id,
+    });
+  });
+
+  it('also in preview, which only members see', async () => {
+    await asEditorA(async (client) => {
+      const id = await storedIn(client, ELECTIONS.previewA.id);
+      expect(await errorCode(client, set(`title = 'Otro título'`, id))).toBeNull();
+    });
+  });
+
+  it('never has its kind, address or copy changed', async () => {
+    await asEditorA(async (client) => {
+      for (const assignments of [
+        `kind = 'web_page'`,
+        `url = 'https://example.org/otro'`,
+        `file_id = NULL, file_origin = NULL`,
+        `title = 'Otro título', kind = 'web_page'`,
+      ]) {
+        expect(await errorCode(client, set(assignments))).toBe(RESTRICT_VIOLATION);
+      }
+    });
+  });
+
+  it('is fixed for good once its election is public', async () => {
+    await asEditorA(async (client) => {
+      const id = await storedIn(client, ELECTIONS.liveA.id);
+      expect(await errorCode(client, set(`title = 'Otro título'`, id))).toBe(RESTRICT_VIOLATION);
+    });
+  });
+
+  it('is fixed for good once a quote, a "not mentioned" check or a suggestion run rests on it', async () => {
+    // Each written past the triggers, as no cell of this draft election could cite the source yet.
+    const citing = [
+      `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote,
+                                       created_by)
+       VALUES ('${TENANT_A}', '${ELECTIONS.draftA.id}', '${CELLS.A.draft}', '${pending}', 9, 'Cita de ejemplo',
+               '${USERS.editorA}')`,
+      `INSERT INTO app.draft_checked_documents (assessment_id, tenant_id, election_id, source_document_id, checked_by)
+       VALUES ('${CELLS.A.review}', '${TENANT_A}', '${ELECTIONS.draftA.id}', '${pending}', '${USERS.editorA}')`,
+      `INSERT INTO app.revision_evidence (revision_id, tenant_id, election_id, ordinal, source_document_id, quote,
+                                          match_status)
+       VALUES ('${CELLS.A.published}', '${TENANT_A}', '${ELECTIONS.draftA.id}', 9, '${pending}', 'Cita de ejemplo',
+               'matched')`,
+      `INSERT INTO app.revision_checked_documents (revision_id, tenant_id, election_id, source_document_id, checked_at)
+       VALUES ('${CELLS.A.published}', '${TENANT_A}', '${ELECTIONS.draftA.id}', '${pending}', now())`,
+      `INSERT INTO app.llm_runs (tenant_id, election_id, source_document_id, model, prompt_version, requested_by)
+       VALUES ('${TENANT_A}', '${ELECTIONS.draftA.id}', '${pending}', 'modelo-de-ejemplo', 'v1', '${USERS.editorA}')`,
+    ];
+    for (const sql of citing) {
+      expect(
+        await inRolledBackTransaction(async (client) => {
+          await client.query('SET LOCAL session_replication_role = replica');
+          await client.query(sql);
+          await client.query('SET LOCAL session_replication_role = origin');
+          await client.query('SET LOCAL ROLE aiontheballot_admin');
+          await client.query(
+            `SELECT set_config('app.user_id', $1, true), set_config('app.aal', '2', true)`,
+            [USERS.editorA],
+          );
+          return errorCode(client, set(`title = 'Otro título'`));
+        }),
+      ).toBe(RESTRICT_VIOLATION);
+    }
+  });
+
+  it("keeps a published programme's party with a source marked as its programme", async () => {
+    const party = ELECTIONS.draftA.party;
+    await asEditorA(async (client) => {
+      await client.query(set(`party_id = '${party}', is_programme = true`));
+      await client.query(`UPDATE app.parties SET programme_status = 'published' WHERE id = $1`, [
+        party,
+      ]);
+      for (const assignments of [
+        'is_programme = false',
+        `party_id = '${ELECTIONS.draftA.secondParty}'`,
+      ]) {
+        expect(await errorCode(client, set(assignments))).toBe(CHECK_VIOLATION);
+      }
+      // Another of its sources marked as its programme first, and this one may go.
+      const other = await storedIn(client, ELECTIONS.draftA.id);
+      await client.query(set(`party_id = '${party}', is_programme = true`, other));
+      expect(await errorCode(client, set('is_programme = false'))).toBeNull();
+    });
   });
 });
 

@@ -1456,9 +1456,13 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
       // Public once a public revision cites it: the party-neutral documents the published cells quote.
       public: Object.values(CELLS).some((c) => c.neutral.id === src.id) && isPublic(src.election),
       where: `id = '${src.id}'`,
-      // Once its copy is stored, a source never changes (only its extraction status and archive, by the worker); its
-      // text, LLM runs or job requests keep it from being deleted.
-      blocked: src.file ? { update: '23001', delete: '23503' } : { delete: '23503' },
+      // Once its copy is stored, a source never changes (only its extraction status and archive, by the worker), save
+      // its description while its election isn't public and nothing cites it (PLAN R226): no fixture in a draft or
+      // preview election is cited. Its text, LLM runs or job requests keep it from being deleted.
+      blocked:
+        src.file && !['draft', 'preview'].includes(src.election.status)
+          ? { update: '23001', delete: '23503' }
+          : { delete: '23503' },
     })),
     inserts: TENANT_KEYS.map((key) => ({
       id: `source in ${key}`,
