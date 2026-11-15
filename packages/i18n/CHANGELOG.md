@@ -1,5 +1,11 @@
 # @aiontheballot/i18n
 
+## 0.33.1
+
+### Patch Changes
+
+- 267ab61: Dependencies bump
+
 ## 0.33.0
 
 ### Minor Changes

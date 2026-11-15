@@ -1,5 +1,11 @@
 # @aiontheballot/mcp
 
+## 0.2.6
+
+### Patch Changes
+
+- 267ab61: Dependencies bump
+
 ## 0.2.5
 
 ### Patch Changes

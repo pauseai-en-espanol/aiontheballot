@@ -1,5 +1,11 @@
 # @aiontheballot/domain
 
+## 0.16.6
+
+### Patch Changes
+
+- 267ab61: Dependencies bump
+
 ## 0.16.5
 
 ### Patch Changes

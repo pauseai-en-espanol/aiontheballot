@@ -1,5 +1,16 @@
 # @aiontheballot/api
 
+## 0.35.1
+
+### Patch Changes
+
+- 267ab61: Dependencies bump
+- Updated dependencies [267ab61]
+  - @aiontheballot/db@0.18.6
+  - @aiontheballot/domain@0.16.6
+  - @aiontheballot/i18n@0.33.1
+  - @aiontheballot/observability@0.2.13
+
 ## 0.35.0
 
 ### Minor Changes

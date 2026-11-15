@@ -1,5 +1,11 @@
 # @aiontheballot/migrations
 
+## 0.30.1
+
+### Patch Changes
+
+- 267ab61: Dependencies bump
+
 ## 0.30.0
 
 ### Minor Changes
