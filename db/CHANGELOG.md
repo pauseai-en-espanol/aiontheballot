@@ -1,5 +1,21 @@
 # @aiontheballot/migrations
 
+## 0.30.0
+
+### Minor Changes
+
+- 57ae086: A source's uploaded copy can be up to 100 MB, for programmes that are mostly images. Other files keep their limits: an
+  attestation's file and a fetched copy 50 MB, a brand image 2 MB.
+- 87ba429: A source whose copy is stored can still have its title, language, party and programme mark corrected while its
+  election is a draft or in preview and nothing cites it; its kind, address and copy never change. A party whose
+  programme is published keeps a source marked as its programme.
+- a726084: A source nothing cites can be deleted with its stored copy and its text while its election is a draft or in preview,
+  by its site's editors and country admins; once the election is public, a stored source is still kept and replaced.
+
+### Patch Changes
+
+- 7de5d6a: Dependencies bump
+
 ## 0.29.2
 
 ### Patch Changes

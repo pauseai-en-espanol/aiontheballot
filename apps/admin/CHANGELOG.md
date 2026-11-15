@@ -1,5 +1,32 @@
 # @aiontheballot/admin
 
+## 0.35.0
+
+### Minor Changes
+
+- 57ae086: A source's uploaded copy can be up to 100 MB, for programmes that are mostly images. Other files keep their limits: an
+  attestation's file and a fetched copy 50 MB, a brand image 2 MB.
+- 87ba429: A source whose copy is stored can still have its title, language, party and programme mark corrected while its
+  election is a draft or in preview and nothing cites it; its kind, address and copy never change. A party whose
+  programme is published keeps a source marked as its programme.
+- a726084: A source nothing cites can be deleted with its stored copy and its text while its election is a draft or in preview,
+  by its site's editors and country admins; once the election is public, a stored source is still kept and replaced.
+
+### Patch Changes
+
+- 7de5d6a: Dependencies bump
+- e3c4efb: Adding a source with its copy keeps the form busy, saying so, until the copy is stored and the source's page opens: a
+  second press of "Save" while a large file goes up no longer adds the source twice.
+- Updated dependencies [57ae086]
+- Updated dependencies [87ba429]
+- Updated dependencies [a726084]
+- Updated dependencies [7de5d6a]
+- Updated dependencies [e3c4efb]
+  - @aiontheballot/i18n@0.33.0
+  - @aiontheballot/domain@0.16.5
+  - @aiontheballot/observability@0.2.12
+  - @aiontheballot/og@0.7.10
+
 ## 0.34.2
 
 ### Patch Changes

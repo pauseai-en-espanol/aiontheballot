@@ -1,5 +1,33 @@
 # @aiontheballot/api
 
+## 0.35.0
+
+### Minor Changes
+
+- 57ae086: A source's uploaded copy can be up to 100 MB, for programmes that are mostly images. Other files keep their limits: an
+  attestation's file and a fetched copy 50 MB, a brand image 2 MB.
+- 87ba429: A source whose copy is stored can still have its title, language, party and programme mark corrected while its
+  election is a draft or in preview and nothing cites it; its kind, address and copy never change. A party whose
+  programme is published keeps a source marked as its programme.
+- a726084: A source nothing cites can be deleted with its stored copy and its text while its election is a draft or in preview,
+  by its site's editors and country admins; once the election is public, a stored source is still kept and replaced.
+
+### Patch Changes
+
+- 6e09bc1: A passkey whose device didn't check who holds it (fingerprint, face or PIN) is refused with its own reason again, which
+  the admin explains, when adding one and when signing in. Since Better Auth 1.7.18 its passkey plugin refused it first,
+  as a ceremony that failed for no reason the admin could tell.
+- 7de5d6a: Dependencies bump
+- Updated dependencies [57ae086]
+- Updated dependencies [87ba429]
+- Updated dependencies [a726084]
+- Updated dependencies [7de5d6a]
+- Updated dependencies [e3c4efb]
+  - @aiontheballot/i18n@0.33.0
+  - @aiontheballot/db@0.18.5
+  - @aiontheballot/domain@0.16.5
+  - @aiontheballot/observability@0.2.12
+
 ## 0.34.2
 
 ### Patch Changes
