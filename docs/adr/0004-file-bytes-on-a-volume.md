@@ -177,7 +177,8 @@ them. The API itself has no default: without `FILES_ROOT`, its brand-image route
 **Benefits:**
 
 - Database dumps stay small, and the 2 GB cap on all files together is gone (50 MB per file and 2 MB per brand image
-  stay). Nothing caps a tenant's total any more; M2's uploads should add a per-tenant quota (a sum over its rows).
+  stay; amended, PLAN R229: 100 MB for a source's uploaded copy). Nothing caps a tenant's total any more; M2's uploads
+  should add a per-tenant quota (a sum over its rows).
 - Bytes are read from disk, not through Postgres.
 
 **Costs and risks:**

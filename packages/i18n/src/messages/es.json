@@ -86,7 +86,7 @@
     "notEnrolled": "Este miembro aún no ha configurado la verificación en dos pasos, así que un enlace dejaría entrar en su cuenta a quien lea su correo. Pide ayuda a quien gestiona la plataforma.",
     "holdsRole": "Esta persona ya tiene ese rol aquí.",
     "cellChanged": "Alguien ha cambiado esta celda desde que la abriste.",
-    "tooLarge": "Ese archivo es demasiado grande: el límite es de 50 MB.",
+    "tooLarge": "Ese archivo es demasiado grande para guardarlo aquí.",
     "fileType": "Ese tipo de archivo no se puede guardar. Usa un PDF, una página HTML, texto plano o una imagen PNG, JPEG o WebP.",
     "hasCopy": "Esta fuente ya tiene su copia guardada, que no cambia nunca. Añade otra fuente para un documento nuevo.",
     "otherType": "Este archivo ya está guardado aquí como otro tipo de documento. Súbelo como ese tipo.",
@@ -1213,7 +1213,7 @@
         "title": "Copia guardada",
         "none": "Aún no hay copia guardada. Hasta que la haya, los datos de arriba pueden cambiar; después, su tipo y su dirección quedan fijos, y lo demás solo mientras ninguna celda la cite y la elección no sea pública.",
         "file": "Archivo",
-        "fileHint": "Un PDF, una página web guardada como HTML, texto plano o una imagen (PNG, JPEG o WebP), de hasta 50 MB.",
+        "fileHint": "Un PDF, una página web guardada como HTML, texto plano o una imagen (PNG, JPEG o WebP), de hasta 100 MB.",
         "contributor": "Quien guarda la copia cuenta como participante en cada celda que la cite, así que, mientras se exija una segunda revisión, no puede publicar esas celdas.",
         "final": "Una vez guardada la copia, la copia, el tipo y la dirección no cambian. El título, el idioma, el partido y si es su programa se pueden corregir mientras ninguna celda la cite y la elección no sea pública; después, si es errónea, se sustituye por una fuente nueva.",
         "upload": "Guardar copia",
@@ -1551,7 +1551,7 @@
         "none": "Aún no has elegido ningún archivo.",
         "problems": {
           "type": "Ese tipo de archivo no se puede guardar: usa un PDF, una página HTML, texto sin formato o una imagen PNG, JPEG o WebP.",
-          "size": "Ese archivo pasa de 50 MB.",
+          "size": "Ese archivo pasa de 100 MB.",
           "missing": "Elige antes un archivo."
         }
       },

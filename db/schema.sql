@@ -4003,7 +4003,7 @@ CREATE TABLE app.files (
     original_filename text,
     created_by uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT files_byte_size_check CHECK (((byte_size >= 0) AND (byte_size <= 52428800))),
+    CONSTRAINT files_byte_size_check CHECK (((byte_size >= 0) AND (byte_size <= 104857600))),
     CONSTRAINT files_check CHECK (((bucket <> 'public_assets'::app.file_bucket) OR (content_type = ANY (ARRAY['image/png'::text, 'image/jpeg'::text, 'image/webp'::text])))),
     CONSTRAINT files_content_type_check CHECK ((content_type ~ '^[a-z]+/[a-z0-9.+-]+$'::text)),
     CONSTRAINT files_sha256_check CHECK ((sha256 ~ '^[0-9a-f]{64}$'::text))

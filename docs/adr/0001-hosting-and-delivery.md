@@ -189,7 +189,8 @@ Amended: bytes first lived in Postgres (`app.file_blobs`); the owner moved them 
   who sees it; the API reads bytes only for a row it can see, from that row's own folder.
 - Bytes are written before their row, so a row never names missing bytes. Bytes no row names are swept after a grace
   period at least as long as the database backups are kept.
-- Limit of 50 MB per file (2 MB for brand images). The default class doesn't enforce the volume's size: the node's
+- Limit of 100 MB for a source's uploaded copy and 50 MB for any other file (amended, PLAN R229: a party's programme
+  of 69 MB, mostly images), 2 MB for brand images. The default class doesn't enforce the volume's size: the node's
   disk is the limit.
 - **One node** (ADR-0004's design): the volume is a folder on that node, so every replica shares it. A second node
   would need shared storage, or object storage behind the same store interface.

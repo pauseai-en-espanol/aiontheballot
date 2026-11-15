@@ -90,7 +90,7 @@ export const buildApp = ({
     logger,
     // Longer than the Envoy Gateway idle timeout (60s), so the gateway closes idle connections first.
     keepAliveTimeout: 75_000,
-    // A whole request, body included, within 15 minutes: a 50 MB copy on a slow connection fits, and a client that
+    // A whole request, body included, within 15 minutes: a 100 MB copy at about 1 Mbit/s fits, and a client that
     // stops sending halfway doesn't keep its connection for ever.
     requestTimeout: 15 * 60_000,
   });

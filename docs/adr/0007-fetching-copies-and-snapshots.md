@@ -63,10 +63,10 @@ address and keys, and its own error-tracking DSN.
    private, loopback, link-local, shared (CGNAT) and multicast ranges, IPv4 and IPv6. A policy can't see names, so the
    fetcher checks too: `http` or `https` only, no user name or password in the URL, port 80 or 443, and every address
    the name resolves to public, checked in the connection's own lookup, so the address checked is the one connected to
-   (no DNS rebinding). It follows at most 5 redirects, each checked the same way, sends no cookie and no referrer,
-   gives up after a deadline (8 seconds by default, 10 at most, under the admin route's 15), a compressed body
-   included, which is counted once decoded, and past 50 MB (a copy's limit). The archive's address is configuration,
-   not a member's input, so it is exempt from the address check only.
+   (no DNS rebinding). It follows at most 5 redirects, each checked the same way, sends no cookie and no referrer, gives
+   up after a deadline (8 seconds by default, 10 at most, under the admin route's 15), a compressed body included, which
+   is counted once decoded, and past 50 MB (a fetched copy's limit; an uploaded one may be 100 MB, PLAN R229). The
+   archive's address is configuration, not a member's input, so it is exempt from the address check only.
 3. **A copy by URL (S2.1) is the requester's upload.** On a source with a URL and no copy, an editor, country admin
    or platform admin presses "Fetch a copy". The API checks what it checks before an upload (who may, the source,
    no copy yet), asks the fetcher, and streams the answer into the file store exactly as an upload: hashed on the way,

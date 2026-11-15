@@ -121,8 +121,9 @@ worker:
     requests:
       cpu: 100m
       memory: 256Mi
-    # Room for the child's memoryMb plus the worker itself: about 100 MB, the copy it holds (50 MB at most), and the
-    # child's answer as it parses it (about five times the answer, itself at most 50 MB). Raise this with memoryMb:
+    # Room for the child's memoryMb plus the worker itself: about 100 MB, the copy it holds (100 MB at most, PLAN
+    # R229), and the child's answer as it parses it (about five times the answer, itself at most 50 MB): about
+    # 960 MB with the default memoryMb. Raise this with memoryMb:
     # past the limit the kernel stops the whole container, the worker with its child, and the job stays open.
     limits:
       cpu: '1'

@@ -3346,6 +3346,17 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   `forbid_mutation` in `rls-review` now targets this migration (it survived since R212 redefined the function).
   Specs: data model §3.4, editorial workflow S5.2.
 
+- **R229. A source's uploaded copy can be up to 100 MB.** Coalición Canaria's programme is a 69 MB PDF of 23 pages,
+  mostly images; the admin refused it at 50 MB. Dani: raise it to 100. Migration `copies_up_to_100_mb` raises the
+  files table's ceiling to 100 MB; the API takes a source's copy up to that (its own `MAX_COPY_BYTES`), and the worker
+  reads copies up to it. The rest stays: an attestation's file and a fetched copy 50 MB, a brand image 2 MB, and the
+  extracted text the worker parses at most 50 MB (its own `MAX_TEXT_BYTES`), so the worker's memory stays within the
+  chart's limit (about 960 MB of 1280 Mi with the default child memory; the note in the chart's values says so). The
+  admin's file field says 100 MB, and the API's "too large" answer names no number, since the limits differ. Not
+  checked here: the gateway's request size and timeouts for a 100 MB upload, which live in gitops. Tests first: the
+  files table at 100 MB and over, the API taking a 60 MB copy and refusing one over 100 MB; mutation list `copy-size`
+  (4 killed). ADR-0001, ADR-0004 and ADR-0007 amended; specs: data model §3.4, editorial workflow S2.2.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

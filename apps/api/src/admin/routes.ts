@@ -459,8 +459,13 @@ interface SourceBody {
 }
 /** What a copy may be (S2.2): copy-types.ts, shared with the fetcher. */
 const UPLOAD_TYPES = COPY_TYPES;
-/** The largest copy (S2.2), as the files table's check has it. */
+/** The largest file taken otherwise (an attestation's, a fetched copy, which the fetcher also caps): 50 MB. */
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+/**
+ * The largest copy uploaded for a source (S2.2, PLAN R229), as the files table's check has it: a party's programme
+ * can be mostly images. The worker reads copies up to the same size.
+ */
+const MAX_COPY_BYTES = 100 * 1024 * 1024;
 const isUploadType = isCopyType;
 
 /**
@@ -3280,7 +3285,7 @@ export const adminDataRoutes =
             if (declared === 0) {
               throw new Refusal(400, 'invalid');
             }
-            if (declared > MAX_UPLOAD_BYTES) {
+            if (declared > MAX_COPY_BYTES) {
               throw new Refusal(413, 'tooLarge');
             }
             let stored: { sha256: string; byteSize: number };
@@ -3289,7 +3294,7 @@ export const adminDataRoutes =
                 { tenantId: access.tenantId, bucket: 'sources' },
                 // Stopping early (too large) leaves the connection open for the refusal.
                 request.body.iterator({ destroyOnReturn: false }),
-                { maxBytes: MAX_UPLOAD_BYTES },
+                { maxBytes: MAX_COPY_BYTES },
               );
             } catch (error) {
               if (error instanceof TooLargeError) {

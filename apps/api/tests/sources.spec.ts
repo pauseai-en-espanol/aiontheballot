@@ -464,7 +464,8 @@ describe('sources (editorial workflow S1, S2, S5, S6)', () => {
     try {
       const { id } = (await send('POST', base, USERS.editorA, FIELDS)).json<{ id: string }>();
       made.push(id);
-      const tooLarge = Buffer.alloc(50 * 1024 * 1024 + 1, 0x20);
+      // The limit is 100 MB for a source's copy (PLAN R229).
+      const tooLarge = Buffer.alloc(100 * 1024 * 1024 + 1, 0x20);
       // Declared too large: refused before a byte is read.
       const declared = await send('PUT', `${base}/${id}/copy`, USERS.editorA, tooLarge, {
         'content-type': 'text/plain',
@@ -479,7 +480,7 @@ describe('sources (editorial workflow S1, S2, S5, S6)', () => {
         headers: { 'x-test-user': USERS.editorA, origin: ORIGIN, 'content-type': 'text/plain' },
         payload: Readable.from(
           (function* () {
-            for (let i = 0; i < 51; i += 1) {
+            for (let i = 0; i < 101; i += 1) {
               yield Buffer.alloc(1024 * 1024, 0x20);
             }
           })(),
@@ -492,6 +493,22 @@ describe('sources (editorial workflow S1, S2, S5, S6)', () => {
       const { rows } = await sql<{ file_id: string | null }>`
         SELECT file_id FROM app.source_documents WHERE id = ${id}`.execute(owner);
       expect(rows).toEqual([{ file_id: null }]);
+    } finally {
+      await cleanUp(made);
+    }
+  });
+
+  it('take a copy over 50 MB, up to 100 MB (PLAN R229)', async () => {
+    const made: string[] = [];
+    try {
+      const { id } = (await send('POST', base, USERS.editorA, FIELDS)).json<{ id: string }>();
+      made.push(id);
+      const large = Buffer.alloc(60 * 1024 * 1024, 0x20);
+      large.write(`%PDF-1.4 un programa grande ${crypto.randomUUID()}`);
+      const uploaded = await send('PUT', `${base}/${id}/copy`, USERS.editorA, large, {
+        'content-type': 'application/pdf',
+      });
+      expect(uploaded.statusCode).toBe(201);
     } finally {
       await cleanUp(made);
     }

@@ -44,7 +44,8 @@ describe('app.files (the bytes live on the volume, under their hash)', () => {
       'a public asset that is not a PNG, JPEG or WebP image',
       upload('public_assets', 'image/svg+xml', 'svg'),
     ],
-    ['a file over 50 MB', upload('sources', 'application/pdf', 'grande', '52428801')],
+    // A source's copy may be up to 100 MB (PLAN R229); other files keep their own, smaller, limits in the API.
+    ['a file over 100 MB', upload('sources', 'application/pdf', 'grande', '104857601')],
     ['a malformed content type', upload('sources', 'PDF', 'pdf')],
     [
       'a malformed hash',
@@ -53,6 +54,14 @@ describe('app.files (the bytes live on the volume, under their hash)', () => {
     ],
   ])('refuses %s', async (_name, sql) => {
     expect(await asEditorA((c) => errorCode(c, sql))).toBe(CHECK_VIOLATION);
+  });
+
+  it("takes a source's copy of up to 100 MB (PLAN R229)", async () => {
+    expect(
+      await asEditorA((c) =>
+        errorCode(c, upload('sources', 'application/pdf', 'programa-grande', '104857600')),
+      ),
+    ).toBeNull();
   });
 
   it('stores the same content once per tenant and bucket', async () => {

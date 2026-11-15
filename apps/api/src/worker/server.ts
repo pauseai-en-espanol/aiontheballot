@@ -20,8 +20,14 @@ export interface Failed {
  */
 export type Extractor = (contentType: string, bytes: Uint8Array) => Promise<Extraction | Failed>;
 
-/** The largest copy, as the files table's check has it. */
-export const MAX_COPY_BYTES = 50 * 1024 * 1024;
+/** The largest copy, as the files table's check has it (PLAN R229). */
+export const MAX_COPY_BYTES = 100 * 1024 * 1024;
+/**
+ * The largest text the extraction answers with, as JSON: 50 MB, far more than a programme's text, even of a 100 MB
+ * copy that is mostly images. Kept apart from the copy's limit, since the worker parses the answer with about five
+ * times its size of memory (chart values).
+ */
+export const MAX_TEXT_BYTES = 50 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 
 class Refused extends Error {

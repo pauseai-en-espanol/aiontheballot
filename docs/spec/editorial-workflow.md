@@ -388,8 +388,8 @@ D12._
    internet only, within a deadline and a copy's size (ADR-0007). The API stores the bytes exactly as an upload, in
    the requester's name, so S2.3 applies to them too; the type is the site's, or what the first bytes show, and must be
    one an upload may have. [API: fetcher; DB: as an upload]
-2. **By upload:** the editor uploads the file into the `sources` bucket, up to 50 MB. The same bytes are stored once
-   per tenant, so a second upload reuses the first file. [DB: checks, unique hash; API]
+2. **By upload:** the editor uploads the file into the `sources` bucket, up to 100 MB (PLAN R229). The same bytes are
+   stored once per tenant, so a second upload reuses the first file. [DB: checks, unique hash; API]
 3. Before an upload, the screen says that the uploader counts as a contributor of every cell that cites the file,
    so they can't publish those cells while four-eyes is on. [UI; DB: publish trigger, step 4]
 4. The file store computes the bytes' hash as it stores them, in the tenant's `sources` bucket, and checks it again

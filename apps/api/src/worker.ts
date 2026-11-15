@@ -7,7 +7,7 @@ import { initErrorTracking } from './error-tracking.js';
 import { createChildExtractor } from './worker/child-extractor.js';
 import { readRootsFor } from './worker/child.js';
 import { SELF_CHECKS } from './worker/self-check.js';
-import { buildWorkerApp, MAX_COPY_BYTES } from './worker/server.js';
+import { buildWorkerApp, MAX_TEXT_BYTES } from './worker/server.js';
 import { readWorkerToken } from './worker/token.js';
 
 /**
@@ -35,9 +35,9 @@ const port = Number(process.env.PORT ?? 3002);
 const extractor = createChildExtractor(new URL('./worker/extract-child.js', import.meta.url), {
   timeoutMs: Number(process.env.EXTRACTION_TIMEOUT_MS ?? 120_000),
   memoryMb: Number(process.env.EXTRACTION_MEMORY_MB ?? 512),
-  // A copy's text, as JSON: about what a 50 MB copy's text can be. The worker parses the answer with about five times
+  // A copy's text, as JSON, at most 50 MB whatever the copy's size. The worker parses the answer with about five times
   // its size of memory, which the pod's limit leaves room for beside the child's (chart values).
-  maxOutputBytes: MAX_COPY_BYTES,
+  maxOutputBytes: MAX_TEXT_BYTES,
   readRoots: readRootsFor(fileURLToPath(new URL('.', import.meta.url))),
 });
 

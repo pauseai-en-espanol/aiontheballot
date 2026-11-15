@@ -433,7 +433,7 @@ create table app.files (
   tenant_id          uuid not null references app.tenants,
   bucket             app.file_bucket not null,
   content_type       text not null,
-  byte_size          bigint not null check (byte_size <= 52428800),   -- 50 MB
+  byte_size          bigint not null check (byte_size <= 104857600),  -- 100 MB (PLAN R229); the API keeps others to 50
   sha256             text not null,
   original_filename  text,                             -- personal data (file names often carry names)
   created_by         uuid not null,

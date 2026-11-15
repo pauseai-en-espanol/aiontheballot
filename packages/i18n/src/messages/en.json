@@ -86,7 +86,7 @@
     "notEnrolled": "This member hasn't set up two-step verification yet, so a link would let whoever reads their email into the account. Ask whoever runs the platform.",
     "holdsRole": "This person already holds that role here.",
     "cellChanged": "Someone changed this cell since you opened it.",
-    "tooLarge": "That file is too large: the limit is 50 MB.",
+    "tooLarge": "That file is too large to store here.",
     "fileType": "That kind of file can't be stored. Use a PDF, an HTML page, plain text, or a PNG, JPEG or WebP image.",
     "hasCopy": "This source already has its stored copy, which never changes. Add another source for a new document.",
     "otherType": "This file is already stored here as another kind of document. Upload it as that kind.",
@@ -1213,7 +1213,7 @@
         "title": "Stored copy",
         "none": "No copy is stored yet. Until one is, the fields above can change; afterwards its kind and address are fixed, and the rest only while no cell cites it and the election isn't public.",
         "file": "File",
-        "fileHint": "A PDF, a web page saved as HTML, plain text, or an image (PNG, JPEG or WebP), up to 50 MB.",
+        "fileHint": "A PDF, a web page saved as HTML, plain text, or an image (PNG, JPEG or WebP), up to 100 MB.",
         "contributor": "Whoever stores the copy counts as having worked on every cell that cites it, so while a second reviewer is required, they can't publish those cells.",
         "final": "Once its copy is stored, the copy, kind and address never change. Its title, language, party and programme mark can still be corrected while no cell cites it and the election isn't public; after that, a wrong source is replaced by a new one.",
         "upload": "Store copy",
@@ -1551,7 +1551,7 @@
         "none": "No file chosen yet.",
         "problems": {
           "type": "That kind of file can't be stored: use a PDF, an HTML page, plain text, or a PNG, JPEG or WebP image.",
-          "size": "That file is over 50 MB.",
+          "size": "That file is over 100 MB.",
           "missing": "Choose a file first."
         }
       },
