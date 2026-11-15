@@ -1168,7 +1168,7 @@
         "party": "Partido",
         "kind": "Tipo",
         "state": "Estado",
-        "citations": "Citada"
+        "citations": "En celdas"
       },
       "neutral": "Ningún partido",
       "programmeTag": "Programa",
@@ -1189,7 +1189,7 @@
       },
       "citable": "Se puede citar",
       "notCitable": "Aún no se puede citar",
-      "citations": "{count, plural, =0 {Sin citar} one {Citada una vez} other {Citada # veces}}",
+      "citations": "{count, plural, =0 {En ninguna celda} one {En una celda} other {En # celdas}}",
       "back": "Todas las fuentes",
       "details": "Datos",
       "fields": {

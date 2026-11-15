@@ -46,6 +46,9 @@ test.describe('sources (editorial workflow §7)', () => {
     const programme = page.getByRole('row', { name: /Programa de ejemplo/ });
     await expect(programme).toContainText(sources.programmeTag);
     await expect(programme).toContainText(`${sources.states.done} · ${sources.citable}`);
+    // The cells resting on it, each once (PLAN R231): the published cell's quote is in its draft and its revision,
+    // and the draft cell's check, never three. (Another test takes that check away and back for a moment.)
+    await expect(programme).toContainText(/In (one cell|2 cells)/u);
     // Reviewers read sources; only editors and country admins add them.
     await expect(page.getByRole('link', { name: sources.add })).toHaveCount(0);
     await expectAccessible(page);

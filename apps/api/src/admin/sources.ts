@@ -27,7 +27,10 @@ export interface Source {
   archiveUrl: string | null;
   /** The extracted units (pages or sections), once extraction is done. */
   units: number;
-  /** Quotes and checked documents that cite it, drafts and published revisions alike: it is deleted only at 0. */
+  /**
+   * The cells whose quotes or checked documents rest on it, drafts and published revisions alike, each cell once (PLAN
+   * R231).
+   */
   citations: number;
   /**
    * Whether its description can still change (S1.2): always until its copy is stored; after that, its title, language,
@@ -89,12 +92,17 @@ export const listSources = async (
       sql<number>`(SELECT count(*)::int FROM app.source_texts t WHERE t.source_document_id = s.id)`.as(
         'units',
       ),
-      sql<number>`(
-        (SELECT count(*) FROM app.draft_evidence e WHERE e.source_document_id = s.id)
-        + (SELECT count(*) FROM app.revision_evidence e WHERE e.source_document_id = s.id)
-        + (SELECT count(*) FROM app.draft_checked_documents c WHERE c.source_document_id = s.id)
-        + (SELECT count(*) FROM app.revision_checked_documents c WHERE c.source_document_id = s.id)
-      )::int`.as('citations'),
+      // The cells that rest on it, each once (PLAN R231): a cell's draft and its published revisions hold copies of the
+      // same quotes and checks, and a cell may quote a source several times.
+      sql<number>`(SELECT count(DISTINCT x.cell)::int FROM (
+        SELECT e.assessment_id AS cell FROM app.draft_evidence e WHERE e.source_document_id = s.id
+        UNION SELECT c.assessment_id FROM app.draft_checked_documents c WHERE c.source_document_id = s.id
+        UNION SELECT r.assessment_id FROM app.revision_evidence e
+                 JOIN app.assessment_revisions r ON r.id = e.revision_id WHERE e.source_document_id = s.id
+        UNION SELECT r.assessment_id FROM app.revision_checked_documents c
+                 JOIN app.assessment_revisions r ON r.id = c.revision_id WHERE c.source_document_id = s.id) x)`.as(
+        'citations',
+      ),
       // As private.source_document_rules decides it (PLAN R226).
       sql<boolean>`(s.file_id IS NULL OR (
         EXISTS (SELECT 1 FROM app.elections e WHERE e.id = s.election_id AND e.status IN ('draft', 'preview'))

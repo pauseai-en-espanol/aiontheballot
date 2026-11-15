@@ -24,7 +24,7 @@ export interface Source {
   extractionStatus: ExtractionStatus;
   archiveUrl: string | null;
   units: number;
-  /** Quotes and checked documents citing it: it can be deleted only at 0 (S5.2). */
+  /** The cells whose quotes or checked documents rest on it, each once (PLAN R231). */
   citations: number;
   /**
    * Whether its fields can still change (S1.2): all of them until its copy is stored; after that its title, language,

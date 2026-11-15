@@ -3373,6 +3373,14 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   chosen already); the seeded draft says "not mentioned", so the quote tests now choose a rating that takes quotes
   first. Spec: editorial workflow C2.10, C2.11, C3.4.
 
+- **R231. A source says how many cells rest on it, each once.** After Dani published five "No lo menciona" cells on
+  PP's programme, its source read "Citada 10 veces": the count added the quotes and checked documents of drafts and
+  of published revisions, which hold copies of the same ones, so each published cell counted twice, and a cell
+  quoting a source twice counted twice too. It now counts the cells whose draft or published revisions quote or
+  check the source, each once, and says so ("En 5 celdas"; the column "En celdas"). E2e test: the seeded programme,
+  quoted by a published cell (in its draft and its revision) and checked by a draft cell, is in two cells, never
+  three.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

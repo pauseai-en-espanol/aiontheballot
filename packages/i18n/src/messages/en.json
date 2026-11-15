@@ -1168,7 +1168,7 @@
         "party": "Party",
         "kind": "Kind",
         "state": "State",
-        "citations": "Cited"
+        "citations": "Used in"
       },
       "neutral": "No party",
       "programmeTag": "Programme",
@@ -1189,7 +1189,7 @@
       },
       "citable": "Can be cited",
       "notCitable": "Can't be cited yet",
-      "citations": "{count, plural, =0 {Not cited} one {Cited once} other {Cited # times}}",
+      "citations": "{count, plural, =0 {In no cell} one {In one cell} other {In # cells}}",
       "back": "All sources",
       "details": "Details",
       "fields": {
