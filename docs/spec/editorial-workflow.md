@@ -473,6 +473,13 @@ _As an editor, I write a rating backed by verbatim quotes, and see at once wheth
 8. The public sees the matched pages' labels, never a page an editor typed. The page field is a hint only. [DB:
    publish trigger]
 9. Quotes are always shown exactly as stored; normalization is for matching only. [UI]
+10. A passage picked from a source's text is stored as it reads (PLAN R230): a word a line break split with a hyphen
+    joined again, and every run of blanks, line breaks included, one space. Those are two of the steps normalization
+    takes, and the only ones, so it matches exactly what was selected. [UI]
+11. The cell editor shows the evidence the rating chosen needs, saved or not (PLAN R230): quotes for _Cumple_,
+    _Cumple parcialmente_ and _No cumple_ (and while no rating is chosen), the checked documents for _No lo
+    menciona_. Evidence the rating doesn't take shows while there is some, with a warning to remove it; the database
+    refuses neither. [UI]
 
 ### C3. "No lo menciona"
 
@@ -481,6 +488,8 @@ _As an editor, I write a rating backed by verbatim quotes, and see at once wheth
 2. The time each document was checked is set by the database. Checking it again is removing and adding it. [DB:
    stamp, primary key]
 3. It may be given before the party's programme exists (PLAN P15). [DB]
+4. The party's programme, when it can be checked, is chosen already in the cell editor: a person still adds it, so
+   who checked it and when are recorded (PLAN R230). [UI]
 
 ### C4. Attested quotes
 

@@ -15,6 +15,7 @@ import { ClipForm } from '@/cells/ClipForm';
 import { cellsPath, getCell, type Rating } from '@/cells/data';
 import { DraftBar } from '@/cells/DraftBar';
 import { DraftEditor } from '@/cells/DraftEditor';
+import { EvidenceSection } from '@/cells/EvidenceSection';
 import { NoteForm } from '@/cells/NoteForm';
 import { QuoteForm } from '@/cells/QuoteForm';
 import { StartChange } from '@/cells/StartChange';
@@ -264,7 +265,7 @@ const CellPage = async ({ params }: CellParams) => {
         <>
           {(() => {
             const editor = (
-              <DraftEditor leave={t('admin.cells.bar.leave')}>
+              <DraftEditor leave={t('admin.cells.bar.leave')} rating={draft.rating}>
                 <section aria-labelledby="draft" className={styles.section}>
                   <h3 id="draft" className={styles.h3}>
                     {t('admin.cells.draftTitle')}
@@ -387,10 +388,14 @@ const CellPage = async ({ params }: CellParams) => {
                   )}
                 </section>
 
-                <section aria-labelledby="quotes" className={styles.section}>
-                  <h3 id="quotes" className={styles.h3}>
-                    {t('admin.cells.quotes')}
-                  </h3>
+                <EvidenceSection
+                  id="quotes"
+                  title={t('admin.cells.quotes')}
+                  kind="quotes"
+                  count={draft.quotes.length}
+                  rating={draft.rating}
+                  mismatch={t('admin.cells.quotesMismatch')}
+                >
                   <p className={styles.text}>{t('admin.cells.quotesIntro')}</p>
                   {draft.quotes.length === 0 ? (
                     <p className={styles.text}>{t('admin.cells.noQuotes')}</p>
@@ -610,66 +615,71 @@ const CellPage = async ({ params }: CellParams) => {
                       </>
                     )
                   ) : null}
-                </section>
+                </EvidenceSection>
 
-                {draft.rating === 'not_mentioned' || draft.checkedDocuments.length > 0 ? (
-                  <section aria-labelledby="checked" className={styles.section}>
-                    <h3 id="checked" className={styles.h3}>
-                      {t('admin.cells.checked')}
-                    </h3>
-                    <p className={styles.text}>{t('admin.cells.checkedIntro')}</p>
-                    {draft.checkedDocuments.length === 0 ? (
-                      <p className={styles.text}>{t('admin.cells.noChecked')}</p>
+                {/* Shown as the rating chosen needs it, saved or not (PLAN R230). */}
+                <EvidenceSection
+                  id="checked"
+                  title={t('admin.cells.checked')}
+                  kind="checked"
+                  count={draft.checkedDocuments.length}
+                  rating={draft.rating}
+                  mismatch={t('admin.cells.checkedMismatch')}
+                >
+                  <p className={styles.text}>{t('admin.cells.checkedIntro')}</p>
+                  {draft.checkedDocuments.length === 0 ? (
+                    <p className={styles.text}>{t('admin.cells.noChecked')}</p>
+                  ) : (
+                    <ul className={styles.list}>
+                      {draft.checkedDocuments.map((checked) => (
+                        <li key={checked.source.id}>
+                          {t('admin.cells.checkedOn', {
+                            title: checked.source.title,
+                            date: new Date(checked.checkedAt),
+                            name: nameOf(checked.checkedBy),
+                          })}
+                          {replacedNote(checked.source.id)}
+                          {editable ? (
+                            <CellAction
+                              method="DELETE"
+                              path={`${cellApi}/checked/${checked.source.id}?version=${draft.contentVersion}`}
+                              secondary
+                              label={`${t('admin.cells.removeChecked')}: ${checked.source.title}`}
+                              text={{
+                                button: t('admin.cells.removeChecked'),
+                                done: t('admin.cells.checkedRemoved'),
+                                ...stale,
+                                errors,
+                              }}
+                            />
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {editable ? (
+                    checkable.length === 0 ? (
+                      <p className={styles.text}>{t('admin.cells.noCheckable')}</p>
                     ) : (
-                      <ul className={styles.list}>
-                        {draft.checkedDocuments.map((checked) => (
-                          <li key={checked.source.id}>
-                            {t('admin.cells.checkedOn', {
-                              title: checked.source.title,
-                              date: new Date(checked.checkedAt),
-                              name: nameOf(checked.checkedBy),
-                            })}
-                            {replacedNote(checked.source.id)}
-                            {editable ? (
-                              <CellAction
-                                method="DELETE"
-                                path={`${cellApi}/checked/${checked.source.id}?version=${draft.contentVersion}`}
-                                secondary
-                                label={`${t('admin.cells.removeChecked')}: ${checked.source.title}`}
-                                text={{
-                                  button: t('admin.cells.removeChecked'),
-                                  done: t('admin.cells.checkedRemoved'),
-                                  ...stale,
-                                  errors,
-                                }}
-                              />
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {editable ? (
-                      checkable.length === 0 ? (
-                        <p className={styles.text}>{t('admin.cells.noCheckable')}</p>
-                      ) : (
-                        <CheckedForm
-                          path={`${cellApi}/checked`}
-                          version={draft.contentVersion}
-                          sources={checkable.map(({ id, title }) => ({ id, title }))}
-                          text={{
-                            label: t('admin.cells.addChecked'),
-                            choose: t('admin.cells.chooseSource'),
-                            button: t('admin.cells.addCheckedButton'),
-                            done: t('admin.cells.checkedAdded'),
-                            ...stale,
-                            errors,
-                            problems: problemText(t),
-                          }}
-                        />
-                      )
-                    ) : null}
-                  </section>
-                ) : null}
+                      <CheckedForm
+                        path={`${cellApi}/checked`}
+                        version={draft.contentVersion}
+                        sources={checkable.map(({ id, title }) => ({ id, title }))}
+                        // The party's programme, the document a "not mentioned" rests on almost always.
+                        chosen={checkable.find((s) => s.isProgramme)?.id}
+                        text={{
+                          label: t('admin.cells.addChecked'),
+                          choose: t('admin.cells.chooseSource'),
+                          button: t('admin.cells.addCheckedButton'),
+                          done: t('admin.cells.checkedAdded'),
+                          ...stale,
+                          errors,
+                          problems: problemText(t),
+                        }}
+                      />
+                    )
+                  ) : null}
+                </EvidenceSection>
 
                 <section aria-labelledby="workflow" className={styles.section}>
                   <h3 id="workflow" className={styles.h3}>

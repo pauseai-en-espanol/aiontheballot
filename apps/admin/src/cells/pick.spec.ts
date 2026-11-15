@@ -1,3 +1,4 @@
+import { normalizeForMatch } from '@aiontheballot/domain/matching';
 import { matchQuote } from '@aiontheballot/domain/quote-match';
 import { describe, expect, it } from 'vitest';
 
@@ -21,13 +22,35 @@ const part = (unit: number, from: string, to?: string) => {
 };
 
 describe('pickQuote', () => {
-  it('takes the passage as it is in the text, line breaks included, with its page', () => {
+  it("takes the passage as it reads, with its page: the text's line breaks as spaces (PLAN R230)", () => {
     const picked = pickQuote(UNITS, [part(0, 'propone', 'prueba.')]);
     expect(picked).toEqual({
       kind: 'picked',
-      quote: 'propone una moratoria\nficticia sobre los sistemas de prueba.',
+      quote: 'propone una moratoria ficticia sobre los sistemas de prueba.',
       label: 'p. 1',
     });
+  });
+
+  it('joins a word split by a hyphen at the end of a line, as the match does (PLAN R230)', () => {
+    const picked = pickQuote(UNITS, [part(1, 'una agencia', 'ejemplo.')]);
+    expect(picked).toEqual({
+      kind: 'picked',
+      quote: 'una agencia de supervisión de ejemplo.',
+      label: 'p. 2',
+    });
+  });
+
+  it('normalises to what the selection did, so it matches exactly as before (PLAN R230)', () => {
+    const body =
+      'Un guion de verdad: COVID-\n19, y otra pala-\n  bra  con\t\tespacios\n\ny párrafos.';
+    const picked = pickQuote([{ label: 'p. 9', body }], [{ unit: 0, from: 0, to: body.length }]);
+    if (picked.kind !== 'picked') {
+      throw new Error('Nothing picked');
+    }
+    expect(picked.quote).toBe(
+      'Un guion de verdad: COVID- 19, y otra palabra con espacios y párrafos.',
+    );
+    expect(normalizeForMatch(picked.quote)).toBe(normalizeForMatch(body));
   });
 
   it('joins pages with one space and names the span, as the match does', () => {

@@ -24,11 +24,14 @@ export const CheckedForm = ({
   path,
   version,
   sources,
+  chosen,
   text,
 }: {
   path: string;
   version: number;
   sources: { id: string; title: string }[];
+  /** The document chosen to start with: the party's programme, when it can be checked (PLAN R230). */
+  chosen?: string | undefined;
   text: {
     label: string;
     choose: string;
@@ -68,7 +71,7 @@ export const CheckedForm = ({
   return (
     <form ref={formRef} className={styles.form} onSubmit={submit} noValidate>
       <Field label={text.label} error={problems.source} required>
-        <FieldSelect className={styles.select} name="sourceId" defaultValue="">
+        <FieldSelect className={styles.select} name="sourceId" defaultValue={chosen ?? ''}>
           <option value="" disabled>
             {text.choose}
           </option>

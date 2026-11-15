@@ -3357,6 +3357,22 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   files table at 100 MB and over, the API taking a 60 MB copy and refusing one over 100 MB; mutation list `copy-size`
   (4 killed). ADR-0001, ADR-0004 and ADR-0007 amended; specs: data model §3.4, editorial workflow S2.2.
 
+- **R230. The cell editor shows the evidence the rating needs, and a picked quote reads as it reads.** Writing PP's
+  first cells, Dani found the relation between quotes and checked documents "a bit weird": "Documentos revisados"
+  appeared only once a "No lo menciona" draft was saved, "Citas" stayed for a rating that takes none, and every "not
+  mentioned" cell meant choosing the same programme by hand. Now the draft's form shares the rating chosen, saved or
+  not (`DraftEditor`), and each kind of evidence follows it (`EvidenceSection`): quotes for the ratings a programme
+  backs or contradicts and while none is chosen, checked documents for "No lo menciona"; evidence the rating doesn't
+  take stays visible while there is some, with a warning to remove it (the database refuses neither). The party's
+  programme is chosen already in "Documento revisado", still added by a person. And the source text Dani picked
+  quotes from showed the PDF's layout ("OPORTUNI-/DADES"), which the picker copied into the quote as it was, so the
+  published quote would have read "OPORTUNI- DADES": a picked passage is now stored as it reads, a word a line break
+  split with a hyphen joined again and every run of blanks one space, the two normalization steps that do so and no
+  other, so it matches exactly what was selected. Tests first: the picker's (each step, and that the quote normalises
+  as the selection did) and an e2e test on A's seeded draft (the evidence as ratings are chosen unsaved, the programme
+  chosen already); the seeded draft says "not mentioned", so the quote tests now choose a rating that takes quotes
+  first. Spec: editorial workflow C2.10, C2.11, C3.4.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

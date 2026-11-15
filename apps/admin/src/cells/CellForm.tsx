@@ -188,7 +188,14 @@ export const CellForm = ({
       ref={formRef}
       className={styles.form}
       onSubmit={submit}
-      onChange={() => setEdited(true)}
+      onChange={(event) => {
+        setEdited(true);
+        // The rating chosen, saved or not, for the evidence it needs (PLAN R230).
+        const changed = event.target;
+        if (changed instanceof HTMLInputElement && changed.name === 'rating') {
+          editor?.setRating(changed.value === '' ? null : (changed.value as Rating));
+        }
+      }}
       noValidate
     >
       <fieldset className={styles.fieldset}>

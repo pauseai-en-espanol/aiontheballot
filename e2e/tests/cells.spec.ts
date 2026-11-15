@@ -56,6 +56,9 @@ test.describe('cells (editorial workflow §8)', () => {
       await expect(page.getByRole('heading', { level: 3, name: cells.checked })).toBeVisible();
       await expectAccessible(page);
 
+      // The seeded draft says "not mentioned", which takes no quotes: a rating that does, chosen and not saved, offers
+      // them (PLAN R230).
+      await page.getByRole('radio', { name: en.rating.meets, exact: true }).check();
       await page.getByLabel(cells.quoteSource).selectOption({ label: 'Programa de ejemplo' });
       const quote = page.getByLabel(cells.quote);
       await quote.fill('propone una moratoria ficticia sobre los sistemas');
@@ -87,6 +90,9 @@ test.describe('cells (editorial workflow §8)', () => {
         .getByRole('row', { name: /Partido Ejemplo A/ })
         .getByRole('link', { name: `PEA, Ejemplo 2: ${en.cell.pending} · ${cells.states.draft}` })
         .click();
+      // The seeded draft says "not mentioned", which takes no quotes: a rating that does, chosen and not saved, offers
+      // them (PLAN R230).
+      await page.getByRole('radio', { name: en.rating.meets, exact: true }).check();
       await page.getByLabel(cells.quoteSource).selectOption({ label: 'Programa de ejemplo' });
       const text = page.getByRole('region', { name: cells.pick.title });
       await expect(text.getByText('p. 1', { exact: true })).toBeVisible();
@@ -167,6 +173,9 @@ test.describe('cells (editorial workflow §8)', () => {
 
       // A quote added from this same page moves the cell's version: the summary keeps its text, with no warning that
       // someone else changed the cell (admin forms §2).
+      // The seeded draft says "not mentioned", which takes no quotes: a rating that does, chosen and not saved, offers
+      // them (PLAN R230).
+      await page.getByRole('radio', { name: en.rating.meets, exact: true }).check();
       await page.getByLabel(cells.quoteSource).selectOption({ label: 'Programa de ejemplo' });
       await page.getByLabel(cells.quote).fill('propone una moratoria ficticia sobre los sistemas');
       await page.getByRole('button', { name: cells.add }).click();
@@ -204,6 +213,47 @@ test.describe('cells (editorial workflow §8)', () => {
       await expect(page).not.toHaveURL(/\/cells\//u);
       await page.goBack();
       await expect(summary).toHaveValue(original);
+    });
+
+    test('show the evidence the rating chosen needs, saved or not, the programme ready to check (PLAN R230)', async ({
+      page,
+    }) => {
+      const { id } = await signedInAccount(page, created, 'Persona editora de evidencias');
+      await addMembership(id, 'ejemplo-a', 'editor');
+      await page.goto(GRID);
+      await page
+        .getByRole('row', { name: /Partido Ejemplo A/ })
+        .getByRole('link', { name: `PEA, Ejemplo 2: ${en.cell.pending} · ${cells.states.draft}` })
+        .click();
+      const quotes = page.getByRole('heading', { level: 3, name: cells.quotes });
+      const checked = page.getByRole('heading', { level: 3, name: cells.checked });
+      // Saved as "not mentioned": the programme it was checked against, and no quotes asked for.
+      await expect(checked).toBeVisible();
+      await expect(quotes).toHaveCount(0);
+      await expect(page.getByText(cells.checkedMismatch)).toHaveCount(0);
+
+      // A rating the programme backs, chosen and not saved: quotes asked for, and the checked document now out of
+      // place, and said so.
+      await page.getByRole('radio', { name: en.rating.meets, exact: true }).check();
+      await expect(quotes).toBeVisible();
+      await expect(page.getByText(cells.checkedMismatch)).toBeVisible();
+      await expectAccessible(page);
+
+      // "Not mentioned", chosen and not saved: no quotes asked for, and the documents checked are what it needs.
+      await page.getByRole('radio', { name: en.rating.not_mentioned, exact: true }).check();
+      await expect(page.getByText(cells.checkedMismatch)).toHaveCount(0);
+      await expect(quotes).toHaveCount(0);
+      // Removed, the party's programme is chosen already to check again: one press puts the cell back as it was.
+      await page
+        .getByRole('button', { name: `${cells.removeChecked}: Programa de ejemplo` })
+        .click();
+      await expect(page.locator('#page-announcer')).toHaveText(cells.checkedRemoved);
+      const document = page.getByLabel(cells.addChecked);
+      await expect(document.locator('option:checked')).toHaveText('Programa de ejemplo');
+      await page.getByRole('button', { name: cells.addCheckedButton }).click();
+      await expect(
+        page.getByRole('button', { name: `${cells.removeChecked}: Programa de ejemplo` }),
+      ).toBeVisible();
     });
   });
 
