@@ -74,26 +74,41 @@ const text = (result: unknown) =>
   JSON.parse((result as { content: { text: string }[] }).content[0]!.text) as unknown;
 
 describe('the tools (PLAN R204)', () => {
-  it('are the routes a token may reach: reading, and drafting an election’s parties and criteria', async () => {
+  it('are the routes a token may reach: reading, and drafting an election’s parties, criteria and cells', async () => {
     const { client } = await connected({});
-    expect((await client.listTools()).tools.map((tool) => tool.name).sort()).toEqual([
+    const names = (await client.listTools()).tools.map((tool) => tool.name).sort();
+    expect(names).toEqual([
+      'add_checked_document',
+      'add_quote',
       'create_criterion',
       'create_election',
       'create_party',
+      'get_cell',
       'get_election',
+      'list_cells',
       'list_changes',
       'list_criteria',
       'list_elections',
       'list_parties',
       'list_sites',
+      'list_sources',
       'propose_change',
+      'read_source',
+      'remove_checked_document',
+      'remove_quote',
       'reorder_criteria',
       'reorder_parties',
+      'save_cell_draft',
       'set_party_logo',
+      'start_cell',
       'update_criterion',
       'update_party',
       'withdraw_change',
     ]);
+    // A cell is drafted, never taken through review or decided (PLAN R232).
+    expect(
+      names.filter((name) => /submit|recall|reject|publish|attest|recheck|delete/.test(name)),
+    ).toEqual([]);
   });
 
   it('create a criterion in the words given, never linked to a core criterion (PLAN R213)', async () => {
@@ -214,5 +229,235 @@ describe('the tools (PLAN R204)', () => {
     });
     expect(result.isError).toBe(true);
     expect(calls).toEqual([]);
+  });
+
+  describe('a cell’s draft (PLAN R232)', () => {
+    const CELL = '0190f8c4-0000-7000-8000-000000000951';
+    const SOURCE = '0190f8c4-0000-7000-8000-000000000961';
+    const at = '/api/t/ejemplo-a/e/autonomicas';
+    const where = {
+      site: 'ejemplo-a',
+      election: 'autonomicas',
+      party: PARTY,
+      criterion: CRITERION,
+    };
+    /** A fictional cell's draft, with a public note a person wrote, as the admin shows it. */
+    const cell = (quotes: unknown[] = []) => ({
+      party: { id: PARTY },
+      criterion: { id: CRITERION },
+      draft: {
+        id: CELL,
+        state: 'draft',
+        contentVersion: 7,
+        rating: null,
+        summary: null,
+        changeKind: 'update',
+        publicNote: { es: 'Nota pública de ejemplo' },
+        quotes,
+        checkedDocuments: [],
+      },
+      revisions: [],
+      sources: [],
+      names: { '0190f8c4-0000-7000-8000-000000000102': 'Persona de Ejemplo' },
+      you: '0190f8c4-0000-7000-8000-000000000102',
+    });
+    /** The fictional source's text, by page. */
+    const source = {
+      source: {
+        id: SOURCE,
+        title: 'Programa de ejemplo',
+        language: 'es',
+        kind: 'pdf',
+        extractionStatus: 'done',
+      },
+      units: [
+        { index: 0, label: 'p. 1', body: 'Portada del programa de ejemplo.' },
+        { index: 1, label: 'p. 2', body: 'Proponemos una agencia de evalua-\nción de ejemplo.' },
+      ],
+    };
+    const get = async (path: string) => (path.includes('/sources/') ? source : cell());
+
+    it('shows a cell without the names of the people its trail names', async () => {
+      const { client, calls } = await connected({ get });
+      const shown = text(await client.callTool({ name: 'get_cell', arguments: where }));
+      expect(calls).toEqual([['GET', `${at}/cells/${PARTY}/${CRITERION}`]]);
+      expect(shown).toMatchObject({ draft: { id: CELL, contentVersion: 7 } });
+      expect(shown).not.toHaveProperty('names');
+      expect(shown).not.toHaveProperty('you');
+    });
+
+    it('saves the rating and summary given at the version given, the change kind and public note as they are', async () => {
+      const { client, calls } = await connected({ get, send: async () => ({ version: 8 }) });
+      const result = await client.callTool({
+        name: 'save_cell_draft',
+        // The version the member's tool last read, not the one it reads now: a change since is refused.
+        arguments: { ...where, version: 6, rating: 'meets', summary: { es: 'Resumen de ejemplo' } },
+      });
+      expect(text(result)).toEqual({ version: 8 });
+      expect(calls.at(-1)).toEqual([
+        'PUT',
+        `${at}/cells/${CELL}`,
+        {
+          version: 6,
+          rating: 'meets',
+          summary: { es: 'Resumen de ejemplo' },
+          changeKind: 'update',
+          publicNote: { es: 'Nota pública de ejemplo' },
+        },
+      ]);
+    });
+
+    it('says to start a cell that doesn’t exist yet, and writes nothing', async () => {
+      const { client, calls } = await connected({ get: async () => ({ ...cell(), draft: null }) });
+      const result = await client.callTool({
+        name: 'save_cell_draft',
+        arguments: { ...where, version: 0, rating: 'meets', summary: { es: 'Resumen de ejemplo' } },
+      });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toMatchObject({ error: 'noCell' });
+      expect(calls.filter(([method]) => method !== 'GET')).toEqual([]);
+    });
+
+    it('adds a quote that matches the source as it reads, labelled with the page it matched on', async () => {
+      const added = {
+        id: 'q',
+        ordinal: 1,
+        quote: 'Proponemos una agencia de evaluación',
+        matchStatus: 'matched',
+      };
+      let reads = 0;
+      const { client, calls } = await connected({
+        get: async (path) => {
+          if (path.includes('/sources/')) {
+            return source;
+          }
+          reads += 1;
+          return reads === 1 ? cell() : cell([added]);
+        },
+        send: async () => ({ version: 8 }),
+      });
+      const result = await client.callTool({
+        name: 'add_quote',
+        arguments: {
+          ...where,
+          version: 7,
+          source: SOURCE,
+          quote: 'Proponemos una agencia de evaluación',
+        },
+      });
+      expect(text(result)).toEqual({ version: 8, quote: added });
+      expect(calls).toContainEqual([
+        'POST',
+        `${at}/cells/${CELL}/quotes`,
+        {
+          version: 7,
+          sourceId: SOURCE,
+          quote: 'Proponemos una agencia de evaluación',
+          sectionLabel: 'p. 2',
+        },
+      ]);
+    });
+
+    it('refuses a quote the source doesn’t have, saying how much of it it has, and adds nothing', async () => {
+      const { client, calls } = await connected({ get, send: async () => ({ version: 8 }) });
+      const result = await client.callTool({
+        name: 'add_quote',
+        arguments: {
+          ...where,
+          version: 7,
+          source: SOURCE,
+          quote: 'Proponemos una agencia de supervisión',
+        },
+      });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toMatchObject({
+        error: 'unmatched',
+        detail: {
+          kind: 'unmatched',
+          longest: { part: 'start', text: 'Proponemos una agencia de ' },
+        },
+      });
+      expect(calls.filter(([method]) => method !== 'GET')).toEqual([]);
+    });
+
+    it('refuses a quote from a source the database doesn’t match, which a person attests instead', async () => {
+      const submitted = { ...source, source: { ...source.source, kind: 'party_submission' } };
+      const { client, calls } = await connected({
+        get: async (path) => (path.includes('/sources/') ? submitted : cell()),
+        send: async () => ({ version: 8 }),
+      });
+      const result = await client.callTool({
+        name: 'add_quote',
+        arguments: {
+          ...where,
+          version: 7,
+          source: SOURCE,
+          quote: 'Proponemos una agencia de evaluación',
+        },
+      });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toMatchObject({
+        error: 'notMatched',
+        detail: { kind: 'party_submission' },
+      });
+      expect(calls.filter(([method]) => method !== 'GET')).toEqual([]);
+    });
+
+    it('records and removes a checked document, and removes a quote, at the version given', async () => {
+      const { client, calls } = await connected({ get, send: async () => ({ version: 8 }) });
+      await client.callTool({
+        name: 'add_checked_document',
+        arguments: { ...where, version: 7, source: SOURCE },
+      });
+      await client.callTool({
+        name: 'remove_checked_document',
+        arguments: { ...where, version: 8, source: SOURCE },
+      });
+      await client.callTool({
+        name: 'remove_quote',
+        arguments: { ...where, version: 9, quote: SOURCE },
+      });
+      expect(calls.filter(([method]) => method !== 'GET')).toEqual([
+        ['POST', `${at}/cells/${CELL}/checked`, { version: 7, sourceId: SOURCE }],
+        ['DELETE', `${at}/cells/${CELL}/checked/${SOURCE}?version=8`],
+        ['DELETE', `${at}/cells/${CELL}/quotes/${SOURCE}?version=9`],
+      ]);
+    });
+
+    it('searches a source, or reads some of its pages', async () => {
+      const { client } = await connected({ get });
+      expect(
+        text(
+          await client.callTool({
+            name: 'read_source',
+            arguments: { ...where, source: SOURCE, search: ['EVALUACION'] },
+          }),
+        ),
+      ).toMatchObject({
+        found: 1,
+        passages: [{ label: 'p. 2', text: 'Proponemos una agencia de evaluación de ejemplo.' }],
+      });
+      expect(
+        text(
+          await client.callTool({
+            name: 'read_source',
+            arguments: { ...where, source: SOURCE, from: 0, to: 0 },
+          }),
+        ),
+      ).toMatchObject({
+        units: [{ label: 'p. 1', text: 'Portada del programa de ejemplo.' }],
+        next: null,
+      });
+      expect(
+        text(
+          await client.callTool({ name: 'read_source', arguments: { ...where, source: SOURCE } }),
+        ),
+      ).toMatchObject({
+        units: [
+          { index: 0, label: 'p. 1' },
+          { index: 1, label: 'p. 2' },
+        ],
+      });
+    });
   });
 });

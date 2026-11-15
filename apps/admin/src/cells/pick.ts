@@ -1,4 +1,4 @@
-import { MAX_QUOTE_LENGTH } from '@aiontheballot/domain/quote-match';
+import { asItReads, MAX_QUOTE_LENGTH } from '@aiontheballot/domain/quote-match';
 
 /**
  * A quote picked from a source's extracted text (editorial workflow C2): the passage an editor selected, as it is in
@@ -30,17 +30,6 @@ export type Picked =
 
 const BLANK = /^\p{White_Space}*$/u;
 const EDGES = /^\p{White_Space}+|\p{White_Space}+$/gu;
-
-/**
- * A passage as it reads (PLAN R230): a word a line break split with a hyphen joined again, and every run of blanks, line
- * breaks included, one space. These are two of the steps the match normalises with (normalizeForMatch), and the only
- * ones taken, so the quote matches exactly what the selection did; it is stored, and published, without the layout's
- * line breaks and hyphens. A real hyphen at the end of a line goes too, as the match already drops it.
- */
-const asItReads = (text: string): string =>
-  text
-    .replace(/(\p{Alphabetic})-[^\P{White_Space}\n]*\n\p{White_Space}*(\p{Alphabetic})/gu, '$1$2')
-    .replace(/\p{White_Space}+/gu, ' ');
 
 /**
  * The quote and its page from the parts of each unit a selection covers. Units are joined with one space, as the

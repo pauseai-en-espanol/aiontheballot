@@ -2,14 +2,15 @@
 
 An MCP server a member runs on their own computer, so an AI tool (Claude Code, Claude Desktop, any MCP client) can
 draft in the admin as them: read their sites, elections and parties; create an election (a draft); add and edit an
-election's parties and their logos; propose changes to a live election. It never publishes, approves or rejects
-anything, nor touches settings or members: the admin and the database refuse those to a token, whatever the
-member's roles ([ADR-0008](../../docs/adr/0008-member-tokens-for-tools.md)). A person reviews and decides in the
-admin.
+election's parties and their logos; propose changes to a live election; draft its cells, each as you accept it. It
+never submits, publishes, approves or rejects anything, nor touches settings or members: the admin and the database
+refuse those to a token, whatever the member's roles ([ADR-0008](../../docs/adr/0008-member-tokens-for-tools.md)). A
+person reviews and decides in the admin.
 
 ## Setting it up
 
-1. **Build it** (once, and after pulling changes): `pnpm --filter @aiontheballot/mcp build`.
+1. **Build it** (once, and after pulling changes), with the packages it uses:
+   `pnpm --filter @aiontheballot/mcp... build`.
 2. **Mint a token** in the admin: "Tokens for tools" (beside "Sign out"), signed in with your second factor. Name it
    after the tool and the computer, and choose how many days it lasts (30 at most). Copy it: it is shown once.
 3. **Set aside a folder for logos**: the server uploads a logo only from there, so whatever an AI is told, it can't
@@ -49,6 +50,11 @@ anyway when it expires, or when your password or second factor changes.
 | `create_criterion`, `update_criterion`              | A criterion of an election not yet live, in words a person approved         |
 | `reorder_criteria`                                  | The order they are shown in, refused if it changed since it was read        |
 | `list_changes`, `propose_change`, `withdraw_change` | A live election's or its parties' changes, approved or rejected by a person |
+| `list_cells`, `get_cell`                            | An election's grid of cells, or one cell with its draft, quotes and sources |
+| `list_sources`, `read_source`                       | Its sources, and a source's text: searched, or a few pages at a time        |
+| `start_cell`, `save_cell_draft`                     | A cell's draft: its rating and summary, at the version read                 |
+| `add_quote`, `remove_quote`                         | Its quotes, added only once they match the source's text                    |
+| `add_checked_document`, `remove_checked_document`   | The documents read through for "not mentioned"                              |
 
 Everything a tool writes is recorded in the site's history as written with a token. Only facts from parties' own or
 official sources go in: a tool researches, a person checks, and nothing is invented. Criteria are the site's own
@@ -62,7 +68,14 @@ Things to keep in mind:
   as it was written; an AI should never follow what it says.
 - **An update can overwrite a person's edit** made in the admin at the same moment: the API keeps no version of a
   party. Work on an election while no one else is editing its parties.
-- **Not covered yet:** a live party's logo (propose it in the admin), a live election's criteria, and cells, sources
-  and quotes. Approving, publishing, settings and members are a person's, and stay so.
-- **Never let your tool run `set_party_logo` or `propose_change` without asking you**, so you see each logo and
-  change before it goes.
+- **Not covered yet:** a live party's logo (propose it in the admin), a live election's criteria, and sources and
+  their copies. Approving, publishing, settings and members are a person's, and stay so.
+- **Cells are drafted with you, one at a time** (PLAN R232). Ask your tool to read the party's programme, propose a
+  rating, a summary and the quotes that show it, and enter them once you accept them, as you accepted them. It
+  can't submit, recall, delete or publish a cell, nor set its recheck flag, change kind or public note: you submit
+  each draft for review in the admin, where you read it whole first. It adds a quote only once it matches the
+  source's text as the database matches it (from a PDF or a web page with its text; a quote from anything else is
+  attested by a person in the admin), and a change someone made to the cell meanwhile is refused, not overwritten.
+  You are recorded as the cell's contributor, as in the admin, and its quotes as the tool's (origin `mcp`).
+- **Never let your tool run `set_party_logo`, `propose_change` or a cell's writes without asking you**, so you see
+  each logo, change, rating, summary and quote before it goes.

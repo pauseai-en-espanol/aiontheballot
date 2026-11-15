@@ -3381,6 +3381,32 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   quoted by a published cell (in its draft and its revision) and checked by a draft cell, is in two cells, never
   three.
 
+- **R232. A member's tool drafts cells with them, one at a time.** With 12 parties and 10 criteria to rate for the
+  general election, Dani asked for "a way in which you review the criteria and i accept one by one and set in my
+  behalf": the tool reads a party's programme, proposes each cell's rating, summary and quotes, and enters what Dani
+  accepts; submitting and publishing stay Dani's, in the admin. A token now drafts cells (ADR-0008 amended): it starts
+  one, sets its draft's rating and summary, and adds and removes its quotes and the documents checked for "not
+  mentioned", and editing a published cell returns it to draft, as for anyone. The database still refuses it, by
+  trigger, taking a cell through review (submit, recall, reject; publishing was refused already), deleting one,
+  editing or attesting a quote, and the recheck flag, the report a draft answers, and a cell's change kind and public
+  note, set on an edit or as the cell is started; its member is recorded as the cell's contributor, so four-eyes
+  counts them, and its quotes as the MCP server's (origin `mcp`). The API opens the cell
+  routes that draft, and reading sources and their text, to tokens; every other cell route refuses one. The MCP server
+  has ten new tools (`list_cells`, `get_cell`, `list_sources`, `read_source`, `start_cell`, `save_cell_draft`,
+  `add_quote`, `remove_quote`, `add_checked_document`, `remove_checked_document`), each saying a write is only what
+  the member accepted. `read_source` searches a programme's text, or reads a few pages at a time, shown as the admin's
+  picker takes a passage (`asItReads`, now in `@aiontheballot/domain`), and `add_quote` adds a quote only once it
+  matches the source as the database will, and only from a PDF or a web page with its text, so a misquote never
+  reaches a draft; every write names the version read, so a change made in the admin meanwhile is refused, not
+  overwritten. Tests first: the database's (a token drafts a cell, its quotes and checks; it can't submit, recall,
+  delete, set a recheck, a report, a change kind or a public note, nor start a cell with one, nor edit or attest a
+  quote), the API's (the routes, and the refusals through them), and the tools' (what each sends, a quote refused
+  unmatched or from a source the database doesn't match, without a write, a source searched and read). An
+  adversarial review found the start of a cell open to a preset public note, quotes from sources the database
+  doesn't match, and the tool's quotes recorded as typed: all three fixed. The token tests now remove what they
+  commit, which broke files run after them once the new test made theirs the larger file (CI runs larger files
+  first). Mutation list cells-drafted-by-tokens.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

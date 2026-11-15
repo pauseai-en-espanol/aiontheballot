@@ -37,7 +37,8 @@
     "old": "      if (request.headers.authorization !== undefined) {\n        return undefined;\n      }\n      const found = await findSession(request);",
     "new": "      const found = await findSession(request);",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts tests/token-routes.spec.ts",
-    "cwd": "apps/api"
+    "cwd": "apps/api",
+    "equivalent": "Minting is one of the riskiest actions since R224 (PLAN D23): the step-up hook refuses a request carrying a token (403 notForTokens) before the route looks for a session, and a token's request carries no cookie, so none would be found anyway"
   },
   {
     "name": "minted without the admin's Origin",

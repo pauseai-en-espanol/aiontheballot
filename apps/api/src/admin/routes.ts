@@ -1342,10 +1342,11 @@ const CHANGE_APPLIED = recentSecondFactorIf('apply');
 const WRITES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
- * The routes a member's token reaches (ADR-0008, PLAN R203, R213), by method and pattern: reading the member's sites,
- * elections, parties and criteria, and drafting: creating an election (always a draft), creating, editing and ordering
- * its parties, their logos and its criteria, and proposing changes to a live one and withdrawing them. Every other
- * route refuses a token, whatever its member may do there; the database bounds what these write (needs_a_person).
+ * The routes a member's token reaches (ADR-0008, PLAN R203, R213, R232), by method and pattern: reading the member's
+ * sites, elections, parties, criteria, cells and sources, and drafting: creating an election (always a draft), creating,
+ * editing and ordering its parties, their logos and its criteria, proposing changes to a live one and withdrawing them,
+ * and drafting its cells. Every other route refuses a token, whatever its member may do there; the database bounds what
+ * these write (needs_a_person).
  */
 export const TOKEN_ROUTES: ReadonlySet<string> = new Set([
   'GET /api/tenants',
@@ -1368,6 +1369,18 @@ export const TOKEN_ROUTES: ReadonlySet<string> = new Set([
   'GET /api/t/:tenant/e/:election/changes',
   'POST /api/t/:tenant/e/:election/changes',
   'DELETE /api/t/:tenant/e/:election/changes/:id',
+  // Cells' drafts, each rating and text one a person accepted (PLAN R232): read, started, rated, quoted and checked,
+  // from the sources' text. Never submitted, recalled, rejected, published, deleted or attested by a token.
+  'GET /api/t/:tenant/e/:election/cells',
+  'GET /api/t/:tenant/e/:election/cells/:party/:criterion',
+  'POST /api/t/:tenant/e/:election/cells',
+  'PUT /api/t/:tenant/e/:election/cells/:id',
+  'POST /api/t/:tenant/e/:election/cells/:id/quotes',
+  'DELETE /api/t/:tenant/e/:election/cells/:id/quotes/:quote',
+  'POST /api/t/:tenant/e/:election/cells/:id/checked',
+  'DELETE /api/t/:tenant/e/:election/cells/:id/checked/:source',
+  'GET /api/t/:tenant/e/:election/sources',
+  'GET /api/t/:tenant/e/:election/sources/:id',
 ]);
 
 const tokenMayReach = (request: FastifyRequest): boolean =>

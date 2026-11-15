@@ -1,0 +1,252 @@
+[
+  {
+    "name": "migration: a token submits a cell",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "CREATE TRIGGER needs_a_person_to_review BEFORE UPDATE ON app.assessments\n  FOR EACH ROW WHEN (NEW.state IS DISTINCT FROM OLD.state AND NOT (OLD.state = 'published' AND NEW.state = 'draft'))\n  EXECUTE FUNCTION private.needs_a_person('take a cell through review');\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token recalls a cell from review",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "AND NOT (OLD.state = 'published' AND NEW.state = 'draft'))",
+    "new": "AND NOT (NEW.state = 'draft'))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token can't edit a published cell",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "NEW.state IS DISTINCT FROM OLD.state AND NOT (OLD.state = 'published' AND NEW.state = 'draft'))",
+    "new": "NEW.state IS DISTINCT FROM OLD.state)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token deletes a cell",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "CREATE TRIGGER needs_a_person BEFORE DELETE ON app.assessments\n  FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('delete a cell');\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token sets a recheck flag",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "FOR EACH ROW WHEN (NEW.recheck_reason IS DISTINCT FROM OLD.recheck_reason\n                     OR NEW.draft_report_id",
+    "new": "FOR EACH ROW WHEN (NEW.draft_report_id",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token says which report a cell answers",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "                     OR NEW.draft_report_id IS DISTINCT FROM OLD.draft_report_id\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token sets a cell's change kind",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "                     OR NEW.draft_change_kind IS DISTINCT FROM OLD.draft_change_kind\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token writes a cell's public note",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "\n                     OR NEW.draft_public_note IS DISTINCT FROM OLD.draft_public_note)",
+    "new": ")",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token's edits can't record its member as a contributor",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "BEFORE DELETE OR UPDATE ON app.assessment_contributors",
+    "new": "BEFORE INSERT OR DELETE OR UPDATE ON app.assessment_contributors",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token can't add a quote",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "CREATE TRIGGER needs_a_person BEFORE UPDATE ON app.draft_evidence",
+    "new": "CREATE TRIGGER needs_a_person BEFORE INSERT OR UPDATE ON app.draft_evidence",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token edits a quote",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "CREATE TRIGGER needs_a_person BEFORE UPDATE ON app.draft_evidence\n  FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('edit or attest a quote');\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token adds a quote attested against a screenshot",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "WHEN (NEW.attested_by IS NOT NULL OR NEW.attestation_file_id IS NOT NULL\n",
+    "new": "WHEN (NEW.attested_by IS NOT NULL\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token adds a quote from a model's suggestion",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "\n                     OR NEW.llm_suggestion_id IS NOT NULL)",
+    "new": ")",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token can't check a document",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "CREATE TRIGGER needs_a_person BEFORE UPDATE ON app.draft_checked_documents",
+    "new": "CREATE TRIGGER needs_a_person BEFORE INSERT OR UPDATE ON app.draft_checked_documents",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token starts a cell with its public note",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "OR NEW.draft_change_kind IS NOT NULL OR NEW.draft_public_note IS NOT NULL)",
+    "new": "OR NEW.draft_change_kind IS NOT NULL)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token starts a cell with its change kind",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "OR NEW.draft_change_kind IS NOT NULL OR NEW.draft_public_note IS NOT NULL)",
+    "new": "OR NEW.draft_public_note IS NOT NULL)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a token's quote recorded as typed by a person",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "      NEW.origin := 'mcp';\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a person's quote recorded as the tool's",
+    "file": "db/migrations/20261115223322_cells_drafted_by_tokens.sql",
+    "old": "    IF coalesce(current_setting('app.token_id', true), '') <> '' THEN\n      NEW.origin := 'mcp';",
+    "new": "    IF true THEN\n      NEW.origin := 'mcp';",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/member-tokens.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "api: a token can't save a cell's draft (R232)",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'PUT /api/t/:tenant/e/:election/cells/:id',\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: a token can't read a source's text (R232)",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'GET /api/t/:tenant/e/:election/sources/:id',\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: a token reaches a cell's submit (R232)",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'POST /api/t/:tenant/e/:election/cells/:id/quotes',\n",
+    "new": "  'POST /api/t/:tenant/e/:election/cells/:id/quotes',\n  'POST /api/t/:tenant/e/:election/cells/:id/submit',\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: a token reaches a cell's delete (R232)",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "  'PUT /api/t/:tenant/e/:election/cells/:id',\n",
+    "new": "  'PUT /api/t/:tenant/e/:election/cells/:id',\n  'DELETE /api/t/:tenant/e/:election/cells/:id',\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/token-routes.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "mcp: a draft's public note overwritten (R232)",
+    "file": "packages/mcp/src/cells.ts",
+    "old": "          publicNote: draft.publicNote,\n",
+    "new": "          publicNote: null,\n",
+    "cmd": "npx vitest run",
+    "cwd": "packages/mcp"
+  },
+  {
+    "name": "mcp: a draft saved at the version read now, not the one given (R232)",
+    "file": "packages/mcp/src/cells.ts",
+    "old": "          version: v,\n          rating,",
+    "new": "          version: draft.contentVersion,\n          rating,",
+    "cmd": "npx vitest run",
+    "cwd": "packages/mcp"
+  },
+  {
+    "name": "mcp: a quote added though it matches nothing (R232)",
+    "file": "packages/mcp/src/cells.ts",
+    "old": "        if (match.kind === 'unmatched') {\n          throw new ToolRefusal('unmatched', match);\n        }\n",
+    "new": "",
+    "cmd": "npx vitest run",
+    "cwd": "packages/mcp"
+  },
+  {
+    "name": "mcp: a cell shown with its people's names (R232)",
+    "file": "packages/mcp/src/cells.ts",
+    "old": "const { names: _names, you: _you, ...cell } =",
+    "new": "const { you: _you, ...cell } =",
+    "cmd": "npx vitest run",
+    "cwd": "packages/mcp"
+  },
+  {
+    "name": "mcp: a search that minds accents (R232)",
+    "file": "packages/mcp/src/source-text.ts",
+    "old": ".replaceAll(/\\p{M}/gu, '')",
+    "new": "",
+    "cmd": "npx vitest run",
+    "cwd": "packages/mcp"
+  },
+  {
+    "name": "mcp: a source searched as laid out, not as it reads (R232)",
+    "file": "packages/mcp/src/source-text.ts",
+    "old": "    const text = asItReads(unit.body).trim();\n    const haystack",
+    "new": "    const text = unit.body.trim();\n    const haystack",
+    "cmd": "npx vitest run",
+    "cwd": "packages/mcp"
+  },
+  {
+    "name": "mcp: a quote added from a source the database doesn't match (R232)",
+    "file": "packages/mcp/src/cells.ts",
+    "old": "        if (!MATCHED_KINDS.has(quoted.kind) || quoted.extractionStatus !== 'done') {",
+    "new": "        if (false) {",
+    "cmd": "npx vitest run",
+    "cwd": "packages/mcp"
+  }
+]

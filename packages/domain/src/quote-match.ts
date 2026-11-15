@@ -18,6 +18,18 @@ export const MIN_QUOTE_LENGTH = 15;
 /** The most characters a quote may have as stored. */
 export const MAX_QUOTE_LENGTH = 1000;
 
+/**
+ * A passage as it reads (PLAN R230): a word a line break split with a hyphen joined again, and every run of blanks, line
+ * breaks included, one space. These are two of the steps the match normalises with (normalizeForMatch), and the only
+ * ones taken, so a quote copied from it matches exactly what it was copied from; it is stored, and published, without
+ * the layout's line breaks and hyphens. A real hyphen at the end of a line goes too, as the match already drops it. The
+ * admin's quote picker takes a selection this way, and the MCP server shows a source's text this way (PLAN R232).
+ */
+export const asItReads = (text: string): string =>
+  text
+    .replace(/(\p{Alphabetic})-[^\P{White_Space}\n]*\n\p{White_Space}*(\p{Alphabetic})/gu, '$1$2')
+    .replace(/\p{White_Space}+/gu, ' ');
+
 /** One extracted unit of a source: a PDF's page or a web page's section. */
 export interface SourceUnit {
   index: number;

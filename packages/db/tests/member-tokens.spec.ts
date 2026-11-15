@@ -3,7 +3,15 @@ import { describe, expect, it } from 'vitest';
 
 import { errorCode, inRolledBackTransaction } from './db.js';
 import { superuserUrl } from './env.js';
-import { CELLS, CORE_CRITERION, ELECTIONS, TENANT_A, TENANT_B, USERS } from './rls/matrix.js';
+import {
+  CELLS,
+  CORE_CRITERION,
+  ELECTIONS,
+  LLM_RUNS,
+  TENANT_A,
+  TENANT_B,
+  USERS,
+} from './rls/matrix.js';
 
 const CHECK_VIOLATION = '23514';
 const RESTRICT_VIOLATION = '23001';
@@ -420,6 +428,15 @@ const asPerson = async <T>(client: pg.Client, fn: () => Promise<T>): Promise<T> 
   return result;
 };
 
+/** What `fn` does as the owner of the tables (RLS aside), as the member in the admin, then back in the admin role. */
+const asOwner = <T>(client: pg.Client, fn: () => Promise<T>): Promise<T> =>
+  asPerson(client, async () => {
+    await client.query('RESET ROLE');
+    const result = await fn();
+    await client.query('SET LOCAL ROLE aiontheballot_admin');
+    return result;
+  });
+
 /** The SQLSTATE and message `sql` failed with, or null. */
 const refusal = async (
   client: pg.Client,
@@ -455,6 +472,144 @@ const proposedByAPerson = (client: pg.Client): Promise<string> =>
 type Decision = readonly [string, string, string, (client: pg.Client) => Promise<string>];
 
 const PEOPLE_ONLY: readonly Decision[] = [
+  // A token drafts cells (PLAN R232): their review, deletion and these decisions stay a person's.
+  [
+    'submit a cell for review',
+    USERS.editorA,
+    'take a cell through review',
+    async () => `UPDATE app.assessments SET state = 'in_review' WHERE id = '${A.draft}'`,
+  ],
+  [
+    'recall a cell from review',
+    USERS.editorA,
+    'take a cell through review',
+    async () => `UPDATE app.assessments SET state = 'draft' WHERE id = '${A.review}'`,
+  ],
+  [
+    'delete a cell',
+    USERS.editorA,
+    'delete a cell',
+    async (client) => {
+      const cell = await asPerson(
+        client,
+        async () =>
+          (
+            await client.query<{ id: string }>(
+              `INSERT INTO app.assessments (tenant_id, election_id, party_id, criterion_id)
+               VALUES ($1, $2, $3, $4) RETURNING id`,
+              [TENANT_A, draft.id, draft.party, draft.criterion],
+            )
+          ).rows[0]!.id,
+      );
+      return `DELETE FROM app.assessments WHERE id = '${cell}'`;
+    },
+  ],
+  [
+    "set a cell's recheck flag",
+    USERS.editorA,
+    "decide a cell's recheck, report or change",
+    async () =>
+      `UPDATE app.assessments SET recheck_reason = 'Motivo de ejemplo' WHERE id = '${A.draft}'`,
+  ],
+  [
+    "write a cell's public note",
+    USERS.editorA,
+    "decide a cell's recheck, report or change",
+    async () =>
+      `UPDATE app.assessments SET draft_public_note = '{"es": "Nota pública de ejemplo"}' WHERE id = '${A.draft}'`,
+  ],
+  ...(
+    [
+      ['its public note', 'draft_public_note', NOTE],
+      ['its change kind', 'draft_change_kind', `'update'`],
+    ] as const
+  ).map(([what, column, value]): Decision => [
+    `start a cell with ${what} set`,
+    USERS.editorA,
+    "decide a cell's recheck, report or change",
+    async () =>
+      `INSERT INTO app.assessments (tenant_id, election_id, party_id, criterion_id, ${column})
+         VALUES ('${TENANT_A}', '${draft.id}', '${draft.party}', '${draft.criterion}', ${value})`,
+  ]),
+  [
+    "set a cell's change kind",
+    USERS.editorA,
+    "decide a cell's recheck, report or change",
+    async () => `UPDATE app.assessments SET draft_change_kind = 'update' WHERE id = '${A.draft}'`,
+  ],
+  [
+    'say which report a cell answers',
+    USERS.editorA,
+    "decide a cell's recheck, report or change",
+    async (client) => {
+      const report = await asOwner(
+        client,
+        async () =>
+          (
+            await client.query<{ id: string }>('SELECT id FROM app.reports WHERE tenant_id = $1', [
+              TENANT_A,
+            ])
+          ).rows[0]!.id,
+      );
+      return `UPDATE app.assessments SET draft_report_id = '${report}' WHERE id = '${A.draft}'`;
+    },
+  ],
+  [
+    'add a quote attested already, against a screenshot',
+    USERS.editorA,
+    'edit or attest a quote',
+    async (client) => {
+      // A scanned document, with no text, and a screenshot of it, as an editor would leave them.
+      const [source, shot] = await asOwner(client, async () => {
+        const file = async (type: string, bytes: string) =>
+          (
+            await client.query<{ id: string }>(
+              `INSERT INTO app.files (tenant_id, bucket, content_type, byte_size, sha256)
+               VALUES ($1, 'sources', $2, 4, encode(sha256(convert_to($3, 'UTF8')), 'hex')) RETURNING id`,
+              [TENANT_A, type, bytes],
+            )
+          ).rows[0]!.id;
+        const copy = await file('application/pdf', 'escaneo de ejemplo');
+        const scanned = (
+          await client.query<{ id: string }>(
+            `INSERT INTO app.source_documents (tenant_id, election_id, kind, title)
+             VALUES ($1, $2, 'pdf', 'Documento escaneado de ejemplo') RETURNING id`,
+            [TENANT_A, live.id],
+          )
+        ).rows[0]!.id;
+        await client.query(
+          `UPDATE app.source_documents SET file_id = $1, file_origin = 'uploaded' WHERE id = $2`,
+          [copy, scanned],
+        );
+        await client.query(
+          `UPDATE app.source_documents SET extraction_status = 'not_applicable' WHERE id = $1`,
+          [scanned],
+        );
+        return [scanned, await file('image/png', 'captura de ejemplo')];
+      });
+      return `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote,
+                                              attestation_file_id)
+              VALUES ('${TENANT_A}', '${live.id}', '${A.draft}', '${source}', 9, 'Una frase escaneada de ejemplo',
+                      '${shot}')`;
+    },
+  ],
+  [
+    "add a quote from a model's suggestion",
+    USERS.editorA,
+    'edit or attest a quote',
+    async () =>
+      `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote,
+                                       origin, llm_suggestion_id)
+       VALUES ('${TENANT_A}', '${live.id}', '${A.draft}', '${A.source.id}', 9, '${A.quote}', 'llm',
+               '${LLM_RUNS.A.suggestion}')`,
+  ],
+  [
+    'edit a quote',
+    USERS.editorA,
+    'edit or attest a quote',
+    async () =>
+      `UPDATE app.draft_evidence SET section_label = 'p. 9' WHERE id = '${A.draftEvidence}'`,
+  ],
   [
     'publish a cell',
     USERS.reviewerA,
@@ -474,7 +629,7 @@ const PEOPLE_ONLY: readonly Decision[] = [
   [
     'reject a cell in review',
     USERS.reviewerA,
-    'change assessments',
+    'take a cell through review',
     async (client) => {
       await asPerson(client, () =>
         client.query(
@@ -674,6 +829,11 @@ describe('what a token may never do, whatever its member may (private.needs_a_pe
         parties: 'BEFORE UPDATE',
         // Its criteria, in words a person approved, never deleting one or linking it to a core criterion (R213).
         criteria: 'BEFORE DELETE',
+        // Its cells' drafts, ratings and words a person approved, never their review, deletion or decisions (R232).
+        assessments: 'BEFORE DELETE',
+        assessment_contributors: 'BEFORE DELETE OR UPDATE',
+        draft_evidence: 'BEFORE UPDATE',
+        draft_checked_documents: 'BEFORE UPDATE',
       };
       for (const { table, guard } of rows) {
         if (table in drafting) {
@@ -691,7 +851,7 @@ describe('what a token may never do, whatever its member may (private.needs_a_pe
     });
   });
 
-  it('drafts: an election, its details, its parties and their logos, its criteria, and changes proposed to a live one', async () => {
+  it('drafts: an election, its details, its parties and their logos, its criteria, its cells, and changes proposed to a live one', async () => {
     await actingAs(USERS.countryAdminA, true, async (client) => {
       for (const statement of [
         `INSERT INTO app.elections (tenant_id, slug, type, name)
@@ -708,13 +868,48 @@ describe('what a token may never do, whatever its member may (private.needs_a_pe
         `INSERT INTO app.files (tenant_id, bucket, content_type, byte_size, sha256)
          VALUES ('${TENANT_A}', 'public_assets', 'image/png', 4,
                  encode(sha256(convert_to('logo de ejemplo', 'UTF8')), 'hex'))`,
+        // A cell's draft, a person accepting each rating and text (PLAN R232): started, rated, quoted and checked.
+        `INSERT INTO app.assessments (tenant_id, election_id, party_id, criterion_id)
+         VALUES ('${TENANT_A}', '${draft.id}', '${draft.party}', '${draft.criterion}')`,
+        `UPDATE app.assessments SET draft_rating = 'not_mentioned', draft_summary = '{"es": "Resumen de ejemplo"}'
+          WHERE id = '${A.draft}'`,
+        `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote)
+         VALUES ('${TENANT_A}', '${live.id}', '${A.draft}', '${A.source.id}', 9, '${A.quote}')`,
+        `DELETE FROM app.draft_evidence WHERE id = '${A.draftEvidence}'`,
+        `DELETE FROM app.draft_checked_documents WHERE assessment_id = '${A.draft}'`,
+        `INSERT INTO app.draft_checked_documents (assessment_id, tenant_id, election_id, source_document_id)
+         VALUES ('${A.draft}', '${TENANT_A}', '${live.id}', '${A.source.id}')`,
+        // A published cell's edit returns it to draft, as anyone's does: that is drafting too. A quote added to it
+        // does so with an update of its own, from the quote's trigger.
+        `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote)
+         VALUES ('${TENANT_A}', '${live.id}', '${A.published}', '${A.neutral.id}', 99, '${A.publishedQuote}')`,
+        `UPDATE app.assessments SET draft_summary = '{"es": "Otro resumen de ejemplo"}' WHERE id = '${A.published}'`,
       ]) {
         expect(await refusal(client, statement), statement).toBeNull();
       }
+      const { rows } = await client.query<{ state: string }>(
+        `SELECT state FROM app.assessments WHERE id = $1`,
+        [A.published],
+      );
+      expect(rows).toEqual([{ state: 'draft' }]);
       const proposed = (await client.query<{ id: string }>(proposal())).rows[0]!.id;
       expect(
         await refusal(client, `DELETE FROM app.change_requests WHERE id = '${proposed}'`),
       ).toBeNull();
+    });
+  });
+});
+
+describe("a token's quotes (PLAN R232)", () => {
+  it("are recorded as the MCP server's, a person's as typed, whatever either says", async () => {
+    const quote = (ordinal: number) =>
+      `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote, origin)
+       VALUES ('${TENANT_A}', '${live.id}', '${A.draft}', '${A.source.id}', ${ordinal}, '${A.quote}', 'manual')
+       RETURNING origin`;
+    await actingAs(USERS.editorA, true, async (client) => {
+      expect((await client.query<{ origin: string }>(quote(97))).rows).toEqual([{ origin: 'mcp' }]);
+      const typed = await asPerson(client, () => client.query<{ origin: string }>(quote(98)));
+      expect(typed.rows).toEqual([{ origin: 'manual' }]);
     });
   });
 });

@@ -1,99 +1,26 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import * as z from 'zod';
 
 import { type AdminClient, AdminError } from './admin-client.js';
+import { registerCellTools } from './cells.js';
+import {
+  election,
+  electionPath,
+  FACTS,
+  localized,
+  run,
+  segment,
+  site,
+  sitePath,
+  slug,
+} from './common.js';
 import { readLogo } from './logo.js';
 
-/** Why the admin refused, in words a tool can act on. */
-const REASONS: Readonly<Record<string, string>> = {
-  notForTokens:
-    'A token can’t do this: a person does it in the admin (publishing, approving, settings, members…).',
-  forbidden:
-    'The database refused it: a token drafts and never decides, and the member’s roles may not allow it either.',
-  changeControlled:
-    'The election is live: propose a change to it or its parties with propose_change, and a person approves it in ' +
-    'the admin; its criteria and methodology are a person’s to change there.',
-  notFound: 'No such site, election, party, criterion or change, or not one this member can open.',
-  taken: 'That short name (slug) is taken in this election.',
-  invalid: 'A value was refused: check the field named.',
-  stale:
-    'It changed meanwhile, or the election is live and changes only through an approved change: read it again, and ' +
-    'retry only if it is still a draft or in preview.',
-  limit: 'A limit was reached: wait and try again later.',
-};
-
-const FACTS = ' Only facts from official sources or the party’s own; never invent any.';
 /** Criteria are the chapter's words (CLAUDE.md): a tool carries them, never writes them (PLAN R213). */
 const CHAPTER_WORDS =
   ' Only the exact wording a person of the site gave and approved for it, in the languages they gave it in; ' +
   'never write, complete, reword or translate any.';
-
-const answer = (value: unknown): CallToolResult => ({
-  content: [{ type: 'text', text: JSON.stringify(value ?? { ok: true }, null, 2) }],
-});
-
-const refusal = (error: unknown): CallToolResult => {
-  if (error instanceof AdminError) {
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              status: error.status,
-              error: error.key ?? null,
-              ...(error.field === undefined ? {} : { field: error.field }),
-              reason:
-                (error.key !== undefined ? REASONS[error.key] : undefined) ??
-                (error.status === 401
-                  ? 'The token is unknown, expired or revoked: mint another in the admin.'
-                  : 'The admin refused it.'),
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-    };
-  }
-  return {
-    isError: true,
-    content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
-  };
-};
-
-const run = async (work: () => Promise<unknown>): Promise<CallToolResult> => {
-  try {
-    return answer(await work());
-  } catch (error) {
-    return refusal(error);
-  }
-};
-
-const segment = (value: string) => encodeURIComponent(value);
-const sitePath = (site: string) => `/api/t/${segment(site)}`;
-const electionPath = (site: string, election: string) => `${sitePath(site)}/e/${segment(election)}`;
-
-/** A short name, as sites and elections have them: nothing a path could take as more than one segment. */
-const SHORT_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const site = z.string().regex(SHORT_NAME).describe('The site’s short name, as list_sites gives it');
-const election = z
-  .string()
-  .regex(SHORT_NAME)
-  .describe('The election’s short name (slug), as list_elections gives it');
-const localized = (what: string) =>
-  z
-    .record(z.string(), z.string())
-    .describe(
-      `${what}, by language code, such as {"es": "…", "en": "…"}; the site's main language is needed`,
-    );
-const slug = z
-  .string()
-  .regex(SHORT_NAME)
-  .describe('A short name for addresses: lowercase letters, digits and hyphens');
 
 interface Party {
   id: string;
@@ -143,7 +70,10 @@ const partyFields = {
     ),
 };
 
-/** The tools, each a route a token may reach (ADR-0008): reading, and drafting an election's parties and criteria. */
+/**
+ * The tools, each a route a token may reach (ADR-0008): reading, and drafting an election's parties, its criteria and
+ * its cells (PLAN R232).
+ */
 export const registerTools = (
   server: McpServer,
   admin: AdminClient,
@@ -445,4 +375,6 @@ export const registerTools = (
     ({ site: s, election: e, change }) =>
       run(() => admin.send('DELETE', `${electionPath(s, e)}/changes/${segment(change)}`)),
   );
+
+  registerCellTools(server, admin);
 };

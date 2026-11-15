@@ -2,8 +2,10 @@
 
 - **Status:** Accepted (Dani, 2026-10-15: "i want to start now", choosing each recommendation below). Database part
   built in PLAN R202; the API and the admin page in R203; the MCP server in R204. **Amended 2026-10-30** (Dani, PLAN
-  D23): a token never reaches the riskiest actions, and minting one is one of them (the API, below).
-- **Date:** 2026-10-15; amended 2026-10-30
+  D23): a token never reaches the riskiest actions, and minting one is one of them (the API, below). **Amended
+  2026-11-15** (Dani, PLAN R232): a token drafts cells, each as its member accepted it, and never takes one through
+  review.
+- **Date:** 2026-10-15; amended 2026-10-30 and 2026-11-15
 - **Deciders:** Dani; drafted by Claude
 - **Relates to:** BRIEF §4 (four-eyes), §8 (least privilege); [ADR-0002](0002-tenancy-and-authorization.md) (§3 the
   actor, §6 definer functions, §9 MFA in the database, §12 change control); PLAN "Later: an MCP server for feeding
@@ -73,11 +75,23 @@ do, except what drafting needs:
 - the files their logos are (the public assets bucket only);
 - changes its member proposes to a live election and its parties, and withdrawing them (never approving or rejecting
   one, nor withdrawing someone else's, nor proposing one to its criteria or methodology, R213);
+- its cells' drafts (amended, PLAN R232, Dani's decision: "a way in which you review the criteria and i accept one by
+  one and set in my behalf"): starting a cell, setting its draft's rating and summary, and adding and removing its
+  quotes and the documents checked for "not mentioned", as an editor would, an edit of a published cell returning it
+  to draft as for anyone. Never taking one through review (submitting, recalling or rejecting it; publishing stays
+  refused by its revisions' tables), deleting one, editing or attesting a quote (an attestation is a second person's
+  confirmation), nor deciding its recheck flag, the report it answers, or its change kind and public note, which the
+  public reads in its history, whether on an edit or as the cell is started. Its member is recorded as a
+  contributor, as in the admin, so with four-eyes on they don't publish it, and its quotes as the MCP server's
+  (`origin = 'mcp'`, kept in the revision's provenance), not as typed by a person. A rating and its summary are a
+  judgement, and quotes are chosen: the tool is told to write only what its member accepted in the conversation, one
+  cell at a time, which the database can't tell from what a tool chose alone, so the member submits each draft for
+  review in the admin;
 - what the database writes itself for those (the audit log, the public cache).
 
 A table added later refuses it too, until a catalog test's list says otherwise, so widening what a tool may do is a
-decision taken on purpose: cells, sources and quotes, which a tool could draft well, are not open to it yet. A person
-reviews, decides and publishes, in the admin, as before.
+decision taken on purpose: sources and their copies, which a tool could add well, are not open to it yet (cells are
+since R232). A person reviews, decides and publishes, in the admin, as before.
 
 **The audit log names the token** (`audit_log.token_id`, R202): `private.audit`, the log's only writer, copies it
 from the request beside its member. Its id only: the name its member gave it stays in `auth`, where the admin reads
@@ -91,7 +105,8 @@ allowlist, with no new definer function or grant.
 - Such a request reaches only the routes marked for tokens, which the database's list above bounds: reading the
   member's sites, elections, parties and criteria; creating an election (always a draft), and creating, editing and
   ordering parties and criteria and setting the parties' logos where the election is edited directly (criteria since
-  R213); proposing a change to a live one and withdrawing it. Every other route refuses it
+  R213); proposing a change to a live one and withdrawing it; reading cells and sources, a source's text included,
+  and drafting cells (R232). Every other route refuses it
   (403), the token routes themselves included, so a token never mints, lists or revokes tokens.
 - It carries no cookie and is never sent one, so the Origin check that stops cross-site writes doesn't apply to it; a
   request carrying both a cookie and a token is refused.
@@ -104,7 +119,10 @@ allowlist, with no new definer function or grant.
   adding a passkey; and removing a passkey revokes its member's tokens, as a changed password does (PLAN D22).
 
 **The MCP server** (R204) runs on the member's machine, started by their AI tool, with the admin's address and the
-token in its environment. Its tools are the routes above, and it uploads logos from local files.
+token in its environment. Its tools are the routes above, and it uploads logos from local files. For cells (R232) it
+searches a source's text, a few passages or pages at a time, and adds a quote only once it matches the source as the
+database will match it (`@aiontheballot/domain/quote-match`), and only from a PDF or a web page with its text, the
+sources the database matches, so a tool's misquote never reaches a draft.
 
 ## Consequences
 
@@ -113,7 +131,9 @@ token in its environment. Its tools are the routes above, and it uploads logos f
 - **Accepted risk.** A token leaked from the member's machine acts as them, at aal2, for up to 30 days or until
   revoked, within the token routes and short of every decision above. That is more than a password alone gives
   (nothing, ADR-0002 §9), so a token is shown once, named, revocable at once in the admin, and listed with when it was
-  last used. Revisit when tools should draft more (cells, sources, quotes): each table opened is a decision.
+  last used. Revisit when tools should draft more (sources, their copies): each table opened is a decision, as cells
+  were (R232). A leaked token can now also fill drafts of cells with ratings and words no one accepted: none reaches
+  the public without a person submitting it in the admin, who reads it there.
 - **Trust, unchanged.** `app.token_id` is the API's word, as `app.user_id` and `app.aal` are (T23): a compromised API
   or an injection in an admin route could omit it, as it could impersonate anyone. A later step could have the
   database check a token's hash itself (a definer helper; this ADR and ADR-0002 would be amended).

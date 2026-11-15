@@ -2834,6 +2834,24 @@ CREATE FUNCTION private.purging_election() RETURNS boolean
 ALTER FUNCTION private.purging_election() OWNER TO aiontheballot_owner;
 
 --
+-- Name: quote_by_token(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.quote_by_token() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  BEGIN
+    IF coalesce(current_setting('app.token_id', true), '') <> '' THEN
+      NEW.origin := 'mcp';
+    END IF;
+    RETURN NEW;
+  END $$;
+
+
+ALTER FUNCTION private.quote_by_token() OWNER TO aiontheballot_owner;
+
+--
 -- Name: report_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -7071,7 +7089,7 @@ CREATE TRIGGER members_may_change BEFORE UPDATE ON app.tenants FOR EACH ROW EXEC
 -- Name: assessment_contributors needs_a_person; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.assessment_contributors FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change assessment_contributors');
+CREATE TRIGGER needs_a_person BEFORE DELETE OR UPDATE ON app.assessment_contributors FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change assessment_contributors');
 
 
 --
@@ -7085,7 +7103,7 @@ CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.assessmen
 -- Name: assessments needs_a_person; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.assessments FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change assessments');
+CREATE TRIGGER needs_a_person BEFORE DELETE ON app.assessments FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('delete a cell');
 
 
 --
@@ -7127,14 +7145,14 @@ CREATE TRIGGER needs_a_person BEFORE DELETE ON app.criteria FOR EACH ROW EXECUTE
 -- Name: draft_checked_documents needs_a_person; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.draft_checked_documents FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change draft_checked_documents');
+CREATE TRIGGER needs_a_person BEFORE UPDATE ON app.draft_checked_documents FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change draft_checked_documents');
 
 
 --
 -- Name: draft_evidence needs_a_person; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.draft_evidence FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change draft_evidence');
+CREATE TRIGGER needs_a_person BEFORE UPDATE ON app.draft_evidence FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('edit or attest a quote');
 
 
 --
@@ -7369,10 +7387,31 @@ CREATE TRIGGER needs_a_person_once_public BEFORE UPDATE ON app.elections FOR EAC
 
 
 --
+-- Name: draft_evidence needs_a_person_to_attest; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER needs_a_person_to_attest BEFORE INSERT ON app.draft_evidence FOR EACH ROW WHEN (((new.attested_by IS NOT NULL) OR (new.attestation_file_id IS NOT NULL) OR (new.llm_suggestion_id IS NOT NULL))) EXECUTE FUNCTION private.needs_a_person('edit or attest a quote');
+
+
+--
 -- Name: files needs_a_person_to_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER needs_a_person_to_change BEFORE DELETE OR UPDATE ON app.files FOR EACH ROW WHEN ((old.bucket <> 'public_assets'::app.file_bucket)) EXECUTE FUNCTION private.needs_a_person('store this file');
+
+
+--
+-- Name: assessments needs_a_person_to_decide; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER needs_a_person_to_decide BEFORE UPDATE ON app.assessments FOR EACH ROW WHEN (((new.recheck_reason IS DISTINCT FROM old.recheck_reason) OR (new.draft_report_id IS DISTINCT FROM old.draft_report_id) OR (new.draft_change_kind IS DISTINCT FROM old.draft_change_kind) OR ((new.draft_public_note)::jsonb IS DISTINCT FROM (old.draft_public_note)::jsonb))) EXECUTE FUNCTION private.needs_a_person('decide a cell''s recheck, report or change');
+
+
+--
+-- Name: assessments needs_a_person_to_decide_first; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER needs_a_person_to_decide_first BEFORE INSERT ON app.assessments FOR EACH ROW WHEN (((new.recheck_reason IS NOT NULL) OR (new.draft_report_id IS NOT NULL) OR (new.draft_change_kind IS NOT NULL) OR (new.draft_public_note IS NOT NULL))) EXECUTE FUNCTION private.needs_a_person('decide a cell''s recheck, report or change');
 
 
 --
@@ -7404,10 +7443,24 @@ CREATE TRIGGER needs_a_person_to_relink BEFORE UPDATE ON app.criteria FOR EACH R
 
 
 --
+-- Name: assessments needs_a_person_to_review; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER needs_a_person_to_review BEFORE UPDATE ON app.assessments FOR EACH ROW WHEN (((new.state IS DISTINCT FROM old.state) AND (NOT ((old.state = 'published'::app.assessment_state) AND (new.state = 'draft'::app.assessment_state))))) EXECUTE FUNCTION private.needs_a_person('take a cell through review');
+
+
+--
 -- Name: change_requests needs_a_person_to_withdraw; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
 CREATE TRIGGER needs_a_person_to_withdraw BEFORE DELETE ON app.change_requests FOR EACH ROW WHEN ((old.proposed_by IS DISTINCT FROM private.current_user_id())) EXECUTE FUNCTION private.needs_a_person('withdraw someone else''s change');
+
+
+--
+-- Name: draft_evidence origin; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER origin BEFORE INSERT ON app.draft_evidence FOR EACH ROW EXECUTE FUNCTION private.quote_by_token();
 
 
 --
@@ -10636,6 +10689,13 @@ REVOKE ALL ON FUNCTION private.purging(relation oid) FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.purging_election() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION quote_by_token(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.quote_by_token() FROM PUBLIC;
 
 
 --

@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { adminDataRoutes, TOKEN_ROUTES } from '../src/admin/routes.js';
-import { ELECTIONS_A, USERS } from './fixtures.js';
+import { ELECTIONS_A, TENANT_A, USERS } from './fixtures.js';
 import './db.js';
 
 const env = (name: string): string => {
@@ -69,6 +69,20 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app.close();
+  // What the token committed, which the audit log names it beside (the elections, parties, criteria and logos these
+  // create), goes again, so a file run after this one finds A's empty election empty, whatever order they run in.
+  const created = (table: string) => sql<{ id: string }>`
+    SELECT row_id::uuid AS id FROM app.audit_log
+     WHERE token_id = ${TOKEN_ID} AND table_name = ${table} AND action = 'insert'`;
+  await owner.transaction().execute(async (trx) => {
+    // One at a time: a transaction is one connection. Parties first, which name their logos.
+    for (const table of ['parties', 'criteria', 'elections', 'files']) {
+      const ids = (await created(table).execute(trx)).rows.map((r) => r.id);
+      await sql`DELETE FROM ${sql.table(`app.${table}`)} WHERE id = ANY (${ids}::uuid[])`.execute(
+        trx,
+      );
+    }
+  });
   await rm(root, { recursive: true, force: true });
   await Promise.all([admin.destroy(), owner.destroy()]);
 });
@@ -203,6 +217,130 @@ describe("a member's token, at the admin's routes (ADR-0008, PLAN R203)", () => 
       SELECT token_id FROM app.audit_log
        WHERE table_name = 'criteria' AND row_id = ${id} AND action = 'insert'`.execute(owner);
     expect(rows).toEqual([{ token_id: TOKEN_ID }]);
+  });
+
+  it('drafts a cell: starts it, rates it, quotes and checks its sources, but never decides it (PLAN R232)', async () => {
+    const draft = ELECTIONS_A.draft;
+    const [, PARTY] = draft.parties;
+    const [, CRITERION] = draft.criteria;
+    const cells = `/api/t/test-a/e/${draft.slug}/cells`;
+    // The party's programme, stored and with text, committed by the owner as an editor would leave it.
+    await sql`SELECT set_config('app.user_id', ${USERS.editorA}, false)`.execute(owner);
+    const file = (
+      await sql<{ id: string }>`
+        INSERT INTO app.files (tenant_id, bucket, content_type, byte_size, sha256, original_filename)
+        VALUES (${TENANT_A}, 'sources', 'application/pdf', 4,
+                encode(sha256(convert_to(${`programa de ejemplo ${randomUUID()}`}, 'UTF8')), 'hex'), 'programa.pdf')
+        RETURNING id`.execute(owner)
+    ).rows[0]?.id;
+    const source = (
+      await sql<{ id: string }>`
+        INSERT INTO app.source_documents (tenant_id, election_id, kind, title, party_id)
+        VALUES (${TENANT_A}, ${draft.id}, 'pdf', 'Programa de ejemplo de la herramienta', ${PARTY})
+        RETURNING id`.execute(owner)
+    ).rows[0]?.id;
+    await sql`UPDATE app.source_documents SET file_id = ${file}, file_origin = 'uploaded', extraction_status = 'done'
+               WHERE id = ${source}`.execute(owner);
+    let cell: string | undefined;
+    try {
+      const sources = await asTool('GET', `/api/t/test-a/e/${draft.slug}/sources`);
+      expect(sources.statusCode).toBe(200);
+      expect(
+        (await asTool('GET', `/api/t/test-a/e/${draft.slug}/sources/${source}`)).statusCode,
+      ).toBe(200);
+      const created = await asTool('POST', cells, { partyId: PARTY, criterionId: CRITERION });
+      expect(created.statusCode).toBe(201);
+      cell = created.json<{ id: string }>().id;
+      expect((await asTool('GET', cells)).statusCode).toBe(200);
+      const read = await asTool('GET', `${cells}/${PARTY}/${CRITERION}`);
+      expect(read.statusCode).toBe(200);
+      const fields = { changeKind: null, publicNote: null };
+      const saved = await asTool('PUT', `${cells}/${cell}`, {
+        version: read.json<{ draft: { contentVersion: number } }>().draft.contentVersion,
+        rating: 'meets',
+        summary: { es: 'Resumen de ejemplo de la herramienta' },
+        ...fields,
+      });
+      expect(saved.statusCode).toBe(200);
+      let { version } = saved.json<{ version: number }>();
+      const quoted = await asTool('POST', `${cells}/${cell}/quotes`, {
+        version,
+        sourceId: source,
+        quote: 'Una frase de ejemplo que la herramienta cita',
+        sectionLabel: 'p. 1',
+      });
+      expect(quoted.statusCode).toBe(201);
+      ({ version } = quoted.json<{ version: number }>());
+      const { rows: quotes } = await sql<{ id: string }>`
+        SELECT id FROM app.draft_evidence WHERE assessment_id = ${cell}`.execute(owner);
+      const unquoted = await asTool(
+        'DELETE',
+        `${cells}/${cell}/quotes/${quotes[0]?.id}?version=${version}`,
+      );
+      expect(unquoted.statusCode).toBe(200);
+      ({ version } = unquoted.json<{ version: number }>());
+      const unrated = await asTool('PUT', `${cells}/${cell}`, {
+        version,
+        rating: 'not_mentioned',
+        summary: { es: 'Resumen de ejemplo de la herramienta' },
+        ...fields,
+      });
+      expect(unrated.statusCode).toBe(200);
+      ({ version } = unrated.json<{ version: number }>());
+      const checked = await asTool('POST', `${cells}/${cell}/checked`, {
+        version,
+        sourceId: source,
+      });
+      expect(checked.statusCode).toBe(201);
+      ({ version } = checked.json<{ version: number }>());
+      const unchecked = await asTool(
+        'DELETE',
+        `${cells}/${cell}/checked/${source}?version=${version}`,
+      );
+      expect(unchecked.statusCode).toBe(200);
+      ({ version } = unchecked.json<{ version: number }>());
+      // A change kind or a public note is a person's decision, whatever the route: the database refuses it.
+      const decided = await asTool('PUT', `${cells}/${cell}`, {
+        version,
+        rating: 'not_mentioned',
+        summary: { es: 'Resumen de ejemplo de la herramienta' },
+        changeKind: null,
+        publicNote: { es: 'Nota pública de ejemplo' },
+      });
+      expect(decided.statusCode).toBe(403);
+      for (const [method, path, body] of [
+        ['POST', `${cells}/${cell}/submit`, { version }],
+        ['DELETE', `${cells}/${cell}/recheck`, undefined],
+        ['DELETE', `${cells}/${cell}?version=${version}`, undefined],
+      ] as const) {
+        const refused = await asTool(method, path, body);
+        expect([refused.statusCode, refused.json()], path).toEqual([
+          403,
+          { error: 'notForTokens' },
+        ]);
+      }
+      // Its member drafted it: they count as its contributor for four-eyes, and the history names the token.
+      const { rows: contributors } = await sql<{ user_id: string }>`
+        SELECT user_id FROM app.assessment_contributors WHERE assessment_id = ${cell}`.execute(
+        owner,
+      );
+      expect(contributors).toEqual([{ user_id: USERS.countryAdminA }]);
+      const { rows: history } = await sql<{ token_id: string | null }>`
+        SELECT token_id FROM app.audit_log
+         WHERE table_name = 'assessments' AND row_id = ${cell} AND action = 'insert'`.execute(
+        owner,
+      );
+      expect(history).toEqual([{ token_id: TOKEN_ID }]);
+      const { rows: states } = await sql<{ state: string }>`
+        SELECT state FROM app.assessments WHERE id = ${cell}`.execute(owner);
+      expect(states).toEqual([{ state: 'draft' }]);
+    } finally {
+      if (cell) {
+        await sql`DELETE FROM app.assessments WHERE id = ${cell}`.execute(owner);
+      }
+      await sql`DELETE FROM app.source_documents WHERE id = ${source}`.execute(owner);
+      await sql`DELETE FROM app.files WHERE id = ${file}`.execute(owner);
+    }
   });
 
   it('creates an election, always a draft', async () => {
