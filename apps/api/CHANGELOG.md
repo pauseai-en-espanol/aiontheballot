@@ -1,5 +1,20 @@
 # @aiontheballot/api
 
+## 0.36.0
+
+### Minor Changes
+
+- 4861bfe: A member's token may draft cells: start one, set its draft's rating and summary, and add and remove its quotes and
+  the documents checked for "not mentioned", never submitting, recalling, deleting or attesting anything, nor deciding
+  a cell's recheck flag, report, change kind or public note. The MCP server has tools to read a cell and search a
+  source's text, and to write each draft its member accepted, adding a quote only once it matches the source.
+
+### Patch Changes
+
+- Updated dependencies [4861bfe]
+  - @aiontheballot/domain@0.16.7
+  - @aiontheballot/db@0.18.6
+
 ## 0.35.3
 
 ### Patch Changes
