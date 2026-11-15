@@ -1,5 +1,12 @@
 # @aiontheballot/i18n
 
+## 0.34.1
+
+### Patch Changes
+
+- 8e8e265: A source says how many cells rest on it, each cell once, instead of adding up the quotes and checked documents of its
+  cells' drafts and published revisions, which counted each published cell twice.
+
 ## 0.34.0
 
 ### Minor Changes
