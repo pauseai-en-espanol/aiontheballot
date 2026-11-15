@@ -422,13 +422,17 @@ D12._
 
 1. Replacing a source is adding the right one, moving each quote to it (a content change of each cell, so it goes
    back through review), and deleting the old one. [DB: evidence rules; UI]
-2. A source is deleted only while nothing cites it; an uploaded file only while nothing references it. [DB: foreign
-   keys, `files` rules]
-3. An old version whose copy is stored can't be deleted (its text and job are kept for good), so once its newer
-   version is a source of its own, the old one is marked replaced, once, by an editor, country admin or platform
-   admin: it then takes no new quote or "No lo menciona" check, nor one moved to it, and is listed last; what cites it
-   stays, edited and published as before, marked as resting on a replaced source. [DB: source and evidence rules; UI]
-   _Built (PLAN D14, R172)._
+2. A source is deleted only while nothing rests on it (no quote or "No lo menciona" check, draft or published, and no
+   LLM run); an uploaded file only while nothing references it. A source whose copy is stored is deleted only while
+   its election is a draft or in preview, with its text, its job requests and its file (unless another row names it;
+   its bytes go with the sweep), by an editor, country admin or platform admin in person; never a party's only
+   programme source once its programme is published. [DB: `private.delete_source`, the text's guard, foreign keys,
+   `files` rules] _Built (PLAN R228)._
+3. Once its election is public, or once anything cites it, a source whose copy is stored can't be deleted (its text
+   and job are kept for good), so once its newer version is a source of its own, the old one is marked replaced,
+   once, by an editor, country admin or platform admin: it then takes no new quote or "No lo menciona" check, nor one
+   moved to it, and is listed last; what cites it stays, edited and published as before, marked as resting on a
+   replaced source. [DB: source and evidence rules; UI] _Built (PLAN D14, R172)._
 4. _Added (D20, PLAN R187):_ a published "No lo menciona" whose every checked document is since replaced says nothing
    about the newer version. The admin lists such cells on the election's overview and the party's page, and the cell
    editor warns about such a draft; it never refuses anything. [UI]

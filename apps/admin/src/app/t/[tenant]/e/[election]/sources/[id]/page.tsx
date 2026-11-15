@@ -38,7 +38,7 @@ export const generateMetadata = async ({ params }: Params): Promise<Metadata> =>
  * One source (editorial workflow §7): its fields, which change until its copy is stored, and then its description
  * while nothing rests on it and its election isn't public (S1.2, PLAN R226); its copy, uploaded here (S2.2) and
  * downloaded, never opened on the admin's origin (S6); its extraction (S3) and the text quotes are matched against,
- * members only (S6.2); and its deletion while it has no copy, so nothing cites it (S5.2).
+ * members only (S6.2); and its deletion while nothing rests on it (S5.2, PLAN R228).
  */
 const SourcePage = async ({ params }: Params) => {
   const { tenant: slug, election, id } = await params;
@@ -370,8 +370,8 @@ const SourcePage = async ({ params }: Params) => {
           />
         </section>
       ) : null}
-      {/* Once a copy is stored, its text and its job are kept for good (data model §3.4), so the source stays. */}
-      {canEdit && !source.copy && source.citations === 0 ? (
+      {/* While nothing rests on it, and once stored while its election isn't public, it goes with its copy and text. */}
+      {canEdit && source.deletable ? (
         // Last on the page, apart (admin forms §1.4).
         <FormSection id="source-delete" title={t('admin.sources.delete')} level={3} danger>
           <ConfirmButton
@@ -385,7 +385,13 @@ const SourcePage = async ({ params }: Params) => {
               confirm: t('admin.sources.delete'),
               cancel: t('admin.members.cancel'),
               done: t('admin.sources.deleted'),
-              errors: { ...writeErrors(t), linked: t('admin.sources.deleteCited') },
+              // Cited, public with its copy, or a published programme's only source (PLAN R228).
+              errors: {
+                ...writeErrors(t),
+                linked: t('admin.sources.deleteCited'),
+                stale: t('admin.sources.deleteCited'),
+                incomplete: t('admin.sources.deleteCited'),
+              },
             }}
           />
         </FormSection>

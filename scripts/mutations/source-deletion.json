@@ -1,0 +1,219 @@
+[
+  {
+    "name": "migration: a member's token deletes a source",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "    IF nullif(current_setting('app.token_id', true), '') IS NOT NULL\n       OR NOT",
+    "new": "    IF false\n       OR NOT",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts",
+    "equivalent": "needs_a_person on job_requests, source_texts and source_documents refuses a member's token the same way, with the same code, before anything is deleted"
+  },
+  {
+    "name": "migration: anyone deletes a source",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       OR NOT (tenant IN (SELECT private.my_tenants('country_admin', 'editor')) OR private.is_platform_admin()) THEN",
+    "new": "       OR false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a reviewer deletes a source",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "private.my_tenants('country_admin', 'editor')",
+    "new": "private.my_tenants('country_admin', 'editor', 'reviewer')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a source of another election is deleted",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "     WHERE s.tenant_id = tenant AND s.election_id = election AND s.id = source",
+    "new": "     WHERE s.id = source",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: delete_source deletes a source a draft quotes",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "    IF EXISTS (SELECT 1 FROM app.draft_evidence x WHERE x.source_document_id = source)",
+    "new": "    IF false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: delete_source deletes a source a published rating quotes",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       OR EXISTS (SELECT 1 FROM app.revision_evidence x WHERE x.source_document_id = source)",
+    "new": "       OR false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: delete_source deletes a source a draft checked",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       OR EXISTS (SELECT 1 FROM app.draft_checked_documents x WHERE x.source_document_id = source)",
+    "new": "       OR false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: delete_source deletes a source a published rating checked",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       OR EXISTS (SELECT 1 FROM app.revision_checked_documents x WHERE x.source_document_id = source)",
+    "new": "       OR false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: delete_source deletes a source a suggestion run read",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       OR EXISTS (SELECT 1 FROM app.llm_runs x WHERE x.source_document_id = source)",
+    "new": "       OR false",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a stored source of a public election is deleted",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       AND NOT EXISTS (SELECT 1 FROM app.elections e WHERE e.id = election AND e.status IN ('draft', 'preview')) THEN",
+    "new": "       AND false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a published programme's only source is deleted",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "    IF src.is_programme\n",
+    "new": "    IF false\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a published programme's only source counts as another",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "WHERE s.party_id = src.party_id AND s.is_programme AND s.id <> source) THEN",
+    "new": "WHERE s.party_id = src.party_id AND s.is_programme) THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a file another source names is deleted",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "         AND NOT EXISTS (SELECT 1 FROM app.source_documents s WHERE s.file_id = f.id)\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the flag stays set after the text is deleted",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "    PERFORM pg_catalog.set_config('app.delete_source', '', true);\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the text's guard takes the owner's rights without the flag",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "        IF OLD.source_document_id::text = current_setting('app.delete_source', true)\n           AND",
+    "new": "        IF true\n           AND",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the text's guard takes the flag for a source that can't go",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "           AND private.source_deletable(OLD.source_document_id) THEN",
+    "new": "           THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the guard deletes the text of a source a draft quotes",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "    SELECT NOT EXISTS (SELECT 1 FROM app.draft_evidence x WHERE x.source_document_id = source)",
+    "new": "    SELECT true",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the guard deletes the text of a source a published rating quotes",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       AND NOT EXISTS (SELECT 1 FROM app.revision_evidence x WHERE x.source_document_id = source)",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the guard deletes the text of a source a draft checked",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       AND NOT EXISTS (SELECT 1 FROM app.draft_checked_documents x WHERE x.source_document_id = source)",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the guard deletes the text of a source a published rating checked",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       AND NOT EXISTS (SELECT 1 FROM app.revision_checked_documents x WHERE x.source_document_id = source)",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the guard deletes the text of a source a suggestion run read",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "       AND NOT EXISTS (SELECT 1 FROM app.llm_runs x WHERE x.source_document_id = source)",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the guard deletes the text of a stored source of a public election",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "WHERE s.id = source AND (s.file_id IS NULL OR e.status IN ('draft', 'preview')))",
+    "new": "WHERE s.id = source)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: delete_source runs as the caller",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "  LANGUAGE plpgsql SECURITY DEFINER\n",
+    "new": "  LANGUAGE plpgsql\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the admin role can't delete a source",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
+    "old": "GRANT EXECUTE ON FUNCTION private.delete_source(tenant uuid, election uuid, source uuid) TO aiontheballot_admin;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/sources.spec.ts tests/catalog.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  }
+]

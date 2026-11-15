@@ -3329,6 +3329,23 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   source is added and its page is opening. E2e test first: the upload held back, a second press refused, one source
   listed (it failed on the old form).
 
+- **R228. A source nothing rests on can be deleted, its copy stored too, before its election is public.** R227's
+  double press left SALF's programme twice, both stored; R226 left them correctable but not removable. Dani:
+  "deletion is important". Migration `delete_unused_sources` adds `private.delete_source(tenant, election, source)`,
+  `SECURITY DEFINER`, executed by `aiontheballot_admin` (ADR-0002 §6 and §14 amended): an editor, country admin or
+  platform admin in person (no token) deletes a source no quote, "not mentioned" check or LLM run rests on, with a
+  stored copy only while its election is a draft or in preview, never a party's only programme source once its
+  programme is published; its job requests, its text, the source (audited as theirs) and its file unless another row
+  names it (bytes go with the sweep) go with it. The text's guard (`forbid_mutation`) lets that deletion through only
+  with the owner's rights, for the source a transaction-local flag names, while it may still be deleted
+  (`private.source_deletable`); the flag is cleared before the source goes. The API deletes through it (a source with
+  no copy too, as before, now with its finished job requests) and says whether a source can go (`deletable`); the
+  admin offers "Borrar fuente" then. Tests first: the function (stored and not, its file kept while named, every
+  refusal), the text's guard (the flag or the owner's rights alone, a cited source, a public election), the API and an
+  e2e deletion on B's draft; mutation list `source-deletion` breaks each rule, and the stale mutation of
+  `forbid_mutation` in `rls-review` now targets this migration (it survived since R212 redefined the function).
+  Specs: data model §3.4, editorial workflow S5.2.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

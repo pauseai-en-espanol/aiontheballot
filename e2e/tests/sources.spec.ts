@@ -115,7 +115,7 @@ test.describe('sources (editorial workflow §7)', () => {
     expect(await readFile(await download.path())).toEqual(bytes);
   });
 
-  test('keep their description open to correction, copy stored, while nothing cites them in a draft (PLAN R226)', async ({
+  test('stay correctable and deletable, copy stored, while nothing cites them in a draft (PLAN R226, R228)', async ({
     page,
   }) => {
     const { id } = await signedInAccount(page, created, 'Persona correctora de fuentes');
@@ -148,6 +148,15 @@ test.describe('sources (editorial workflow §7)', () => {
       page.getByRole('heading', { level: 2, name: `${title} (corregido)` }),
     ).toBeVisible();
     await expect(page.getByRole('link', { name: sources.copy.download })).toBeVisible();
+
+    // And, nothing resting on it, it can still go, with its copy and text (PLAN R228).
+    await page.getByRole('button', { name: sources.delete }).click();
+    const dialog = page.getByRole('alertdialog', { name: sources.deleteTitle });
+    await expect(dialog).toContainText(sources.deleteBody);
+    await dialog.getByRole('button', { name: sources.delete }).click();
+    await expect(page).toHaveURL(DRAFT_LIST);
+    await expect(page.locator('#page-announcer')).toHaveText(sources.deleted);
+    await expect(page.getByRole('link', { name: `${title} (corregido)` })).toHaveCount(0);
   });
 
   test('are added once, however many times "Save" is pressed while the copy goes up', async ({

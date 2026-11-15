@@ -149,13 +149,13 @@ names the token.
   `bump_public_version` (so no runtime role can write `public_versions`), `submit_report`, the signup list's
   `sign_up`, `confirm_signup` and `unsubscribe` (amended, PLAN R119, R122), the invitations' `pending_invitation` and
   `accept_invitation` (amended, PLAN R114), the publish trigger `publish_revision` and `anonymize_expired_reports`
-  (worker only), the sweep's `file_sweep_list` (amended, PLAN R117, R141), and `purge_election` (§14; amended, PLAN
-  R212). All of them set `search_path = ''`.
+  (worker only), the sweep's `file_sweep_list` (amended, PLAN R117, R141), `purge_election` (§14; amended, PLAN
+  R212) and `delete_source` (§14; amended, PLAN R228). All of them set `search_path = ''`.
 - The actor helpers (`private.current_user_id`, `private.current_aal`) and the policy helpers
   (`private.my_tenants`, `private.is_platform_admin`) are executable by `aiontheballot_admin`, whose policies and
   triggers call them.
 - `private.pending_invitation` and `private.accept_invitation` are executable by `aiontheballot_admin` only (§10), and
-  so is `private.purge_election` (§14).
+  so are `private.purge_election` and `private.delete_source` (§14).
 - `private.normalize_for_match` is executable by `aiontheballot_admin` (the match trigger) and
   `aiontheballot_worker` (the generated column on `source_texts`).
 - The worker may also execute `private.current_user_id`: it sets `app.user_id` to its job request's requester, so what
@@ -370,6 +370,20 @@ cell without a rating (_withdrawn_, distinct from _pending_) and logs a correcti
   - The trade-off, accepted: a platform admin, or a stolen platform-admin session with its second factor, can remove a
     published comparison and its corrections. The purge record keeps who, when, which election and how many rows of
     each kind; backups keep the rest for their retention.
+- A source nothing rests on goes with its text (amended, PLAN R228, Dani's decision): a programme uploaded twice, or
+  under the wrong party, otherwise stayed for good in an election nobody saw yet.
+  - `private.delete_source(tenant, election, source)`, `SECURITY DEFINER`, executed by `aiontheballot_admin`. It
+    refuses a member's token and anyone who doesn't write the site's sources (an editor or country admin with the
+    second factor, or a platform admin); a source a quote, a "not mentioned" check (draft or published) or an LLM
+    run rests on; one with a stored copy once its election is public; and a party's only programme source once its
+    programme is published. It deletes the source's job requests, its text, the source (audited as the caller's)
+    and its file when nothing else names it (bytes go with the sweep, ADR-0004).
+  - The text's guard lets the deletion through only with the owner's rights, for the source a transaction-local
+    `app.delete_source` flag names, and only while that source may still be deleted (`private.source_deletable`):
+    neither the flag nor the owner's rights alone exempt anything, and the function clears the flag before it
+    deletes the source.
+  - The trade-off, accepted: the text a quote could have been matched against can go, but only while nothing has
+    been matched against it and before the election is public.
 - Personal data is never copied into `audit_log`. A report's entries keep its non-personal columns (its kind, cell,
   status, triage and whether a party representative sent it), never its reporter's details or words; platform admins
   read them too, like every audit entry (PLAN R166: D17b, kept by Dani's decision).

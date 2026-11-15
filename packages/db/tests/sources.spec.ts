@@ -239,6 +239,260 @@ describe('a stored source nothing rests on, in an election not yet public (PLAN 
   });
 });
 
+describe('deleting a source, with its text, jobs and file (private.delete_source; PLAN R228)', () => {
+  const remove = (election: string, source: string) =>
+    `SELECT private.delete_source('${TENANT_A}', '${election}', '${source}') AS deleted`;
+  const as = async (client: pg.Client, user: string): Promise<void> => {
+    await client.query('SET LOCAL ROLE aiontheballot_admin');
+    await client.query(
+      `SELECT set_config('app.user_id', $1, true), set_config('app.aal', '2', true)`,
+      [user],
+    );
+  };
+  /** What is left of a source, read as the superuser. */
+  const left = async (client: pg.Client, source: string, file: string) =>
+    (
+      await client.query<{ sources: number; texts: number; jobs: number; files: number }>(
+        `SELECT (SELECT count(*)::int FROM app.source_documents WHERE id = $1) AS sources,
+                (SELECT count(*)::int FROM app.source_texts WHERE source_document_id = $1) AS texts,
+                (SELECT count(*)::int FROM app.job_requests WHERE source_document_id = $1) AS jobs,
+                (SELECT count(*)::int FROM app.files WHERE id = $2) AS files`,
+        [source, file],
+      )
+    ).rows[0];
+  const pending = SOURCES.pendingA.id;
+  const draft = ELECTIONS.draftA.id;
+  /** A page of a source's text, written past the triggers, as extraction would have. */
+  const page = (source: string): string =>
+    `INSERT INTO app.source_texts (source_document_id, tenant_id, unit_index, label, body)
+     VALUES ('${source}', '${TENANT_A}', 1, 'p. 1', 'Texto de ejemplo extraído')`;
+  /** Each kind of row that rests on the pending source, written past the triggers. */
+  const citing = [
+    `INSERT INTO app.draft_evidence (tenant_id, election_id, assessment_id, source_document_id, ordinal, quote,
+                                     created_by)
+     VALUES ('${TENANT_A}', '${draft}', '${CELLS.A.draft}', '${pending}', 9, 'Cita de ejemplo', '${USERS.editorA}')`,
+    `INSERT INTO app.draft_checked_documents (assessment_id, tenant_id, election_id, source_document_id, checked_by)
+     VALUES ('${CELLS.A.review}', '${TENANT_A}', '${draft}', '${pending}', '${USERS.editorA}')`,
+    `INSERT INTO app.revision_evidence (revision_id, tenant_id, election_id, ordinal, source_document_id, quote,
+                                        match_status)
+     VALUES ('${CELLS.A.published}', '${TENANT_A}', '${draft}', 9, '${pending}', 'Cita de ejemplo', 'matched')`,
+    `INSERT INTO app.revision_checked_documents (revision_id, tenant_id, election_id, source_document_id, checked_at)
+     VALUES ('${CELLS.A.published}', '${TENANT_A}', '${draft}', '${pending}', now())`,
+    `INSERT INTO app.llm_runs (tenant_id, election_id, source_document_id, model, prompt_version, requested_by)
+     VALUES ('${TENANT_A}', '${draft}', '${pending}', 'modelo-de-ejemplo', 'v1', '${USERS.editorA}')`,
+  ];
+
+  it('deletes a stored source nothing rests on, in an election not yet public, with its jobs and file', async () => {
+    await inRolledBackTransaction(async (client) => {
+      // Its text too: a page given past the triggers, as extraction would have.
+      await client.query('SET LOCAL session_replication_role = replica');
+      await client.query(
+        `INSERT INTO app.source_texts (source_document_id, tenant_id, unit_index, label, body)
+         VALUES ($1, $2, 1, 'p. 1', 'Texto de ejemplo extraído')`,
+        [pending, TENANT_A],
+      );
+      await client.query('SET LOCAL session_replication_role = origin');
+      await as(client, USERS.editorA);
+      expect((await client.query(remove(draft, pending))).rows).toEqual([{ deleted: true }]);
+      await client.query('RESET ROLE');
+      expect(await left(client, pending, FILES.awaitingA.id)).toEqual({
+        sources: 0,
+        texts: 0,
+        jobs: 0,
+        files: 0,
+      });
+      // In the audit, as the editor's.
+      const { rows } = await client.query(
+        `SELECT actor_id FROM app.audit_log WHERE table_name = 'source_documents' AND row_id = $1
+            AND diff -> 'new' IS NULL ORDER BY id DESC LIMIT 1`,
+        [pending],
+      );
+      expect(rows).toEqual([{ actor_id: USERS.editorA }]);
+      // Its flag cleared: nothing later in the transaction gets past the text's guard with it.
+      const { rows: flag } = await client.query(
+        `SELECT current_setting('app.delete_source', true) AS flag`,
+      );
+      expect(flag).toEqual([{ flag: '' }]);
+    });
+  });
+
+  it('keeps the file while another source names it', async () => {
+    await asEditorA(async (client) => {
+      await client.query(attach(FILES.awaitingA.id, SOURCES.draftA.id));
+      await client.query(remove(draft, pending));
+      await client.query('RESET ROLE');
+      expect((await left(client, pending, FILES.awaitingA.id))?.files).toBe(1);
+    });
+  });
+
+  it('deletes a source with no copy, in any election, its jobs with it', async () => {
+    await asEditorA(async (client) => {
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO app.source_documents (tenant_id, election_id, kind, title)
+         VALUES ($1, $2, 'web_page', 'Página de ejemplo') RETURNING id`,
+        [TENANT_A, ELECTIONS.liveA.id],
+      );
+      const fresh = rows[0]?.id ?? '';
+      expect((await client.query(remove(ELECTIONS.liveA.id, fresh))).rows).toEqual([
+        { deleted: true },
+      ]);
+      // The draft's own: an open fetch job and a finished one.
+      expect((await client.query(remove(draft, SOURCES.draftA.id))).rows).toEqual([
+        { deleted: true },
+      ]);
+      await client.query('RESET ROLE');
+      expect((await left(client, SOURCES.draftA.id, FILES.awaitingA.id))?.jobs).toBe(0);
+    });
+  });
+
+  it('answers false for a source not in that election', async () => {
+    expect(
+      await asEditorA(
+        async (client) => (await client.query(remove(ELECTIONS.liveA.id, pending))).rows,
+      ),
+    ).toEqual([{ deleted: false }]);
+  });
+
+  it('refuses a stored source once its election is public', async () => {
+    await asEditorA(async (client) => {
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO app.source_documents (tenant_id, election_id, kind, title)
+         VALUES ($1, $2, 'pdf', 'Documento de ejemplo') RETURNING id`,
+        [TENANT_A, ELECTIONS.liveA.id],
+      );
+      const stored = rows[0]?.id ?? '';
+      await client.query(attach(FILES.awaitingA.id, stored));
+      expect(await errorCode(client, remove(ELECTIONS.liveA.id, stored))).toBe(RESTRICT_VIOLATION);
+    });
+  });
+
+  it('refuses a source a quote, a "not mentioned" check or a suggestion run rests on', async () => {
+    // With a page of text, so the refusal is the function's own, before the text's guard and the foreign keys.
+    for (const sql of citing) {
+      expect(
+        await inRolledBackTransaction(async (client) => {
+          await client.query('SET LOCAL session_replication_role = replica');
+          await client.query(sql);
+          await client.query(page(pending));
+          await client.query('SET LOCAL session_replication_role = origin');
+          await as(client, USERS.editorA);
+          return errorCode(client, remove(draft, pending));
+        }),
+      ).toBe(FOREIGN_KEY_VIOLATION);
+    }
+  });
+
+  it("refuses those who don't write the site's sources, and members' tokens", async () => {
+    for (const user of [USERS.reviewerA, USERS.countryAdminB, USERS.noMembership]) {
+      expect(
+        await inRolledBackTransaction(async (client) => {
+          await as(client, user);
+          return errorCode(client, remove(draft, pending));
+        }),
+      ).toBe(INSUFFICIENT_PRIVILEGE);
+    }
+    expect(
+      await asEditorA(async (client) => {
+        await client.query(`SELECT set_config('app.token_id', gen_random_uuid()::text, true)`);
+        return errorCode(client, remove(draft, pending));
+      }),
+    ).toBe(INSUFFICIENT_PRIVILEGE);
+  });
+
+  it("refuses a published programme's only source", async () => {
+    await asEditorA(async (client) => {
+      await client.query(
+        `UPDATE app.source_documents SET party_id = $1, is_programme = true WHERE id = $2`,
+        [ELECTIONS.draftA.party, pending],
+      );
+      await client.query(`UPDATE app.parties SET programme_status = 'published' WHERE id = $1`, [
+        ELECTIONS.draftA.party,
+      ]);
+      expect(await errorCode(client, remove(draft, pending))).toBe(CHECK_VIOLATION);
+    });
+  });
+
+  it("lets no flag alone through the text's guard, nor the owner's rights alone", async () => {
+    /** Deletes the text of the source `setUp` names, with the owner's rights, with or without the flag naming it. */
+    const guarded = async (
+      flagged: boolean,
+      setUp: (client: pg.Client) => Promise<string>,
+    ): Promise<string | null> =>
+      inRolledBackTransaction(async (client) => {
+        await client.query('SET LOCAL session_replication_role = replica');
+        const source = await setUp(client);
+        await client.query('SET LOCAL session_replication_role = origin');
+        await client.query('SET LOCAL ROLE aiontheballot_owner');
+        if (flagged) {
+          await client.query(`SELECT set_config('app.delete_source', $1, true)`, [source]);
+        }
+        return errorCode(
+          client,
+          `DELETE FROM app.source_texts WHERE source_document_id = '${source}'`,
+        );
+      });
+    // The flag and the owner's rights, on a source that may go: through, as delete_source does it.
+    expect(
+      await guarded(true, async (client) => {
+        await client.query(page(pending));
+        return pending;
+      }),
+    ).toBeNull();
+    // The owner's rights without the flag: the same source keeps its text.
+    expect(
+      await guarded(false, async (client) => {
+        await client.query(page(pending));
+        return pending;
+      }),
+    ).toBe(RESTRICT_VIOLATION);
+    // The flag and the owner's rights, but something rests on the source.
+    for (const sql of citing) {
+      expect(
+        await guarded(true, async (client) => {
+          await client.query(page(pending));
+          await client.query(sql);
+          return pending;
+        }),
+      ).toBe(RESTRICT_VIOLATION);
+    }
+    // The flag and the owner's rights, but the source is stored in a public election.
+    expect(
+      await guarded(true, async (client) => {
+        const { rows } = await client.query<{ id: string }>(
+          `INSERT INTO app.source_documents (tenant_id, election_id, kind, title, file_id, file_origin, sha256,
+                                             retrieved_at, created_by)
+           SELECT tenant_id, '${ELECTIONS.liveA.id}', 'pdf', 'Documento de ejemplo', id, 'uploaded', sha256, now(),
+                  '${USERS.editorA}'
+             FROM app.files WHERE id = '${FILES.awaitingA.id}' RETURNING id`,
+        );
+        const stored = rows[0]?.id ?? '';
+        await client.query(page(stored));
+        return stored;
+      }),
+    ).toBe(RESTRICT_VIOLATION);
+    // The flag names a source a quote rests on: its text stays, whoever deletes it.
+    await asOwner(async (client) => {
+      await client.query(`SELECT set_config('app.delete_source', $1, true)`, [SOURCES.liveA.id]);
+      expect(
+        await errorCode(
+          client,
+          `DELETE FROM app.source_texts WHERE source_document_id = '${SOURCES.liveA.id}'`,
+        ),
+      ).toBe(RESTRICT_VIOLATION);
+    });
+    // The runtime role can't delete text at all, flag or not.
+    await asEditorA(async (client) => {
+      await client.query(`SELECT set_config('app.delete_source', $1, true)`, [pending]);
+      expect(
+        await errorCode(
+          client,
+          `DELETE FROM app.source_texts WHERE source_document_id = '${pending}'`,
+        ),
+      ).toBe(INSUFFICIENT_PRIVILEGE);
+    });
+  });
+});
+
 describe('the extraction status and the archive', () => {
   it('move one way: the status leaves pending once, and the archive is set once', async () => {
     await asOwner(async (client) => {

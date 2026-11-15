@@ -74,7 +74,7 @@
   },
   {
     "name": "migration: the owner's own purge is refused",
-    "file": "db/migrations/20261012175551_immutability_purge_from_owner_sessions.sql",
+    "file": "db/migrations/20261115183313_delete_unused_sources.sql",
     "old": "pg_catalog.pg_has_role(session_user, table_owner, 'MEMBER')",
     "new": "pg_catalog.pg_has_role(session_user, table_owner, 'MEMBER') AND false",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/helpers.spec.ts tests/purge.spec.ts",

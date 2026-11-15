@@ -578,9 +578,37 @@ describe('sources (editorial workflow S1, S2, S5, S6)', () => {
     }
   }, 30_000);
 
-  it('are deleted while nothing cites them', async () => {
-    const { id } = (await send('POST', base, USERS.editorA, FIELDS)).json<{ id: string }>();
-    expect((await send('DELETE', `${base}/${id}`, USERS.editorA)).statusCode).toBe(204);
-    expect((await send('DELETE', `${base}/${id}`, USERS.editorA)).statusCode).toBe(404);
+  it('are deleted while nothing cites them, stored ones too while the election is a draft (PLAN R228)', async () => {
+    const made: string[] = [];
+    try {
+      const { id } = (await send('POST', base, USERS.editorA, FIELDS)).json<{ id: string }>();
+      made.push(id);
+      expect((await send('DELETE', `${base}/${id}`, USERS.editorA)).statusCode).toBe(204);
+      expect((await send('DELETE', `${base}/${id}`, USERS.editorA)).statusCode).toBe(404);
+      // Stored, with its extraction requested: it goes with its job and its file.
+      const { id: stored } = (await send('POST', base, USERS.editorA, FIELDS)).json<{
+        id: string;
+      }>();
+      made.push(stored);
+      const bytes = Buffer.from(`%PDF-1.4 un documento que se borra ${crypto.randomUUID()}`);
+      await send('PUT', `${base}/${stored}/copy`, USERS.editorA, bytes, {
+        'content-type': 'application/pdf',
+      });
+      const [listed] = (await send('GET', base, USERS.editorA))
+        .json<{ sources: { id: string; deletable: boolean }[] }>()
+        .sources.filter((s) => s.id === stored);
+      expect(listed?.deletable).toBe(true);
+      expect((await send('DELETE', `${base}/${stored}`, USERS.reviewerA)).statusCode).toBe(403);
+      expect((await send('DELETE', `${base}/${stored}`, USERS.editorA)).statusCode).toBe(204);
+      const sha256 = createHash('sha256').update(bytes).digest('hex');
+      const { rows } = await sql<{ files: number; jobs: number }>`
+        SELECT (SELECT count(*)::int FROM app.files WHERE sha256 = ${sha256}) AS files,
+               (SELECT count(*)::int FROM app.job_requests WHERE source_document_id = ${stored}) AS jobs`.execute(
+        owner,
+      );
+      expect(rows).toEqual([{ files: 0, jobs: 0 }]);
+    } finally {
+      await cleanUp(made);
+    }
   });
 });

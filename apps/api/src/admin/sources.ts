@@ -35,6 +35,12 @@ export interface Source {
    * R226). The database decides; this says what it will allow.
    */
   editable: boolean;
+  /**
+   * Whether it can be deleted, with its text and file (S5.2, PLAN R228): nothing rests on it, its election isn't public
+   * once its copy is stored, and it isn't the only programme of a party whose programme is published. As
+   * private.delete_source decides it.
+   */
+  deletable: boolean;
   /** Whether an extraction job is waiting to be done. */
   extractionRequested: boolean;
   /** Whether an archive job is waiting for its snapshot (S4; ADR-0007 §4). */
@@ -99,6 +105,21 @@ export const listSources = async (
         AND NOT EXISTS (SELECT 1 FROM app.llm_runs x WHERE x.source_document_id = s.id)))`.as(
         'editable',
       ),
+      // As private.delete_source decides it (PLAN R228).
+      sql<boolean>`(
+        NOT EXISTS (SELECT 1 FROM app.draft_evidence x WHERE x.source_document_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM app.revision_evidence x WHERE x.source_document_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM app.draft_checked_documents x WHERE x.source_document_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM app.revision_checked_documents x WHERE x.source_document_id = s.id)
+        AND NOT EXISTS (SELECT 1 FROM app.llm_runs x WHERE x.source_document_id = s.id)
+        AND (s.file_id IS NULL
+             OR EXISTS (SELECT 1 FROM app.elections e WHERE e.id = s.election_id AND e.status IN ('draft', 'preview')))
+        AND NOT (s.is_programme
+                 AND EXISTS (SELECT 1 FROM app.parties p WHERE p.id = s.party_id AND p.programme_status = 'published')
+                 AND NOT EXISTS (SELECT 1 FROM app.source_documents o
+                                  WHERE o.party_id = s.party_id AND o.is_programme AND o.id <> s.id)))`.as(
+        'deletable',
+      ),
       sql<boolean>`EXISTS (SELECT 1 FROM app.job_requests j
                             WHERE j.source_document_id = s.id AND j.kind = 'extract_source'
                               AND j.finished_at IS NULL)`.as('extraction_requested'),
@@ -138,6 +159,7 @@ export const listSources = async (
     units: r.units,
     citations: r.citations,
     editable: r.editable,
+    deletable: r.deletable,
     extractionRequested: r.extraction_requested,
     archiveRequested: r.archive_requested,
     // A replaced one takes no new quote or check (PLAN D14).
@@ -227,19 +249,24 @@ export const markReplaced = async (
   return updated.numUpdatedRows > 0n ? 'marked' : 'forbidden';
 };
 
-/** Deletes a source nothing cites (S5.2); the foreign keys refuse one that is cited. */
+/**
+ * Deletes a source nothing rests on, with its text, job requests and file, through private.delete_source (S5.2, PLAN
+ * R228): one with a stored copy only while its election isn't public. False if the election has no such source; the
+ * database refuses the rest (cited: 23503, public: 23001, a published programme's only source: 23514, anyone who
+ * doesn't write sources or a member's token: 42501).
+ */
 export const deleteSource = async (
   trx: Transaction<DB>,
+  tenantId: string,
   electionId: string,
   id: string,
-): Promise<boolean> =>
-  (
-    await trx
-      .deleteFrom('app.source_documents')
-      .where('election_id', '=', electionId)
-      .where('id', '=', id)
-      .executeTakeFirst()
-  ).numDeletedRows > 0n;
+): Promise<boolean> => {
+  const { rows } = await sql<{ deleted: boolean }>`
+    SELECT private.delete_source(${tenantId}::uuid, ${electionId}::uuid, ${id}::uuid) AS deleted`.execute(
+    trx,
+  );
+  return rows[0]?.deleted === true;
+};
 
 /** The source with its copy's place in the file store, for the API to serve its bytes (S6.1). */
 export const sourceCopy = async (

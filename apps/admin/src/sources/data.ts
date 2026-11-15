@@ -31,6 +31,11 @@ export interface Source {
    * party and programme mark, while its election isn't public and nothing rests on it (PLAN R226).
    */
   editable: boolean;
+  /**
+   * Whether it can be deleted, with its copy and text (S5.2, PLAN R228): nothing rests on it, its election isn't public
+   * once its copy is stored, and it isn't the only programme of a party whose programme is published.
+   */
+  deletable: boolean;
   extractionRequested: boolean;
   /** Whether a snapshot of its URL has been asked for and is still awaited (S4). */
   archiveRequested?: boolean;

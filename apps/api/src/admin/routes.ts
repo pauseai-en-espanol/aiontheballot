@@ -3204,15 +3204,16 @@ export const adminDataRoutes =
         }),
     );
 
-    // Deletes a source nothing cites (S5.2).
+    // Deletes a source nothing rests on, with its text, jobs and file; a stored one while its election isn't public
+    // (S5.2, PLAN R228).
     scope.delete<{ Params: { tenant: string; election: string; id: string } }>(
       '/t/:tenant/e/:election/sources/:id',
       { schema: { params: ELECTION_ID_PARAMS } },
       async (request, reply) =>
         signedIn(request, reply, async (db, actor) => {
           await withActor(db, actor, async (trx) => {
-            const { election } = await electionFor(trx, actor, request.params);
-            if (!(await deleteSource(trx, election.id, request.params.id))) {
+            const { access, election } = await electionFor(trx, actor, request.params);
+            if (!(await deleteSource(trx, access.tenantId, election.id, request.params.id))) {
               throw new Refusal(404, 'notFound');
             }
           });

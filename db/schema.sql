@@ -1423,6 +1423,70 @@ CREATE FUNCTION private.delete_expired_signups() RETURNS void
 ALTER FUNCTION private.delete_expired_signups() OWNER TO aiontheballot_owner;
 
 --
+-- Name: delete_source(uuid, uuid, uuid); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.delete_source(tenant uuid, election uuid, source uuid) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    src record;
+  BEGIN
+    IF nullif(current_setting('app.token_id', true), '') IS NOT NULL
+       OR NOT (tenant IN (SELECT private.my_tenants('country_admin', 'editor')) OR private.is_platform_admin()) THEN
+      RAISE EXCEPTION 'deleting a source needs an editor or country admin of its site, in person'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    SELECT s.file_id, s.party_id, s.is_programme INTO src FROM app.source_documents s
+     WHERE s.tenant_id = tenant AND s.election_id = election AND s.id = source
+       FOR UPDATE;
+    IF NOT FOUND THEN
+      RETURN false;
+    END IF;
+    IF EXISTS (SELECT 1 FROM app.draft_evidence x WHERE x.source_document_id = source)
+       OR EXISTS (SELECT 1 FROM app.revision_evidence x WHERE x.source_document_id = source)
+       OR EXISTS (SELECT 1 FROM app.draft_checked_documents x WHERE x.source_document_id = source)
+       OR EXISTS (SELECT 1 FROM app.revision_checked_documents x WHERE x.source_document_id = source)
+       OR EXISTS (SELECT 1 FROM app.llm_runs x WHERE x.source_document_id = source) THEN
+      RAISE EXCEPTION 'source % is cited, so it stays: replace it instead', source
+        USING ERRCODE = 'foreign_key_violation';
+    END IF;
+    IF src.file_id IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM app.elections e WHERE e.id = election AND e.status IN ('draft', 'preview')) THEN
+      RAISE EXCEPTION 'source % has a stored copy and its election is public, so it stays: replace it instead', source
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF src.is_programme
+       AND EXISTS (SELECT 1 FROM app.parties p WHERE p.id = src.party_id AND p.programme_status = 'published')
+       AND NOT EXISTS (SELECT 1 FROM app.source_documents s
+                        WHERE s.party_id = src.party_id AND s.is_programme AND s.id <> source) THEN
+      RAISE EXCEPTION 'party %: its published programme needs a source marked as its programme: mark another first',
+        src.party_id USING ERRCODE = 'check_violation';
+    END IF;
+
+    DELETE FROM app.job_requests j WHERE j.source_document_id = source;
+    PERFORM pg_catalog.set_config('app.delete_source', source::text, true);
+    DELETE FROM app.source_texts t WHERE t.source_document_id = source;
+    PERFORM pg_catalog.set_config('app.delete_source', '', true);
+    DELETE FROM app.source_documents s WHERE s.id = source;
+    -- Its file, unless another row names it; its bytes go with the sweep (ADR-0004).
+    IF src.file_id IS NOT NULL THEN
+      DELETE FROM app.files f
+       WHERE f.id = src.file_id
+         AND NOT EXISTS (SELECT 1 FROM app.source_documents s WHERE s.file_id = f.id)
+         AND NOT EXISTS (SELECT 1 FROM app.parties p WHERE p.logo_file_id = f.id)
+         AND NOT EXISTS (SELECT 1 FROM app.draft_evidence d WHERE d.attestation_file_id = f.id)
+         AND NOT EXISTS (SELECT 1 FROM app.tenant_brand_selections b WHERE b.file_id = f.id);
+    END IF;
+    RETURN true;
+  END
+  $$;
+
+
+ALTER FUNCTION private.delete_source(tenant uuid, election uuid, source uuid) OWNER TO aiontheballot_owner;
+
+--
 -- Name: draft_report_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -1751,6 +1815,14 @@ CREATE FUNCTION private.forbid_mutation() RETURNS trigger
           RETURN coalesce(NEW, OLD);
         END IF;
         RETURN NULL;
+      END IF;
+      -- A source's text goes with the source (private.delete_source): only the text of the source the flag names,
+      -- and only while that source may be deleted.
+      IF TG_TABLE_NAME = 'source_texts' AND TG_OP = 'DELETE' THEN
+        IF OLD.source_document_id::text = current_setting('app.delete_source', true)
+           AND private.source_deletable(OLD.source_document_id) THEN
+          RETURN OLD;
+        END IF;
       END IF;
     END IF;
     RAISE EXCEPTION '%.% is immutable: % is not allowed', TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP
@@ -3073,6 +3145,26 @@ CREATE FUNCTION private.signup_rules() RETURNS trigger
 
 
 ALTER FUNCTION private.signup_rules() OWNER TO aiontheballot_owner;
+
+--
+-- Name: source_deletable(uuid); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.source_deletable(source uuid) RETURNS boolean
+    LANGUAGE sql STABLE
+    SET search_path TO ''
+    AS $$
+    SELECT NOT EXISTS (SELECT 1 FROM app.draft_evidence x WHERE x.source_document_id = source)
+       AND NOT EXISTS (SELECT 1 FROM app.revision_evidence x WHERE x.source_document_id = source)
+       AND NOT EXISTS (SELECT 1 FROM app.draft_checked_documents x WHERE x.source_document_id = source)
+       AND NOT EXISTS (SELECT 1 FROM app.revision_checked_documents x WHERE x.source_document_id = source)
+       AND NOT EXISTS (SELECT 1 FROM app.llm_runs x WHERE x.source_document_id = source)
+       AND EXISTS (SELECT 1 FROM app.source_documents s JOIN app.elections e ON e.id = s.election_id
+                    WHERE s.id = source AND (s.file_id IS NULL OR e.status IN ('draft', 'preview')))
+  $$;
+
+
+ALTER FUNCTION private.source_deletable(source uuid) OWNER TO aiontheballot_owner;
 
 --
 -- Name: source_document_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
@@ -10329,6 +10421,14 @@ REVOKE ALL ON FUNCTION private.delete_expired_signups() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION delete_source(tenant uuid, election uuid, source uuid); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.delete_source(tenant uuid, election uuid, source uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION private.delete_source(tenant uuid, election uuid, source uuid) TO aiontheballot_admin;
+
+
+--
 -- Name: FUNCTION draft_report_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -10606,6 +10706,13 @@ REVOKE ALL ON FUNCTION private.signup_mailbox(address text) FROM PUBLIC;
 --
 
 REVOKE ALL ON FUNCTION private.signup_rules() FROM PUBLIC;
+
+
+--
+-- Name: FUNCTION source_deletable(source uuid); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.source_deletable(source uuid) FROM PUBLIC;
 
 
 --
