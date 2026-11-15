@@ -1,5 +1,18 @@
 # @aiontheballot/admin
 
+## 0.36.0
+
+### Minor Changes
+
+- 04cfb8a: The cell editor shows the evidence the chosen rating needs before it is saved: quotes, or the documents checked for
+  "not mentioned", with the party's programme chosen already, and a warning for evidence the rating doesn't take. A
+  quote picked from a source's text is stored as it reads, without the layout's line breaks and hyphenated splits.
+
+### Patch Changes
+
+- Updated dependencies [04cfb8a]
+  - @aiontheballot/i18n@0.34.0
+
 ## 0.35.1
 
 ### Patch Changes
