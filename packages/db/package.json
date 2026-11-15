@@ -20,7 +20,7 @@
     "test:db": "vitest --run --config vitest.db.config.ts"
   },
   "dependencies": {
-    "kysely": "0.29.8",
+    "kysely": "0.29.9",
     "pg": "8.23.1"
   },
   "devDependencies": {
@@ -33,10 +33,10 @@
     "@types/pg": "8.23.1",
     "@vitest/coverage-v8": "5.1.0",
     "@vitest/ui": "5.1.0",
-    "dbmate": "2.37.0",
+    "dbmate": "2.38.1",
     "kysely-codegen": "0.20.0",
-    "oxlint": "1.92.0",
-    "oxlint-tsgolint": "7.0.2006",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2007",
     "typescript": "7.0.2",
     "vitest": "5.1.0"
   }
