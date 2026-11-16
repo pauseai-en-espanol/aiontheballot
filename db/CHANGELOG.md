@@ -1,5 +1,12 @@
 # @aiontheballot/migrations
 
+## 0.32.0
+
+### Minor Changes
+
+- 3425985: Until an election is public, a published cell's changes need no change kind or public note: they are published as
+  updates, and the cell editor stops asking for both until the election goes live, when every change needs them again.
+
 ## 0.31.0
 
 ### Minor Changes

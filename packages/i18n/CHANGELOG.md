@@ -1,5 +1,12 @@
 # @aiontheballot/i18n
 
+## 0.34.2
+
+### Patch Changes
+
+- 3425985: Until an election is public, a published cell's changes need no change kind or public note: they are published as
+  updates, and the cell editor stops asking for both until the election goes live, when every change needs them again.
+
 ## 0.34.1
 
 ### Patch Changes
