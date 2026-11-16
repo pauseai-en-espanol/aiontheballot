@@ -60,6 +60,29 @@ describe('createAdminClient', () => {
     expect(init.redirect).toBe('error');
   });
 
+  it('says a body is JSON only when it sends one: a DELETE without one is never refused as empty JSON', async () => {
+    recorded.length = 0;
+    const admin = createAdminClient(
+      { origin: 'https://admin.example.org', token: TOKEN },
+      fake(200, { version: 2 }),
+    );
+    await admin.send('DELETE', '/api/x/1?version=1');
+    await admin.send('PUT', '/api/x/1', { version: 1 });
+    const [deleted, put] = [recorded[0]!, recorded[1]!];
+    expect([deleted.init.headers, deleted.init.body]).toEqual([
+      { authorization: `Bearer ${TOKEN}`, accept: 'application/json' },
+      undefined,
+    ]);
+    expect([put.init.headers, put.init.body]).toEqual([
+      {
+        authorization: `Bearer ${TOKEN}`,
+        accept: 'application/json',
+        'content-type': 'application/json',
+      },
+      '{"version":1}',
+    ]);
+  });
+
   it('turns a refusal into an error with the API’s key and field', async () => {
     const admin = createAdminClient(
       { origin: 'https://admin.example.org', token: TOKEN },

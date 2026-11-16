@@ -95,8 +95,11 @@ export const createAdminClient = (
   };
   return {
     get: (path) => call('GET', path),
+    // A JSON type only with a body: the API refuses an empty one said to be JSON (a DELETE has none).
     send: (method, path, body) =>
-      call(method, path, body === undefined ? undefined : JSON.stringify(body), 'application/json'),
+      body === undefined
+        ? call(method, path)
+        : call(method, path, JSON.stringify(body), 'application/json'),
     upload: (path, bytes, contentType) => call('PUT', path, bytes, contentType),
   };
 };
