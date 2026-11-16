@@ -9,7 +9,12 @@ import { AttestationUpload } from '@/cells/AttestationUpload';
 import { CellAction } from '@/cells/CellAction';
 import { CellForm } from '@/cells/CellForm';
 import { CheckedForm } from '@/cells/CheckedForm';
-import { attestationLapses, checkedOnlyReplaced, submitChecklist } from '@/cells/checklist';
+import {
+  attestationLapses,
+  changesLogged,
+  checkedOnlyReplaced,
+  submitChecklist,
+} from '@/cells/checklist';
 import { formatClipTime } from '@/cells/clip-time';
 import { ClipForm } from '@/cells/ClipForm';
 import { cellsPath, getCell, type Rating } from '@/cells/data';
@@ -301,6 +306,7 @@ const CellPage = async ({ params }: CellParams) => {
                       }}
                       locales={localeOptions(tenant, locale)}
                       afterFirstPublish={cell.revisions.length > 0}
+                      changeLogged={cell.revisions.length > 0 && changesLogged(cell.electionStatus)}
                       reports={reportOptions}
                       text={{
                         rating: t('admin.cells.rating'),
@@ -316,11 +322,8 @@ const CellPage = async ({ params }: CellParams) => {
                           withdrawal: t('admin.cells.changeKinds.withdrawal'),
                         },
                         publicNote: t('admin.cells.publicNote'),
-                        // In preview, the note is never published (PLAN R181).
-                        publicNoteHint:
-                          cell.electionStatus === 'preview'
-                            ? t('admin.cells.publicNoteHintPreview')
-                            : t('admin.cells.publicNoteHint'),
+                        publicNoteHint: t('admin.cells.publicNoteHint'),
+                        changeNotLoggedYet: t('admin.cells.changeNotLoggedYet'),
                         report: t('admin.cells.report'),
                         reportHint: t('admin.cells.reportHint'),
                         noReport: t('admin.cells.noReport'),

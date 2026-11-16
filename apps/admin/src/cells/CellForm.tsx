@@ -29,6 +29,8 @@ export interface CellFormText {
   changeKinds: Record<Exclude<ChangeKind, 'initial'>, string>;
   publicNote: string;
   publicNoteHint: string;
+  /** Why a change asks for neither, while the election isn't public yet (PLAN R233). */
+  changeNotLoggedYet: string;
   report: string;
   reportHint: string;
   noReport: string;
@@ -68,6 +70,7 @@ export const CellForm = ({
   values,
   locales,
   afterFirstPublish,
+  changeLogged,
   reports,
   text,
 }: {
@@ -89,8 +92,13 @@ export const CellForm = ({
   reports: { id: string; label: string }[];
   /** The site's languages, its main one first and needed to submit. */
   locales: LocaleOption[];
-  /** Whether it was published before, so a change needs a kind and a public note. */
+  /** Whether it was published before, so a change may answer a report. */
   afterFirstPublish: boolean;
+  /**
+   * Whether a change needs a kind and a public note: it was published before and the public sees its election
+   * (PLAN R233). Until then, a change is an update with no note.
+   */
+  changeLogged: boolean;
   text: CellFormText;
 }) => {
   const { error, status, statusLine, run, setError } = useWrite();
@@ -133,8 +141,8 @@ export const CellForm = ({
       version: loaded,
       rating: rating === '' ? null : rating,
       summary: localizedFromForm(form, 'summary', locales),
-      changeKind: afterFirstPublish && changeKind !== '' ? changeKind : null,
-      publicNote: afterFirstPublish ? localizedFromForm(form, 'publicNote', locales) : null,
+      changeKind: changeLogged && changeKind !== '' ? changeKind : null,
+      publicNote: changeLogged ? localizedFromForm(form, 'publicNote', locales) : null,
       // Sent only when changed: a form that doesn't offer it, or shows it as it was, leaves the link as it is.
       ...(offersReports && formText(form, 'reportId') !== (values.reportId ?? '')
         ? { reportId: formText(form, 'reportId') || null }
@@ -233,7 +241,10 @@ export const CellForm = ({
         requiredLabel={text.needed}
         error={problems.summary}
       />
-      {afterFirstPublish ? (
+      {afterFirstPublish && !changeLogged ? (
+        <p className={styles.hint}>{text.changeNotLoggedYet}</p>
+      ) : null}
+      {changeLogged ? (
         <>
           <fieldset className={styles.fieldset} aria-describedby="cell-change-kind-hint">
             <legend className={styles.label}>{text.changeKind}</legend>
@@ -267,6 +278,10 @@ export const CellForm = ({
             requiredLabel={text.needed}
             error={problems.publicNote}
           />
+        </>
+      ) : null}
+      {afterFirstPublish ? (
+        <>
           {reports.length > 0 ? (
             <div className={styles.field}>
               <label className={styles.label} htmlFor="cell-report">

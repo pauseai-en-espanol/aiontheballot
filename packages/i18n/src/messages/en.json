@@ -1136,7 +1136,7 @@
         "clipTimeInvalid": "Write a time as minutes and seconds, such as 1:23."
       },
       "replacedSource": "from a replaced source",
-      "publicNoteHintPreview": "Why it changed. While the election is in preview it is never published: the corrections log starts when the election goes live. The site's main language is needed to submit.",
+      "changeNotLoggedYet": "Until the election is public, changes need no change kind or public note: the public will see the last version published as the first.",
       "replacedOnlyTitle": "\"Not mentioned\", checked only against replaced documents",
       "replacedOnlyBody": "Every document this rating was checked against has been marked replaced: check the new version before submitting it, or correct it if it is already published.",
       "bar": {

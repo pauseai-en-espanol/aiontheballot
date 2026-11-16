@@ -687,9 +687,12 @@ CREATE FUNCTION private.assessment_trail() RETURNS trigger
       missing := CASE
         WHEN NEW.generation = 0 AND NEW.draft_change_kind IS NOT NULL
           THEN 'no change kind, since its first publish is the initial one'
-        WHEN NEW.generation > 0 AND NOT coalesce(NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'), false)
+        -- Until the public sees the election, a change needs no kind (an update) and no note (PLAN R233).
+        WHEN NEW.generation > 0 AND NOT coalesce(NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'),
+                                                 election_status IN ('draft', 'preview'))
           THEN 'a change kind: update, correction or withdrawal'
-        WHEN NEW.generation > 0 AND NOT coalesce(NEW.draft_public_note ? tenant.default_locale, false)
+        WHEN NEW.generation > 0 AND election_status IN ('live', 'archived')
+             AND NOT coalesce(NEW.draft_public_note ? tenant.default_locale, false)
           THEN 'a public note in the default locale'
         WHEN NEW.draft_change_kind = 'withdrawal'
           THEN CASE WHEN NEW.draft_rating IS NOT NULL THEN 'no rating, since it is a withdrawal' END
@@ -2463,9 +2466,12 @@ CREATE FUNCTION private.publish_revision() RETURNS trigger
     END IF;
 
     -- 5.
+    -- Until the public sees the election, a later one needs no kind (an update) and no note (PLAN R233).
     IF cell.generation = 0 AND cell.draft_change_kind IS NOT NULL
-       OR cell.generation > 0 AND NOT coalesce(cell.draft_change_kind IN ('update', 'correction', 'withdrawal'), false)
-       OR cell.generation > 0 AND NOT coalesce(cell.draft_public_note ? tenant.default_locale, false) THEN
+       OR cell.generation > 0 AND NOT coalesce(cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),
+                                               election.status = 'preview')
+       OR cell.generation > 0 AND election.status <> 'preview'
+          AND NOT coalesce(cell.draft_public_note ? tenant.default_locale, false) THEN
       RAISE EXCEPTION 'cell %: only the first revision is initial; later ones need a kind and a default-locale note',
         cell.id USING ERRCODE = 'check_violation';
     END IF;
@@ -2511,7 +2517,8 @@ CREATE FUNCTION private.publish_revision() RETURNS trigger
     NEW.revision_no := cell.generation + 1;
     NEW.rating := cell.draft_rating;
     NEW.summary := cell.draft_summary;
-    NEW.change_kind := CASE WHEN cell.generation = 0 THEN 'initial' ELSE cell.draft_change_kind END;
+    NEW.change_kind := CASE WHEN cell.generation = 0 THEN 'initial'
+                            ELSE coalesce(cell.draft_change_kind, 'update') END;
     NEW.public_note := cell.draft_public_note;
     NEW.published_at := now();
     NEW.published_in_preview := election.status = 'preview';
@@ -3629,7 +3636,7 @@ CREATE TABLE app.assessment_revisions (
     CONSTRAINT assessment_revisions_check CHECK (((change_kind = 'withdrawal'::app.change_kind) = (rating IS NULL))),
     CONSTRAINT assessment_revisions_check1 CHECK (((change_kind = 'withdrawal'::app.change_kind) OR (summary IS NOT NULL))),
     CONSTRAINT assessment_revisions_check2 CHECK (((change_kind = 'initial'::app.change_kind) = (revision_no = 1))),
-    CONSTRAINT assessment_revisions_check3 CHECK (((change_kind = 'initial'::app.change_kind) OR (public_note IS NOT NULL))),
+    CONSTRAINT assessment_revisions_check3 CHECK (((change_kind = 'initial'::app.change_kind) OR (public_note IS NOT NULL) OR published_in_preview)),
     CONSTRAINT assessment_revisions_revision_no_check CHECK ((revision_no > 0))
 );
 

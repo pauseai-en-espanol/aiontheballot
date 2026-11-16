@@ -3407,6 +3407,22 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   commit, which broke files run after them once the new test made theirs the larger file (CI runs larger files
   first). Mutation list cells-drafted-by-tokens.
 
+- **R233. Free edits until the public sees an election.** Rewording PP's published AESIA cell in preview asked for a
+  change kind and a public note that nobody would ever read: the public history shows only the last version published
+  in preview, as the first, and the corrections log starts when the election goes live (R181). Dani: "we can make
+  edits freely until the election is published". Now, while an election is a draft or in preview, a published cell's
+  change is submitted and published with no kind, recorded as an update, and no note; a kind given is still an update,
+  a correction or a withdrawal, and a withdrawal still takes no rating. Once the election is live or archived, every
+  change needs both again, at submission and at publish, so one submitted in preview and published after going live
+  needs them then. Migration free_edits_before_public: `assessment_trail` and `publish_revision` (bodies only, still
+  on the definer allowlist) and `assessment_revisions`' note check, which now lets a revision published in preview
+  go without one. The cell editor asks for the kind and note only once the election is public, and says why before;
+  the report link stays after the first publish. Tests first: the database's (in preview, an update and a withdrawal
+  with neither; a kind other than a later one refused; once live, each of the two asked for, at submission and at
+  publish) and the editor's checklist. Mutation list free-edits-before-public; four mutations of `publish_revision`
+  in election-curtains and draft-report now target this migration, which replaces the function. Spec: editorial
+  workflow C5.2, C10.5, C11.1; data model §3 (`assessment_revisions`).
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

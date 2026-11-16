@@ -415,6 +415,108 @@ describe('an election in preview: its corrections log', () => {
   });
 });
 
+describe("an election in preview: a published cell's changes (PLAN R233)", () => {
+  /** Editor A's change of the cell's summary, with what else is given, and its submission. */
+  const changed = async (client: pg.Client, cell: string, set = ''): Promise<void> => {
+    await setActor(client, USERS.editorA);
+    await client.query(
+      `UPDATE app.assessments SET draft_summary = '{"es": "Resumen de ejemplo cambiado"}'${set} WHERE id = $1`,
+      [cell],
+    );
+  };
+  const submit = (client: pg.Client, cell: string) =>
+    errorCode(client, `UPDATE app.assessments SET state = 'in_review' WHERE id = '${cell}'`);
+  const publish = async (client: pg.Client, cell: string) => {
+    await setActor(client, USERS.reviewerA);
+    return errorCode(
+      client,
+      `INSERT INTO app.assessment_revisions (assessment_id, reviewed_version)
+       SELECT id, content_version FROM app.assessments WHERE id = '${cell}'`,
+    );
+  };
+  const revisions = async (client: pg.Client, cell: string) =>
+    (
+      await client.query<{
+        revision_no: number;
+        change_kind: string;
+        public_note: unknown;
+        published_in_preview: boolean;
+      }>(
+        `SELECT revision_no, change_kind, public_note, published_in_preview FROM app.assessment_revisions
+          WHERE assessment_id = $1 ORDER BY revision_no`,
+        [cell],
+      )
+    ).rows;
+
+  it('takes a change with no kind or public note while the public sees nothing, recorded as an update', async () => {
+    await actingAs(USERS.countryAdminA, async (client) => {
+      const cell = await publishedInPreview(client);
+      await changed(client, cell);
+      expect(await submit(client, cell)).toBeNull();
+      expect(await publish(client, cell)).toBeNull();
+      expect(await revisions(client, cell)).toEqual([
+        { revision_no: 1, change_kind: 'initial', public_note: null, published_in_preview: true },
+        { revision_no: 2, change_kind: 'update', public_note: null, published_in_preview: true },
+      ]);
+    });
+  });
+
+  it('takes a withdrawal with no public note', async () => {
+    await actingAs(USERS.countryAdminA, async (client) => {
+      const cell = await publishedInPreview(client);
+      await setActor(client, USERS.editorA);
+      await client.query(
+        `UPDATE app.assessments SET draft_rating = NULL, draft_change_kind = 'withdrawal' WHERE id = $1`,
+        [cell],
+      );
+      expect(await submit(client, cell)).toBeNull();
+      expect(await publish(client, cell)).toBeNull();
+      expect((await revisions(client, cell)).at(-1)).toMatchObject({
+        change_kind: 'withdrawal',
+        public_note: null,
+      });
+    });
+  });
+
+  it('still takes only a later kind, when one is given', async () => {
+    await actingAs(USERS.countryAdminA, async (client) => {
+      const cell = await publishedInPreview(client);
+      await changed(client, cell, `, draft_change_kind = 'initial'`);
+      expect(await submit(client, cell)).toBe(CHECK_VIOLATION);
+    });
+  });
+
+  // Each lacking one of the two, so either requirement alone refuses it.
+  const lacking = [
+    ['a kind', `, draft_public_note = '{"es": "Nota de ejemplo"}'`],
+    ['a public note', `, draft_change_kind = 'update'`],
+  ] as const;
+
+  it.each(lacking)('asks for %s again once the election is live', async (_, set) => {
+    await actingAs(USERS.countryAdminA, async (client) => {
+      const cell = await publishedInPreview(client);
+      await setActor(client, USERS.countryAdminA);
+      await client.query(status(preview.id, 'live'));
+      await changed(client, cell, set);
+      expect(await submit(client, cell)).toBe(CHECK_VIOLATION);
+    });
+  });
+
+  it.each(lacking)(
+    'asks for %s at publish when the election went live after the submission',
+    async (_, set) => {
+      await actingAs(USERS.countryAdminA, async (client) => {
+        const cell = await publishedInPreview(client);
+        await changed(client, cell, set);
+        expect(await submit(client, cell)).toBeNull();
+        await setActor(client, USERS.countryAdminA);
+        await client.query(status(preview.id, 'live'));
+        expect(await publish(client, cell)).toBe(CHECK_VIOLATION);
+      });
+    },
+  );
+});
+
 describe('an election in preview: the public', () => {
   it("reads nothing of one that isn't announced, not even its own row, which the preview's role reads", async () => {
     await actingAs(USERS.countryAdminA, async (client) => {

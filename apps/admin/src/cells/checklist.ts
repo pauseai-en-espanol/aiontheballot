@@ -22,7 +22,10 @@ export interface SubmitItem {
   done: boolean;
 }
 
-type ChecklistCell = Pick<Cell, 'party' | 'sources' | 'requireSecondReviewer'> & {
+type ChecklistCell = Pick<
+  Cell,
+  'party' | 'sources' | 'requireSecondReviewer' | 'electionStatus'
+> & {
   draft: NonNullable<Cell['draft']>;
 };
 type Draft = NonNullable<Cell['draft']>;
@@ -44,6 +47,14 @@ export const attestationLapses = (
     draft.contributors.includes(quote.attestedBy) ||
     draft.uploaders.includes(quote.attestedBy));
 
+/**
+ * Whether a published cell's changes need a kind and a public note (PLAN R233): only once the public sees its election.
+ * Until then, what was published is never shown as a change (the public history and the corrections log start when it
+ * goes live), so a change is an update with no note.
+ */
+export const changesLogged = (status: Cell['electionStatus']): boolean =>
+  status === 'live' || status === 'archived';
+
 const hasText = (value: Record<string, string> | null, locale: string): boolean =>
   (value?.[locale] ?? '').trim() !== '';
 
@@ -51,8 +62,9 @@ export const submitChecklist = (cell: ChecklistCell, defaultLocale: string): Sub
   const { draft, sources, party } = cell;
   const source = (id: string) => sources.find((s) => s.id === id);
   const items: SubmitItem[] = [];
-  // After the first publish, every change says what kind it is and why, in the site's main language.
-  if (draft.generation > 0) {
+  // After the first publish, every change says what kind it is and why, in the site's main language: once the public
+  // sees the election, never before (PLAN R233).
+  if (draft.generation > 0 && changesLogged(cell.electionStatus)) {
     items.push(
       {
         need: 'changeKind',

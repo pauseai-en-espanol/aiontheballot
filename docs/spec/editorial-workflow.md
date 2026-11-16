@@ -517,9 +517,9 @@ _For a source without text (a social post, a video, a scan), a second person con
 
 1. Editors and country admins submit a draft. Reviewers don't. [DB: `assessment_transition`]
 2. The database refuses a submission without: a rating (unless withdrawing), a summary in the default locale, the
-   evidence the rating needs, every quote matched or attested from an admitted kind, and after the first publish a
-   change kind and a public note in the default locale. The cell editor shows the same checklist as it fills. [DB:
-   `assessment_trail`, `submitted_evidence_rules`; UI]
+   evidence the rating needs, every quote matched or attested from an admitted kind, and after the first publish,
+   once the election is live or archived, a change kind and a public note in the default locale (C10.5). The cell
+   editor shows the same checklist as it fills. [DB: `assessment_trail`, `submitted_evidence_rules`; UI]
 3. Cells may be submitted in a draft election, so the work can be reviewed before going live; they are published
    only once it is live (PLAN R6). [DB]
 4. In review, the content is locked. [DB: `assessment_transition`]
@@ -572,11 +572,18 @@ _As a reviewer, I check someone else's draft against its sources and publish it.
    column; UI] _Built (PLAN R157):_ `assessments.draft_report_id`, offered after the first publish from the election's
    reports past triage; any report of the election may be named, about it or any of its cells, and one of another
    election, or one the writer can't read, is refused.
+5. Until the public sees the election (a draft or in preview), a change needs neither a kind nor a note: it is
+   published as an update with no note, and the editor doesn't ask for them. A kind given is still an update, a
+   correction or a withdrawal. The public history shows only the last version published in preview, as the first,
+   and the corrections log starts when the election goes live (PLAN R181), so nothing the public could read is
+   lost. A change submitted in preview and published once the election is live needs both then. (PLAN R233, Dani's
+   decision: "we can make edits freely until the election is published".) [DB: `assessment_trail`, publish trigger,
+   `assessment_revisions` check; UI]
 
 ### C11. Withdraw a rating
 
-1. Withdrawing is a draft with the change kind "withdrawal", no rating and a public note, reviewed like any other.
-   [DB: `assessment_trail`, publish trigger]
+1. Withdrawing is a draft with the change kind "withdrawal", no rating and a public note (none needed before the
+   election is live, C10.5), reviewed like any other. [DB: `assessment_trail`, publish trigger]
 2. Only a published cell is withdrawn; one never published is deleted instead (C13). [DB: `assessment_trail`]
 3. Once published, the cell shows as withdrawn, which is not the same as pending. [DB: `current_revisions`]
 

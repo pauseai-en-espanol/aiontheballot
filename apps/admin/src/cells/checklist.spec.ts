@@ -72,13 +72,14 @@ const checked = (sourceId: string) => ({
   checkedBy: 'persona',
 });
 
-const check = (d: Draft) =>
+const check = (d: Draft, electionStatus: Cell['electionStatus'] = 'live') =>
   Object.fromEntries(
     submitChecklist(
       {
         party: { id: PARTY } as Cell['party'],
         sources: SOURCES,
         requireSecondReviewer: true,
+        electionStatus,
         draft: d,
       },
       'es',
@@ -173,6 +174,22 @@ describe('submitChecklist (editorial workflow C5.2)', () => {
     expect(
       check(draft({ generation: 1, changeKind: 'withdrawal', publicNote: { es: 'Nota' } })),
     ).toEqual({ changeKind: true, publicNote: true, noRating: true });
+  });
+
+  it('asks a later change for neither while the election is in preview, where the public sees none (R233)', () => {
+    const later = draft({
+      generation: 1,
+      rating: 'meets',
+      summary: { es: 'Resumen' },
+      quotes: [quote('programa')],
+    });
+    expect(check(later, 'preview')).toEqual({
+      rating: true,
+      summary: true,
+      quote: true,
+      quotesMatched: true,
+    });
+    expect(check(later, 'archived')).toMatchObject({ changeKind: false, publicNote: false });
   });
 });
 

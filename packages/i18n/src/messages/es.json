@@ -1136,7 +1136,7 @@
         "clipTimeInvalid": "Escribe el tiempo en minutos y segundos, como 1:23."
       },
       "replacedSource": "de una fuente sustituida",
-      "publicNoteHintPreview": "Por qué cambió. Mientras la elección esté en vista previa no se publica: el registro de correcciones empieza cuando la elección se haga pública. Para enviarla hace falta el idioma principal del sitio.",
+      "changeNotLoggedYet": "Hasta que la elección sea pública, los cambios no necesitan tipo de cambio ni nota pública: el público verá la última versión publicada como la primera.",
       "replacedOnlyTitle": "«No lo menciona», comprobado solo con documentos sustituidos",
       "replacedOnlyBody": "Todos los documentos con los que se comprobó esta valoración se han marcado como sustituidos: comprueba la versión nueva antes de enviar la valoración, o corrígela si ya está publicada.",
       "bar": {

@@ -730,14 +730,15 @@ create table app.assessment_revisions (                -- public
   rating            app.rating,                        -- null only for a withdrawal
   summary           jsonb,                             -- localized; null only for a withdrawal
   change_kind       app.change_kind not null,
-  public_note       jsonb,                             -- required unless change_kind = 'initial'
+  public_note       jsonb,                             -- required unless initial or published in preview (R233)
   published_at      timestamptz not null default now(),
+  published_in_preview boolean not null default false, -- before the public saw it (R181): never a correction
   unique (tenant_id, id),
   unique (tenant_id, id, election_id),
   unique (assessment_id, revision_no),
   check ((change_kind = 'withdrawal') = (rating is null)),
   check ((change_kind = 'initial') = (revision_no = 1)),
-  check (change_kind = 'initial' or public_note is not null),
+  check (change_kind = 'initial' or public_note is not null or published_in_preview),
   -- The copied election, party and criterion must be the cell's own: public visibility follows election_id.
   foreign key (tenant_id, assessment_id, election_id, party_id, criterion_id)
     references app.assessments (tenant_id, id, election_id, party_id, criterion_id)
