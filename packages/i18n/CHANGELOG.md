@@ -1,5 +1,12 @@
 # @aiontheballot/i18n
 
+## 0.34.3
+
+### Patch Changes
+
+- a2a2a98: The share dialog shows the page's address as text, selected whole with one click or tap, so it can be copied without
+  scripts (as in the admin's preview) or where the browser has no clipboard.
+
 ## 0.34.2
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @aiontheballot/mcp
 
+## 0.3.2
+
+### Patch Changes
+
+- a2a2a98: The MCP server's cell tools say a cell in review takes no edit until it is back in draft, before sending anything,
+  instead of passing on the database's bare refusal.
+
 ## 0.3.1
 
 ### Patch Changes

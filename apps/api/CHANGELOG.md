@@ -1,5 +1,12 @@
 # @aiontheballot/api
 
+## 0.36.2
+
+### Patch Changes
+
+- Updated dependencies [a2a2a98]
+  - @aiontheballot/i18n@0.34.3
+
 ## 0.36.1
 
 ### Patch Changes

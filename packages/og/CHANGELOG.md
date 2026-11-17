@@ -1,5 +1,12 @@
 # @aiontheballot/og
 
+## 0.8.0
+
+### Minor Changes
+
+- a2a2a98: Parties' logos are drawn small for the site's boxes (96 and 192 px), once per process, and served as such, or as
+  uploaded where that is smaller or can't be drawn (WebP): pages download a fraction of what large uploads weigh.
+
 ## 0.7.12
 
 ### Patch Changes

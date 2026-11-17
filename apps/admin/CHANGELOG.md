@@ -1,5 +1,19 @@
 # @aiontheballot/admin
 
+## 0.38.0
+
+### Minor Changes
+
+- a2a2a98: A site's preview in the admin lets members download its share images, and keeps its logos and other immutable images
+  in the browser, so its pages no longer fetch every logo again.
+
+### Patch Changes
+
+- Updated dependencies [a2a2a98]
+- Updated dependencies [a2a2a98]
+  - @aiontheballot/i18n@0.34.3
+  - @aiontheballot/og@0.8.0
+
 ## 0.37.0
 
 ### Minor Changes

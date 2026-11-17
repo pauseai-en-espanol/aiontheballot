@@ -1,5 +1,21 @@
 # @aiontheballot/web
 
+## 0.22.0
+
+### Minor Changes
+
+- a2a2a98: The share dialog shows the page's address as text, selected whole with one click or tap, so it can be copied without
+  scripts (as in the admin's preview) or where the browser has no clipboard.
+- a2a2a98: Parties' logos are drawn small for the site's boxes (96 and 192 px), once per process, and served as such, or as
+  uploaded where that is smaller or can't be drawn (WebP): pages download a fraction of what large uploads weigh.
+
+### Patch Changes
+
+- Updated dependencies [a2a2a98]
+- Updated dependencies [a2a2a98]
+  - @aiontheballot/i18n@0.34.3
+  - @aiontheballot/og@0.8.0
+
 ## 0.21.12
 
 ### Patch Changes
