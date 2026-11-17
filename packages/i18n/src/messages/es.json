@@ -1820,7 +1820,7 @@
       "native": "Compartir…",
       "copy": "Copiar enlace",
       "copied": "Enlace copiado.",
-      "copyFailed": "No se pudo copiar el enlace: cópialo de la barra de direcciones.",
+      "copyFailed": "No se pudo copiar el enlace: selecciona la dirección de arriba y cópiala.",
       "newTab": "(se abre en una pestaña nueva)"
     },
     "alt": {
@@ -1853,6 +1853,7 @@
       "download": "Descargar",
       "imageFailed": "No se pudo pasar la imagen a otra aplicación: descárgala y súbela desde allí.",
       "link": "El enlace",
+      "address": "La dirección de la página",
       "close": "Cerrar"
     }
   },

@@ -96,6 +96,18 @@ export const registerCellTools = (server: McpServer, admin: AdminClient): void =
     return draft;
   };
 
+  /**
+   * The cell's draft to write to, or a refusal before anything is sent: a cell in review takes no edit until a person
+   * recalls it to draft in the admin, or a reviewer sends it back.
+   */
+  const editableDraft = async (s: string, e: string, p: string, c: string): Promise<CellDraft> => {
+    const draft = await draftOf(s, e, p, c);
+    if (draft.state === 'in_review') {
+      throw new ToolRefusal('inReview');
+    }
+    return draft;
+  };
+
   server.registerTool(
     'list_cells',
     {
@@ -243,7 +255,7 @@ export const registerCellTools = (server: McpServer, admin: AdminClient): void =
     },
     ({ site: s, election: e, party: p, criterion: c, version: v, rating, summary }) =>
       run(async () => {
-        const draft = await draftOf(s, e, p, c);
+        const draft = await editableDraft(s, e, p, c);
         return admin.send('PUT', `${cellsPath(s, e)}/${segment(draft.id)}`, {
           version: v,
           rating,
@@ -294,7 +306,7 @@ export const registerCellTools = (server: McpServer, admin: AdminClient): void =
       sectionLabel,
     }) =>
       run(async () => {
-        const draft = await draftOf(s, e, p, c);
+        const draft = await editableDraft(s, e, p, c);
         const { source: quoted, units } = (await admin.get(
           `${electionPath(s, e)}/sources/${segment(from)}`,
         )) as { source: { kind: string; extractionStatus: string }; units: Unit[] };
@@ -345,7 +357,7 @@ export const registerCellTools = (server: McpServer, admin: AdminClient): void =
     },
     ({ site: s, election: e, party: p, criterion: c, version: v, quote }) =>
       run(async () => {
-        const draft = await draftOf(s, e, p, c);
+        const draft = await editableDraft(s, e, p, c);
         return admin.send(
           'DELETE',
           `${cellsPath(s, e)}/${segment(draft.id)}/quotes/${segment(quote)}?version=${v}`,
@@ -366,7 +378,7 @@ export const registerCellTools = (server: McpServer, admin: AdminClient): void =
     },
     ({ site: s, election: e, party: p, criterion: c, version: v, source: checked }) =>
       run(async () => {
-        const draft = await draftOf(s, e, p, c);
+        const draft = await editableDraft(s, e, p, c);
         return admin.send('POST', `${cellsPath(s, e)}/${segment(draft.id)}/checked`, {
           version: v,
           sourceId: checked,
@@ -383,7 +395,7 @@ export const registerCellTools = (server: McpServer, admin: AdminClient): void =
     },
     ({ site: s, election: e, party: p, criterion: c, version: v, source: checked }) =>
       run(async () => {
-        const draft = await draftOf(s, e, p, c);
+        const draft = await editableDraft(s, e, p, c);
         return admin.send(
           'DELETE',
           `${cellsPath(s, e)}/${segment(draft.id)}/checked/${segment(checked)}?version=${v}`,

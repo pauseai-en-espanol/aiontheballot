@@ -409,8 +409,9 @@ cell without a rating (_withdrawn_, distinct from _pending_) and logs a correcti
   members, any role, and platform admins), the same rule as every admin page; anyone else gets 404. The admin fetches
   them from the web app inside the cluster, on its preview host with a shared secret only the two apps hold, and
   serves them under a policy that runs no script and submits no form (`sandbox allow-same-origin`, no
-  `allow-scripts`), so no page of the public site ever acts with a member's session. The web app's preview mode needs
-  that secret, so the Host header still grants nothing, and the public app still has no session or cookie.
+  `allow-scripts`; downloads allowed since R234), so no page of the public site ever acts with a member's session.
+  The web app's preview mode needs that secret, so the Host header still grants nothing, and the public app still has
+  no session or cookie.
 
 ## Capabilities by role
 

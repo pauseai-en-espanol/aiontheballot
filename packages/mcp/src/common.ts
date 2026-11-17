@@ -10,7 +10,8 @@ const REASONS: Readonly<Record<string, string>> = {
     'A token can’t do this: a person does it in the admin (submitting, publishing, approving, settings, members…).',
   forbidden:
     'The database refused it: a token drafts and never decides (a cell’s review, recheck, report, change kind or ' +
-    'public note), and the member’s roles may not allow it either.',
+    'public note), and the member’s roles may not allow it either. A cell may have gone into review meanwhile: ' +
+    'get_cell shows its state.',
   changeControlled:
     'The election is live: propose a change to it or its parties with propose_change, and a person approves it in ' +
     'the admin; its criteria and methodology are a person’s to change there.',
@@ -29,6 +30,9 @@ const REASONS: Readonly<Record<string, string>> = {
     'show the member what changed, and write only what they accept again.',
   limit: 'A limit was reached: wait and try again later.',
   noCell: 'This party and criterion have no cell yet: start one with start_cell.',
+  inReview:
+    'The cell is in review, and takes no edit until it is back in draft: the member recalls it in the admin ' +
+    '(“Recall to edit”), or a reviewer sends it back. Then read it again with get_cell.',
   unmatched:
     'The quote isn’t in the source’s text, as the database matches it: copy it again exactly from read_source. ' +
     '`detail.longest` is the longest start or end of it that is there; the difference is right after (or before) it.',

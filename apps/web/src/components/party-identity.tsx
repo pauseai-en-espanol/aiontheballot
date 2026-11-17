@@ -4,10 +4,12 @@ import type { ReactNode } from 'react';
 import { palette } from '@aiontheballot/ui/brand';
 import { css, cx } from '@styled-system/css';
 
-import { brandImagePath } from '@/brand-images';
+import { partyLogoPath } from '@/party-logo-path';
 
 /** The box a party's mark sits in, one size for every party, so names line up whatever each has. */
 const BOX = { small: 30, large: 64 } as const;
+/** The logo drawn for each box, about three times its side, for dense screens (PLAN R236). */
+const LOGO_SIDE = { small: 96, large: 192 } as const;
 /** The colour line under a name: thin in a list, a little thicker under a page's heading. */
 const LINE = { small: 4, large: 6 } as const;
 
@@ -52,10 +54,10 @@ export const PartyMark = ({
   line?: boolean;
 }) => {
   const box = BOX[size];
-  const path = party.logo ? brandImagePath(party.logo) : undefined;
+  const path = party.logo ? partyLogoPath(party.logo, LOGO_SIDE[size]) : undefined;
   const square = Math.round(box * 0.8);
   const mark = path ? (
-    // A plain img: a small logo the brand route serves once, cached for a year; nothing for next/image to do.
+    // A plain img: the logo drawn small, served once and cached for a year; nothing for next/image to do.
     // oxlint-disable-next-line next/no-img-element
     <img
       src={`${root}${path}`}

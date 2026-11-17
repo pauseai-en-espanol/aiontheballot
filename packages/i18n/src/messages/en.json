@@ -1820,7 +1820,7 @@
       "native": "Share…",
       "copy": "Copy link",
       "copied": "Link copied.",
-      "copyFailed": "The link couldn't be copied: copy it from the address bar.",
+      "copyFailed": "The link couldn't be copied: select the address above and copy it.",
       "newTab": "(opens in a new tab)"
     },
     "alt": {
@@ -1853,6 +1853,7 @@
       "download": "Download",
       "imageFailed": "The image couldn’t be passed to another app: download it and post it from there.",
       "link": "The link",
+      "address": "The page’s address",
       "close": "Close"
     }
   },

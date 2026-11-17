@@ -345,6 +345,20 @@ test.describe("election pages' own share images (R148)", () => {
     expect(html).toContain(`href="https://wa.me/?text=`);
   });
 
+  test('show the address to select and copy without scripts, the same the copy button copies (PLAN R235)', async ({
+    newContext,
+  }) => {
+    const context = await newContext({ javaScriptEnabled: false });
+    const page = await context.newPage();
+    await page.goto(`${PREVIEW_SITE}${ELECTION}/partidos/partido-ejemplo-a`);
+    const dialog = await openSharing(page);
+    const address = dialog.locator('[data-share="address"]');
+    await expect(address).toBeVisible();
+    await expect(dialog.getByText(messages.es.share.panel.address)).toBeVisible();
+    expect(await address.textContent()).toBe(await meta(page, 'og:url'));
+    await context.close();
+  });
+
   test('open and close as a dialog without scripts: its button, Escape or its own close button (PLAN R218)', async ({
     newContext,
   }) => {

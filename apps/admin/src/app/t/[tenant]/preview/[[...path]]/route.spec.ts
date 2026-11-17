@@ -64,7 +64,9 @@ describe("a site's preview route (ADR-0005, PLAN R174)", () => {
   it("serves a member the site's page, sandboxed, script-free, with its assets moved", async () => {
     const response = await get('ejemplo-a', ['es', 'partidos'], '?vista=tabla');
     expect(response.status).toBe(200);
-    expect(response.headers.get('content-security-policy')).toMatch(/^sandbox allow-same-origin;/u);
+    expect(response.headers.get('content-security-policy')).toMatch(
+      /^sandbox allow-same-origin allow-downloads;/u,
+    );
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(await response.text()).toBe(
       '<link rel="stylesheet" href="/preview-static/chunks/a.css"/><p>Hola</p>',
@@ -75,6 +77,32 @@ describe("a site's preview route (ADR-0005, PLAN R174)", () => {
         options: { root: '/t/ejemplo-a/preview', acceptLanguage: null },
       },
     ]);
+  });
+
+  it("keeps a party's logo in the member's browser, as the web app marks it, and pages never (PLAN R234)", async () => {
+    web.answer = {
+      status: 200,
+      headers: {
+        'content-type': 'image/png',
+        'cache-control': 'public, max-age=31536000, immutable',
+      },
+      body: Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+    };
+    const logo = await get('ejemplo-a', ['es', 'brand', `${'a'.repeat(64)}.png`]);
+    expect([logo.status, logo.headers.get('cache-control')]).toEqual([
+      200,
+      'private, max-age=31536000, immutable',
+    ]);
+    expect(logo.headers.get('content-security-policy')).toMatch(/^sandbox/u);
+    web.answer = {
+      status: 200,
+      headers: {
+        'content-type': 'text/html',
+        'cache-control': 'public, max-age=31536000, immutable',
+      },
+      body: Buffer.from('<p>Hola</p>'),
+    };
+    expect((await get('ejemplo-a', ['es'])).headers.get('cache-control')).toBe('private, no-store');
   });
 
   it('sends someone signed out to sign in, and anyone the API refuses to a 404, never asking the web app', async () => {

@@ -5,6 +5,7 @@ import { getFromApi } from '../../../../../api';
 import {
   fetchFromWeb,
   PREVIEW_HEADERS,
+  previewCaching,
   previewConfig,
   previewHtml,
   previewLocation,
@@ -61,6 +62,6 @@ export const GET = async (request: Request, { params }: Params): Promise<Respons
     : new Uint8Array(answer.body);
   return new Response(body, {
     status: answer.status,
-    headers: { ...PREVIEW_HEADERS, 'content-type': type },
+    headers: { ...PREVIEW_HEADERS, 'content-type': type, 'cache-control': previewCaching(answer) },
   });
 };

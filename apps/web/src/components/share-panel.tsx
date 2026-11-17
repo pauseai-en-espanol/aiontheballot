@@ -35,6 +35,8 @@ export interface SharePanelText {
   imageFailed: string;
   /** "El enlace". */
   link: string;
+  /** "La dirección de la página": over the address itself, to select and copy without the button. */
+  address: string;
   /** "Cerrar": the dialog's own way out. */
   close: string;
   email: string;
@@ -148,7 +150,9 @@ const groupLabel = css({ fontSize: '18px', fontWeight: '700' });
  * people send, whose preview is itself the page's data card: copied, the device's share sheet, and a plain link per
  * network, which load nothing from any network until followed (R177). Then the data image, the page's own card (on
  * the scorecard, the whole table), in the three shapes people post: each handed to the phone's apps with the picture
- * itself where the device can, and always downloadable. Icons always beside the names.
+ * itself where the device can, and always downloadable. Icons always beside the names. The address itself is there as
+ * text, selected whole with a click or a tap (PLAN R235), to copy where the button isn't: without scripts, as in the
+ * admin's preview, or where the browser has no clipboard.
  */
 export const SharePanel = ({
   links,
@@ -284,6 +288,30 @@ export const SharePanel = ({
           >
             <p id={`${id}-link`} className={groupLabel}>
               {words.link}
+            </p>
+            <p className={css({ display: 'grid', gap: '4px', minWidth: '0' })}>
+              <span className={css({ color: 'fg.muted', fontSize: '15px' })}>{words.address}</span>
+              <span
+                data-share="address"
+                className={css({
+                  display: 'block',
+                  paddingBlock: '10px',
+                  paddingInline: '12px',
+                  border: '1px solid',
+                  borderColor: 'border.subtle',
+                  bg: 'bg.subtle',
+                  fontFamily: 'mono',
+                  fontSize: '15px',
+                  lineHeight: '1.4',
+                  overflowWrap: 'anywhere',
+                  // One click or tap selects it whole, with no script; Safari still reads only the prefixed name.
+                  userSelect: 'all',
+                  WebkitUserSelect: 'all',
+                  cursor: 'text',
+                })}
+              >
+                {url}
+              </span>
             </p>
             <ul
               className={css({

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PREVIEW_ASSET,
   PREVIEW_HEADERS,
+  previewCaching,
   previewConfig,
   previewHtml,
   previewLocation,
@@ -33,19 +34,39 @@ describe("a site's preview through the admin (ADR-0005, PLAN R174)", () => {
     const policy = PREVIEW_HEADERS['content-security-policy'] ?? '';
     expect(policy.split('; ')).toEqual(
       expect.arrayContaining([
-        'sandbox allow-same-origin',
+        'sandbox allow-same-origin allow-downloads',
         "default-src 'none'",
         "form-action 'none'",
         "frame-ancestors 'none'",
       ]),
     );
     expect(policy).not.toContain('script-src');
-    // Never scripts, forms, popups or navigation of anything but itself.
-    expect(policy.match(/allow-[\w-]+/gu)).toEqual(['allow-same-origin']);
+    // Never scripts, forms, popups or navigation of anything but itself: only downloads (PLAN R234).
+    expect(policy.match(/allow-[\w-]+/gu)).toEqual(['allow-same-origin', 'allow-downloads']);
     expect(PREVIEW_HEADERS).toMatchObject({
       'cache-control': 'private, no-store',
       'x-robots-tag': 'noindex, nofollow',
     });
+  });
+
+  it('keeps in the browser only an image the web app marks immutable, and privately (PLAN R234)', () => {
+    const answer = (status: number, type: string, cache?: string) => ({
+      status,
+      headers: { 'content-type': type, ...(cache === undefined ? {} : { 'cache-control': cache }) },
+      body: Buffer.from(''),
+    });
+    const immutable = 'public, max-age=31536000, immutable';
+    expect(previewCaching(answer(200, 'image/png', immutable))).toBe(
+      'private, max-age=31536000, immutable',
+    );
+    for (const other of [
+      answer(200, 'text/html; charset=utf-8', immutable),
+      answer(200, 'image/png', 'public, max-age=60'),
+      answer(200, 'image/png'),
+      answer(404, 'image/png', immutable),
+    ]) {
+      expect(previewCaching(other), JSON.stringify(other.headers)).toBe('private, no-store');
+    }
   });
 
   it("drops the pages' scripts and moves their build assets out of the admin's own `/_next/`", () => {

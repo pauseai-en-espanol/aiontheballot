@@ -51,7 +51,9 @@ describe("the preview's build assets (ADR-0005, PLAN R174)", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('p{}');
     expect(response.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
-    expect(response.headers.get('content-security-policy')).toMatch(/^sandbox allow-same-origin;/u);
+    expect(response.headers.get('content-security-policy')).toMatch(
+      /^sandbox allow-same-origin allow-downloads;/u,
+    );
     expect(web.calls).toEqual(['/_next/static/chunks/2f2hh1zkwa9g6.css']);
   });
 

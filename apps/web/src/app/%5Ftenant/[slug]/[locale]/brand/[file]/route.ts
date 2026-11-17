@@ -1,44 +1,14 @@
 import { isLocale } from '@aiontheballot/i18n/messages';
 
 import { loadBrandImage, parseBrandImageFile } from '@/brand-images';
-import { electionLoader } from '@/election-page';
 import { IMMUTABLE, matchesEtag, plain } from '@/http-cache';
+import { partyLogoNamed } from '@/party-logos';
 import { trustedSiteMode } from '@/preview-guard';
-import { type SiteMode } from '@/site-mode';
 import { loadTenantPage, previewAccess, type TenantPage } from '@/tenant-data';
 
 interface BrandImageContext {
   params: Promise<{ slug: string; locale: string; file: string }>;
 }
-
-/**
- * Whether a party of one of the site's public elections has this logo (PLAN R142): those elections' data is already
- * kept by the web app, so a made-up hash costs no request to the API.
- */
-const isPartyLogo = async (
-  page: TenantPage,
-  slug: string,
-  requested: { sha256: string; contentType: string },
-  mode: SiteMode,
-): Promise<boolean> => {
-  if (page.kind !== 'found') {
-    return false;
-  }
-  for (const listed of page.home.elections) {
-    const result = await electionLoader(mode)(slug, listed.slug);
-    if (
-      result.kind === 'found' &&
-      result.election.parties.some(
-        (party) =>
-          party.logo?.sha256 === requested.sha256 &&
-          party.logo.contentType === requested.contentType,
-      )
-    ) {
-      return true;
-    }
-  }
-  return false;
-};
 
 /**
  * One of the tenant's brand images, or a party's logo, at /brand/{sha256}.{ext}: only one its home data or a public
@@ -62,7 +32,10 @@ export const GET = async (request: Request, { params }: BrandImageContext): Prom
   const preview = mode === 'preview';
   const partyLogos = mode !== 'coming-soon';
   const named = async (candidate: TenantPage) =>
-    shows(candidate) || (partyLogos && (await isPartyLogo(candidate, slug, requested, mode)));
+    shows(candidate) ||
+    (partyLogos &&
+      (await partyLogoNamed(candidate, slug, requested.sha256, mode))?.contentType ===
+        requested.contentType);
   let page = await loadTenantPage(slug, { preview });
   if (page.kind !== 'unavailable' && !(await named(page))) {
     // A logo just changed on another server: refetch (at most once per tenant every 5 seconds) before a 404.

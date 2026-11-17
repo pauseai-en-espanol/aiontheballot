@@ -75,14 +75,22 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     const logos = table.getByRole('rowheader').locator('img');
     await expect(logos).toHaveCount(1);
     await expect(logos).toHaveAttribute('alt', '');
-    await expect(logos).toHaveAttribute('src', /^\/ejemplo-a\/brand\/[0-9a-f]{64}\.png$/);
+    // Drawn small for its box (PLAN R236), and cached for good like the upload.
+    await expect(logos).toHaveAttribute('src', /^\/ejemplo-a\/brand\/logo\/96-[0-9a-f]{64}\.png$/);
     await expect(logos).toHaveJSProperty('naturalWidth', 96);
     // By its Host header: Node doesn't resolve `*.localhost` on every system (fetch-by-host.ts).
-    const logo = await get(`${PREVIEW_URL}${await logos.getAttribute('src')}`);
+    const src = (await logos.getAttribute('src')) ?? '';
+    const logo = await get(`${PREVIEW_URL}${src}`);
     expect(logo.status).toBe(200);
     expect(logo.headers['content-type']).toBe('image/png');
-    // A made-up hash is no logo.
+    expect(logo.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+    // The upload itself is still served at its own address, as share images and the admin name it.
+    const sha256 = /([0-9a-f]{64})\.png$/.exec(src)?.[1] ?? '';
+    expect((await get(`${PREVIEW_URL}/ejemplo-a/brand/${sha256}.png`)).status).toBe(200);
+    // A made-up hash is no logo, nor a side the site doesn't draw.
     expect((await get(`${SITE}/brand/${'0'.repeat(64)}.png`)).status).toBe(404);
+    expect((await get(`${SITE}/brand/logo/96-${'0'.repeat(64)}.png`)).status).toBe(404);
+    expect((await get(`${PREVIEW_URL}/ejemplo-a/brand/logo/512-${sha256}.png`)).status).toBe(404);
     // The one published cell, and the pending others: each an icon, its words its link's name and its tooltip, and
     // the legend right under the table giving every icon's words (BRIEF §6).
     const cells = table.getByRole('cell').getByRole('link');

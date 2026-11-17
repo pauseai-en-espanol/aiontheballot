@@ -146,6 +146,7 @@ export const ElectionFrame = ({
               download: t('share.panel.download'),
               imageFailed: t('share.panel.imageFailed'),
               link: t('share.panel.link'),
+              address: t('share.panel.address'),
               email: t('share.links.email'),
               native: t('share.links.native'),
               copy: t('share.links.copy'),

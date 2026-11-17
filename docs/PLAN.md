@@ -3423,6 +3423,36 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   in election-curtains and draft-report now target this migration, which replaces the function. Spec: editorial
   workflow C5.2, C10.5, C11.1; data model §3 (`assessment_revisions`).
 
+- **R234. The preview downloads, and keeps its images.** Checking the general election in the admin's preview, Dani
+  couldn't download a share image, and its pages were slow to show the parties' logos: the preview's sandbox allowed no
+  download, and every answer, images included, was `no-store`, so each page fetched every logo again. The preview's
+  policy now adds `allow-downloads` (still no script, form, popup or navigation), and an image the web app marks
+  immutable (a party's logo, a brand image, an icon, each named by its hash) is kept in the member's browser for a
+  year, `private` as it came through the membership check; pages and everything else stay `no-store`. ADR-0005
+  amended, and ADR-0002's line on the preview. Tests: the policy (only `allow-same-origin` and `allow-downloads`), the
+  caching rule (an immutable image only, never a page, an error or another image), and the route passing it on.
+
+- **R235. The share dialog shows the address to copy.** Dani missed "a simple copy link" in the preview: the copy
+  button needs a script, which the preview strips, as do browsers without a clipboard. The dialog now shows the page's
+  address as text under "El enlace", selected whole with one click or tap (`user-select: all`, no script), and the
+  copy button's failure points to it. E2e test: without scripts, the dialog shows the address, the same as `og:url`.
+
+- **R236. Parties' logos, drawn small.** The logos are uploaded at up to 4,096 px and served as uploaded, for boxes
+  of 30 and 64 px: SALF's was 105 KB. The web app now draws each logo at three times its box (96 and 192 px) with
+  resvg, as the site icon is drawn (a step down, then halving), once per process, at
+  `/brand/logo/{side}-{sha256}.png`, which only a public election's party logo answers (or, in the preview, one in
+  preview), cached for a year as immutable; where the upload is smaller than its drawing, or can't be drawn (WebP),
+  the upload is served. The upload stays at its own address, for share images and the admin. Thirteen of the general
+  election's logos weigh 66 KB at 96 px, against 389 KB as uploaded. Tests: the drawing (sides, shape, never
+  enlarged, a JPEG drawn as a PNG, a WebP left alone, an upload's text chunk gone), the addresses, and the e2e logo
+  checks.
+
+- **R237. The MCP tools say a cell is in review.** Removing a quote from a cell Dani had just submitted got the
+  database's bare "forbidden". The cell tools that write now read the cell's state first and refuse a cell in review
+  without sending anything, saying it takes no edit until it is recalled in the admin or sent back; the "forbidden"
+  reason also says a cell may have gone into review meanwhile. Test: each of the five writing tools, on a cell in
+  review, refuses and writes nothing.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

@@ -236,10 +236,11 @@ test.describe("an election's status (editorial workflow E5–E7, PLAN R181)", ()
           WHERE p.tenant_id = $1 AND p.slug = 'partido-ejemplo-a'`,
         [site.id],
       );
-      const logo = `${root}/brand/${sha256}.png`;
+      // Drawn small for the page's boxes (PLAN R236); the upload itself at its own address too.
+      const logo = `${root}/brand/logo/96-${sha256}.png`;
       expect(html).toContain(logo);
       const [image] = html.match(new RegExp(`${root}/${election}/og/[^"]+\\.png`, 'u')) ?? [];
-      for (const path of [logo, image]) {
+      for (const path of [logo, `${root}/brand/${sha256}.png`, image]) {
         expect(path).toBeTruthy();
         const answer = await page.request.get(`${ADMIN_URL}${path ?? ''}`);
         expect(answer.status()).toBe(200);

@@ -318,6 +318,28 @@ describe('the tools (PLAN R204)', () => {
       expect(calls.filter(([method]) => method !== 'GET')).toEqual([]);
     });
 
+    it('says a cell in review takes no edit until it is back in draft, and writes nothing', async () => {
+      const inReview = () => ({ ...cell(), draft: { ...cell().draft, state: 'in_review' } });
+      const { client, calls } = await connected({
+        get: async (path) => (path.includes('/sources/') ? source : inReview()),
+      });
+      for (const [name, extra] of [
+        ['save_cell_draft', { rating: 'meets', summary: { es: 'Resumen de ejemplo' } }],
+        ['add_quote', { source: SOURCE, quote: 'Proponemos una agencia de evaluación' }],
+        ['remove_quote', { quote: '0190f8c4-0000-7000-8000-000000000971' }],
+        ['add_checked_document', { source: SOURCE }],
+        ['remove_checked_document', { source: SOURCE }],
+      ] as const) {
+        const result = await client.callTool({
+          name,
+          arguments: { ...where, version: 7, ...extra },
+        });
+        expect(result.isError, name).toBe(true);
+        expect(text(result), name).toMatchObject({ error: 'inReview' });
+      }
+      expect(calls.filter(([method]) => method !== 'GET')).toEqual([]);
+    });
+
     it('adds a quote that matches the source as it reads, labelled with the page it matched on', async () => {
       const added = {
         id: 'q',

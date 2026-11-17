@@ -43,9 +43,11 @@ export const PREVIEW_STATIC = '/preview-static/';
  * styles, fonts and images the admin serves for it. It keeps the admin's origin (`allow-same-origin`, PLAN R174): with
  * an opaque one, the browser sends no session with the page's own images (the site's logos, behind the same membership
  * check) and refuses its fonts (CORS). Without scripts, keeping the origin lets the page do nothing more than load them.
+ * It lets a member save what the page offers to download (`allow-downloads`, PLAN R234), the share images, as a reader
+ * can: a download runs nothing on the admin's origin.
  */
 export const PREVIEW_POLICY = [
-  'sandbox allow-same-origin',
+  'sandbox allow-same-origin allow-downloads',
   "default-src 'none'",
   "img-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
@@ -65,6 +67,21 @@ export const PREVIEW_HEADERS: Readonly<Record<string, string>> = {
   'x-robots-tag': 'noindex, nofollow',
   'x-content-type-options': 'nosniff',
 };
+
+/** A year: an image the web app marks immutable never changes under its name. */
+const KEPT_IMAGE = 'private, max-age=31536000, immutable';
+
+/**
+ * How long a member's browser keeps a preview answer (PLAN R234): an image the web app marks immutable (a party's
+ * logo, a brand image or an icon, each named by its hash) for a year, so a page doesn't fetch every logo again, and
+ * `private`, since it came through the membership check; anything else, pages first, never.
+ */
+export const previewCaching = (answer: WebAnswer): string =>
+  answer.status === 200 &&
+  (answer.headers['content-type'] ?? '').startsWith('image/') &&
+  /\bimmutable\b/u.test(answer.headers['cache-control'] ?? '')
+    ? KEPT_IMAGE
+    : (PREVIEW_HEADERS['cache-control'] ?? 'private, no-store');
 
 /**
  * A preview page's HTML as the admin serves it (ADR-0005's spike, PLAN R174): without its scripts, which the policy
@@ -146,7 +163,7 @@ export const fetchFromWeb = (
         response.on('error', reject);
         response.on('end', () => {
           const headers: Record<string, string> = {};
-          for (const name of ['content-type', 'location']) {
+          for (const name of ['content-type', 'location', 'cache-control']) {
             const value = response.headers[name];
             if (typeof value === 'string') {
               headers[name] = value;

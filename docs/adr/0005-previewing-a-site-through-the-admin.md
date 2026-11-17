@@ -131,5 +131,10 @@ If A is accepted:
   content. Its data loaders and logos' cache keys are apart from the public's; share images are cached by the hash of
   what they show, so the same picture serves both only for the same content, and none is pre-rendered for the preview.
   A page takes the preview's mode only with the secret, and the API checks at startup that each login is its role.
+- **Amended (PLAN R234): downloads, and images kept.** The policy adds `allow-downloads`, so a member can save the
+  share images a page offers, as a reader can: a download runs nothing on the admin's origin, and the sandbox still
+  allows no script, form, popup or navigation. An image the web app marks immutable (a party's logo, a brand image or
+  an icon, each named by its hash) is kept in the member's browser for a year (`private`, as it came through the
+  membership check), so a page no longer fetches every logo again; pages and everything else stay `no-store`.
 - **Revisit** if members need the preview's scripts (then a sandbox with `allow-scripts` and no `allow-same-origin`,
   checked against what the scripts call), or if a tenant gets its own admin host (ADR-0002, D3).

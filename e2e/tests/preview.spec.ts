@@ -37,7 +37,7 @@ test.describe("a site's preview through the admin (ADR-0005, PLAN R174)", () => 
     await expect(page).toHaveURL(`${ROOT}/generales-de-ejemplo`);
     const headers = election.headers();
     expect(headers['content-security-policy']).toMatch(
-      /^sandbox allow-same-origin; default-src 'none'/u,
+      /^sandbox allow-same-origin allow-downloads; default-src 'none'/u,
     );
     expect(headers).toMatchObject({
       'cache-control': 'private, no-store',
@@ -62,6 +62,12 @@ test.describe("a site's preview through the admin (ADR-0005, PLAN R174)", () => 
     }
     // The election's parties, as the public will see them once the site is open, and a party's own page.
     expect(html).toContain('PEA');
+    // A party's logo, drawn small, kept in the member's browser for good (PLAN R234, R236); the page itself never.
+    const [logo] = html.match(/\/t\/ejemplo-a\/preview\/brand\/logo\/96-[0-9a-f]{64}\.png/u) ?? [];
+    expect(logo).toBeTruthy();
+    const kept = await page.request.get(`${ADMIN_URL}${logo ?? ''}`);
+    expect(kept.status()).toBe(200);
+    expect(kept.headers()['cache-control']).toBe('private, max-age=31536000, immutable');
     const party = await page.goto(`${ROOT}/generales-de-ejemplo/partidos/partido-ejemplo-a`);
     expect(party?.status()).toBe(200);
     expect(await party?.text()).toContain('Partido Ejemplo A');
