@@ -590,7 +590,8 @@ scope, closest to the spec and ADRs. Revert any of them with a forward migration
   orange and on white), so the icon reads on light and dark tabs alike. No text, no tenant's branding. 16 and 32 px
   have their own drawings on the pixel grid (at 16 px the sparkle is seven pixels across and reads more as a bold mark
   than as a sparkle); from 180 px the tile fills the square, since home screens cut their own corners. A test pins
-  each drawing, and the URLs' hash covers the drawing itself.
+  each drawing, and the URLs' hash covers the drawing itself. Superseded by R238: the site's mark, the ballot marked
+  «IA» going into a transparent ballot box.
 - **R72. A tenant replaces it through a `site_icon` logo slot:** a PNG, used only if a decoder will draw it whole
   (every chunk's checksum; a colour type and bit depth the format allows, which also bounds what inflating costs; a
   palette when it needs one; image data that inflates to what its header says, every row with a known filter: a file
@@ -3452,6 +3453,19 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   without sending anything, saying it takes no edit until it is recalled in the admin or sent back; the "forbidden"
   reason also says a cell may have gone into review meanwhile. Test: each of the five writing tools, on a cell in
   review, refuses and writes nothing.
+
+- **R238. The site's mark: «IA» on the ballot, going into the ballot box.** Dani missed a mark in the header, and found
+  the AI hard to see on the ballot: the landing page's ballot had plain boxes, and the icon's sparkle doesn't read as
+  "AI" to everyone. Of three sketches (the ballot marked «IA», the sparkle in the box, the transparent ballot box),
+  Dani chose the ballot box: a ballot marked with the letters for AI, half into the slot of a transparent ballot box.
+  One drawing (`@aiontheballot/ui/ballot-box`), as shapes each renderer paints with its own colours, so a site's own
+  colours (R178) reach it everywhere: beside the name in every page's header; on the coming-soon page and its share
+  image, in place of the ballot; beside the site's name on every election card, in place of the pause sign (which
+  stays on the coming-soon label); and the default site icon, pixel-fitted at 16 and 32 px. The letters are in the
+  page's language (the site's default for the icon): «IA», or «AI» in English. They are drawn as shapes, so no
+  renderer needs a font, and the icon's and cards' hashes change with them. Tests: the icon's pixels at 16 and 32 px in
+  both orders, a hash per letter set, the cards' reference pictures accepted again, an English site's icon and home
+  card marked «AI», and the e2e icon check.
 
 ## Queued work
 

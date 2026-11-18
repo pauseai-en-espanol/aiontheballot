@@ -84,11 +84,14 @@ describe('the home card', () => {
       theme: DEFAULT_CARD_THEME,
       label: 'Próximamente · Elecciones de ejemplo · 15 de enero de 2030',
       name: 'Inquilino de ejemplo',
+      // The mark's letters in the card's language (PLAN R238).
+      letters: 'IA',
       question: '¿Qué proponen los partidos frente a los riesgos de la IA?',
       address: 'ejemplo.example.test',
       initiative: 'Una iniciativa de Organización de ejemplo',
       initiativeLead: 'Una iniciativa de',
     });
+    expect(homeCardContent(home, 'en', 'https://ejemplo.example.test', false).letters).toBe('AI');
   });
 
   it('names the current election, and no longer says coming soon, once the site is open', () => {

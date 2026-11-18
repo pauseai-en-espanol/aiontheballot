@@ -11,6 +11,7 @@ import { getTranslator, type Locale } from '@aiontheballot/i18n/messages';
 import { cardHash } from '@aiontheballot/og/hash';
 import { isShareSize, type ShareSize } from '@aiontheballot/og/sizes';
 import { cardTheme, DEFAULT_CARD_THEME } from '@aiontheballot/og/theme';
+import { markLetters } from '@aiontheballot/ui/ballot-box';
 
 /**
  * The views people share, each with its own image template. Only the home exists while the site is coming soon;
@@ -93,6 +94,7 @@ export const homeCardContent = (
     theme: cardTheme(home.tenant.theme ?? {}),
     label,
     name: local(home.tenant.displayName),
+    letters: markLetters(locale),
     question: t('home.question'),
     address: base.replace(/^https:\/\//, ''),
     initiative: t('layout.initiativeOf', { operator: local(home.operator.displayName) }),

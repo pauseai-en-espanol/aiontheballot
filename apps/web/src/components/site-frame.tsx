@@ -2,6 +2,7 @@ import type { PropsWithChildren } from 'react';
 
 import { pickLocalized } from '@aiontheballot/domain/localized';
 import { getTranslator } from '@aiontheballot/i18n/messages';
+import { markLetters } from '@aiontheballot/ui/ballot-box';
 import { siteColourVariables } from '@aiontheballot/ui/site-colours';
 import { css, cx } from '@styled-system/css';
 
@@ -9,6 +10,7 @@ import type { LoadedSitePage } from '../site-page';
 
 import { FOOTER_LOGO } from '../site-page';
 import { display, focusRing, wrap } from '../styles';
+import { BallotBox } from './ballot-box';
 import { SiteFooter, type SiteLinks } from './site-footer';
 
 interface SiteFrameProps {
@@ -23,7 +25,7 @@ interface SiteFrameProps {
 
 /**
  * The shared layout of a site's pages (public-site spec §4), which no tenant setting changes: a skip link, the site's
- * name linking home, the page, and the footer with the operator line and the legal links. Only its colours are the
+ * mark and name linking home, the page, and the footer with the operator line and the legal links. Only its colours are the
  * site's own (PLAN R178): its root sets the accent's variables, which every page under it draws with.
  */
 export const SiteFrame = ({
@@ -69,8 +71,24 @@ export const SiteFrame = ({
         <div className={cx(wrap, css({ paddingBlock: '20px' }))}>
           <a
             href={href({ page: 'home' })}
-            className={cx(display, focusRing, css({ fontSize: '26px', letterSpacing: '0.02em' }))}
+            className={cx(
+              display,
+              focusRing,
+              css({
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '12px',
+                fontSize: '26px',
+                letterSpacing: '0.02em',
+              }),
+            )}
           >
+            {/* The site's mark beside its name (PLAN R238): decorative, the name is the link's text. */}
+            <BallotBox
+              variant="compact"
+              letters={markLetters(locale)}
+              className={css({ height: '40px', width: 'auto', flexShrink: '0' })}
+            />
             {name}
           </a>
         </div>

@@ -1,3 +1,10 @@
+import {
+  ballotBox,
+  ballotBoxPaint,
+  MARK_GLYPHS,
+  type MarkLetters,
+  shapeSvg,
+} from '@aiontheballot/ui/ballot-box';
 import { palette } from '@aiontheballot/ui/brand';
 import { createHash } from 'node:crypto';
 import { crc32, inflateSync } from 'node:zlib';
@@ -39,9 +46,14 @@ export const SITE_ICON_VERSION = 1;
 /** The web manifest's colours: the platform's palette, like the default icon. */
 export const SITE_ICON_COLOURS = { background: palette.paper, theme: palette.orange } as const;
 
-export type SiteIconSource = { kind: 'default' } | { kind: 'tenant'; sha256: string };
+/** The platform's default icon, marked with the letters for AI in the site's language (PLAN R238), or a tenant's own. */
+export type SiteIconSource =
+  { kind: 'default'; letters: MarkLetters } | { kind: 'tenant'; sha256: string };
 
-export const DEFAULT_SITE_ICON: SiteIconSource = { kind: 'default' };
+export const defaultSiteIcon = (letters: MarkLetters): SiteIconSource => ({
+  kind: 'default',
+  letters,
+});
 
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10];
 
@@ -203,28 +215,45 @@ export const isUsableSiteIcon = (bytes: Uint8Array): boolean => {
   );
 };
 
-/** A four-pointed sparkle, the usual sign for AI, centred at (cx, cy) with arms of length r and a waist of w. */
-const sparkle = (cx: number, cy: number, r: number, w: number): string => {
-  const c = w * 0.3;
-  return [
-    `M${cx} ${cy - r}`,
-    `C${cx + c} ${cy - w} ${cx + w} ${cy - c} ${cx + r} ${cy}`,
-    `C${cx + w} ${cy + c} ${cx + c} ${cy + w} ${cx} ${cy + r}`,
-    `C${cx - c} ${cy + w} ${cx - w} ${cy + c} ${cx - r} ${cy}`,
-    `C${cx - w} ${cy - c} ${cx - c} ${cy - w} ${cx} ${cy - r}Z`,
-  ].join(' ');
+/**
+ * The letters drawn pixel by pixel where curves and thin strokes would blur: 3 by 5 for 16 px, 5 by 7 for 32 px. Each
+ * glyph is its rows, `#` a pixel; the letters stand one pixel apart.
+ */
+const PIXEL_GLYPHS: Record<16 | 32, Record<'I' | 'A', readonly string[]>> = {
+  16: {
+    I: ['#', '#', '#', '#', '#'],
+    A: ['.#.', '#.#', '###', '#.#', '#.#'],
+  },
+  32: {
+    I: ['##', '##', '##', '##', '##', '##', '##'],
+    A: ['.###.', '##.##', '##.##', '#####', '##.##', '##.##', '##.##'],
+  },
 };
 
-/** The sparkle drawn pixel by pixel for 16 px, where a curve blurs into a blot: rows of [from, to) columns. */
-const PIXEL_SPARKLE = [
-  [3, 4],
-  [3, 4],
-  [2, 5],
-  [0, 7],
-  [2, 5],
-  [3, 4],
-  [3, 4],
-] as const;
+/** The letters' pixels as rects, their top-left pixel at (x, y). */
+const pixelLetters = (letters: MarkLetters, grid: 16 | 32, x: number, y: number): string[] => {
+  const rects: string[] = [];
+  let left = x;
+  for (const letter of MARK_GLYPHS[letters]) {
+    const rows = PIXEL_GLYPHS[grid][letter];
+    rows.forEach((row, dy) => {
+      Array.from({ length: row.length }, (_, dx) => row.charAt(dx)).forEach((cell, dx) => {
+        if (cell === '#') {
+          rects.push(`<rect x="${left + dx}" y="${y + dy}" width="1" height="1" fill="${ink}"/>`);
+        }
+      });
+    });
+    left += (rows[0]?.length ?? 0) + 1;
+  }
+  return rects;
+};
+
+/** The letters' width in pixels, gap included. */
+const pixelWidth = (letters: MarkLetters, grid: 16 | 32): number =>
+  MARK_GLYPHS[letters].reduce(
+    (width, letter) => width + (PIXEL_GLYPHS[grid][letter][0]?.length ?? 0) + 1,
+    -1,
+  );
 
 const { orange, ink, paper } = palette;
 
@@ -232,39 +261,40 @@ const svg = (viewBox: number, ...parts: string[]) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewBox} ${viewBox}">${parts.join('')}</svg>`;
 
 /**
- * The platform's default icon: the coming-soon page's ballot going into the slot of a ballot box, marked with the AI
- * sparkle instead of a cross ("AI on the ballot"), on an orange tile, so its marks keep their contrast whatever the
- * tab's colour. No text and no tenant's branding. 16 and 32 px have their own drawings, fitted to the pixel grid;
- * from 180 px the tile fills the square, since home screens cut their own corners (and fill transparency with black).
+ * The platform's default icon: the site's mark (PLAN R238), a ballot marked with the letters for AI in the site's
+ * language going into a transparent ballot box, on an orange tile, so its marks keep their contrast whatever the tab's
+ * colour. No tenant's branding. 16 and 32 px have their own drawings, fitted to the pixel grid; from 180 px the tile
+ * fills the square, since home screens cut their own corners (and fill transparency with black).
  */
-export const defaultSiteIconSvg = (size: SiteIconSize): string => {
-  if (size === 16) {
+export const defaultSiteIconSvg = (size: SiteIconSize, letters: MarkLetters): string => {
+  if (size === 16 || size === 32) {
+    const grid = size;
+    const at = (small: number, large: number) => (grid === 16 ? small : large);
+    const ballot = { x: at(4, 9), y: at(1, 2), width: at(8, 14), height: at(8, 15) };
+    const lettersTop = at(2, 4);
+    const lettersLeft = ballot.x + Math.floor((ballot.width - pixelWidth(letters, grid)) / 2);
     return svg(
-      16,
-      `<rect width="16" height="16" rx="3" fill="${orange}"/>`,
-      `<rect x="3" y="1" width="9" height="11" fill="${paper}"/>`,
-      ...PIXEL_SPARKLE.map(
-        ([from, to], row) =>
-          `<rect x="${4 + from}" y="${3 + row}" width="${to - from}" height="1" fill="${ink}"/>`,
-      ),
-      `<rect x="1" y="11" width="14" height="4" rx="2" fill="${ink}"/>`,
+      grid,
+      `<rect width="${grid}" height="${grid}" rx="${at(3, 6)}" fill="${orange}"/>`,
+      `<rect x="${ballot.x}" y="${ballot.y}" width="${ballot.width}" height="${ballot.height}" fill="${paper}"/>`,
+      ...pixelLetters(letters, grid, lettersLeft, lettersTop),
+      // The box's outline, then its slot over the ballot.
+      grid === 16
+        ? `<rect x="1.5" y="9.5" width="13" height="5" fill="none" stroke="${ink}" stroke-width="1"/>`
+        : `<rect x="3" y="17" width="26" height="13" rx="2.5" fill="none" stroke="${ink}" stroke-width="2"/>`,
+      grid === 16
+        ? `<rect x="3" y="8" width="10" height="2" fill="${ink}"/>`
+        : `<rect x="6" y="15" width="20" height="4" rx="2" fill="${ink}"/>`,
     );
   }
-  if (size === 32) {
-    return svg(
-      32,
-      `<rect width="32" height="32" rx="6" fill="${orange}"/>`,
-      `<rect x="8" y="3" width="15" height="21" rx="1" fill="${paper}"/>`,
-      `<path d="${sparkle(15.5, 12.5, 7.5, 2)}" fill="${ink}"/>`,
-      `<rect x="1" y="22" width="30" height="7" rx="3.5" fill="${ink}"/>`,
-    );
-  }
+  const mark = ballotBox('compact', letters);
+  const paint = ballotBoxPaint({ canvas: paper, ink, onAccent: ink });
   return svg(
     64,
     `<rect width="64" height="64"${size < 180 ? ' rx="14"' : ''} fill="${orange}"/>`,
-    `<rect x="16" y="6" width="32" height="44" rx="2" fill="${paper}"/>`,
-    `<path d="${sparkle(32, 25, 13, 3.2)}" fill="${ink}"/>`,
-    `<rect x="4" y="44" width="56" height="14" rx="7" fill="${ink}"/>`,
+    `<g transform="translate(0 ${(64 - mark.height) / 2})">`,
+    ...mark.shapes.map((shape) => shapeSvg(shape, paint)),
+    '</g>',
   );
 };
 
@@ -275,7 +305,8 @@ export const defaultSiteIconSvg = (size: SiteIconSize): string => {
  */
 export const siteIconHash = (source: SiteIconSource, size: SiteIconSize | 'ico'): string => {
   const sizes = size === 'ico' ? ICO_SIZES : [size];
-  const drawings = source.kind === 'default' ? sizes.map(defaultSiteIconSvg) : [];
+  const drawings =
+    source.kind === 'default' ? sizes.map((each) => defaultSiteIconSvg(each, source.letters)) : [];
   return createHash('sha256')
     .update(JSON.stringify([SITE_ICON_VERSION, source, size, sizes, drawings]))
     .digest('hex')

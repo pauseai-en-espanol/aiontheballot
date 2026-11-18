@@ -65,6 +65,7 @@ const COMING_SOON: ComingSoonCard = {
   theme: DEFAULT_CARD_THEME,
   label: 'Próximamente · Elecciones de ejemplo, domingo 1 de enero',
   name: 'Inquilino de ejemplo A',
+  letters: 'IA',
   question: '¿Qué proponen los partidos de ejemplo frente a los riesgos de la IA?',
   address: 'ejemplo-a.example.test',
   initiative: 'Una iniciativa de Organización de ejemplo A',
@@ -74,6 +75,7 @@ const COMING_SOON: ComingSoonCard = {
 const FRAME: CardFrame = {
   theme: DEFAULT_CARD_THEME,
   site: 'Inquilino de ejemplo A',
+  letters: 'IA',
   election: 'Elecciones de ejemplo · domingo, 1 de enero',
   address: 'ejemplo-a.example.test',
   methodology: 'Metodología: ejemplo-a.example.test/elecciones-de-ejemplo/metodologia',

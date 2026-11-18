@@ -1,3 +1,5 @@
+import type { MarkLetters } from '@aiontheballot/ui/ballot-box';
+
 import { Resvg } from '@resvg/resvg-js';
 
 import { imageSize } from './image-size.js';
@@ -10,8 +12,9 @@ import {
   tenantSiteIconSvg,
 } from './site-icon.js';
 
-/** What an icon is drawn from: the default, or a tenant's PNG already checked by `isUsableSiteIcon`. */
-export type SiteIconArt = { kind: 'default' } | { kind: 'tenant'; png: Uint8Array };
+/** What an icon is drawn from: the default with its letters, or a tenant's PNG already checked by `isUsableSiteIcon`. */
+export type SiteIconArt =
+  { kind: 'default'; letters: MarkLetters } | { kind: 'tenant'; png: Uint8Array };
 
 const rasterise = (svg: string, side: number): Uint8Array =>
   new Resvg(svg, { fitTo: { mode: 'width', value: side }, font: { loadSystemFonts: false } })
@@ -55,7 +58,9 @@ const reduce = (png: Uint8Array, size: SiteIconSize): Uint8Array => {
 
 /** The icon as a PNG of `size` pixels a side, rasterised by resvg like the share cards. */
 export const renderSiteIcon = (art: SiteIconArt, size: SiteIconSize): Uint8Array =>
-  art.kind === 'default' ? rasterise(defaultSiteIconSvg(size), size) : reduce(art.png, size);
+  art.kind === 'default'
+    ? rasterise(defaultSiteIconSvg(size, art.letters), size)
+    : reduce(art.png, size);
 
 /** /favicon.ico: the 16, 32 and 48 px icons in one file. */
 export const renderFavicon = (art: SiteIconArt): Uint8Array =>

@@ -48,7 +48,7 @@ const home = (brand: PublicHome['brand'] = {}): PublicHome => ({
 });
 
 /** A whole 512 px PNG (the default icon), or one cut short, which a header check alone would take. */
-const icon = (): Uint8Array => renderSiteIcon({ kind: 'default' }, 512);
+const icon = (): Uint8Array => renderSiteIcon({ kind: 'default', letters: 'IA' }, 512);
 const cutShort = (): Uint8Array => icon().slice(0, 200);
 
 const SHA = 'c'.repeat(64);
@@ -75,7 +75,7 @@ describe('the site icon a tenant gets', () => {
     [
       'with a PNG that is too small',
       withIcon(),
-      async () => renderSiteIcon({ kind: 'default' }, 180),
+      async () => renderSiteIcon({ kind: 'default', letters: 'IA' }, 180),
     ],
     ['with a PNG cut short', withIcon(), async () => cutShort()],
     [
@@ -86,7 +86,13 @@ describe('the site icon a tenant gets', () => {
       },
     ],
   ])('is the default %s, never another mark', async (_name, data, load) => {
-    expect(await siteIconSource('ejemplo', data, load)).toEqual({ kind: 'default' });
+    expect(await siteIconSource('ejemplo', data, load)).toEqual({ kind: 'default', letters: 'IA' });
+  });
+
+  it('marks the default with the letters for AI in the site’s own language (PLAN R238)', async () => {
+    const english = { ...home(), tenant: { ...home().tenant, defaultLocale: 'en' } };
+    expect(await siteIconSource('ejemplo', english)).toEqual({ kind: 'default', letters: 'AI' });
+    expect(await siteIconSource('ejemplo', home())).toEqual({ kind: 'default', letters: 'IA' });
   });
 
   it('decides once per upload: a page never downloads the icon again', async () => {
@@ -97,7 +103,7 @@ describe('the site icon a tenant gets', () => {
     const bad = vi.fn(async () => cutShort());
     const other = home({ site_icon: { sha256: 'e'.repeat(64), contentType: 'image/png' } });
     await siteIconSource('ejemplo', other, bad);
-    expect(await siteIconSource('ejemplo', other, bad)).toEqual({ kind: 'default' });
+    expect(await siteIconSource('ejemplo', other, bad)).toEqual({ kind: 'default', letters: 'IA' });
     expect(bad).toHaveBeenCalledTimes(1);
   });
 
@@ -129,8 +135,14 @@ describe('the site icon a tenant gets', () => {
         .fn<() => Promise<Uint8Array>>()
         .mockRejectedValueOnce(new Error('API down'))
         .mockResolvedValue(icon());
-      expect(await siteIconSource('ejemplo', withIcon(), load)).toEqual({ kind: 'default' });
-      expect(await siteIconSource('ejemplo', withIcon(), load)).toEqual({ kind: 'default' });
+      expect(await siteIconSource('ejemplo', withIcon(), load)).toEqual({
+        kind: 'default',
+        letters: 'IA',
+      });
+      expect(await siteIconSource('ejemplo', withIcon(), load)).toEqual({
+        kind: 'default',
+        letters: 'IA',
+      });
       expect(load).toHaveBeenCalledTimes(1);
       vi.advanceTimersByTime(61_000);
       expect(await siteIconSource('ejemplo', withIcon(), load)).toEqual({
@@ -143,11 +155,11 @@ describe('the site icon a tenant gets', () => {
   });
 
   it('is served by size and content hash, which changes with the icon', () => {
-    const path = siteIconPath({ kind: 'default' }, 32);
-    expect(path).toBe(`/brand/icon/32.${siteIconHash({ kind: 'default' }, 32)}.png`);
+    const path = siteIconPath({ kind: 'default', letters: 'IA' }, 32);
+    expect(path).toBe(`/brand/icon/32.${siteIconHash({ kind: 'default', letters: 'IA' }, 32)}.png`);
     expect(parseSiteIconFile(path.split('/').pop() ?? '')).toEqual({
       size: 32,
-      hash: siteIconHash({ kind: 'default' }, 32),
+      hash: siteIconHash({ kind: 'default', letters: 'IA' }, 32),
     });
     expect(siteIconPath({ kind: 'tenant', sha256: SHA }, 32)).not.toBe(path);
     for (const file of [
@@ -163,26 +175,26 @@ describe('the site icon a tenant gets', () => {
   });
 
   it('is named in the web manifest, relative to it, at 192 and 512 px', () => {
-    const manifest = webManifest('Inquilino de ejemplo', 'es', { kind: 'default' });
+    const manifest = webManifest('Inquilino de ejemplo', 'es', { kind: 'default', letters: 'IA' });
     expect(manifest).toMatchObject({ name: 'Inquilino de ejemplo', lang: 'es', start_url: './' });
     expect(manifest.icons).toEqual([
       expect.objectContaining({
-        src: siteIconPath({ kind: 'default' }, 192).slice(1),
+        src: siteIconPath({ kind: 'default', letters: 'IA' }, 192).slice(1),
         sizes: '192x192',
       }),
       expect.objectContaining({
-        src: siteIconPath({ kind: 'default' }, 512).slice(1),
+        src: siteIconPath({ kind: 'default', letters: 'IA' }, 512).slice(1),
         sizes: '512x512',
       }),
     ]);
   });
 
   it("tints the browser's bar with the site's own accent, or the platform's (R178)", () => {
-    expect(webManifest('Ejemplo', 'es', { kind: 'default' }).theme_color).toBe(
+    expect(webManifest('Ejemplo', 'es', { kind: 'default', letters: 'IA' }).theme_color).toBe(
       SITE_ICON_COLOURS.theme,
     );
-    expect(webManifest('Ejemplo', 'es', { kind: 'default' }, '#1d3557').theme_color).toBe(
-      '#1d3557',
-    );
+    expect(
+      webManifest('Ejemplo', 'es', { kind: 'default', letters: 'IA' }, '#1d3557').theme_color,
+    ).toBe('#1d3557');
   });
 });

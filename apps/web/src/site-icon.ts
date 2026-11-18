@@ -1,6 +1,6 @@
 import { BRAND_SLOTS, type PublicHome } from '@aiontheballot/domain/public-home';
 import {
-  DEFAULT_SITE_ICON,
+  defaultSiteIcon,
   isServedSiteIconSize,
   isUsableSiteIcon,
   type ServedSiteIconSize,
@@ -9,6 +9,7 @@ import {
   type SiteIconSize,
   type SiteIconSource,
 } from '@aiontheballot/og/site-icon';
+import { markLetters } from '@aiontheballot/ui/ballot-box';
 
 import { loadBrandImage } from './brand-images';
 import { createImageCache, type ImageCache } from './image-cache';
@@ -60,25 +61,27 @@ const failed = ({ failures }: IconChecks, sha256: string) => {
 
 /**
  * Which icon a tenant's pages use: its `site_icon` upload if that is a whole PNG, square, 512 to 1,024 px a side, and
- * otherwise the platform's default, also while the upload can't be read. Never another organization's mark.
+ * otherwise the platform's default, marked with the letters for AI in the site's own language (PLAN R238), also while
+ * the upload can't be read. Never another organization's mark.
  */
 export const siteIconSource = async (
   slug: string,
   home: PublicHome,
   load: LoadBytes = loadBrandImage,
 ): Promise<SiteIconSource> => {
+  const fallback = defaultSiteIcon(markLetters(home.tenant.defaultLocale));
   const image = home.brand[BRAND_SLOTS.siteIcon];
   if (image?.contentType !== 'image/png') {
-    return DEFAULT_SITE_ICON;
+    return fallback;
   }
   const tenant: SiteIconSource = { kind: 'tenant', sha256: image.sha256 };
   const state = checks();
   const known = state.verdicts.get(image.sha256);
   if (known !== undefined) {
-    return known ? tenant : DEFAULT_SITE_ICON;
+    return known ? tenant : fallback;
   }
   if ((state.failures.get(image.sha256) ?? 0) > Date.now()) {
-    return DEFAULT_SITE_ICON;
+    return fallback;
   }
   let pending = state.pending.get(image.sha256);
   if (!pending) {
@@ -93,9 +96,9 @@ export const siteIconSource = async (
       .finally(() => state.pending.delete(image.sha256));
   }
   try {
-    return (await pending) ? tenant : DEFAULT_SITE_ICON;
+    return (await pending) ? tenant : fallback;
   } catch {
-    return DEFAULT_SITE_ICON;
+    return fallback;
   }
 };
 
@@ -142,7 +145,7 @@ const siteIcons = (): ImageCache => {
  */
 const art = async (slug: string, source: SiteIconSource, load: LoadBytes) =>
   source.kind === 'default'
-    ? ({ kind: 'default' } as const)
+    ? ({ kind: 'default', letters: source.letters } as const)
     : ({ kind: 'tenant', png: await load(slug, source.sha256) } as const);
 
 export const siteIconPng = (

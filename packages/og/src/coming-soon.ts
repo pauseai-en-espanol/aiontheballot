@@ -1,5 +1,8 @@
+import type { MarkLetters } from '@aiontheballot/ui/ballot-box';
+
 import type { CardTheme } from './theme.js';
 
+import { markImage } from './mark.js';
 import { h, img, type OgNode } from './node.js';
 import { SHARE_SIZES, type ShareSize } from './sizes.js';
 
@@ -14,6 +17,8 @@ export interface ComingSoonCard {
   label: string;
   /** The tenant's name: the product people share. */
   name: string;
+  /** The letters the site's mark is marked with, in the card's language (PLAN R238). */
+  letters: MarkLetters;
   question: string;
   /** The tenant's canonical address without the scheme (BRIEF §3, invariant 4: large on every card). */
   address: string;
@@ -132,66 +137,9 @@ const display = {
   textTransform: 'uppercase',
 } as const;
 
-/** A ballot going into the slot of a ballot box, as on the page: ink on the canvas, the slot on the accent. */
-const ballot = (width: number, theme: CardTheme): OgNode => {
-  const u = width / 440;
-  const row = (checked: boolean, barWidth: number, faded: boolean) =>
-    h(
-      'div',
-      { display: 'flex', alignItems: 'center', gap: 12 * u },
-      h(
-        'div',
-        {
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 20 * u,
-          height: 20 * u,
-          border: `${3 * u}px solid ${theme.ink}`,
-        },
-        checked
-          ? h('div', { width: 8 * u, height: 8 * u, backgroundColor: theme.ink })
-          : h('div', { width: 0, height: 0 }),
-      ),
-      h('div', {
-        width: barWidth * u,
-        height: 6 * u,
-        backgroundColor: theme.ink,
-        opacity: faded ? 0.35 : 1,
-      }),
-    );
-  return h(
-    'div',
-    { display: 'flex', position: 'relative', width, height: 190 * u, flexShrink: 0 },
-    h(
-      'div',
-      {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14 * u,
-        position: 'absolute',
-        left: 79 * u,
-        top: 0,
-        width: 282 * u,
-        height: 160 * u,
-        padding: `${22 * u}px ${24 * u}px`,
-        backgroundColor: theme.canvas,
-      },
-      row(true, 202, false),
-      row(false, 202, true),
-      row(false, 110, true),
-    ),
-    h('div', {
-      position: 'absolute',
-      left: 0,
-      bottom: 0,
-      width,
-      height: 44 * u,
-      borderRadius: 22 * u,
-      backgroundColor: theme.onAccent,
-    }),
-  );
-};
+/** The site's mark (PLAN R238), as on the page: the ballot on the canvas, printed in ink, the box on the accent. */
+const ballot = (width: number, letters: MarkLetters, theme: CardTheme): OgNode =>
+  markImage('hero', letters, theme, Math.round((width * 220) / 440));
 
 /**
  * The coming-soon card in direction A (the orange poster): the label, the name as big as the space allows with the
@@ -268,7 +216,7 @@ export const comingSoonCard = (
           'div',
           { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32 },
           nameLine(first),
-          ballot(l.ballot, card.theme),
+          ballot(l.ballot, card.letters, card.theme),
         ),
         ...(second === undefined ? [] : [nameLine(second)]),
       ),

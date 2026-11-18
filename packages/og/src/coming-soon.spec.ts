@@ -10,6 +10,7 @@ const card = {
   theme: DEFAULT_CARD_THEME,
   label: 'Próximamente',
   name: 'Inquilino de ejemplo A',
+  letters: 'IA' as const,
   question: '¿Qué proponen los partidos frente a los riesgos de la IA?',
   address: 'ejemplo-a.example.test',
   initiative: 'Una iniciativa de Organización de ejemplo A',

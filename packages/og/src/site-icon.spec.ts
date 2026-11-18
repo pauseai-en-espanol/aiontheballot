@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { imageSize } from './image-size.js';
 import { renderFavicon, renderSiteIcon } from './site-icon-render.js';
 import {
-  DEFAULT_SITE_ICON,
+  defaultSiteIcon,
   defaultSiteIconSvg,
   encodeIco,
   isCompletePng,
@@ -268,42 +268,46 @@ describe("a tenant's icon", () => {
 });
 
 describe('the default icon', () => {
-  it('hashes what it is drawn from and its size, so a cached URL never shows another picture', () => {
+  it('hashes what it is drawn from, its letters and its size, so a cached URL never shows another picture', () => {
     const tenant = { kind: 'tenant', sha256: 'a'.repeat(64) } as const;
-    expect(siteIconHash(DEFAULT_SITE_ICON, 32)).toMatch(/^[0-9a-f]{12}$/);
-    expect(siteIconHash(DEFAULT_SITE_ICON, 32)).toBe(siteIconHash({ kind: 'default' }, 32));
+    const spanish = defaultSiteIcon('IA');
+    expect(siteIconHash(spanish, 32)).toMatch(/^[0-9a-f]{12}$/);
+    expect(siteIconHash(spanish, 32)).toBe(siteIconHash({ kind: 'default', letters: 'IA' }, 32));
     expect(
       new Set([
-        siteIconHash(DEFAULT_SITE_ICON, 32),
-        siteIconHash(DEFAULT_SITE_ICON, 180),
-        siteIconHash(DEFAULT_SITE_ICON, 'ico'),
+        siteIconHash(spanish, 32),
+        siteIconHash(spanish, 180),
+        siteIconHash(spanish, 'ico'),
+        siteIconHash(defaultSiteIcon('AI'), 32),
         siteIconHash(tenant, 32),
         siteIconHash(tenant, 'ico'),
         siteIconHash({ kind: 'tenant', sha256: 'b'.repeat(64) }, 32),
       ]).size,
-    ).toBe(6);
+    ).toBe(7);
   });
 
   it('draws the same pictures for this version', () => {
     expect({
       version: SITE_ICON_VERSION,
       ...Object.fromEntries(
-        SITE_ICON_SIZES.map((size) => [size, sha256(defaultSiteIconSvg(size))]),
+        SITE_ICON_SIZES.map((size) => [size, sha256(defaultSiteIconSvg(size, 'IA'))]),
       ),
     }).toEqual({
       version: 1,
-      16: 'fe8e413d6f355557e1b2f8afcebe50e79fbb7635d8a8d88ee0029f26045f9dd6',
-      32: 'f0835796f47556c6b9eb4d536d68227efc27487067af15168227b7be75c48995',
-      48: 'cf8216943fdde79562cdbb64cb18f4c7794ee74193e185143f01ba1789f4e08d',
-      180: '0a3875d7d6ec98a9aae6bbd1723a6cbd2be9a2d23b6dbea271cf95d9caff14d3',
-      192: '0a3875d7d6ec98a9aae6bbd1723a6cbd2be9a2d23b6dbea271cf95d9caff14d3',
-      512: '0a3875d7d6ec98a9aae6bbd1723a6cbd2be9a2d23b6dbea271cf95d9caff14d3',
+      16: '0fa9f35e4b3ebcbc7d4b8c332b935f5e5ca075c7c7b538f870a3b34a733eaa31',
+      32: '8ceb160faed2272ef184bcfba0f1f08066c96baecdbb32c4cf7b42852b476ed9',
+      48: '981fdf1a48b171be53bf3837ba13ae56b9e70c803cb69862c6aed07b8ceb653a',
+      180: '8cc41e59a3c889785ed83a9a2ade7d7f03d9b4582ed59688252fe48758ac25cd',
+      192: '8cc41e59a3c889785ed83a9a2ade7d7f03d9b4582ed59688252fe48758ac25cd',
+      512: '8cc41e59a3c889785ed83a9a2ade7d7f03d9b4582ed59688252fe48758ac25cd',
     });
   });
 
-  it('has no text in it', () => {
+  it('draws its letters as shapes, needing no font', () => {
     for (const size of SITE_ICON_SIZES) {
-      expect(defaultSiteIconSvg(size)).not.toMatch(/<text|<tspan/);
+      for (const letters of ['IA', 'AI'] as const) {
+        expect(defaultSiteIconSvg(size, letters)).not.toMatch(/<text|<tspan/);
+      }
     }
   });
 
@@ -312,40 +316,71 @@ describe('the default icon', () => {
     expect(contrastRatio(palette.ink, palette.paper)).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
-  it('lands on whole pixels at 16 px: tile, ballot, the sparkle and its arms, the slot', () => {
-    const pixels = pixelsOf(renderSiteIcon({ kind: 'default' }, 16), 16);
+  it('lands on whole pixels at 16 px (PLAN R238): tile, ballot, the letters, the slot, the box', () => {
+    const pixels = pixelsOf(renderSiteIcon({ kind: 'default', letters: 'IA' }, 16), 16);
     const at = (x: number, y: number) => hex(pixels, 16, x, y);
-    expect(at(1, 4)).toBe(palette.orange.toLowerCase());
-    expect([at(4, 2), at(5, 4), at(10, 9)]).toEqual(Array(3).fill(palette.paper.toLowerCase()));
-    expect([at(7, 6), at(7, 3), at(7, 9), at(4, 6), at(10, 6)]).toEqual(
-      Array(5).fill(palette.ink.toLowerCase()),
+    const [orange, paper, ink] = [palette.orange, palette.paper, palette.ink].map((c) =>
+      c.toLowerCase(),
     );
-    expect(at(8, 13)).toBe(palette.ink.toLowerCase());
+    expect([at(1, 4), at(8, 12)]).toEqual([orange, orange]);
+    // The ballot's margins, the A's counter and the gap between its legs.
+    expect([at(4, 2), at(11, 4), at(8, 7), at(8, 3), at(8, 5)]).toEqual(Array(5).fill(paper));
+    // The I, the A's apex, crossbar and legs; the slot; the box's side and bottom.
+    expect([
+      at(5, 2),
+      at(5, 6),
+      at(8, 2),
+      at(7, 4),
+      at(9, 4),
+      at(7, 6),
+      at(9, 6),
+      at(8, 8),
+      at(1, 12),
+      at(8, 14),
+    ]).toEqual(Array(10).fill(ink));
   });
 
-  it('lands on whole pixels at 32 px: a one-pixel spine for the sparkle, paper either side', () => {
-    const pixels = pixelsOf(renderSiteIcon({ kind: 'default' }, 32), 32);
+  it('lands on whole pixels at 32 px: two-pixel strokes for the letters, the slot, the box', () => {
+    const pixels = pixelsOf(renderSiteIcon({ kind: 'default', letters: 'IA' }, 32), 32);
     const at = (x: number, y: number) => hex(pixels, 32, x, y);
-    expect([at(15, 9), at(15, 12), at(15, 15), at(11, 12), at(19, 12)]).toEqual(
-      Array(5).fill(palette.ink.toLowerCase()),
+    const [orange, paper, ink] = [palette.orange, palette.paper, palette.ink].map((c) =>
+      c.toLowerCase(),
     );
-    expect([at(13, 8), at(17, 8), at(9, 4), at(21, 20)]).toEqual(
-      Array(4).fill(palette.paper.toLowerCase()),
-    );
-    expect(at(3, 12)).toBe(palette.orange.toLowerCase());
-    expect(at(15, 26)).toBe(palette.ink.toLowerCase());
+    expect([at(10, 4), at(21, 4), at(16, 12), at(17, 6)]).toEqual(Array(4).fill(paper));
+    expect([
+      at(12, 4),
+      at(13, 10),
+      at(16, 4),
+      at(17, 7),
+      at(16, 16),
+      at(2, 24),
+      at(16, 29),
+    ]).toEqual(Array(7).fill(ink));
+    expect([at(16, 24), at(1, 10)]).toEqual([orange, orange]);
+  });
+
+  it('draws «AI» for a site in English, the same pieces in the other order', () => {
+    const pixels = pixelsOf(renderSiteIcon({ kind: 'default', letters: 'AI' }, 16), 16);
+    const at = (x: number, y: number) => hex(pixels, 16, x, y);
+    const [paper, ink] = [palette.paper, palette.ink].map((c) => c.toLowerCase());
+    // The A first (apex at 6), the I last (column 9).
+    expect([at(6, 2), at(5, 4), at(9, 2), at(9, 6)]).toEqual(Array(4).fill(ink));
+    expect([at(6, 3), at(8, 4)]).toEqual([paper, paper]);
   });
 
   it('fills the square from 180 px, since home screens cut their own corners', () => {
-    const pixels = pixelsOf(renderSiteIcon({ kind: 'default' }, 180), 180);
+    const pixels = pixelsOf(renderSiteIcon({ kind: 'default', letters: 'IA' }, 180), 180);
     expect(hex(pixels, 180, 0, 0)).toBe(palette.orange.toLowerCase());
     expect(pixels[3]).toBe(255);
     // A tab's 48 px keeps its rounded corners.
-    expect(pixelsOf(renderSiteIcon({ kind: 'default' }, 48), 48)[3]).toBe(0);
+    expect(pixelsOf(renderSiteIcon({ kind: 'default', letters: 'IA' }, 48), 48)[3]).toBe(0);
   });
 
   it.each(SITE_ICON_SIZES)('renders the default and a tenant icon at %i px', (size) => {
-    for (const art of [{ kind: 'default' }, { kind: 'tenant', png: png(600) }] as const) {
+    for (const art of [
+      { kind: 'default', letters: 'IA' },
+      { kind: 'tenant', png: png(600) },
+    ] as const) {
       expect(imageSize(renderSiteIcon(art, size))).toEqual({
         width: size,
         height: size,
@@ -362,7 +397,7 @@ describe('the default icon', () => {
 
 describe('/favicon.ico', () => {
   it('holds the 16, 32 and 48 px PNGs behind a valid icon directory', () => {
-    const ico = renderFavicon({ kind: 'default' });
+    const ico = renderFavicon({ kind: 'default', letters: 'IA' });
     const view = new DataView(ico.buffer, ico.byteOffset, ico.byteLength);
     expect([view.getUint16(0, true), view.getUint16(2, true), view.getUint16(4, true)]).toEqual([
       0, 1, 3,

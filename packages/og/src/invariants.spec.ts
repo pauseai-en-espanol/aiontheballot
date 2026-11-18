@@ -105,6 +105,7 @@ const LONG_TITLES = [
 const tableData = (parties: number, criteria: number, long = false): TableCard => ({
   theme: DEFAULT_CARD_THEME,
   site: 'Inquilino de ejemplo A',
+  letters: 'IA' as const,
   election: 'Elecciones de ejemplo',
   address: 'ejemplo-a.example.test',
   methodology: 'Metodología: ejemplo-a.example.test/x',

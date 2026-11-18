@@ -3,11 +3,13 @@ import type { Locale } from '@aiontheballot/i18n/catalog';
 
 import { pickLocalized } from '@aiontheballot/domain/localized';
 import { getTranslator } from '@aiontheballot/i18n/messages';
+import { markLetters } from '@aiontheballot/ui/ballot-box';
 import { siteColourVariables } from '@aiontheballot/ui/site-colours';
 import { css, cx } from '@styled-system/css';
 
 import type { SignupOutcome } from '../signup-outcomes';
 
+import { BallotBox } from './ballot-box';
 import { SignupForm } from './signup-form';
 import { type LanguageLink, SiteFooter, type SiteLinks } from './site-footer';
 
@@ -67,49 +69,20 @@ const PauseBars = () => (
 );
 
 /**
- * A ballot going into the slot of a ballot box, floated beside the start of the name. Decorative. An SVG, so it
- * scales down to a phone; no inline styles of its own, since the cached public site's CSP has no nonces (ADR-0003). Its
- * colours are the roles', so a site's own colour (R178) reaches its slot too.
+ * The site's mark (PLAN R238), floated beside the start of the name: a ballot marked with the letters for AI going
+ * into a transparent ballot box. Decorative; an SVG, so it scales down to a phone.
  */
-const Ballot = () => (
-  <svg
-    aria-hidden="true"
-    focusable="false"
-    viewBox="0 0 440 190"
+const Ballot = ({ locale }: { locale: Locale }) => (
+  <BallotBox
+    variant="hero"
+    letters={markLetters(locale)}
     className={css({
       float: 'right',
       width: 'clamp(112px, min(34vw, 40vh), 440px)',
       height: 'auto',
       marginInlineStart: 'clamp(12px, 3vw, 40px)',
     })}
-  >
-    <rect x="79" y="0" width="282" height="160" className={css({ fill: 'bg.canvas' })} />
-    {[22, 56, 90].map((y, row) => (
-      <g key={y}>
-        <rect
-          x="104.5"
-          y={y + 1.5}
-          width="17"
-          height="17"
-          strokeWidth="3"
-          className={css({ fill: 'none', stroke: 'border.default' })}
-        />
-        {row === 0 && (
-          <rect x="110" y={y + 6} width="8" height="8" className={css({ fill: 'fg.default' })} />
-        )}
-        <rect
-          x="135"
-          y={y + 7}
-          width={row === 2 ? 110 : 202}
-          height="6"
-          className={
-            row === 0 ? css({ fill: 'fg.default' }) : css({ fill: 'fg.default', opacity: '0.35' })
-          }
-        />
-      </g>
-    ))}
-    <rect x="0" y="146" width="440" height="44" rx="22" className={css({ fill: 'bg.onAccent' })} />
-  </svg>
+  />
 );
 
 // The name is a poster headline: as big as its longest word allows. A word never breaks (mid-word breaks look
@@ -209,7 +182,7 @@ export const ComingSoon = ({ home, locale, logos, links, languages, signup }: Co
               }),
             )}
           >
-            <Ballot />
+            <Ballot locale={locale} />
             {name}
           </h1>
 

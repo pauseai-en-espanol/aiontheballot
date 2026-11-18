@@ -1,7 +1,9 @@
+import type { MarkLetters } from '@aiontheballot/ui/ballot-box';
 import type { RatingDisplay } from '@aiontheballot/ui/ratings';
 
 import type { CardTheme } from './theme.js';
 
+import { markImage } from './mark.js';
 import { h, img, type OgChild, type OgNode, type Style } from './node.js';
 import { ratingIcon } from './rating-icon.js';
 import { SHARE_SIZES, type ShareSize } from './sizes.js';
@@ -20,6 +22,8 @@ export interface CardFrame {
   theme: CardTheme;
   /** The site's name: the product people share. */
   site: string;
+  /** The letters the site's mark is marked with, in the page's language (PLAN R238). */
+  letters: MarkLetters;
   /** The election's name and date, one line. */
   election: string;
   /** The canonical address without the scheme: large on every card. */
@@ -289,7 +293,7 @@ const frame = (
       color: theme.onAccent,
       fontFamily: 'Roboto Slab',
     },
-    // The site, with the pause sign, and the election.
+    // The site, with its mark, and the election.
     h(
       'div',
       { display: 'flex', flexDirection: 'column', height: headerHeight, flexShrink: 0 },
@@ -304,12 +308,7 @@ const frame = (
           lineHeight: 1.05,
           textTransform: 'uppercase',
         },
-        h(
-          'div',
-          { display: 'flex', gap: l.site * 0.14 },
-          h('div', { width: l.site * 0.2, height: l.site * 0.7, backgroundColor: theme.onAccent }),
-          h('div', { width: l.site * 0.2, height: l.site * 0.7, backgroundColor: theme.onAccent }),
-        ),
+        markImage('compact', card.letters, theme, Math.round(l.site * 0.95)),
         oneLine({}, card.site),
       ),
       oneLine({ fontSize: l.election, lineHeight: 1.35 }, card.election),

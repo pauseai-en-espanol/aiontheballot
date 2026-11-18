@@ -7,7 +7,7 @@ import { expect, test } from '../test.js';
 
 /**
  * ejemplo-a has its own icon in the seeds (a white frame on teal, 512 px); ejemplo-b has none, so it gets the
- * platform's default (the ballot with the sparkle, on orange).
+ * platform's default (the site's mark: the ballot marked «IA» going into the ballot box, on orange).
  */
 const CANONICAL_A = `https://${SEED_HOSTS.canonical}`;
 const CANONICAL_B = `https://${PLATFORM_HOST}/ejemplo-b`;
@@ -107,7 +107,8 @@ test.describe('site icons (fictional seeds)', () => {
       get(`https://${PLATFORM_HOST}${b.icon32}`),
     ]);
     expect(iconB.status).toBe(200);
-    // What each shows: A's frame (teal, white, teal from the edge in), B's ballot (an ink sparkle on white, on orange).
+    // What each shows: A's frame (teal, white, teal from the edge in); B's mark (PLAN R238), its ballot marked «IA»
+    // in its default language: the orange tile, the I in ink, the ballot's white margin beside it.
     const pictureA = decodePng(iconA.body);
     expect([pictureA.at(1, 1), pictureA.at(10, 16), pictureA.at(16, 16)]).toEqual([
       '#0b7a75',
@@ -115,7 +116,7 @@ test.describe('site icons (fictional seeds)', () => {
       '#0b7a75',
     ]);
     const pictureB = decodePng(iconB.body);
-    expect([pictureB.at(3, 12), pictureB.at(15, 12), pictureB.at(9, 4)]).toEqual([
+    expect([pictureB.at(1, 10), pictureB.at(12, 4), pictureB.at(10, 4)]).toEqual([
       '#ff9416',
       '#111111',
       '#ffffff',

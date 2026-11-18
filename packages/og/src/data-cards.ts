@@ -1,3 +1,4 @@
+import type { MarkLetters } from '@aiontheballot/ui/ballot-box';
 import type { RatingDisplay } from '@aiontheballot/ui/ratings';
 
 import type { CardTheme } from './theme.js';
@@ -16,6 +17,7 @@ import {
   partyMark,
   ratingWords,
 } from './election-cards.js';
+import { markImage } from './mark.js';
 import { h, type OgChild, type OgNode } from './node.js';
 import { ratingIcon } from './rating-icon.js';
 import { SHARE_SIZES, type ShareSize } from './sizes.js';
@@ -178,8 +180,8 @@ const LAYOUTS: Record<ShareSize, DataLayout> = {
   },
 };
 
-/** The site's name with its pause sign: the product people share (BRIEF §3, invariant 4). */
-const siteLine = (site: string, size: number, theme: CardTheme): OgNode =>
+/** The site's name with its mark (PLAN R238): the product people share (BRIEF §3, invariant 4). */
+const siteLine = (site: string, letters: MarkLetters, size: number, theme: CardTheme): OgNode =>
   h(
     'div',
     {
@@ -194,12 +196,7 @@ const siteLine = (site: string, size: number, theme: CardTheme): OgNode =>
       minWidth: 0,
       flexShrink: 1,
     },
-    h(
-      'div',
-      { display: 'flex', gap: size * 0.14, flexShrink: 0 },
-      h('div', { width: size * 0.2, height: size * 0.7, backgroundColor: theme.onAccent }),
-      h('div', { width: size * 0.2, height: size * 0.7, backgroundColor: theme.onAccent }),
-    ),
+    markImage('compact', letters, theme, Math.round(size * 0.95)),
     oneLine({ minWidth: 0 }, site),
   );
 
@@ -337,7 +334,7 @@ const dataFrame = (
           justifyContent: 'space-between',
           gap: 16,
         },
-        siteLine(card.site, l.site, theme),
+        siteLine(card.site, card.letters, l.site, theme),
         ...(operatorInHeader ? [] : [operatorLine(card, images, l.small)]),
       ),
       ...(head.kicker

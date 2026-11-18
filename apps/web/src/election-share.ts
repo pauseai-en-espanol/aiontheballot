@@ -27,6 +27,7 @@ import { getTranslator, type Locale } from '@aiontheballot/i18n/messages';
 import { cardHash } from '@aiontheballot/og/hash';
 import { isShareSize, type ShareSize } from '@aiontheballot/og/sizes';
 import { cardTheme } from '@aiontheballot/og/theme';
+import { markLetters } from '@aiontheballot/ui/ballot-box';
 
 import { correctionsLog } from './corrections-log';
 import { type CellView, cellViews, methodologyOf } from './election-view';
@@ -187,6 +188,7 @@ export const electionCard = (
     // The site's own accent (PLAN R178); the ratings' colours never change.
     theme: cardTheme(home.tenant.theme ?? {}),
     site,
+    letters: markLetters(locale),
     election: election.election.date
       ? t('home.election', { name, date: new Date(`${election.election.date}T12:00:00Z`) })
       : name,
