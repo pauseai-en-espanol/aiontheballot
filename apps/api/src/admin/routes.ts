@@ -166,6 +166,7 @@ import {
   updateDocument,
   updateSettings,
 } from './settings.js';
+import { electionShares } from './shares.js';
 import { signupCounts } from './signups.js';
 import {
   createSite,
@@ -4491,6 +4492,19 @@ export const adminDataRoutes =
           withActor(db, actor, async (trx) => {
             const { election } = await electionFor(trx, actor, request.params);
             return { entries: await listCorrections(trx, election) };
+          }),
+        ),
+    );
+
+    // How an election's pages are shared (PLAN R239): every member reads its counts.
+    scope.get<{ Params: { tenant: string; election: string } }>(
+      '/t/:tenant/e/:election/shares',
+      { schema: { params: ELECTION_PARAMS } },
+      async (request, reply) =>
+        signedIn(request, reply, (db, actor) =>
+          withActor(db, actor, async (trx) => {
+            const { election } = await electionFor(trx, actor, request.params);
+            return electionShares(trx, election.id);
           }),
         ),
     );

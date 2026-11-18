@@ -280,7 +280,9 @@ test.describe("election pages' own share images (R148)", () => {
       );
       const title = await page.title();
       const text = encodeURIComponent(title);
-      const address = encodeURIComponent(url);
+      // Each network's link names it as its channel (PLAN R239): a visit through it counts for that network.
+      const tagged = (network: string) =>
+        encodeURIComponent(`${url}&utm_source=${network}&utm_medium=share`);
 
       // In the one share dialog beside the title, before the page's content (PLAN R185, R218).
       const panel = await openSharing(page);
@@ -288,19 +290,21 @@ test.describe("election pages' own share images (R148)", () => {
       await expect(bar).toBeVisible();
       const href = async (network: string) =>
         (await bar.locator(`a[data-share="${network}"]`).getAttribute('href')) ?? '';
-      expect(await href('whatsapp')).toBe(`https://wa.me/?text=${text}%20${address}`);
-      expect(await href('telegram')).toBe(`https://t.me/share/url?url=${address}&text=${text}`);
-      expect(await href('x')).toBe(`https://x.com/intent/post?text=${text}&url=${address}`);
+      expect(await href('whatsapp')).toBe(`https://wa.me/?text=${text}%20${tagged('whatsapp')}`);
+      expect(await href('telegram')).toBe(
+        `https://t.me/share/url?url=${tagged('telegram')}&text=${text}`,
+      );
+      expect(await href('x')).toBe(`https://x.com/intent/post?text=${text}&url=${tagged('x')}`);
       expect(await href('facebook')).toBe(
-        `https://www.facebook.com/sharer/sharer.php?u=${address}`,
+        `https://www.facebook.com/sharer/sharer.php?u=${tagged('facebook')}`,
       );
       expect(await href('bluesky')).toBe(
-        `https://bsky.app/intent/compose?text=${text}%20${address}`,
+        `https://bsky.app/intent/compose?text=${text}%20${tagged('bluesky')}`,
       );
       expect(await href('linkedin')).toBe(
-        `https://www.linkedin.com/sharing/share-offsite/?url=${address}`,
+        `https://www.linkedin.com/sharing/share-offsite/?url=${tagged('linkedin')}`,
       );
-      expect(await href('email')).toBe(`mailto:?subject=${text}&body=${address}`);
+      expect(await href('email')).toBe(`mailto:?subject=${text}&body=${tagged('email')}`);
       // Each named in words beside its icon; the networks' open in a new tab, which screen readers are told.
       for (const name of ['WhatsApp', 'Telegram', 'X', 'Facebook', 'Bluesky', 'LinkedIn']) {
         const link = bar.getByRole('link', { name: `${name} ${messages.es.share.links.newTab}` });

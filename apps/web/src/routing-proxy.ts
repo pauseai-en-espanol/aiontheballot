@@ -6,10 +6,11 @@ import {
   type RoutingConfig,
   type RoutingTable,
 } from '@aiontheballot/domain/routing';
-import { type NextRequest, NextResponse } from 'next/server';
+import { type NextFetchEvent, type NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
 
 import { isInternalHost, REVALIDATE_PATH } from './revalidate';
+import { previewChannel, sitePathOf, visitorOf } from './share-counts';
 import {
   servedWhileComingSoon,
   SITE_LOCALE_HEADER,
@@ -88,8 +89,10 @@ export const createRoutingProxy =
     routingTable: () => Promise<RoutingTable | undefined>,
     config: RoutingConfig,
     previewToken?: string,
+    /** Counts a network's crawler drawing a link preview of a page (PLAN R239); never awaited by the page. */
+    countPreview?: (slug: string, path: string, channel: string, visitor: string) => Promise<void>,
   ) =>
-  async (request: NextRequest): Promise<NextResponse> => {
+  async (request: NextRequest, event?: NextFetchEvent): Promise<NextResponse> => {
     // The host as resolve() reads it: lowercase, without a port.
     const onPreviewHost =
       config.previewHost !== undefined &&
@@ -159,6 +162,18 @@ export const createRoutingProxy =
             : 'coming-soon';
         if (mode === 'coming-soon' && !servedWhileComingSoon(internalPath, tenant.slug, locale)) {
           return plain(404, 'Not found');
+        }
+        // A link preview being drawn: counted for the page, apart from the preview's own (PLAN R239).
+        const channel =
+          countPreview && mode !== 'preview' && ['GET', 'HEAD'].includes(request.method)
+            ? previewChannel(request.headers.get('user-agent'))
+            : undefined;
+        const sitePath = channel ? sitePathOf(internalPath, tenant.slug, locale) : undefined;
+        if (countPreview && channel && sitePath) {
+          const counting = countPreview(tenant.slug, sitePath, channel, visitorOf(request.headers));
+          if (event) {
+            event.waitUntil(counting);
+          }
         }
         const noindex = resolution.preview || !tenant.indexed;
         const headers = new Headers(request.headers);

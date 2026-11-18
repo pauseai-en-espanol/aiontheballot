@@ -150,7 +150,8 @@ names the token.
   `sign_up`, `confirm_signup` and `unsubscribe` (amended, PLAN R119, R122), the invitations' `pending_invitation` and
   `accept_invitation` (amended, PLAN R114), the publish trigger `publish_revision` and `anonymize_expired_reports`
   (worker only), the sweep's `file_sweep_list` (amended, PLAN R117, R141), `purge_election` (§14; amended, PLAN
-  R212) and `delete_source` (§14; amended, PLAN R228). All of them set `search_path = ''`.
+  R212), `delete_source` (§14; amended, PLAN R228) and the share counter `count_share` (§7; amended, PLAN R239). All
+  of them set `search_path = ''`.
 - The actor helpers (`private.current_user_id`, `private.current_aal`) and the policy helpers
   (`private.my_tenants`, `private.is_platform_admin`) are executable by `aiontheballot_admin`, whose policies and
   triggers call them.
@@ -168,11 +169,11 @@ names the token.
   some, so roughly when a tenant was active: never a file's contents, name or uploader. Every relation the function
   reads is schema-qualified, catalogs included, since with an empty `search_path` Postgres still looks in a session's
   temporary schema first for an unqualified one.
-- `app.submit_report`, `app.sign_up`, `app.confirm_signup` and `app.unsubscribe` are executable by
-  `aiontheballot_web` only, and `private.anonymize_expired_reports` by `aiontheballot_worker` only (all `SECURITY
+- `app.submit_report`, `app.sign_up`, `app.confirm_signup`, `app.unsubscribe` and `app.count_share` are executable
+  by `aiontheballot_web` only, and `private.anonymize_expired_reports` by `aiontheballot_worker` only (all `SECURITY
 DEFINER`, on the allowlist above).
 
-### 7. The public role reads, and can call four functions
+### 7. The public role reads, and can call five functions
 
 - `aiontheballot_web` can `SELECT` public-capable tables. RLS limits it to published rows in live or archived elections
   of active tenants, plus the row of an announced draft election (see the public-visibility rule).
@@ -180,7 +181,7 @@ DEFINER`, on the allowlist above).
   public doesn't need (`tenant_documents.created_by`, who wrote a policy text, beside the settings and private columns
   of `tenants`, `elections`, `files` and `source_documents`); `organizations` is still read whole (PLAN D18).
   `hostname_tombstones` is not the public's (a purge may tombstone hostnames that never were public), and the role
-  has no `USAGE` on `private`: nothing it reads calls a helper there, and the four functions below run as their
+  has no `USAGE` on `private`: nothing it reads calls a helper there, and the five functions below run as their
   owner.
 - It can `EXECUTE` `app.submit_report(...)`, which is `SECURITY DEFINER`. The function checks the tenant is
   active, inserts the report with `status='new'`, and enforces a per-tenant daily cap.
@@ -195,6 +196,13 @@ DEFINER`, on the allowlist above).
   first deletes the signups unconfirmed 7 days after they were made. Country admins and platform admins read every
   column of `app.signups` but the address, the mailbox and the token (column grants), so the admin shows counts and no
   runtime role reads an address.
+- **Share counts** (amended, PLAN R239): it can `EXECUTE` `app.count_share(tenant, path, event, channel)`,
+  `SECURITY DEFINER`, the only way to `app.share_counts`, which it can't read: it adds one to the day's count of an
+  event (a share from a page's dialog, an arrival through a share link, a network's link preview) on a page of an
+  active tenant, by its path inside the site and its channel, and returns whether it counted. A page of an election
+  not yet public counts nothing, and a tenant counts at most 100,000 a UTC day. Counts only: nothing of who shared
+  reaches the database. Every member of the tenant, and platform admins, read its counts (`aiontheballot_admin`,
+  SELECT and a membership policy).
 - It has no table write grants at all.
 - **The preview's role** (amended, PLAN R181): `aiontheballot_preview` has the same `USAGE` and `SELECT` grants
   (copied, and kept equal by a catalog test), and a `preview_read` policy beside each `public_read` one, admitting

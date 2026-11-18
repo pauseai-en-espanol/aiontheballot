@@ -23,6 +23,7 @@ import { createMailer, mailFailure } from './mail/mailer.js';
 import { submitReport } from './reports.js';
 import { createRevalidator } from './revalidator.js';
 import { createRoutingSource } from './routing-data.js';
+import { countShare } from './shares.js';
 import { createSignups } from './signups.js';
 
 const config = loadConfig(process.env);
@@ -166,6 +167,8 @@ const app = buildApp({
   // Only while their retention is enforced (the chart's daily anonymization): personal data is kept no longer.
   reports:
     web && config.reportsEnabled ? (slug, input) => submitReport(web, slug, input) : undefined,
+  // Counts only, never who (PLAN R239): nothing personal to keep or expire.
+  shares: web ? (slug, count) => countShare(web, slug, count) : undefined,
   admin: {
     auth:
       config.auth && authPool

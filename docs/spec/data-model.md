@@ -1009,6 +1009,41 @@ create table app.signup_daily_counts (
   email reads the addresses waits for a decision (PLAN R122; the brief).
 - `purge_tenant` deletes a tenant's signups and their counter with the rest.
 
+### 3.8c Share counts (counts only: private)
+
+How a site's pages are shared, and how far they travel (PLAN R239): the admin's "Difusión" page per election.
+
+```sql
+create table app.share_counts (
+  id           uuid primary key default uuidv7(),
+  tenant_id    uuid not null references app.tenants,
+  election_id  uuid,                -- the page's election when its path's first segment is one; null for site pages
+  path         text not null,       -- the page in the site, in the app's route words: /29n/parties/partido-x
+  event        text not null,       -- share | arrival | preview
+  channel      text not null,       -- a network, or the dialog's copy | native | download | image, or a crawler's
+  day          date not null,       -- UTC
+  count        int not null,        -- > 0
+  unique (tenant_id, id),
+  unique nulls not distinct (tenant_id, election_id, path, event, channel, day),
+  foreign key (tenant_id, election_id) references app.elections (tenant_id, id)
+);
+```
+
+- **The events.** `share`: a click in a page's share dialog (a network's link, copying the address, the device's
+  share sheet, downloading or sharing the data image). `arrival`: a visit through a network's share link, which
+  carries its channel as `utm_source` (and `utm_medium=share`) wherever it is forwarded. `preview`: a network's crawler
+  fetching a page to draw its link preview (WhatsApp, Telegram, X, Facebook, LinkedIn, Bluesky, Slack, Discord, or
+  another one's, `other`). A check pins each event's channels.
+- **The only way in** is `app.count_share(tenant, path, event, channel)`, `SECURITY DEFINER`, executable by
+  `aiontheballot_web` only (ADR-0002 §7): it adds one to the day's count and returns whether it counted. Nothing for
+  an inactive or unknown tenant, a page of an election not yet public, or past 100,000 a tenant and UTC day; invalid
+  values break a check (23514). The web app calls it through the API from its proxy (previews) and its relay
+  `/_relay/shares` (shares and arrivals, which a page's own script sends); the preview host counts nothing.
+- **Counts only.** No address, agent or anything else of a visitor is stored; the API sees the visitor's address only
+  to rate-limit them (30 a minute per replica).
+- Every member of the tenant, and platform admins, read its counts. Not audited (a counter of no one); `purge_tenant`
+  and `purge_election` delete them with the rest; the site export includes them.
+
 ### 3.9 LLM assistance (M4; the schema exists from M1)
 
 ```sql
@@ -1208,7 +1243,7 @@ it serves.
 
 - `assessments`, `draft_*`, `assessment_contributors`, `review_events`, `revision_internal`, `change_requests`;
 - `source_texts` and the `sources` bucket (copyright);
-- `reports`, `report_daily_counts`, `signups`, `signup_daily_counts`;
+- `reports`, `report_daily_counts`, `signups`, `signup_daily_counts`, `share_counts`;
 - `invitations`, `memberships`, `platform_admins`, `platform_hostnames`, `hostname_verifications`,
   `hostname_tombstones` (a purge may tombstone hostnames that were never public; PLAN R169), `brand_asset_grants`;
 - `llm_*`, `job_requests`, `audit_log`, `purge_log`.

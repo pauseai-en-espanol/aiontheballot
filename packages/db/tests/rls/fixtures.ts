@@ -426,6 +426,12 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
                           token_hash => encode(sha256(convert_to($3, 'UTF8')), 'hex'))`,
       [tenant.id, `suscripcion-${key.toLowerCase()}@example.org`, SIGNUP_TOKENS[key]],
     );
+    // And a share of its live election, counted through app.count_share like the public site's (PLAN R239).
+    await client.query(
+      `SELECT app.count_share(tenant => $1, path => '/generales-de-ejemplo', event => 'share',
+                              channel => 'whatsapp')`,
+      [tenant.id],
+    );
     await client.query('RESET ROLE');
     await client.query(
       `SELECT set_config('app.user_id', $1, true), set_config('app.aal', '2', true)`,

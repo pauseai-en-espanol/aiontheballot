@@ -120,6 +120,9 @@ lines AS (
   SELECT 28, json_build_object('table', 'app.revision_internal', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.revision_internal x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
+  SELECT 28.5, json_build_object('table', 'app.share_counts', 'rows',
+    (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.share_counts x WHERE x.tenant_id = (SELECT id FROM site)))::text
+  UNION ALL
   SELECT 29, json_build_object('table', 'app.signup_daily_counts', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.signup_daily_counts x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { SHARE_NETWORKS, sharedUrl, shareLinks } from './share-links';
+import { SHARE_NETWORKS, sharedUrl, shareLinks, taggedUrl } from './share-links';
 
 const page = {
   url: 'https://ejemplo.example.test/generales/partidos/partido-ejemplo-a',
@@ -13,16 +13,24 @@ describe("a page's share links (R177)", () => {
     expect(links.map((link) => link.network)).toEqual([...SHARE_NETWORKS]);
     const href = Object.fromEntries(links.map((link) => [link.network, link.href]));
     const text = encodeURIComponent(page.text);
-    const url = encodeURIComponent(page.url);
+    // Each network's address names it as its channel (PLAN R239).
+    const url = (network: string) =>
+      encodeURIComponent(`${page.url}?utm_source=${network}&utm_medium=share`);
     expect(href).toEqual({
-      whatsapp: `https://wa.me/?text=${text}%20${url}`,
-      telegram: `https://t.me/share/url?url=${url}&text=${text}`,
-      x: `https://x.com/intent/post?text=${text}&url=${url}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
-      bluesky: `https://bsky.app/intent/compose?text=${text}%20${url}`,
-      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
-      email: `mailto:?subject=${text}&body=${url}`,
+      whatsapp: `https://wa.me/?text=${text}%20${url('whatsapp')}`,
+      telegram: `https://t.me/share/url?url=${url('telegram')}&text=${text}`,
+      x: `https://x.com/intent/post?text=${text}&url=${url('x')}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${url('facebook')}`,
+      bluesky: `https://bsky.app/intent/compose?text=${text}%20${url('bluesky')}`,
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${url('linkedin')}`,
+      email: `mailto:?subject=${text}&body=${url('email')}`,
     });
+  });
+
+  it('tags an address that already has a query after it (the preview’s hash, R215)', () => {
+    expect(taggedUrl('https://ejemplo.example.test/generales?v=0123456789ab', 'x')).toBe(
+      'https://ejemplo.example.test/generales?v=0123456789ab&utm_source=x&utm_medium=share',
+    );
   });
 
   it('read back as the same address and title: spaces as %20, never +, which mail clients keep', () => {

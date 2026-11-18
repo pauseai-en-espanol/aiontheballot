@@ -740,6 +740,7 @@ const NOT_AUDITED: Readonly<Record<string, string>> = {
   public_versions: 'a counter moved only by triggers, whose writes are audited themselves',
   report_daily_counts: 'a counter moved only by app.submit_report, whose reports are audited',
   signup_daily_counts: 'a counter moved only by app.sign_up, whose signups are audited',
+  share_counts: 'counts of no one, moved only by app.count_share (PLAN R239)',
   purge_log: "the record of a purge, which removes the tenant's audit rows with it",
 };
 

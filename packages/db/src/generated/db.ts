@@ -549,6 +549,17 @@ export interface AppRevisionInternal {
   tenant_id: string;
 }
 
+export interface AppShareCounts {
+  channel: string;
+  count: number;
+  day: Timestamp;
+  election_id: string | null;
+  event: string;
+  id: Generated<string>;
+  path: string;
+  tenant_id: string;
+}
+
 export interface AppSignupDailyCounts {
   count: number;
   day: Timestamp;
@@ -719,6 +730,7 @@ export interface DB {
   'app.revision_checked_documents': AppRevisionCheckedDocuments;
   'app.revision_evidence': AppRevisionEvidence;
   'app.revision_internal': AppRevisionInternal;
+  'app.share_counts': AppShareCounts;
   'app.signup_daily_counts': AppSignupDailyCounts;
   'app.signups': AppSignups;
   'app.source_documents': AppSourceDocuments;

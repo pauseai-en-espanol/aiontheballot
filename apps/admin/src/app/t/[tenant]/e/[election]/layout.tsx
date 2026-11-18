@@ -70,6 +70,7 @@ const ElectionLayout = async ({
           { href: `${base}/cells`, label: t('admin.election.cells') },
           { href: `${base}/changes`, label: t('admin.election.changes') },
           { href: `${base}/corrections`, label: t('admin.election.corrections') },
+          { href: `${base}/shares`, label: t('admin.election.shares') },
         ]}
         variant="inline"
       />

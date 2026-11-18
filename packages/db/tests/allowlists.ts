@@ -14,6 +14,7 @@ export const EXECUTE_ALLOWLIST: readonly string[] = [
   'aiontheballot_admin private.purge_election(tenant uuid, election uuid, confirmation text)',
   'aiontheballot_sweeper private.file_sweep_list()',
   'aiontheballot_web app.confirm_signup(tenant uuid, token_hash text)',
+  'aiontheballot_web app.count_share(tenant uuid, path text, event text, channel text)',
   'aiontheballot_web app.sign_up(tenant uuid, email text, locale text, future_elections boolean, token_hash text)',
   'aiontheballot_web app.submit_report(tenant uuid, kind app.report_kind, message text, election uuid, assessment uuid, name text, email text, organization text, is_party_representative boolean)',
   'aiontheballot_web app.unsubscribe(tenant uuid, token_hash text)',
@@ -25,6 +26,7 @@ export const EXECUTE_ALLOWLIST: readonly string[] = [
 /** SECURITY DEFINER functions allowed in `app` and `private` (ADR-0002 §6). */
 export const SECURITY_DEFINER_ALLOWLIST: readonly string[] = [
   'app.confirm_signup',
+  'app.count_share',
   'app.sign_up',
   'app.submit_report',
   'app.unsubscribe',

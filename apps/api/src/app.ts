@@ -6,10 +6,12 @@ import type { ElectionSource } from './election-data.js';
 import type { BrandImageSource, HomeSource } from './home-data.js';
 import type { ReportInput, ReportOutcome } from './reports.js';
 import type { RoutingSource } from './routing-data.js';
+import type { ShareCount } from './shares.js';
 import type { Signups } from './signups.js';
 
 import { adminRoutes, type AdminRoutesOptions } from './auth/routes.js';
 import { createRateLimiter, visitorKey } from './rate-limit.js';
+import { isShareCount, SHARE_CHANNELS } from './shares.js';
 import { headerMatches } from './worker/token.js';
 
 /** The header the web app sends the preview's secret in, as the admin sends it to the web app (ADR-0005). */
@@ -47,6 +49,10 @@ export interface AppOptions {
   reports?: (slug: string, input: ReportInput) => Promise<ReportOutcome>;
   /** Reports a visitor may send per 10 minutes, per API replica, before 429 (the database caps each site too). */
   reportsPerVisitor?: number;
+  /** How a site's pages are shared (PLAN R239), counted as aiontheballot_web; without it the route answers 503. */
+  shares?: (slug: string, count: ShareCount) => Promise<boolean>;
+  /** Share events a visitor may send per minute, per API replica, before 429 (the database caps each site too). */
+  sharesPerVisitor?: number;
   /** And per day, per API replica. */
   reportsPerVisitorPerDay?: number;
   /** Sign-in and the signed-in routes under /api, on the admin host only; without sign-in they answer 503. */
@@ -84,6 +90,8 @@ export const buildApp = ({
   reports,
   reportsPerVisitor = 3,
   reportsPerVisitorPerDay = 10,
+  shares,
+  sharesPerVisitor = 30,
   admin = {},
 }: AppOptions = {}): FastifyInstance => {
   const app = Fastify({
@@ -289,6 +297,42 @@ export const buildApp = ({
         limit: 429,
       }[outcome];
       return reply.code(status).send({ outcome });
+    },
+  );
+
+  // How a site's pages are shared (PLAN R239): a click in a share dialog, a visit through a shared link, a network's
+  // link preview, each counted for its page and channel. The web app sends them; the answer says nothing either way.
+  const allowShare = createRateLimiter({ limit: sharesPerVisitor, windowMs: 60_000 });
+  app.post<{ Params: { slug: string }; Body: ShareCount }>(
+    '/public/tenants/:slug/shares',
+    {
+      schema: {
+        params: SLUG_PARAMS,
+        body: {
+          type: 'object',
+          required: ['path', 'event', 'channel'],
+          additionalProperties: false,
+          properties: {
+            path: { type: 'string', maxLength: 200 },
+            event: { type: 'string', enum: Object.keys(SHARE_CHANNELS) },
+            channel: { type: 'string', maxLength: 20 },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      void reply.header('cache-control', 'no-store');
+      if (!shares) {
+        return reply.code(503).send({ error: 'unavailable' });
+      }
+      if (!isShareCount(request.body)) {
+        return reply.code(400).send({ error: 'invalid' });
+      }
+      if (!allowShare(visitorOf(request.headers['x-visitor-address']))) {
+        return reply.code(429).send({ error: 'limit' });
+      }
+      await shares(request.params.slug, request.body);
+      return reply.code(204).send();
     },
   );
 

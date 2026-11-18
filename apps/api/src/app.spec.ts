@@ -222,6 +222,90 @@ describe('api', () => {
     });
   });
 
+  describe('share counts (PLAN R239)', () => {
+    const post = (target: FastifyInstance, payload: unknown, visitor = '203.0.113.9') =>
+      target.inject({
+        method: 'POST',
+        url: '/public/tenants/ejemplo/shares',
+        payload: payload as object,
+        headers: { 'x-visitor-address': visitor },
+      });
+    const body = {
+      path: '/generales-de-ejemplo/parties/partido-ejemplo-a',
+      event: 'share',
+      channel: 'whatsapp',
+    };
+
+    it('counts a page’s event and channel for its site, never cached, saying nothing either way', async () => {
+      const counted: unknown[] = [];
+      const counting = buildApp({
+        shares: async (slug, count) => {
+          counted.push([slug, count]);
+          return false;
+        },
+      });
+      const response = await post(counting, body);
+      expect([response.statusCode, response.headers['cache-control'], response.body]).toEqual([
+        204,
+        'no-store',
+        '',
+      ]);
+      expect(counted).toEqual([['ejemplo', body]]);
+    });
+
+    it('passes on nothing but the page, the event and the channel', async () => {
+      const counted: unknown[] = [];
+      const counting = buildApp({
+        shares: async (slug, count) => {
+          counted.push([slug, count]);
+          return true;
+        },
+      });
+      expect(
+        (await post(counting, { ...body, ip: '203.0.113.9', who: 'Persona' })).statusCode,
+      ).toBe(204);
+      expect(counted).toEqual([['ejemplo', body]]);
+    });
+
+    it('answers 503 while nothing counts', async () => {
+      expect((await post(app, body)).statusCode).toBe(503);
+    });
+
+    it.each([
+      ['an event it doesn’t know', { ...body, event: 'like' }],
+      ['a channel the event doesn’t take', { ...body, event: 'arrival', channel: 'copy' }],
+      ['a preview by the share sheet', { ...body, event: 'preview', channel: 'native' }],
+      ['a path that is not one', { ...body, path: '/../aviso-legal' }],
+      ['a path with an address', { ...body, path: 'https://otro.example.org/' }],
+    ])('refuses %s, counting nothing', async (_name, payload) => {
+      const counted: unknown[] = [];
+      const counting = buildApp({
+        shares: async (slug, count) => {
+          counted.push([slug, count]);
+          return true;
+        },
+      });
+      expect((await post(counting, payload)).statusCode).toBe(400);
+      expect(counted).toEqual([]);
+    });
+
+    it('takes a visitor’s 30 a minute, then 429, while another visitor counts on', async () => {
+      let counted = 0;
+      const counting = buildApp({
+        shares: async () => {
+          counted += 1;
+          return true;
+        },
+      });
+      for (let i = 0; i < 30; i += 1) {
+        expect((await post(counting, body)).statusCode).toBe(204);
+      }
+      expect((await post(counting, body)).statusCode).toBe(429);
+      expect((await post(counting, body, '203.0.113.10')).statusCode).toBe(204);
+      expect(counted).toBe(31);
+    });
+  });
+
   describe('the signup list', () => {
     const calls: { slug: string; input: SignupInput }[] = [];
     const signups = (outcome: SignupOutcome): Signups => ({

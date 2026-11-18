@@ -33,6 +33,17 @@ export const sharedUrl = (canonical: string, previewPath: string): string => {
   return hash ? `${canonical}?v=${hash}` : canonical;
 };
 
+/** What marks a visit as one through a share link (PLAN R239): its channel, which also tells Plausible where it came from. */
+export const SHARE_MEDIUM = 'share';
+
+/**
+ * The address a network's link shares (PLAN R239): the page's, with the network as `utm_source`, so a visit through it
+ * counts for that channel, wherever the link is forwarded. The link preview still names the page's own address (og:url),
+ * which the networks key their previews by.
+ */
+export const taggedUrl = (url: string, network: ShareNetwork): string =>
+  `${url}${url.includes('?') ? '&' : '?'}utm_source=${network}&utm_medium=${SHARE_MEDIUM}`;
+
 export const shareLinks = ({
   url,
   text,
@@ -42,16 +53,26 @@ export const shareLinks = ({
   /** The page's title. */
   text: string;
 }): { network: ShareNetwork; href: string }[] => {
-  // Where a network takes one text, the address follows the title in it.
-  const both = `${text} ${url}`;
-  const href: Record<ShareNetwork, string> = {
-    whatsapp: `https://wa.me/?${query({ text: both })}`,
-    telegram: `https://t.me/share/url?${query({ url, text })}`,
-    x: `https://x.com/intent/post?${query({ text, url })}`,
-    facebook: `https://www.facebook.com/sharer/sharer.php?${query({ u: url })}`,
-    bluesky: `https://bsky.app/intent/compose?${query({ text: both })}`,
-    linkedin: `https://www.linkedin.com/sharing/share-offsite/?${query({ url })}`,
-    email: `mailto:?${query({ subject: text, body: url })}`,
+  const href = (network: ShareNetwork): string => {
+    const shared = taggedUrl(url, network);
+    // Where a network takes one text, the address follows the title in it.
+    const both = `${text} ${shared}`;
+    switch (network) {
+      case 'whatsapp':
+        return `https://wa.me/?${query({ text: both })}`;
+      case 'telegram':
+        return `https://t.me/share/url?${query({ url: shared, text })}`;
+      case 'x':
+        return `https://x.com/intent/post?${query({ text, url: shared })}`;
+      case 'facebook':
+        return `https://www.facebook.com/sharer/sharer.php?${query({ u: shared })}`;
+      case 'bluesky':
+        return `https://bsky.app/intent/compose?${query({ text: both })}`;
+      case 'linkedin':
+        return `https://www.linkedin.com/sharing/share-offsite/?${query({ url: shared })}`;
+      case 'email':
+        return `mailto:?${query({ subject: text, body: shared })}`;
+    }
   };
-  return SHARE_NETWORKS.map((network) => ({ network, href: href[network] }));
+  return SHARE_NETWORKS.map((network) => ({ network, href: href(network) }));
 };

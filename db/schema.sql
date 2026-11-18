@@ -421,6 +421,45 @@ CREATE FUNCTION app.confirm_signup(tenant uuid, token_hash text) RETURNS boolean
 ALTER FUNCTION app.confirm_signup(tenant uuid, token_hash text) OWNER TO aiontheballot_owner;
 
 --
+-- Name: count_share(uuid, text, text, text); Type: FUNCTION; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION app.count_share(tenant uuid, path text, event text, channel text) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    daily_cap constant int := 100000;
+    today date := (now() AT TIME ZONE 'UTC')::date;
+    first_segment text := split_part(count_share.path, '/', 2);
+    election_row record;
+    counted int;
+  BEGIN
+    IF NOT EXISTS (SELECT 1 FROM app.tenants t WHERE t.id = tenant AND t.active) THEN
+      RETURN false;
+    END IF;
+    SELECT e.id, e.status INTO election_row
+      FROM app.elections e WHERE e.tenant_id = tenant AND e.slug::text = first_segment;
+    IF FOUND AND election_row.status NOT IN ('live', 'archived') THEN
+      RETURN false;
+    END IF;
+    SELECT coalesce(sum(c.count), 0) INTO counted
+      FROM app.share_counts c WHERE c.tenant_id = tenant AND c.day = today;
+    IF counted >= daily_cap THEN
+      RETURN false;
+    END IF;
+    INSERT INTO app.share_counts AS c (tenant_id, election_id, path, event, channel, day, count)
+    VALUES (tenant, election_row.id, count_share.path, count_share.event, count_share.channel, today, 1)
+    ON CONFLICT ON CONSTRAINT share_counts_tenant_id_election_id_path_event_channel_day_key
+      DO UPDATE SET count = c.count + 1;
+    RETURN true;
+  END
+  $$;
+
+
+ALTER FUNCTION app.count_share(tenant uuid, path text, event text, channel text) OWNER TO aiontheballot_owner;
+
+--
 -- Name: sign_up(uuid, text, text, boolean, text); Type: FUNCTION; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -2569,6 +2608,7 @@ CREATE FUNCTION private.purge_election(tenant uuid, election uuid, confirmation 
       'methodologies', 'r.election_id = $2',
       'criteria', 'r.election_id = $2',
       'parties', 'r.election_id = $2',
+      'share_counts', 'r.election_id = $2',
       'elections', 'r.id = $2'];
     election_slug text;
     i int;
@@ -2732,7 +2772,7 @@ CREATE FUNCTION private.purge_tenant(tenant uuid) RETURNS bigint
     tables text[] := ARRAY[
       'revision_internal', 'revision_evidence', 'revision_checked_documents', 'structural_changes', 'change_requests',
       'assessment_revisions', 'review_events', 'reports', 'report_daily_counts', 'signups', 'signup_daily_counts',
-      'assessment_contributors',
+      'share_counts', 'assessment_contributors',
       'draft_checked_documents', 'draft_evidence', 'assessments', 'job_requests', 'llm_suggestions', 'llm_runs',
       'source_texts', 'source_documents', 'methodology_reviewers', 'methodologies', 'criteria', 'parties', 'elections',
       'tenant_brand_selections', 'files', 'tenant_documents', 'invitations', 'memberships',
@@ -4518,6 +4558,29 @@ CREATE TABLE app.revision_internal (
 ALTER TABLE app.revision_internal OWNER TO aiontheballot_owner;
 
 --
+-- Name: share_counts; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.share_counts (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    election_id uuid,
+    path text NOT NULL,
+    event text NOT NULL,
+    channel text NOT NULL,
+    day date NOT NULL,
+    count integer NOT NULL,
+    CONSTRAINT share_counts_channel_check CHECK ((channel = ANY (ARRAY['whatsapp'::text, 'telegram'::text, 'x'::text, 'facebook'::text, 'bluesky'::text, 'linkedin'::text, 'email'::text, 'copy'::text, 'native'::text, 'download'::text, 'image'::text, 'slack'::text, 'discord'::text, 'other'::text]))),
+    CONSTRAINT share_counts_channel_of_event CHECK ((((event = 'share'::text) AND (channel = ANY (ARRAY['whatsapp'::text, 'telegram'::text, 'x'::text, 'facebook'::text, 'bluesky'::text, 'linkedin'::text, 'email'::text, 'copy'::text, 'native'::text, 'download'::text, 'image'::text]))) OR ((event = 'arrival'::text) AND (channel = ANY (ARRAY['whatsapp'::text, 'telegram'::text, 'x'::text, 'facebook'::text, 'bluesky'::text, 'linkedin'::text, 'email'::text]))) OR ((event = 'preview'::text) AND (channel = ANY (ARRAY['whatsapp'::text, 'telegram'::text, 'x'::text, 'facebook'::text, 'bluesky'::text, 'linkedin'::text, 'slack'::text, 'discord'::text, 'other'::text]))))),
+    CONSTRAINT share_counts_count_check CHECK ((count > 0)),
+    CONSTRAINT share_counts_event_check CHECK ((event = ANY (ARRAY['share'::text, 'arrival'::text, 'preview'::text]))),
+    CONSTRAINT share_counts_path_check CHECK (((char_length(path) <= 200) AND (path ~ '^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$'::text)))
+);
+
+
+ALTER TABLE app.share_counts OWNER TO aiontheballot_owner;
+
+--
 -- Name: signup_daily_counts; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5491,6 +5554,30 @@ ALTER TABLE ONLY app.revision_internal
 
 
 --
+-- Name: share_counts share_counts_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.share_counts
+    ADD CONSTRAINT share_counts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: share_counts share_counts_tenant_id_election_id_path_event_channel_day_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.share_counts
+    ADD CONSTRAINT share_counts_tenant_id_election_id_path_event_channel_day_key UNIQUE NULLS NOT DISTINCT (tenant_id, election_id, path, event, channel, day);
+
+
+--
+-- Name: share_counts share_counts_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.share_counts
+    ADD CONSTRAINT share_counts_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
 -- Name: signup_daily_counts signup_daily_counts_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -5991,6 +6078,13 @@ CREATE INDEX revision_evidence_source_document_id_idx ON app.revision_evidence U
 --
 
 CREATE INDEX revision_internal_report_id_idx ON app.revision_internal USING btree (report_id);
+
+
+--
+-- Name: share_counts_day_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX share_counts_day_idx ON app.share_counts USING btree (tenant_id, day);
 
 
 --
@@ -6897,6 +6991,13 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.revision_internal FOR E
 
 
 --
+-- Name: share_counts forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.share_counts FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
 -- Name: signup_daily_counts forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -7314,6 +7415,13 @@ CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.revision_
 --
 
 CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.revision_internal FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change revision_internal');
+
+
+--
+-- Name: share_counts needs_a_person; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.share_counts FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change share_counts');
 
 
 --
@@ -8374,6 +8482,22 @@ ALTER TABLE ONLY app.revision_internal
 
 
 --
+-- Name: share_counts share_counts_tenant_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.share_counts
+    ADD CONSTRAINT share_counts_tenant_id_election_id_fkey FOREIGN KEY (tenant_id, election_id) REFERENCES app.elections(tenant_id, id);
+
+
+--
+-- Name: share_counts share_counts_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.share_counts
+    ADD CONSTRAINT share_counts_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
 -- Name: signup_daily_counts signup_daily_counts_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -9175,6 +9299,13 @@ CREATE POLICY member_read ON app.revision_internal FOR SELECT TO aiontheballot_a
 
 
 --
+-- Name: share_counts member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.share_counts FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
 -- Name: source_documents member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -9911,6 +10042,12 @@ CREATE POLICY self_insert ON app.assessment_contributors FOR INSERT TO aiontheba
 
 
 --
+-- Name: share_counts; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.share_counts ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: signup_daily_counts; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -10330,6 +10467,14 @@ REVOKE ALL ON TYPE app.tenant_role FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION app.confirm_signup(tenant uuid, token_hash text) FROM PUBLIC;
 GRANT ALL ON FUNCTION app.confirm_signup(tenant uuid, token_hash text) TO aiontheballot_web;
+
+
+--
+-- Name: FUNCTION count_share(tenant uuid, path text, event text, channel text); Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION app.count_share(tenant uuid, path text, event text, channel text) FROM PUBLIC;
+GRANT ALL ON FUNCTION app.count_share(tenant uuid, path text, event text, channel text) TO aiontheballot_web;
 
 
 --
@@ -12454,6 +12599,13 @@ GRANT SELECT ON TABLE app.revision_evidence TO aiontheballot_preview;
 --
 
 GRANT SELECT ON TABLE app.revision_internal TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE share_counts; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.share_counts TO aiontheballot_admin;
 
 
 --

@@ -5,8 +5,9 @@ import type { ShareSize } from '@aiontheballot/og/sizes';
 import { css, cx } from '@styled-system/css';
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react';
 
-import type { ShareNetwork } from '../share-links';
+import type { ShareAction } from '../share-counts';
 
+import { SHARE_MEDIUM, SHARE_NETWORKS, type ShareNetwork } from '../share-links';
 import { focusRing } from '../styles';
 import { ShareIcon } from './share-icons';
 
@@ -48,6 +49,30 @@ export interface SharePanelText {
   /** Said after each link, for screen readers: it opens in a new tab. */
   newTab: string;
 }
+
+/** Where a page reports how it is shared (PLAN R239): counts only, as the relay passes them on. */
+const SHARE_RELAY = '/_relay/shares';
+
+/** Reports a share from the dialog, or an arrival through a share link. Never in the way: a lost count is nothing. */
+const report = (event: 'share' | 'arrival', channel: ShareNetwork | ShareAction) => {
+  try {
+    const body = JSON.stringify({ u: window.location.href, event, channel });
+    if (!navigator.sendBeacon?.(SHARE_RELAY, body)) {
+      void fetch(SHARE_RELAY, { method: 'POST', body, keepalive: true }).catch(() => undefined);
+    }
+  } catch {
+    // Nothing to do.
+  }
+};
+
+/** The network a visit came through, when the address says it came through one of the dialog's links. */
+const arrivedThrough = (search: string): ShareNetwork | undefined => {
+  const params = new URLSearchParams(search);
+  const source = params.get('utm_source');
+  return params.get('utm_medium') === SHARE_MEDIUM
+    ? SHARE_NETWORKS.find((network) => network === source)
+    : undefined;
+};
 
 const noSubscription = () => () => undefined;
 /** What the browser can do, read after hydration: the server, and a browser without scripts, render neither button. */
@@ -178,6 +203,13 @@ export const SharePanel = ({
   const close = useRef<HTMLButtonElement>(null);
   // Opened, its close button takes the focus, so a keyboard starts inside it; closed, the browser gives the focus back
   // to the share button, and what it said goes.
+  // A visit through a share link, counted once the page is up (PLAN R239).
+  useEffect(() => {
+    const network = arrivedThrough(window.location.search);
+    if (network) {
+      report('arrival', network);
+    }
+  }, []);
   useEffect(() => {
     const panel = document.getElementById(id);
     const onToggle = (event: Event) => {
@@ -192,13 +224,19 @@ export const SharePanel = ({
   }, [id]);
   const copy = () => {
     navigator.clipboard.writeText(url).then(
-      () => setStatus(words.copied),
+      () => {
+        setStatus(words.copied);
+        report('share', 'copy');
+      },
       () => setStatus(words.copyFailed),
     );
   };
-  // A cancelled share sheet rejects too: nothing to say.
+  // A cancelled share sheet rejects too: nothing to say, nothing to count.
   const share = () => {
-    navigator.share({ title: text, url }).catch(() => undefined);
+    navigator
+      .share({ title: text, url })
+      .then(() => report('share', 'native'))
+      .catch(() => undefined);
   };
   const shareImage = async (href: string, fileName: string) => {
     setStatus('');
@@ -210,6 +248,7 @@ export const SharePanel = ({
         return;
       }
       await navigator.share({ files: [file], title: text, text: url });
+      report('share', 'image');
     } catch (error) {
       if ((error as { name?: unknown }).name !== 'AbortError') {
         setStatus(words.imageFailed);
@@ -341,7 +380,12 @@ export const SharePanel = ({
                 network === 'email' ? (
                   // The mail app opens; a new tab would stay blank.
                   <li key={network}>
-                    <a href={href} className={tile} data-share={network}>
+                    <a
+                      href={href}
+                      className={tile}
+                      data-share={network}
+                      onClick={() => report('share', network)}
+                    >
                       <ShareIcon mark={network} />
                       {words.email}
                     </a>
@@ -354,6 +398,7 @@ export const SharePanel = ({
                       rel="noopener noreferrer"
                       className={tile}
                       data-share={network}
+                      onClick={() => report('share', network)}
                     >
                       <ShareIcon mark={network} />
                       {NETWORK_NAMES[network]}
@@ -436,6 +481,7 @@ export const SharePanel = ({
                         className={item}
                         data-share="download"
                         aria-label={`${words.download}: ${words.sizes[size] ?? size}`}
+                        onClick={() => report('share', 'download')}
                       >
                         <ShareIcon mark="download" />
                         {words.download}

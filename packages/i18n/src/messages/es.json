@@ -536,7 +536,8 @@
       "purgeTitle": "¿Borrar esta elección para siempre?",
       "purgeBody": "Todo lo que contiene se borra para siempre, también las valoraciones publicadas y las correcciones, y el sitio público deja de mostrarla. No se puede deshacer.",
       "typeToPurge": "Escribe el nombre en la dirección de la elección, {slug}, para borrarla para siempre",
-      "purged": "Elección borrada para siempre."
+      "purged": "Elección borrada para siempre.",
+      "shares": "Difusión"
     },
     "methodology": {
       "kind": "Tipo: {kind}. Es el del sitio y el mismo en todas sus elecciones.",
@@ -1936,5 +1937,43 @@
     },
     "summary": "{count, plural, one {# cambio publicado} other {# cambios publicados}}; el último, el {date, date, long}.",
     "summaryNone": "Aún sin correcciones: cada cambio se anota aquí, con su motivo."
+  },
+  "sharesPage": {
+    "title": "Difusión",
+    "lead": "Cuántas veces se comparten las páginas de esta elección y hasta dónde llegan. Solo se cuentan: no se guarda nada de quién comparte ni de quién llega.",
+    "empty": "Aún no se ha contado nada: las páginas se cuentan desde que la elección es pública.",
+    "since": "Desde el {date, date, long}:",
+    "events": {
+      "share": "veces compartida",
+      "arrival": "visitas desde un enlace compartido",
+      "preview": "vistas previas del enlace"
+    },
+    "explain": {
+      "share": "clics en el diálogo «Compartir»: una red, copiar el enlace, el menú del teléfono o la imagen",
+      "arrival": "entradas por el enlace de una red, también cuando se reenvía",
+      "preview": "una red dibujando la vista previa al pegar el enlace en un chat o una publicación; algunas la guardan, así que se queda corto"
+    },
+    "byChannel": "Por canal",
+    "byPage": "Por página",
+    "byDay": "Últimos 30 días",
+    "channel": "Canal",
+    "page": "Página",
+    "day": "Día",
+    "channels": {
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "x": "X",
+      "facebook": "Facebook",
+      "bluesky": "Bluesky",
+      "linkedin": "LinkedIn",
+      "email": "Correo",
+      "copy": "Copiar enlace",
+      "native": "Menú del teléfono",
+      "download": "Descarga de la imagen",
+      "image": "Imagen compartida",
+      "slack": "Slack",
+      "discord": "Discord",
+      "other": "Otras"
+    }
   }
 }

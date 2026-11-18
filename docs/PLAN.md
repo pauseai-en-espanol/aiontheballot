@@ -3467,6 +3467,26 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   both orders, a hash per letter set, the cards' reference pictures accepted again, an English site's icon and home
   card marked «AI», and the e2e icon check.
 
+- **R239. How the site is shared, counted and shown in the admin.** Dani asked for ways to know how often the site is
+  shared, images included, and how far it travels, "even reshares", readable in the admin. Three counts, by page,
+  channel and day, counts only (migration share_counts; data model §3.8c; ADR-0002 §6, §7 amended):
+  - **Shares:** each click in a page's share dialog (a network's link, copying the address, the share sheet, the
+    image's download or share), sent by the page's script to the web app's relay, `/_relay/shares`.
+  - **Arrivals:** each network's link now carries its channel as `utm_source` (`utm_medium=share`), so a visit through
+    it counts for that network wherever the link was forwarded: the reshares that travel with the link. Plausible
+    reads the same tags. The copied address and the link preview's own (og:url) stay as they were.
+  - **Previews:** the web app's proxy counts the crawlers that draw a link preview when a link is pasted (WhatsApp,
+    Telegram, X, Facebook, LinkedIn, Bluesky, Slack, Discord, a few others), never search engines or AI crawlers,
+    without the page waiting on it. Some networks keep a preview, so this undercounts.
+  - **How:** The relay and the proxy resolve the page as the router does, by its path in the app's route words, so a
+    page counts the same in every language; the preview host counts nothing. They reach the database through the API
+    (`POST /public/tenants/:slug/shares`, 30 a minute per visitor) and `app.count_share`, the only way in, executable by
+    the public role only: it counts a page of an active site, nothing for an election not yet public, at most 100,000 a
+    day. Every member reads the counts on the election's new admin page, "Difusión" (by channel, by page, the last 30
+    days). Tests first: the database's (counting, the election found by the path, refusals, the daily cap, who may call
+    it; the RLS matrix, the allowlists, the export, both purges), the API's (the route, its refusals and rate limit),
+    the web app's (the crawlers, the paths, the relay, the proxy), and e2e (a preview, a relayed share, the admin page).
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

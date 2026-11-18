@@ -1891,6 +1891,28 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     columnReads: { email: NOBODY, mailbox: NOBODY, token_hash: NOBODY, token_issued_at: NOBODY },
   },
 
+  'app.share_counts': {
+    rows: TENANT_KEYS.map((key) => ({
+      id: `share count of ${key}`,
+      tenant: key,
+      public: false,
+      where: `tenant_id = '${TENANTS[key].id}'`,
+    })),
+    // Only app.count_share() writes counts, as its owner (PLAN R239).
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `share count for ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.share_counts (tenant_id, path, event, channel, day, count)
+            VALUES ('${TENANTS[key].id}', '/', 'share', 'copy', current_date - 1, 1)`,
+    })),
+    set: 'count = count + 1',
+    // Every member reads their site's counts: the admin's page of how it is shared.
+    select: MEMBERS,
+    insert: NOBODY,
+    update: NOBODY,
+    delete: NOBODY,
+  },
+
   'app.signup_daily_counts': {
     rows: TENANT_KEYS.map((key) => ({
       id: `signup count of ${key}`,
