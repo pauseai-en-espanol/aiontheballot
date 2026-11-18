@@ -1,5 +1,18 @@
 # @aiontheballot/og
 
+## 0.9.0
+
+### Minor Changes
+
+- e2f139e: The site's mark: a ballot marked «IA» («AI» in English) going into a transparent ballot box, beside the name in every
+  page's header, on the coming-soon page and its share image, beside the site's name on every election card, and as the
+  default site icon, the admin's included.
+
+### Patch Changes
+
+- Updated dependencies [e2f139e]
+  - @aiontheballot/ui@0.5.0
+
 ## 0.8.0
 
 ### Minor Changes

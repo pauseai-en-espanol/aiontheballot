@@ -1,5 +1,13 @@
 # @aiontheballot/i18n
 
+## 0.35.0
+
+### Minor Changes
+
+- 6c42a32: How a site's pages are shared, counted by page, channel and day and shown on each election's new "Difusión" page in
+  the admin: clicks in the share dialog, visits through a network's share link (tagged with its channel, forwards
+  included), and link previews drawn by the networks' crawlers. Counts only, nothing of who shared.
+
 ## 0.34.3
 
 ### Patch Changes

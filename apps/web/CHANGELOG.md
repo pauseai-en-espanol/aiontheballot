@@ -1,5 +1,23 @@
 # @aiontheballot/web
 
+## 0.23.0
+
+### Minor Changes
+
+- 6c42a32: How a site's pages are shared, counted by page, channel and day and shown on each election's new "Difusión" page in
+  the admin: clicks in the share dialog, visits through a network's share link (tagged with its channel, forwards
+  included), and link previews drawn by the networks' crawlers. Counts only, nothing of who shared.
+- e2f139e: The site's mark: a ballot marked «IA» («AI» in English) going into a transparent ballot box, beside the name in every
+  page's header, on the coming-soon page and its share image, beside the site's name on every election card, and as the
+  default site icon, the admin's included.
+
+### Patch Changes
+
+- Updated dependencies [6c42a32]
+- Updated dependencies [e2f139e]
+  - @aiontheballot/i18n@0.35.0
+  - @aiontheballot/og@0.9.0
+
 ## 0.22.0
 
 ### Minor Changes
