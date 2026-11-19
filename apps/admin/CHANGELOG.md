@@ -1,5 +1,12 @@
 # @aiontheballot/admin
 
+## 0.43.2
+
+### Patch Changes
+
+- Updated dependencies [de6a468]
+  - @aiontheballot/og@0.10.0
+
 ## 0.43.1
 
 ### Patch Changes
