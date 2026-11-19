@@ -1,5 +1,13 @@
 # @aiontheballot/db
 
+## 0.19.0
+
+### Minor Changes
+
+- 8c9cf6b: A platform admin can change a published cell of a live election off the record: the change takes no change kind and
+  no public note, stays out of the corrections log, and the public reads it in the place of the revision before it.
+  The admin keeps the revision, marked, with who published it.
+
 ## 0.18.6
 
 ### Patch Changes

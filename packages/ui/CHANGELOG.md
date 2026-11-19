@@ -1,5 +1,12 @@
 # @aiontheballot/ui
 
+## 0.5.2
+
+### Patch Changes
+
+- Updated dependencies [8c9cf6b]
+  - @aiontheballot/domain@0.17.0
+
 ## 0.5.1
 
 ### Patch Changes
