@@ -951,6 +951,7 @@
       "recheck": "Recheck",
       "noStructure": "Add parties and criteria first.",
       "back": "All cells",
+      "criterionAsks": "What the criterion asks",
       "state": "State: {state}",
       "version": "{version, plural, =0 {Not edited yet} one {Edited once} other {Edited # times}}",
       "notStarted": "Nobody has started this cell. Its public page says it is pending.",

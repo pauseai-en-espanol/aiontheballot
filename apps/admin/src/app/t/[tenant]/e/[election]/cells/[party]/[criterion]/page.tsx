@@ -82,6 +82,7 @@ const CellPage = async ({ params }: CellParams) => {
     value ? inLanguage(value, locale, tenant.defaultLocale) : undefined;
   const partyName = local(cell.party.shortName) ?? { text: cell.party.slug, lang: locale };
   const criterionName = local(cell.criterion.title) ?? { text: cell.criterion.slug, lang: locale };
+  const criterionAsks = local(cell.criterion.description);
   const can = (...roles: ('country_admin' | 'editor' | 'reviewer')[]) =>
     cell.platformAdmin || roles.some((role) => cell.roles.includes(role));
   const canEdit = can('editor', 'country_admin');
@@ -211,6 +212,18 @@ const CellPage = async ({ params }: CellParams) => {
           })}{' '}
           · {t('admin.cells.version', { version: draft.contentVersion })}
         </p>
+      ) : null}
+
+      {criterionAsks ? (
+        // What the criterion asks, beside the cell for whoever writes or reviews it (PLAN R240).
+        <section aria-labelledby="criterion-asks" className={styles.section}>
+          <h3 id="criterion-asks" className={styles.h3}>
+            {t('admin.cells.criterionAsks')}
+          </h3>
+          <p className={styles.text}>
+            <Lang value={criterionAsks} page={locale} />
+          </p>
+        </section>
       ) : null}
 
       {checkedOnlyReplaced(cell) ? (

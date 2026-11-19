@@ -78,6 +78,19 @@ describe('a cell (editorial workflow §8)', () => {
     });
   });
 
+  it('says what its criterion asks, its description, to whoever writes or reviews it (PLAN R240)', async () => {
+    await inRolledBackTransaction(async (trx) => {
+      const pair = await pairOf(trx, LIVE_A.cells.draft);
+      const { rows } = await sql<{ description: Record<string, string> }>`
+        SELECT description FROM app.criteria WHERE id = ${pair.criterion_id}`.execute(trx);
+      for (const user of [USERS.editorA, USERS.reviewerA]) {
+        await actAs(trx, user);
+        const cell = await getCell(trx, LIVE_A.id, pair.party_id, pair.criterion_id);
+        expect(cell?.criterion.description).toEqual(rows[0]?.description);
+      }
+    });
+  });
+
   it('shows a published cell with its revisions, newest first', async () => {
     await inRolledBackTransaction(async (trx) => {
       const pair = await pairOf(trx, LIVE_A.cells.published);

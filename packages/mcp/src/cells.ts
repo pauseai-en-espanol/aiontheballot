@@ -126,9 +126,10 @@ export const registerCellTools = (server: McpServer, admin: AdminClient): void =
     {
       title: 'Get a cell',
       description:
-        'One party’s cell on one criterion: its draft (rating, summary, quotes with whether they match, the ' +
-        'documents checked, its review’s history and its version), its published revisions, and the sources it ' +
-        'may cite or check. Read it before proposing anything for it, and again before writing.',
+        'One party’s cell on one criterion: what the criterion asks (its description), its draft (rating, summary, ' +
+        'quotes with whether they match, the documents checked, its review’s history and its version), its ' +
+        'published revisions, and the sources it may cite or check. Read it before proposing anything for it, and ' +
+        'again before writing.',
       inputSchema: { site, election, party, criterion },
     },
     ({ site: s, election: e, party: p, criterion: c }) => run(() => readCell(s, e, p, c)),

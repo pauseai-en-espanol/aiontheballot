@@ -951,6 +951,7 @@
       "recheck": "Revisar de nuevo",
       "noStructure": "Añade antes partidos y criterios.",
       "back": "Todas las celdas",
+      "criterionAsks": "Qué pide el criterio",
       "state": "Estado: {state}",
       "version": "{version, plural, =0 {Aún sin editar} one {Editada una vez} other {Editada # veces}}",
       "notStarted": "Nadie ha empezado esta celda. Su página pública dice que está pendiente.",

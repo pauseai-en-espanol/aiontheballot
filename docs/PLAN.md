@@ -3487,6 +3487,13 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
     it; the RLS matrix, the allowlists, the export, both purges), the API's (the route, its refusals and rate limit),
     the web app's (the crawlers, the paths, the relay, the proxy), and e2e (a preview, a relayed share, the admin page).
 
+- **R240. A cell's page says what its criterion asks.** Whoever writes or reviews a cell chose between «Cumple» and
+  «Cumple parcialmente» without the criterion's description in sight: the cell's page showed only its title, the
+  criterion's page shows the description only in its edit form (editors and country admins, while the election is a
+  draft or in preview), and otherwise only the public site did. The cell's page now shows it, read-only, under its
+  heading, «Qué pide el criterio», for every member; the API's cell carries it, and so does the MCP's `get_cell`.
+  Tests: the API's (an editor and a reviewer both read it) and e2e (a reviewer sees it on the page).
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

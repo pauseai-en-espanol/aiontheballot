@@ -128,6 +128,8 @@ export interface Cell {
     slug: string;
     title: Localized;
     shortTitle: Localized | null;
+    /** What it asks, as the site's methodology words it: shown to whoever writes or reviews the cell (PLAN R240). */
+    description: Localized;
     retired: boolean;
   };
   /**
@@ -176,7 +178,7 @@ export const getCell = async (
       .executeTakeFirst(),
     trx
       .selectFrom('app.criteria')
-      .select(['id', 'slug', 'title', 'short_title', 'retired_at'])
+      .select(['id', 'slug', 'title', 'short_title', 'description', 'retired_at'])
       .where('election_id', '=', electionId)
       .where('id', '=', criterionId)
       .executeTakeFirst(),
@@ -283,6 +285,7 @@ export const getCell = async (
       slug: criterion.slug,
       title: localized(criterion.title, 'criteria.title'),
       shortTitle: optionalLocalized(criterion.short_title, 'criteria.short_title'),
+      description: localized(criterion.description, 'criteria.description'),
       retired: criterion.retired_at !== null,
     },
     electionStatus: election.status,

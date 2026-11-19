@@ -55,6 +55,8 @@ export interface Cell {
     slug: string;
     title: Localized;
     shortTitle: Localized | null;
+    /** What it asks: shown beside the cell (PLAN R240). */
+    description: Localized;
     retired: boolean;
   };
   electionStatus: ElectionStatus;
