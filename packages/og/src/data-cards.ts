@@ -21,6 +21,7 @@ import { markImage } from './mark.js';
 import { h, type OgChild, type OgNode } from './node.js';
 import { ratingIcon } from './rating-icon.js';
 import { SHARE_SIZES, type ShareSize } from './sizes.js';
+import { textWidth } from './text-width.js';
 
 /**
  * The data cards (PLAN R185; the canvas's boards A to D, "data first"): the scorecard's link preview (A, every party's
@@ -419,8 +420,52 @@ const TEXT_EM = 0.55;
 /** The smallest icon above a rating's words, as a share of the words' size. */
 const MIN_ICON_WITH_WORDS = 1.6;
 
-/** Saira Condensed's capitals, as the legend writes its words: wider than its letters' average. */
-const CAPITALS_EM = 0.56;
+/**
+ * How wide a line of the display face is drawn: measured in the font, with a margin for kerning (a few pixels in a
+ * hundred, text-width.ts) and satori's rounding.
+ */
+const displayWidth = (text: string, font: number): number =>
+  textWidth(text, font, 'Saira Condensed') * 1.03 + 2;
+
+/** sin 45° and cos 45°: how far up, and how far along, a title tilted at 45° reaches for each unit of its length. */
+const TILT = Math.SQRT1_2;
+/** The tilted titles' sizes, in the layout's small text, largest first: the largest that leaves the rows room. */
+const TILT_SIZES = [1.1, 1.05, 1];
+
+/**
+ * The criteria's titles tilted at 45° on one line at `font`, each rising to the right from the middle of its column,
+ * as on the web: the header as tall as the longest rises, and the columns narrowed to leave room past the last one
+ * for any title that reaches beyond it. A title starts `start` before its column's middle; column j's middle is
+ * (columns − j − ½) columns from the end, so with the columns narrowed by `overhang` a title reaching `along` goes
+ * past the end by along − start − (columns − j − ½)(width − overhang)/columns, which `overhang` must cover.
+ */
+const tiltedTitles = (criteria: string[], width: number, font: number) => {
+  const columns = Math.max(1, criteria.length);
+  const line = font * 1.15;
+  const start = font * 0.3;
+  const bottom = Math.round(font * 0.35);
+  const reach = criteria.map((criterion) => displayWidth(criterion, font) * TILT);
+  const overhang = Math.ceil(
+    Math.max(
+      0,
+      ...reach.map((along, j) => {
+        const before = columns - j - 0.5;
+        return (along - start - (before * width) / columns) / (1 - before / columns);
+      }),
+    ),
+  );
+  const column = (width - overhang) / columns;
+  return {
+    font,
+    start,
+    bottom,
+    column,
+    // Over the longest's top corner, a little room.
+    head: Math.ceil(bottom + Math.max(0, ...reach) + line * TILT + 4),
+    // Neighbouring titles, a column apart along the row, are column × sin 45° apart across their lines.
+    clear: column * TILT >= line,
+  };
+};
 
 /**
  * How many lines `text` takes at `font` in `width`, broken at spaces as satori breaks it, its characters `em` wide on
@@ -476,22 +521,25 @@ const ratingGrid = (
       ),
     ),
   );
-  const columnWidth = (space.width - partyWidth) / columns;
-  const headFont = Math.round(Math.min(l.small * 1.15, columnWidth * 0.2 + 6));
+  const gridWidth = space.width - partyWidth;
+  const flatColumn = gridWidth / columns;
+  const headFont = Math.round(Math.min(l.small * 1.15, flatColumn * 0.2 + 6));
   const headPad = Math.round(headFont * 0.2);
-  // The titles across their columns only where every one fits whole on two lines; else the columns' numbers, the
-  // titles keyed below. Never cut (PLAN R221).
+  // The titles across their columns only where every one fits whole on two lines (PLAN R221).
   const across =
-    columnWidth >= headFont * 4.2 &&
+    flatColumn >= headFont * 4.2 &&
     criteria.every(
-      (criterion) => linesOf(criterion, headFont, columnWidth - 2 * headPad, DISPLAY_EM) <= 2,
+      (criterion) => linesOf(criterion, headFont, flatColumn - 2 * headPad, DISPLAY_EM) <= 2,
     );
-  const headHeight = Math.round(across ? headFont * 1.2 * 2 + headFont * 0.6 : headFont * 1.6);
   // The legend and the key take the lines they need, measured, and never give any up to the rows.
   const legendFont = Math.round(l.small * 1.05);
   const legendLines = legendEntries.reduce(
     (state, entry) => {
-      const width = legendFont * (1.35 + 0.45 + entry.label.length * CAPITALS_EM);
+      // As ratingWords draws it: the icon, a gap, and the words in capitals.
+      const width =
+        Math.round(legendFont * 1.35) +
+        legendFont * 0.45 +
+        displayWidth(entry.label.toUpperCase(), legendFont);
       return state.used === 0 || state.used + legendFont * 1.4 + width <= space.width
         ? {
             lines: Math.max(1, state.lines),
@@ -504,10 +552,26 @@ const ratingGrid = (
   const legendHeight = Math.ceil(
     legendFont * (1.35 * legendLines + 0.7 * Math.max(0, legendLines - 1) + 0.8),
   );
-  const key = criteria.map((criterion, index) => `${index + 1}. ${criterion}`).join(' · ');
-  const keyLines = across ? 0 : linesOf(key, l.small, space.width);
-  const keyHeight = across ? 0 : Math.ceil(l.small * (1.45 * keyLines + 0.5));
   const rule = 1;
+  const minRow = nameFont * (more ? 1.5 : 1.05);
+  // Where they don't fit across, the titles tilted (as on the web), at the largest size that leaves every party a row
+  // of the grid's smallest, none of them left to "and # more", the titles clear of each other; else the columns'
+  // numbers, the titles keyed below. Never cut (PLAN R221).
+  const tilted = across
+    ? undefined
+    : TILT_SIZES.map((size) => tiltedTitles(criteria, gridWidth, Math.round(l.small * size))).find(
+        (tilt) =>
+          tilt.clear &&
+          (space.height - tilt.head - legendHeight) / Math.max(1, parties.length) - rule >= minRow,
+      );
+  const columnWidth = tilted ? tilted.column : flatColumn;
+  const headHeight = Math.round(
+    across ? headFont * 1.2 * 2 + headFont * 0.6 : tilted ? tilted.head : headFont * 1.6,
+  );
+  const keyed = !across && !tilted;
+  const key = criteria.map((criterion, index) => `${index + 1}. ${criterion}`).join(' · ');
+  const keyLines = keyed ? linesOf(key, l.small, space.width) : 0;
+  const keyHeight = keyed ? Math.ceil(l.small * (1.45 * keyLines + 0.5)) : 0;
   const available = space.height - headHeight - legendHeight - keyHeight;
   // The words under each icon: at a size where every rating's longest word fits the column, on as many lines as the
   // longest words need, or none (the legend gives them).
@@ -524,7 +588,6 @@ const ratingGrid = (
   const wordsFit = words && labels.length > 0 && wordFont >= 11 && wordLines <= 3;
   const wordsHeight = wordLines * wordFont * 1.1 + Math.round(wordFont * 0.25);
   const maxRow = nameFont * (wordsFit ? 3.6 : 2.7);
-  const minRow = nameFont * (more ? 1.5 : 1.05);
   let shown = parties.length;
   let rowHeight = Math.min(maxRow, available / Math.max(1, shown) - rule);
   if (more && rowHeight < minRow) {
@@ -542,6 +605,35 @@ const ratingGrid = (
   const showFull = rowHeight >= nameFont * 1.85;
   const font = Math.round(Math.min(nameFont, rowHeight * 0.55));
 
+  const tiltedTitle = (criterion: string, tilt: ReturnType<typeof tiltedTitles>) =>
+    h(
+      'div',
+      // Its title is placed from it: satori places an absolute box from its nearest positioned ancestor, as CSS does.
+      {
+        display: 'flex',
+        position: 'relative',
+        alignSelf: 'stretch',
+        width: columnWidth,
+        flexShrink: 0,
+      },
+      h(
+        'div',
+        {
+          ...display,
+          position: 'absolute',
+          left: Math.round(columnWidth / 2 - tilt.start),
+          bottom: tilt.bottom,
+          fontSize: tilt.font,
+          lineHeight: 1.15,
+          whiteSpace: 'nowrap',
+          color: theme.ink,
+          transformOrigin: '0 100%',
+          transform: 'rotate(-45deg)',
+        },
+        criterion,
+      ),
+    );
+
   const headRow = h(
     'div',
     {
@@ -549,35 +641,40 @@ const ratingGrid = (
       alignItems: 'flex-end',
       height: headHeight,
       flexShrink: 0,
-      paddingBottom: headFont * 0.35,
+      paddingBottom: tilted ? 0 : headFont * 0.35,
       borderBottom: `3px solid ${theme.ink}`,
     },
     h('div', { display: 'flex', width: partyWidth, flexShrink: 0 }),
     ...criteria.map((criterion, index) =>
-      h(
-        'div',
-        {
-          display: 'flex',
-          justifyContent: 'center',
-          width: columnWidth,
-          flexShrink: 0,
-          padding: `0 ${headPad}px`,
-        },
-        across
-          ? clamped(
-              {
-                ...display,
-                fontWeight: 600,
-                fontSize: headFont,
-                lineHeight: 1.15,
-                textAlign: 'center',
-                color: theme.muted,
-              },
-              criterion,
-              2,
-            )
-          : oneLine({ ...display, fontSize: headFont * 1.2, color: theme.ink }, String(index + 1)),
-      ),
+      tilted
+        ? tiltedTitle(criterion, tilted)
+        : h(
+            'div',
+            {
+              display: 'flex',
+              justifyContent: 'center',
+              width: columnWidth,
+              flexShrink: 0,
+              padding: `0 ${headPad}px`,
+            },
+            across
+              ? clamped(
+                  {
+                    ...display,
+                    fontWeight: 600,
+                    fontSize: headFont,
+                    lineHeight: 1.15,
+                    textAlign: 'center',
+                    color: theme.muted,
+                  },
+                  criterion,
+                  2,
+                )
+              : oneLine(
+                  { ...display, fontSize: headFont * 1.2, color: theme.ink },
+                  String(index + 1),
+                ),
+          ),
     ),
   );
 
@@ -653,7 +750,7 @@ const ratingGrid = (
           ),
         ]
       : []),
-    ...(across
+    ...(!keyed
       ? []
       : [
           clamped(

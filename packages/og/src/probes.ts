@@ -180,6 +180,19 @@ const MANY_PARTIES: CardParty[] = Array.from({ length: 20 }, (_, i) => ({
   colour: i % 3 === 0 ? '#6a4c93' : null,
 }));
 const MANY_CRITERIA = Array.from({ length: 12 }, (_, i) => `Ejemplo ${i + 1}`);
+/** Ten invented short titles about as long as the live election's: too long to go across ten columns. */
+const TILTED_CRITERIA = [
+  'Criterio de ejemplo',
+  'Ejemplo de criterio',
+  'Tercer criterio inventado',
+  'Cuarto ejemplo',
+  'Quinto criterio de prueba',
+  'Sexto',
+  'Séptimo ejemplo',
+  'Octavo',
+  'Noveno ejemplo',
+  'Décimo criterio',
+];
 
 export const PROBES: Readonly<Record<TemplateName, readonly Probe[]>> = {
   overview: [
@@ -550,6 +563,30 @@ export const PROBES: Readonly<Record<TemplateName, readonly Probe[]>> = {
             legend: LEGEND,
           },
           size,
+        ),
+    },
+    {
+      // The live election's shape (PLAN R246): fifteen parties and ten criteria whose titles don't fit across, tilted
+      // over their columns where every party keeps a row; numbered and keyed where not.
+      id: 'tilted',
+      node: (size) =>
+        tableCard(
+          {
+            ...DATA,
+            ...WITH_LOGO,
+            title: QUESTION,
+            subtitle: 'Elecciones de ejemplo · cada valoración, con sus citas en la web',
+            parties: MANY_PARTIES.slice(0, 15),
+            criteria: TILTED_CRITERIA,
+            cells: labelled(
+              MANY_PARTIES.slice(0, 15).map((_, i) =>
+                TILTED_CRITERIA.map((__, j) => DISPLAYS[(i * 3 + j) % 5] ?? 'pending'),
+              ),
+            ),
+            legend: LEGEND,
+          },
+          size,
+          { operatorLogo: probeLogo() },
         ),
     },
   ],

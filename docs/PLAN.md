@@ -3566,6 +3566,23 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   (a quote pasted with a line break and a split word matches and shows as it reads). Spec: editorial workflow C2 rule
   9; public site §5.2; ADR-0002's data rules.
 
+- **R246. The shared table names its columns.** Feedback on the live 29N site: on the whole table posted to social
+  networks, which criterion a column was could only be read in the key below it, while the web names each column
+  above it. Where the criteria's titles don't fit across their columns, the data cards now tilt them at 45° over
+  them on one line, rising from the middle of each column as the web's summary does (`tiltedTitles`): the header as
+  tall as the longest title rises, the columns narrowed to leave room past the last one for a title that reaches
+  beyond it, at the largest of three sizes that leaves every party a row of the grid's smallest and, on a link
+  preview, none to "and # more"; else the columns are numbered and keyed below as before. The titles are measured in
+  the cards' own fonts (`text-width.ts`, from the embedded files' advance widths: within 3% of satori's layout, which
+  kerns, with a margin for it), and so is the legend, which an estimate counted as two lines where it drew one: on
+  29N's portrait table that line pays for the tilted header, its rows about 34 px instead of 38. 29N's portrait and
+  story tables tilt their titles; the square keeps the key, its rows a little taller; no link preview changes. Tests:
+  the measure against satori's layout in both fonts, kerned tight or not; the tilted titles whole, under the header
+  and clear of the side margin in six shapes at every size on both grid cards (two broken geometries caught); 29N's
+  shape tilted at portrait and story sizes, 20 parties keyed at the square, and a link preview never losing a party
+  to them. A probe of 29N's shape (`tilted`, fictional) joins the references; the data cards' references were
+  accepted again, no link preview's among them. Spec: public site §5.4.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

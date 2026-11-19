@@ -98,11 +98,25 @@ const LONG_TITLES = [
   'Décimo criterio de prueba',
 ];
 
+/** Invented short titles about as long as the live election's: too long to go across ten columns (PLAN R246). */
+const MEDIUM_TITLES = [
+  'Criterio de ejemplo',
+  'Ejemplo de criterio',
+  'Tercer criterio inventado',
+  'Cuarto ejemplo',
+  'Quinto criterio de prueba',
+  'Sexto',
+  'Séptimo ejemplo',
+  'Octavo',
+  'Noveno ejemplo',
+  'Décimo criterio',
+];
+
 /**
  * The whole table's data for so many parties and criteria, every state in turn, with names too short to cut, and the
- * criteria short or, with `long`, as long as a chapter's may be.
+ * criteria short or, with `titles`, those titles numbered.
  */
-const tableData = (parties: number, criteria: number, long = false): TableCard => ({
+const tableData = (parties: number, criteria: number, titles?: readonly string[]): TableCard => ({
   theme: DEFAULT_CARD_THEME,
   site: 'Inquilino de ejemplo A',
   letters: 'IA' as const,
@@ -119,7 +133,7 @@ const tableData = (parties: number, criteria: number, long = false): TableCard =
     return { short, name: short, colour: null };
   }),
   criteria: Array.from({ length: criteria }, (_, j) =>
-    long ? `${LONG_TITLES[j % LONG_TITLES.length]} ${j + 1}` : `Ejemplo ${j + 1}`,
+    titles ? `${titles[j % titles.length]} ${j + 1}` : `Ejemplo ${j + 1}`,
   ),
   cells: Array.from({ length: parties }, (_, i) =>
     Array.from({ length: criteria }, (__, j) => {
@@ -164,7 +178,7 @@ describe("the whole table's words", () => {
     "leave the criteria's key whole, however long their titles: %i parties, %i criteria",
     async (parties, criteria) => {
       for (const size of SIZES) {
-        const data = tableData(parties, criteria, true);
+        const data = tableData(parties, criteria, LONG_TITLES);
         const preview = overviewCard(
           {
             ...data,
@@ -203,4 +217,144 @@ describe("the whole table's words", () => {
       expect(text).toMatch(new RegExp(words.replaceAll(' ', ' ?')));
     }
   });
+});
+
+/** The card's side margins, as its layouts set them: no title reaches into them. */
+const MARGIN: Record<ShareSize, number> = {
+  '1200x630': 44,
+  '1080x1080': 56,
+  '1080x1350': 56,
+  '1080x1920': 72,
+};
+
+/** A word satori turned 45° up: its place, size and turn (the matrix of rotate(-45deg) about its origin). */
+const TILTED =
+  /<text x="([\d.]+)" y="([\d.]+)" width="([\d.]+)"[^>]*font-size="([\d.]+)"[^>]*transform="matrix\((0\.7071\d*),(-0\.7071\d*),([\d.-]+),([\d.-]+),([\d.-]+),([\d.-]+)\)"/g;
+
+/**
+ * Where on the card each tilted word is drawn: its glyphs' box (an em above the baseline, a third of one below) with
+ * its corners turned as satori turns them.
+ */
+const tiltedWords = (svg: string) =>
+  [...svg.matchAll(TILTED)].map((match) => {
+    const [x, y, width, size, a, b, c, d, e, f] = match.slice(1).map(Number) as number[] as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
+    const corners = [
+      [x, y - size],
+      [x + width, y - size],
+      [x, y + size / 3],
+      [x + width, y + size / 3],
+    ].map(([px = 0, py = 0]) => ({ x: a * px + c * py + e, y: b * px + d * py + f }));
+    return {
+      right: Math.max(...corners.map((corner) => corner.x)),
+      top: Math.min(...corners.map((corner) => corner.y)),
+    };
+  });
+
+/** The accent header's height: a card's body starts under it. */
+const headerHeight = (svg: string): number =>
+  Number(
+    new RegExp(
+      `<rect x="0" y="0" width="\\d+" height="([\\d.]+)" fill="${DEFAULT_CARD_THEME.accent}"/>`,
+    ).exec(svg)?.[1],
+  );
+
+/** The table and the scorecard's link preview of the same data. */
+const bothGrids = (data: TableCard, size: ShareSize) =>
+  [
+    ['table', tableCard(data, size)],
+    [
+      'preview',
+      overviewCard(
+        {
+          ...data,
+          cells: data.cells.map((row) => row.map(({ rating }) => rating)),
+          more: 'y # más en la web',
+        },
+        size,
+      ),
+    ],
+  ] as const;
+
+// Feedback on the live 29N site: on the shared table, which column was which was only in the key below (PLAN R246).
+describe("the criteria's titles, where they don't fit across", () => {
+  it.each(['1080x1350', '1080x1920'] as const)(
+    'are tilted over their columns, whole, where every party keeps a row: 15 parties, 10 criteria at %s',
+    async (size) => {
+      const data = tableData(15, 10, MEDIUM_TITLES);
+      const svg = await renderSvg(tableCard(data, size), size, { text: true });
+      const text = svgText(svg);
+      expect(tiltedWords(svg).length).toBeGreaterThan(0);
+      expect(text).not.toMatch(/\d+\. /);
+      expect(text).not.toContain('…');
+      for (const title of data.criteria) {
+        expect(text).toMatch(new RegExp(title.replaceAll(' ', ' ?')));
+      }
+    },
+  );
+
+  it('are numbered and keyed where tilting them would leave the rows too low: 20 parties at 1080x1080', async () => {
+    const svg = await renderSvg(
+      tableCard(tableData(20, 10, MEDIUM_TITLES), '1080x1080'),
+      '1080x1080',
+      { text: true },
+    );
+    expect(tiltedWords(svg)).toEqual([]);
+    expect(svgText(svg)).toMatch(/1\. Criterio de ejemplo 1/);
+  });
+
+  it.each([
+    [3, 4],
+    [11, 10],
+    [15, 10],
+    [11, 17],
+    [5, 12],
+    [20, 12],
+  ])(
+    'stay on the card when tilted, under its header and clear of its margin: %i parties, %i criteria',
+    async (parties, criteria) => {
+      for (const titles of [undefined, MEDIUM_TITLES, LONG_TITLES]) {
+        for (const size of SIZES) {
+          for (const [kind, node] of bothGrids(tableData(parties, criteria, titles), size)) {
+            const svg = await renderSvg(node, size, { text: true });
+            const header = headerHeight(svg);
+            expect(header, `${kind} ${size}: the header`).toBeGreaterThan(0);
+            for (const word of tiltedWords(svg)) {
+              expect(word.right, `${kind} ${size}`).toBeLessThanOrEqual(
+                SHARE_SIZES[size].width - MARGIN[size] + 1,
+              );
+              expect(word.top, `${kind} ${size}`).toBeGreaterThanOrEqual(header);
+            }
+          }
+        }
+      }
+    },
+    30_000,
+  );
+
+  it.each([5, 11, 15, 20])(
+    'leave every party on the link preview when tilted, none to "and # more": %i parties',
+    async (parties) => {
+      for (const titles of [undefined, MEDIUM_TITLES, LONG_TITLES]) {
+        for (const size of SIZES) {
+          const [, [, preview]] = bothGrids(tableData(parties, 10, titles), size);
+          const svg = await renderSvg(preview, size, { text: true });
+          if (tiltedWords(svg).length > 0) {
+            expect(svgText(svg), size).not.toMatch(/y \d+ más en la web/);
+          }
+        }
+      }
+    },
+    30_000,
+  );
 });
