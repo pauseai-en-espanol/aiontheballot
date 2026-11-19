@@ -1145,6 +1145,12 @@
       },
       "replacedSource": "de una fuente sustituida",
       "changeNotLoggedYet": "Hasta que la elección sea pública, los cambios no necesitan tipo de cambio ni nota pública: el público verá la última versión publicada como la primera.",
+      "unlogged": "Publicar sin registro público",
+      "unloggedHint": "Solo para administradores de la plataforma. El cambio se publica sin tipo de cambio ni nota pública y no aparece en el registro de correcciones: el público ve la nueva versión en el lugar de la anterior, con su nueva fecha. Quién lo publicó y cuándo queda en el historial de esta página.",
+      "unloggedMarked": "Un administrador de la plataforma ha marcado este cambio como sin registro público: no necesita tipo de cambio ni nota pública, y solo un administrador de la plataforma puede publicarlo.",
+      "cannotPublishUnlogged": "Este cambio es sin registro público: solo un administrador de la plataforma puede publicarlo.",
+      "publishUnloggedBody": "Se publicará sin registro público: el público verá la nueva versión al momento, sin nota pública y sin entrada en el registro de correcciones.",
+      "unloggedRevision": "Sin registro público: al público no se le anunció ningún cambio.",
       "replacedOnlyTitle": "«No lo menciona», comprobado solo con documentos sustituidos",
       "replacedOnlyBody": "Todos los documentos con los que se comprobó esta valoración se han marcado como sustituidos: comprueba la versión nueva antes de enviar la valoración, o corrígela si ya está publicada.",
       "bar": {

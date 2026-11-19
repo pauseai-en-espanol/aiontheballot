@@ -376,6 +376,62 @@ describe('the workflow (C5–C9, C12, C13)', () => {
     });
   });
 
+  it('is marked as off the record by a platform admin alone, and then carries no kind or note (C10.6)', async () => {
+    await inRolledBackTransaction(async (trx) => {
+      const pair = await pairOf(trx, LIVE_A.cells.published);
+      const fields = {
+        rating: LIVE_A.publishedRating,
+        summary: { es: 'Resumen de ejemplo cambiado' },
+        changeKind: 'correction',
+        publicNote: { es: 'Nota de ejemplo' },
+      } as const;
+      // Anyone else's mark is the database's to refuse.
+      await actAs(trx, USERS.editorA);
+      await sql`SAVEPOINT attempt`.execute(trx);
+      await expect(
+        saveCell(trx, LIVE_A.id, LIVE_A.cells.published, pair.content_version, {
+          ...fields,
+          unlogged: true,
+        }),
+      ).rejects.toMatchObject({ code: '42501' });
+      await sql`ROLLBACK TO SAVEPOINT attempt`.execute(trx);
+      // A platform admin's is saved with no kind and no note, whatever the form held.
+      await actAs(trx, USERS.platformAdmin);
+      expect(
+        await saveCell(trx, LIVE_A.id, LIVE_A.cells.published, pair.content_version, {
+          ...fields,
+          unlogged: true,
+        }),
+      ).toBe('changed');
+      const marked = await getCell(trx, LIVE_A.id, pair.party_id, pair.criterion_id);
+      expect(marked?.draft).toMatchObject({
+        state: 'draft',
+        unlogged: true,
+        changeKind: null,
+        publicNote: null,
+      });
+      // A form that doesn't offer the mark (an editor's) leaves it as it is.
+      await actAs(trx, USERS.editorA);
+      expect(
+        await saveCell(
+          trx,
+          LIVE_A.id,
+          LIVE_A.cells.published,
+          marked?.draft?.contentVersion ?? -1,
+          {
+            rating: LIVE_A.publishedRating,
+            summary: { es: 'Resumen de ejemplo cambiado otra vez' },
+            changeKind: null,
+            publicNote: null,
+          },
+        ),
+      ).toBe('changed');
+      const edited = await getCell(trx, LIVE_A.id, pair.party_id, pair.criterion_id);
+      expect(edited?.draft?.unlogged).toBe(true);
+      expect(edited?.revisions[0]?.unlogged).toBe(false);
+    });
+  });
+
   it('takes comments from any member, and its recheck flag is cleared without a new version', async () => {
     await inRolledBackTransaction(async (trx) => {
       const pair = await pairOf(trx, LIVE_A.cells.published);

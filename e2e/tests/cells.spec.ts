@@ -1,6 +1,6 @@
 import { messages } from '@aiontheballot/i18n/messages';
 
-import { addMembership, deleteAccounts } from '../accounts.js';
+import { addMembership, asOwner, deleteAccounts } from '../accounts.js';
 import { signedInAccount } from '../admin.js';
 import { expectAccessible } from '../axe.js';
 import { ADMIN_URL } from '../servers.js';
@@ -311,6 +311,52 @@ test.describe('cells (editorial workflow §8)', () => {
     await page.getByRole('button', { name: cells.startChange.button }).click();
     await expect(page.getByRole('button', { name: cells.save })).toBeVisible();
     await expect(page.getByRole('radio').first()).toBeFocused();
+  });
+
+  test('offer a platform admin alone to publish a change off the record, with no kind and no note (PLAN R243)', async ({
+    page,
+  }) => {
+    const { id } = await signedInAccount(page, created, 'Persona que administra');
+    await addMembership(id, 'ejemplo-a', 'editor');
+    const startChange = async () => {
+      await page.goto(GRID);
+      await page
+        .getByRole('row', { name: /Partido Ejemplo A/ })
+        .getByRole('link', {
+          name: `PEA, Ejemplo 1: ${en.rating.meets} · ${cells.states.published}`,
+        })
+        .click();
+      await page.getByRole('button', { name: cells.startChange.button }).click();
+    };
+    // An editor's change says its kind and why, and is offered nothing else.
+    await startChange();
+    await expect(page.getByRole('group', { name: cells.changeKind })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: cells.unlogged })).toHaveCount(0);
+
+    // A platform admin's may be off the record: the kind and the note then leave the form.
+    await asOwner('INSERT INTO app.platform_admins (user_id) VALUES ($1)', [id]);
+    await startChange();
+    const offTheRecord = page.getByRole('checkbox', { name: cells.unlogged });
+    await expect(offTheRecord).not.toBeChecked();
+    await expect(page.getByRole('group', { name: cells.changeKind })).toBeVisible();
+    await offTheRecord.check();
+    await expect(page.getByRole('group', { name: cells.changeKind })).toHaveCount(0);
+    await expect(page.getByText(cells.unloggedHint)).toBeVisible();
+    await expectAccessible(page);
+
+    // What the form sends, never saved: the seeded cell stays published, as every other test finds it.
+    const isSave = (method: string, url: string) =>
+      method === 'PUT' && /\/cells\/[^/]+$/.test(new URL(url).pathname);
+    await page.route(/\/cells\/[^/?]+$/, (route) =>
+      isSave(route.request().method(), route.request().url()) ? route.abort() : route.continue(),
+    );
+    const sent = page.waitForRequest((request) => isSave(request.method(), request.url()));
+    await page.getByRole('button', { name: cells.save }).click();
+    expect((await sent).postDataJSON()).toMatchObject({
+      unlogged: true,
+      changeKind: null,
+      publicNote: null,
+    });
   });
 
   test('are a 404 for anyone outside the site', async ({ page }) => {

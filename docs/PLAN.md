@@ -3513,6 +3513,33 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   under it, driven by the scroll where the browser supports scroll-driven animations. Tests: e2e (the logo alone and
   the accessible name on a phone, both names from a tablet up; both shadows, at the start and at the end).
 
+- **R243. A platform admin changes a published cell off the record.** Auditing the 29N ratings for coherence, Dani
+  wanted to fix several published cells without the corrections process: "i want to be able to make changes outside
+  this process when i want (for example now) in this case it would change and that's it", because "the site has not
+  been visited by bearly anyone". Offered a switch per election (free edits until turned off, as in preview, R233) or
+  a choice on each change, he chose the choice on each change. A platform admin may now mark a published cell's
+  change as off the record (`assessments.draft_unlogged`): it is submitted and published with no change kind and no
+  public note, recorded as an update marked `unlogged`, which the corrections log leaves out. The public reads it in
+  the place of the revision before it, whose number, kind and note it keeps (`publicHistory`), dated when it was
+  published, so nothing but the date says the cell changed. The revision is kept like any other: who published it
+  and when stay in the admin's history, which marks it, and in the audit log. Its limits are the database's: only a
+  platform admin marks it (never a member's token) and publishes it; only in a live election (before, changes are
+  free anyway; an archived one takes corrections and withdrawals only); no kind or note of its own, so never a
+  withdrawal, and never after one, which the public was told of; the mark ends with its publish. The review rule is
+  untouched: while an election requires a second reviewer, another platform admin publishes it. This narrows BRIEF
+  §4's public corrections log, by the operator's decision: what is published on the record is logged as before.
+  Migration unlogged_changes: `assessments.draft_unlogged` (its check, its UPDATE grant to `aiontheballot_admin`,
+  ADR-0002 §6, `platform_admin_columns` and `needs_a_person_to_decide`), `assessment_revisions.unlogged` (its
+  checks), `assessment_transition`, `assessment_trail` and `publish_revision` (bodies only, the last still on the
+  definer allowlist) and `corrections_log`. The cell editor offers the choice to a platform admin, says so to
+  everyone else on a marked draft, and confirms a publish off the record in its own words. Tests first: the
+  database's (`unlogged.spec.ts`, and one of preview's), the public history's, the API's (the public election data,
+  saving the mark), the editor's checklist and an e2e of the editor's choice (offered to a platform admin alone, and
+  what its form then sends). Mutation list unlogged-changes; the mutations of `assessment_trail`
+  and `publish_revision` in free-edits-before-public, election-curtains and draft-report now target this migration,
+  which replaces both functions. Spec: editorial workflow C10.6; data model §3; public site §5.2, §5.6; runbook
+  corrections §7; ADR-0002 §6 and its data rules.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

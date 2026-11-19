@@ -1,0 +1,235 @@
+[
+  {
+    "name": "migration: an editor or country admin marks a change as off the record",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "private.restrict_columns('', 'draft_unlogged');",
+    "new": "private.restrict_columns('country_admin,editor', 'draft_unlogged');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a member's token marks a change as off the record",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "        OR new.draft_unlogged IS DISTINCT FROM old.draft_unlogged)",
+    "new": "        OR false)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a cell never published is marked as off the record",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "CHECK (NOT draft_unlogged OR (generation > 0 AND draft_change_kind IS NULL AND draft_public_note IS NULL));",
+    "new": "CHECK (NOT draft_unlogged OR (draft_change_kind IS NULL AND draft_public_note IS NULL));",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a change off the record carries a kind",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "CHECK (NOT draft_unlogged OR (generation > 0 AND draft_change_kind IS NULL AND draft_public_note IS NULL));",
+    "new": "CHECK (NOT draft_unlogged OR (generation > 0 AND draft_public_note IS NULL));",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a change off the record carries a public note",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "CHECK (NOT draft_unlogged OR (generation > 0 AND draft_change_kind IS NULL AND draft_public_note IS NULL));",
+    "new": "CHECK (NOT draft_unlogged OR (generation > 0 AND draft_change_kind IS NULL));",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: marking a cell as off the record is no edit of it",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "'draft_report_id', 'draft_unlogged'];",
+    "new": "'draft_report_id'];",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the mark outlives its publish",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "      NEW.draft_unlogged := false;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a cell is marked as off the record before its election is live",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "    IF edited AND NEW.draft_unlogged AND election_status <> 'live' THEN",
+    "new": "    IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a change off the record follows a withdrawal",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "        WHEN NEW.draft_unlogged\n             AND EXISTS (SELECT 1 FROM app.assessment_revisions r",
+    "new": "        WHEN false\n             AND EXISTS (SELECT 1 FROM app.assessment_revisions r",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a change off the record is submitted only with a kind",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "election_status IN ('draft', 'preview') OR NEW.draft_unlogged)",
+    "new": "election_status IN ('draft', 'preview'))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a change off the record is submitted only with a public note",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "AND election_status IN ('live', 'archived') AND NOT NEW.draft_unlogged\n",
+    "new": "AND election_status IN ('live', 'archived')\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: anyone who may publish publishes a change off the record",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "    IF cell.draft_unlogged AND NOT private.is_platform_admin() THEN",
+    "new": "    IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a change off the record is published only with a kind",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "election.status = 'preview' OR cell.draft_unlogged)",
+    "new": "election.status = 'preview')",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a change off the record is published only with a public note",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "AND election.status <> 'preview' AND NOT cell.draft_unlogged\n",
+    "new": "AND election.status <> 'preview'\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a revision doesn't record that it was published off the record",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "    NEW.unlogged := cell.draft_unlogged;\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: the corrections log lists what was published off the record",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "AND NOT r.published_in_preview AND NOT r.unlogged\n",
+    "new": "AND NOT r.published_in_preview\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a revision off the record carries a note or another kind",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "CHECK (NOT unlogged OR (change_kind = 'update' AND public_note IS NULL AND NOT published_in_preview));",
+    "new": "CHECK (true);",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "domain: a revision off the record stands as its own in the public history",
+    "file": "packages/domain/src/public-history.ts",
+    "old": "    if (unlogged && before && before.revision.changeKind !== 'withdrawal') {",
+    "new": "    if (false) {",
+    "cmd": "npx vitest run src/public-history.spec.ts",
+    "cwd": "packages/domain"
+  },
+  {
+    "name": "domain: a revision off the record replaces a withdrawal",
+    "file": "packages/domain/src/public-history.ts",
+    "old": "    if (unlogged && before && before.revision.changeKind !== 'withdrawal') {",
+    "new": "    if (unlogged && before) {",
+    "cmd": "npx vitest run src/public-history.spec.ts",
+    "cwd": "packages/domain"
+  },
+  {
+    "name": "domain: a revision off the record shows its own kind in the place it takes",
+    "file": "packages/domain/src/public-history.ts",
+    "old": "          changeKind: before.revision.changeKind,\n",
+    "new": "",
+    "cmd": "npx vitest run src/public-history.spec.ts",
+    "cwd": "packages/domain"
+  },
+  {
+    "name": "domain: a revision off the record drops the note of the one it replaces",
+    "file": "packages/domain/src/public-history.ts",
+    "old": "          publicNote: before.revision.publicNote,\n",
+    "new": "",
+    "cmd": "npx vitest run src/public-history.spec.ts",
+    "cwd": "packages/domain"
+  },
+  {
+    "name": "domain: a revision off the record keeps its own number",
+    "file": "packages/domain/src/public-history.ts",
+    "old": "          revisionNo: before.revision.revisionNo,\n",
+    "new": "",
+    "cmd": "npx vitest run src/public-history.spec.ts",
+    "cwd": "packages/domain"
+  },
+  {
+    "name": "domain: the revisions after one off the record keep their numbers",
+    "file": "packages/domain/src/public-history.ts",
+    "old": "revision: { ...revision, revisionNo: told.length + 1 }",
+    "new": "revision",
+    "cmd": "npx vitest run src/public-history.spec.ts",
+    "cwd": "packages/domain"
+  },
+  {
+    "name": "api: the public election data ignores what was published off the record",
+    "file": "apps/api/src/election-data.ts",
+    "old": "      unlogged: row.unlogged,\n",
+    "new": "",
+    "cmd": "npx vitest --run --config vitest.db.config.ts tests/election-data.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: saving a change off the record keeps the form's kind and note",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "      draft_change_kind: fields.unlogged ? null : fields.changeKind,",
+    "new": "      draft_change_kind: fields.changeKind,",
+    "cmd": "npx vitest --run --config vitest.db.config.ts tests/cells.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: a form that doesn't offer the mark clears it",
+    "file": "apps/api/src/admin/cells.ts",
+    "old": "      ...(fields.unlogged === undefined ? {} : { draft_unlogged: fields.unlogged }),",
+    "new": "      draft_unlogged: fields.unlogged ?? false,",
+    "cmd": "npx vitest --run --config vitest.db.config.ts tests/cells.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "admin: the checklist asks a change off the record for a kind and a note (R243)",
+    "file": "apps/admin/src/cells/checklist.ts",
+    "old": "if (draft.generation > 0 && changesLogged(cell.electionStatus) && !draft.unlogged) {",
+    "new": "if (draft.generation > 0 && changesLogged(cell.electionStatus)) {",
+    "cmd": "npx vitest run src/cells/checklist.spec.ts",
+    "cwd": "apps/admin"
+  }
+]

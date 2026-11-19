@@ -148,6 +148,7 @@ const readElection = async (
           'r.public_note',
           instant('r.published_at').as('published_at'),
           'r.published_in_preview',
+          'r.unlogged',
         ])
         .where('r.election_id', '=', election.id)
         .where('p.retired_at', 'is', null)
@@ -213,7 +214,7 @@ const readElection = async (
     archiveUrl: row.archive_url,
   });
 
-  // Each cell's revisions, newest first, and whether each was published in preview.
+  // Each cell's revisions, newest first, and whether each was published in preview, or off the record (PLAN R243).
   const staged = new Map<
     string,
     { partyId: string; criterionId: string; revisions: StagedRevision[] }
@@ -248,7 +249,11 @@ const readElection = async (
         .filter((item) => item.revision_id === row.id)
         .map((item) => ({ source: source(item), checkedAt: item.checked_at })),
     };
-    cell.revisions.push({ revision, inPreview: row.published_in_preview });
+    cell.revisions.push({
+      revision,
+      inPreview: row.published_in_preview,
+      unlogged: row.unlogged,
+    });
   }
   const cells: PublicCell[] = [...staged.values()].flatMap(
     ({ partyId, criterionId, revisions }) => {

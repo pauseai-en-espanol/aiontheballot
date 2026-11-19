@@ -70,6 +70,8 @@ export interface CellRevision {
   changeKind: ChangeKind;
   publicNote: Localized | null;
   publishedAt: string;
+  /** Published off the record by a platform admin (PLAN R243): the public is told of no change. */
+  unlogged: boolean;
   /**
    * Its private record (editorial workflow H1.1), as members see it: who contributed, who published it, whether it was
    * self-reviewed (P14), and the report it answers (C10.4), when there is one.
@@ -91,6 +93,8 @@ export interface CellDraft {
   summary: Localized | null;
   changeKind: ChangeKind | null;
   publicNote: Localized | null;
+  /** A platform admin's mark (C10.6, PLAN R243): published off the record, with no kind, note or log entry. */
+  unlogged: boolean;
   /** The right-of-reply report it answers (C10.4), copied into its revision's private record on publish. */
   reportId: string | null;
   recheckReason: string | null;
@@ -208,6 +212,7 @@ export const getCell = async (
       'draft_summary',
       'draft_change_kind',
       'draft_public_note',
+      'draft_unlogged',
       'draft_report_id',
       'recheck_reason',
     ])
@@ -263,6 +268,7 @@ export const getCell = async (
           'r.change_kind',
           'r.public_note',
           instant('r.published_at').as('published_at'),
+          'r.unlogged',
           'i.contributor_ids',
           'i.reviewer_id',
           'i.self_reviewed',
@@ -298,6 +304,7 @@ export const getCell = async (
       changeKind: r.change_kind,
       publicNote: optionalLocalized(r.public_note, 'assessment_revisions.public_note'),
       publishedAt: r.published_at,
+      unlogged: r.unlogged,
       internal:
         r.reviewer_id !== null && r.self_reviewed !== null
           ? {
@@ -323,6 +330,7 @@ const draftOf = async (
     draft_summary: unknown;
     draft_change_kind: ChangeKind | null;
     draft_public_note: unknown;
+    draft_unlogged: boolean;
     draft_report_id: string | null;
     recheck_reason: string | null;
   },
@@ -416,6 +424,7 @@ const draftOf = async (
     summary: optionalLocalized(assessment.draft_summary, 'assessments.draft_summary'),
     changeKind: assessment.draft_change_kind,
     publicNote: optionalLocalized(assessment.draft_public_note, 'assessments.draft_public_note'),
+    unlogged: assessment.draft_unlogged,
     reportId: assessment.draft_report_id,
     recheckReason: assessment.recheck_reason,
     quotes: quotes.map((q) => ({
@@ -518,11 +527,16 @@ export interface CellFields {
   publicNote: Localized | null;
   /** The right-of-reply report it answers (C10.4), or none; undefined leaves it as it is. */
   reportId?: string | null;
+  /**
+   * Off the record (C10.6, PLAN R243): a platform admin's mark, which the database refuses from anyone else; undefined
+   * leaves it as it is. A change so marked carries no kind and no note.
+   */
+  unlogged?: boolean | undefined;
 }
 
 /**
- * Saves the draft's rating, summary, change kind, public note and the report it answers (C2, C10, C11), all at once,
- * as the form holds them.
+ * Saves the draft's rating, summary, change kind, public note, the report it answers and whether it is off the record
+ * (C2, C10, C11), all at once, as the form holds them.
  */
 export const saveCell = async (
   trx: Transaction<DB>,
@@ -553,9 +567,11 @@ export const saveCell = async (
     .set({
       draft_rating: fields.rating,
       draft_summary: fields.summary === null ? null : JSON.stringify(fields.summary),
-      draft_change_kind: fields.changeKind,
-      draft_public_note: fields.publicNote === null ? null : JSON.stringify(fields.publicNote),
+      draft_change_kind: fields.unlogged ? null : fields.changeKind,
+      draft_public_note:
+        fields.unlogged || fields.publicNote === null ? null : JSON.stringify(fields.publicNote),
       ...(fields.reportId === undefined ? {} : { draft_report_id: fields.reportId }),
+      ...(fields.unlogged === undefined ? {} : { draft_unlogged: fields.unlogged }),
     })
     .where('id', '=', cellId)
     .execute();

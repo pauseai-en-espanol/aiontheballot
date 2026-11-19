@@ -1,17 +1,17 @@
 [
   {
     "name": "migration: a change in preview is submitted only with a kind",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
-    "old": "NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                                 election_status IN ('draft', 'preview'))",
-    "new": "NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                                 false)",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                                 election_status IN ('draft', 'preview') OR NEW.draft_unlogged)",
+    "new": "NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                                 NEW.draft_unlogged)",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
     "cwd": "packages/db",
     "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
   },
   {
     "name": "migration: a change is submitted with no kind once live",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
-    "old": "NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                                 election_status IN ('draft', 'preview'))",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                                 election_status IN ('draft', 'preview') OR NEW.draft_unlogged)",
     "new": "NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                                 true)",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
     "cwd": "packages/db",
@@ -19,35 +19,35 @@
   },
   {
     "name": "migration: a change in preview is submitted only with a public note",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
-    "old": "        WHEN NEW.generation > 0 AND election_status IN ('live', 'archived')\n             AND NOT coalesce(NEW.draft_public_note",
-    "new": "        WHEN NEW.generation > 0\n             AND NOT coalesce(NEW.draft_public_note",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "        WHEN NEW.generation > 0 AND election_status IN ('live', 'archived') AND NOT NEW.draft_unlogged\n             AND NOT coalesce(NEW.draft_public_note",
+    "new": "        WHEN NEW.generation > 0 AND NOT NEW.draft_unlogged\n             AND NOT coalesce(NEW.draft_public_note",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
     "cwd": "packages/db",
     "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
   },
   {
     "name": "migration: a change is submitted with no public note once live",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
-    "old": "        WHEN NEW.generation > 0 AND election_status IN ('live', 'archived')\n             AND NOT coalesce(NEW.draft_public_note",
-    "new": "        WHEN NEW.generation > 0 AND false\n             AND NOT coalesce(NEW.draft_public_note",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "        WHEN NEW.generation > 0 AND election_status IN ('live', 'archived') AND NOT NEW.draft_unlogged\n             AND NOT coalesce(NEW.draft_public_note",
+    "new": "        WHEN NEW.generation > 0 AND false AND NOT NEW.draft_unlogged\n             AND NOT coalesce(NEW.draft_public_note",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
     "cwd": "packages/db",
     "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
   },
   {
     "name": "migration: a change in preview is published only with a kind",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
-    "old": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               election.status = 'preview')",
-    "new": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               false)",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               election.status = 'preview' OR cell.draft_unlogged)",
+    "new": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               cell.draft_unlogged)",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
     "cwd": "packages/db",
     "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
   },
   {
     "name": "migration: a change is published with no kind once live",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
-    "old": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               election.status = 'preview')",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               election.status = 'preview' OR cell.draft_unlogged)",
     "new": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               true)",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
     "cwd": "packages/db",
@@ -55,25 +55,25 @@
   },
   {
     "name": "migration: a change in preview is published only with a public note",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
-    "old": "       OR cell.generation > 0 AND election.status <> 'preview'\n          AND NOT coalesce(cell.draft_public_note",
-    "new": "       OR cell.generation > 0\n          AND NOT coalesce(cell.draft_public_note",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "       OR cell.generation > 0 AND election.status <> 'preview' AND NOT cell.draft_unlogged\n          AND NOT coalesce(cell.draft_public_note",
+    "new": "       OR cell.generation > 0 AND NOT cell.draft_unlogged\n          AND NOT coalesce(cell.draft_public_note",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
     "cwd": "packages/db",
     "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
   },
   {
     "name": "migration: a change is published with no public note once live",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
-    "old": "       OR cell.generation > 0 AND election.status <> 'preview'\n          AND NOT coalesce(cell.draft_public_note",
-    "new": "       OR cell.generation > 0 AND false\n          AND NOT coalesce(cell.draft_public_note",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "       OR cell.generation > 0 AND election.status <> 'preview' AND NOT cell.draft_unlogged\n          AND NOT coalesce(cell.draft_public_note",
+    "new": "       OR cell.generation > 0 AND false AND NOT cell.draft_unlogged\n          AND NOT coalesce(cell.draft_public_note",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
     "cwd": "packages/db",
     "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
   },
   {
     "name": "migration: a change with no kind is recorded with none",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
     "old": "coalesce(cell.draft_change_kind, 'update') END;",
     "new": "cell.draft_change_kind END;",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
@@ -82,9 +82,9 @@
   },
   {
     "name": "migration: a revision in preview still needs a public note",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
-    "old": "CHECK (change_kind = 'initial' OR public_note IS NOT NULL OR published_in_preview);",
-    "new": "CHECK (change_kind = 'initial' OR public_note IS NOT NULL);",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "old": "CHECK (change_kind = 'initial' OR public_note IS NOT NULL OR published_in_preview OR unlogged),",
+    "new": "CHECK (change_kind = 'initial' OR public_note IS NOT NULL OR unlogged),",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
     "cwd": "packages/db",
     "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
@@ -92,8 +92,8 @@
   {
     "name": "admin: the checklist asks a change in preview for a kind and a note (R233)",
     "file": "apps/admin/src/cells/checklist.ts",
-    "old": "if (draft.generation > 0 && changesLogged(cell.electionStatus)) {",
-    "new": "if (draft.generation > 0) {",
+    "old": "if (draft.generation > 0 && changesLogged(cell.electionStatus) && !draft.unlogged) {",
+    "new": "if (draft.generation > 0 && !draft.unlogged) {",
     "cmd": "npx vitest run src/cells/checklist.spec.ts",
     "cwd": "apps/admin"
   },

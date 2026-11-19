@@ -31,6 +31,9 @@ export interface CellFormText {
   publicNoteHint: string;
   /** Why a change asks for neither, while the election isn't public yet (PLAN R233). */
   changeNotLoggedYet: string;
+  /** A platform admin's choice to publish the change off the record (C10.6, PLAN R243), and what that means. */
+  unlogged: string;
+  unloggedHint: string;
   report: string;
   reportHint: string;
   noReport: string;
@@ -56,7 +59,8 @@ const BODY_FIELDS: Readonly<Record<string, CellField>> = {
 
 /**
  * A draft's rating, summary and, after the first publish, its kind of change, public note and the right-of-reply report
- * it answers (editorial workflow C2, C10, C11), saved all at once at the version its fields were loaded at (C14). When
+ * it answers (editorial workflow C2, C10, C11), saved all at once at the version its fields were loaded at (C14). A
+ * platform admin may mark the change as off the record instead (C10.6): it then asks for no kind and no note. When
  * the page reloads its data (after any step, a comment included) with a newer version, untouched fields show it;
  * edited ones keep their text and say at once that the cell changed, rather than saving over someone else's change. A
  * change made from this same page (a quote, a checked document) moves the version they count as loaded at instead,
@@ -71,6 +75,7 @@ export const CellForm = ({
   locales,
   afterFirstPublish,
   changeLogged,
+  offersUnlogged,
   reports,
   text,
 }: {
@@ -84,6 +89,8 @@ export const CellForm = ({
     changeKind: ChangeKind | null;
     publicNote: Record<string, string> | null;
     reportId: string | null;
+    /** Whether a platform admin marked the change as off the record (C10.6): it then has no kind and no note. */
+    unlogged: boolean;
   };
   /**
    * The reports the draft may answer (C10.4): the election's past triage, and the one it answers now. None for whoever
@@ -99,6 +106,11 @@ export const CellForm = ({
    * (PLAN R233). Until then, a change is an update with no note.
    */
   changeLogged: boolean;
+  /**
+   * Whether the form offers to publish the change off the record (C10.6, PLAN R243): to a platform admin, for a live
+   * election's published cell whose last revision isn't a withdrawal. The database decides again.
+   */
+  offersUnlogged: boolean;
   text: CellFormText;
 }) => {
   const { error, status, statusLine, run, setError } = useWrite();
@@ -109,9 +121,12 @@ export const CellForm = ({
   const [loaded, setLoaded] = useState(version);
   const [edited, setEdited] = useState(false);
   const [fields, setFields] = useState(0);
+  // Off the record (C10.6): the form then shows no kind and no note, whoever marked it.
+  const [unlogged, setUnlogged] = useState(values.unlogged);
   if (version !== loaded && !edited) {
     setLoaded(version);
     setFields((n) => n + 1);
+    setUnlogged(values.unlogged);
   }
   const stale = staleOnSave || (version !== loaded && edited);
 
@@ -141,8 +156,10 @@ export const CellForm = ({
       version: loaded,
       rating: rating === '' ? null : rating,
       summary: localizedFromForm(form, 'summary', locales),
-      changeKind: changeLogged && changeKind !== '' ? changeKind : null,
-      publicNote: changeLogged ? localizedFromForm(form, 'publicNote', locales) : null,
+      changeKind: changeLogged && !unlogged && changeKind !== '' ? changeKind : null,
+      publicNote: changeLogged && !unlogged ? localizedFromForm(form, 'publicNote', locales) : null,
+      // Sent only by a form that offers it: anyone else's leaves the mark as it is.
+      ...(offersUnlogged ? { unlogged } : {}),
       // Sent only when changed: a form that doesn't offer it, or shows it as it was, leaves the link as it is.
       ...(offersReports && formText(form, 'reportId') !== (values.reportId ?? '')
         ? { reportId: formText(form, 'reportId') || null }
@@ -244,7 +261,28 @@ export const CellForm = ({
       {afterFirstPublish && !changeLogged ? (
         <p className={styles.hint}>{text.changeNotLoggedYet}</p>
       ) : null}
-      {changeLogged ? (
+      {offersUnlogged ? (
+        <div className={styles.field}>
+          <div className={styles.checkboxField}>
+            <input
+              id="cell-unlogged"
+              className={styles.checkbox}
+              type="checkbox"
+              name="unlogged"
+              checked={unlogged}
+              onChange={(event) => setUnlogged(event.target.checked)}
+              aria-describedby="cell-unlogged-hint"
+            />
+            <label className={styles.label} htmlFor="cell-unlogged">
+              {text.unlogged}
+            </label>
+          </div>
+          <p id="cell-unlogged-hint" className={styles.hint}>
+            {text.unloggedHint}
+          </p>
+        </div>
+      ) : null}
+      {changeLogged && !unlogged ? (
         <>
           <fieldset className={styles.fieldset} aria-describedby="cell-change-kind-hint">
             <legend className={styles.label}>{text.changeKind}</legend>

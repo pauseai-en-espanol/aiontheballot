@@ -708,6 +708,11 @@ CREATE FUNCTION private.assessment_trail() RETURNS trigger
       RAISE EXCEPTION 'election % is archived: a cell''s draft must be a correction or a withdrawal', NEW.election_id
         USING ERRCODE = 'restrict_violation';
     END IF;
+    -- Off the record (PLAN R243): only what a live election's public already reads is changed so.
+    IF edited AND NEW.draft_unlogged AND election_status <> 'live' THEN
+      RAISE EXCEPTION 'election % is %: only a live election''s published cell is changed off the record',
+        NEW.election_id, election_status USING ERRCODE = 'restrict_violation';
+    END IF;
     IF (TG_OP = 'INSERT' OR NEW.draft_rating IS DISTINCT FROM OLD.draft_rating)
        AND NOT (CASE tenant.methodology_kind
                   WHEN 'demands' THEN NEW.draft_rating IN ('meets', 'partially_meets', 'does_not_meet', 'not_mentioned')
@@ -726,11 +731,18 @@ CREATE FUNCTION private.assessment_trail() RETURNS trigger
       missing := CASE
         WHEN NEW.generation = 0 AND NEW.draft_change_kind IS NOT NULL
           THEN 'no change kind, since its first publish is the initial one'
-        -- Until the public sees the election, a change needs no kind (an update) and no note (PLAN R233).
+        -- Off the record (PLAN R243): never after a withdrawal, which the public was told of.
+        WHEN NEW.draft_unlogged
+             AND EXISTS (SELECT 1 FROM app.assessment_revisions r
+                          WHERE r.assessment_id = NEW.id AND r.revision_no = NEW.generation
+                            AND r.change_kind = 'withdrawal')
+          THEN 'a change kind and a public note, since it follows a withdrawal'
+        -- Until the public sees the election, a change needs no kind (an update) and no note (PLAN R233); nor
+        -- does one off the record (PLAN R243).
         WHEN NEW.generation > 0 AND NOT coalesce(NEW.draft_change_kind IN ('update', 'correction', 'withdrawal'),
-                                                 election_status IN ('draft', 'preview'))
+                                                 election_status IN ('draft', 'preview') OR NEW.draft_unlogged)
           THEN 'a change kind: update, correction or withdrawal'
-        WHEN NEW.generation > 0 AND election_status IN ('live', 'archived')
+        WHEN NEW.generation > 0 AND election_status IN ('live', 'archived') AND NOT NEW.draft_unlogged
              AND NOT coalesce(NEW.draft_public_note ? tenant.default_locale, false)
           THEN 'a public note in the default locale'
         WHEN NEW.draft_change_kind = 'withdrawal'
@@ -795,11 +807,12 @@ CREATE FUNCTION private.assessment_transition() RETURNS trigger
     AS $$
   DECLARE
     content text[] := ARRAY['draft_rating', 'draft_summary', 'draft_change_kind', 'draft_public_note',
-                            'draft_report_id'];
+                            'draft_report_id', 'draft_unlogged'];
     edited boolean;
   BEGIN
     -- Publishing: only the publish trigger (as the table owner), from review, changing nothing else. It starts the
-    -- next generation, whose draft starts from the published content with no change kind, note or report.
+    -- next generation, whose draft starts from the published content with no change kind, note or report, on the
+    -- record.
     IF NEW.state = 'published' AND OLD.state <> 'published' THEN
       IF (SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.oid = TG_RELID)
            <> (SELECT r.oid FROM pg_catalog.pg_roles r WHERE r.rolname = current_user)
@@ -812,6 +825,7 @@ CREATE FUNCTION private.assessment_transition() RETURNS trigger
       NEW.draft_change_kind := NULL;
       NEW.draft_public_note := NULL;
       NEW.draft_report_id := NULL;
+      NEW.draft_unlogged := false;
       RETURN NEW;
     END IF;
 
@@ -2493,6 +2507,13 @@ CREATE FUNCTION private.publish_revision() RETURNS trigger
       RAISE EXCEPTION 'election % is frozen: nothing public changes until the window ends', election.id
         USING ERRCODE = 'restrict_violation';
     END IF;
+    -- Off the record (PLAN R243): only a platform admin publishes it. (Its election is live and its last revision no
+    -- withdrawal: marking it and submitting it were refused otherwise, and an archived election, above, takes no
+    -- change without a kind.)
+    IF cell.draft_unlogged AND NOT private.is_platform_admin() THEN
+      RAISE EXCEPTION 'cell %: only a platform admin publishes a change off the record', cell.id
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
 
     -- 4.
     contributors := private.revision_contributors(cell.id);
@@ -2505,11 +2526,12 @@ CREATE FUNCTION private.publish_revision() RETURNS trigger
     END IF;
 
     -- 5.
-    -- Until the public sees the election, a later one needs no kind (an update) and no note (PLAN R233).
+    -- Until the public sees the election, a later one needs no kind (an update) and no note (PLAN R233); nor
+    -- does one off the record (PLAN R243).
     IF cell.generation = 0 AND cell.draft_change_kind IS NOT NULL
        OR cell.generation > 0 AND NOT coalesce(cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),
-                                               election.status = 'preview')
-       OR cell.generation > 0 AND election.status <> 'preview'
+                                               election.status = 'preview' OR cell.draft_unlogged)
+       OR cell.generation > 0 AND election.status <> 'preview' AND NOT cell.draft_unlogged
           AND NOT coalesce(cell.draft_public_note ? tenant.default_locale, false) THEN
       RAISE EXCEPTION 'cell %: only the first revision is initial; later ones need a kind and a default-locale note',
         cell.id USING ERRCODE = 'check_violation';
@@ -2561,6 +2583,7 @@ CREATE FUNCTION private.publish_revision() RETURNS trigger
     NEW.public_note := cell.draft_public_note;
     NEW.published_at := now();
     NEW.published_in_preview := election.status = 'preview';
+    NEW.unlogged := cell.draft_unlogged;
     RETURN NEW;
   END
   $$;
@@ -3673,11 +3696,13 @@ CREATE TABLE app.assessment_revisions (
     public_note app.localized,
     published_at timestamp with time zone DEFAULT now() NOT NULL,
     published_in_preview boolean DEFAULT false NOT NULL,
+    unlogged boolean DEFAULT false NOT NULL,
     CONSTRAINT assessment_revisions_check CHECK (((change_kind = 'withdrawal'::app.change_kind) = (rating IS NULL))),
     CONSTRAINT assessment_revisions_check1 CHECK (((change_kind = 'withdrawal'::app.change_kind) OR (summary IS NOT NULL))),
     CONSTRAINT assessment_revisions_check2 CHECK (((change_kind = 'initial'::app.change_kind) = (revision_no = 1))),
-    CONSTRAINT assessment_revisions_check3 CHECK (((change_kind = 'initial'::app.change_kind) OR (public_note IS NOT NULL) OR published_in_preview)),
-    CONSTRAINT assessment_revisions_revision_no_check CHECK ((revision_no > 0))
+    CONSTRAINT assessment_revisions_check3 CHECK (((change_kind = 'initial'::app.change_kind) OR (public_note IS NOT NULL) OR published_in_preview OR unlogged)),
+    CONSTRAINT assessment_revisions_revision_no_check CHECK ((revision_no > 0)),
+    CONSTRAINT assessment_revisions_unlogged CHECK (((NOT unlogged) OR ((change_kind = 'update'::app.change_kind) AND (public_note IS NULL) AND (NOT published_in_preview))))
 );
 
 
@@ -3688,6 +3713,13 @@ ALTER TABLE app.assessment_revisions OWNER TO aiontheballot_owner;
 --
 
 COMMENT ON COLUMN app.assessment_revisions.published_in_preview IS 'Published while its election was in preview (PLAN R181): before the public saw it, so never a correction.';
+
+
+--
+-- Name: COLUMN assessment_revisions.unlogged; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.assessment_revisions.unlogged IS 'Published off the record by a platform admin (PLAN R243): no note, and the corrections log leaves it out.';
 
 
 --
@@ -3710,7 +3742,9 @@ CREATE TABLE app.assessments (
     recheck_reason text,
     updated_by uuid NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    draft_report_id uuid
+    draft_report_id uuid,
+    draft_unlogged boolean DEFAULT false NOT NULL,
+    CONSTRAINT assessments_unlogged_draft CHECK (((NOT draft_unlogged) OR ((generation > 0) AND (draft_change_kind IS NULL) AND (draft_public_note IS NULL))))
 );
 
 
@@ -3721,6 +3755,13 @@ ALTER TABLE app.assessments OWNER TO aiontheballot_owner;
 --
 
 COMMENT ON COLUMN app.assessments.draft_report_id IS 'The right-of-reply report the draft answers, copied into revision_internal.report_id on publish';
+
+
+--
+-- Name: COLUMN assessments.draft_unlogged; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
+--
+
+COMMENT ON COLUMN app.assessments.draft_unlogged IS 'A platform admin''s mark (PLAN R243): the change is published off the record, with no kind, note or log entry.';
 
 
 --
@@ -3906,7 +3947,7 @@ CREATE VIEW app.corrections_log WITH (security_invoker='true') AS
     NULL::jsonb AS new_value,
     r.public_note
    FROM app.assessment_revisions r
-  WHERE ((r.change_kind <> 'initial'::app.change_kind) AND (NOT r.published_in_preview) AND (NOT (EXISTS ( SELECT 1
+  WHERE ((r.change_kind <> 'initial'::app.change_kind) AND (NOT r.published_in_preview) AND (NOT r.unlogged) AND (NOT (EXISTS ( SELECT 1
            FROM app.assessment_revisions p
           WHERE ((p.assessment_id = r.assessment_id) AND (p.revision_no = (r.revision_no - 1)) AND p.published_in_preview AND (p.change_kind = 'withdrawal'::app.change_kind))))))
 UNION ALL
@@ -7519,7 +7560,7 @@ CREATE TRIGGER needs_a_person_to_change BEFORE DELETE OR UPDATE ON app.files FOR
 -- Name: assessments needs_a_person_to_decide; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE TRIGGER needs_a_person_to_decide BEFORE UPDATE ON app.assessments FOR EACH ROW WHEN (((new.recheck_reason IS DISTINCT FROM old.recheck_reason) OR (new.draft_report_id IS DISTINCT FROM old.draft_report_id) OR (new.draft_change_kind IS DISTINCT FROM old.draft_change_kind) OR ((new.draft_public_note)::jsonb IS DISTINCT FROM (old.draft_public_note)::jsonb))) EXECUTE FUNCTION private.needs_a_person('decide a cell''s recheck, report or change');
+CREATE TRIGGER needs_a_person_to_decide BEFORE UPDATE ON app.assessments FOR EACH ROW WHEN (((new.recheck_reason IS DISTINCT FROM old.recheck_reason) OR (new.draft_report_id IS DISTINCT FROM old.draft_report_id) OR (new.draft_change_kind IS DISTINCT FROM old.draft_change_kind) OR ((new.draft_public_note)::jsonb IS DISTINCT FROM (old.draft_public_note)::jsonb) OR (new.draft_unlogged IS DISTINCT FROM old.draft_unlogged))) EXECUTE FUNCTION private.needs_a_person('decide a cell''s recheck, report or change');
 
 
 --
@@ -7576,6 +7617,13 @@ CREATE TRIGGER needs_a_person_to_withdraw BEFORE DELETE ON app.change_requests F
 --
 
 CREATE TRIGGER origin BEFORE INSERT ON app.draft_evidence FOR EACH ROW EXECUTE FUNCTION private.quote_by_token();
+
+
+--
+-- Name: assessments platform_admin_columns; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER platform_admin_columns BEFORE UPDATE ON app.assessments FOR EACH ROW EXECUTE FUNCTION private.restrict_columns('', 'draft_unlogged');
 
 
 --
@@ -11137,6 +11185,13 @@ GRANT UPDATE(recheck_reason) ON TABLE app.assessments TO aiontheballot_admin;
 --
 
 GRANT UPDATE(draft_report_id) ON TABLE app.assessments TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN assessments.draft_unlogged; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT UPDATE(draft_unlogged) ON TABLE app.assessments TO aiontheballot_admin;
 
 
 --

@@ -54,6 +54,7 @@ export const listCorrections = async (
         'r.rating',
         'r.public_note',
         'r.published_in_preview',
+        'r.unlogged',
         'r.assessment_id',
         'p.id as party_id',
         'p.slug as party_slug',
@@ -117,6 +118,7 @@ export const listCorrections = async (
           checkedDocuments: [],
         } satisfies PublicRevision,
         inPreview: r.published_in_preview,
+        unlogged: r.unlogged,
       })),
       { since: since?.went_live_at },
     );

@@ -105,6 +105,10 @@ export interface AppAssessmentRevisions {
   revision_no: number;
   summary: Json | null;
   tenant_id: string;
+  /**
+   * Published off the record by a platform admin (PLAN R243): no note, and the corrections log leaves it out.
+   */
+  unlogged: Generated<boolean>;
 }
 
 export interface AppAssessments {
@@ -118,6 +122,10 @@ export interface AppAssessments {
    */
   draft_report_id: string | null;
   draft_summary: Json | null;
+  /**
+   * A platform admin's mark (PLAN R243): the change is published off the record, with no kind, note or log entry.
+   */
+  draft_unlogged: Generated<boolean>;
   election_id: string;
   generation: Generated<number>;
   id: Generated<string>;

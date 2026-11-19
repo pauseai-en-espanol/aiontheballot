@@ -135,3 +135,109 @@ describe('publicHistory (PLAN R181)', () => {
     expect(publicHistory(history)[0]?.publishedAt).toBe('2026-10-01T10:00:00.000Z');
   });
 });
+
+describe('publicHistory: a change off the record (PLAN R243)', () => {
+  /** As the database records it: an update with no note. */
+  const unlogged = (revisionNo: number) => ({
+    revision: { ...revision(revisionNo, 'update'), publicNote: null },
+    inPreview: false,
+    unlogged: true,
+  });
+  const logged = (revisionNo: number, changeKind: PublicRevision['changeKind']) => ({
+    revision: revision(revisionNo, changeKind),
+    inPreview: false,
+  });
+  const told = (revisions: readonly PublicRevision[]) =>
+    revisions.map(({ revisionNo, changeKind, publicNote, summary, publishedAt }) => ({
+      revisionNo,
+      changeKind,
+      publicNote,
+      summary,
+      publishedAt,
+    }));
+
+  it('takes the place of the revision before it: its content and date, as the first, with no note', () => {
+    expect(told(publicHistory([unlogged(2), logged(1, 'initial')]))).toEqual([
+      {
+        revisionNo: 1,
+        changeKind: 'initial',
+        publicNote: null,
+        summary: { es: 'Resumen 2' },
+        publishedAt: '2026-10-02T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('keeps the kind and the note of a correction it replaces', () => {
+    expect(
+      told(publicHistory([unlogged(3), logged(2, 'correction'), logged(1, 'initial')])),
+    ).toEqual([
+      {
+        revisionNo: 2,
+        changeKind: 'correction',
+        publicNote: { es: 'Nota 2' },
+        summary: { es: 'Resumen 3' },
+        publishedAt: '2026-10-03T10:00:00.000Z',
+      },
+      {
+        revisionNo: 1,
+        changeKind: 'initial',
+        publicNote: null,
+        summary: { es: 'Resumen 1' },
+        publishedAt: '2026-10-01T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('numbers the later revisions on, so no number is missing', () => {
+    expect(
+      kept(publicHistory([logged(3, 'correction'), unlogged(2), logged(1, 'initial')])),
+    ).toEqual([
+      {
+        revisionNo: 2,
+        changeKind: 'correction',
+        publicNote: { es: 'Nota 3' },
+        summary: { es: 'Resumen 3' },
+      },
+      { revisionNo: 1, changeKind: 'initial', publicNote: null, summary: { es: 'Resumen 2' } },
+    ]);
+  });
+
+  it('folds several in a row into the same revision', () => {
+    expect(kept(publicHistory([unlogged(3), unlogged(2), logged(1, 'initial')]))).toEqual([
+      { revisionNo: 1, changeKind: 'initial', publicNote: null, summary: { es: 'Resumen 3' } },
+    ]);
+  });
+
+  it('replaces the version carried over from preview, dated when it was published', () => {
+    const history = publicHistory(
+      [
+        unlogged(3),
+        { revision: revision(2, 'update'), inPreview: true },
+        { revision: revision(1, 'initial'), inPreview: true },
+      ],
+      { since: '2026-10-02T12:00:00.000Z' },
+    );
+    expect(told(history)).toEqual([
+      {
+        revisionNo: 1,
+        changeKind: 'initial',
+        publicNote: null,
+        summary: { es: 'Resumen 3' },
+        publishedAt: '2026-10-03T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('leaves one after a withdrawal, which the database refuses, as its own revision', () => {
+    expect(
+      kept(publicHistory([unlogged(3), logged(2, 'withdrawal'), logged(1, 'initial')])).map(
+        ({ revisionNo, changeKind }) => ({ revisionNo, changeKind }),
+      ),
+    ).toEqual([
+      { revisionNo: 3, changeKind: 'update' },
+      { revisionNo: 2, changeKind: 'withdrawal' },
+      { revisionNo: 1, changeKind: 'initial' },
+    ]);
+  });
+});

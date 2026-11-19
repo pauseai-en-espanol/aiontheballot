@@ -535,6 +535,8 @@ create table app.assessments (
   draft_summary        jsonb,
   draft_change_kind    app.change_kind,                -- null before the first publish (it will be 'initial')
   draft_public_note    jsonb,                          -- required for every change after the first
+  draft_unlogged       boolean not null default false, -- a platform admin's mark: off the record (R243); then
+                                                       -- no kind and no note, and only on a cell published before
   generation           int not null default 0,         -- publishes so far; contributions are counted per generation
   content_version      int not null default 0,         -- bumped by every content change, by trigger
   recheck_reason       text,                           -- private flag, e.g. the party's programme appeared
@@ -656,12 +658,16 @@ document):
   actor is a contributor of the generation; otherwise it is a rejection, which needs `reviewer` or `country_admin`
   and a note: a comment the rejecter writes on the cell in the same transaction, copied into the `rejected` event.
 - Only the table owner sets a cell `published`, which only the `SECURITY DEFINER` publish trigger runs as. That
-  update changes nothing else; the transition trigger then starts the next generation and clears the change kind and
-  note (§3.6 step 9). A published cell goes back to draft only by an edit.
+  update changes nothing else; the transition trigger then starts the next generation and clears the change kind,
+  the note and the off-the-record mark (§3.6 step 9). A published cell goes back to draft only by an edit.
 - `review_events` other than comments are written by these triggers only: the insert policy admits other kinds only
   at trigger depth > 0. Review events are immutable, so a cell with a review trail is never deleted.
 - In an archived election, no new cell is created, and a cell's content changes only while its draft is a
   correction or a withdrawal (PLAN P16).
+- Off the record (PLAN R243): only a platform admin sets `draft_unlogged` (`platform_admin_columns`; never through
+  a member's token), only on a live election's cell published before, and the draft then carries no change kind
+  and no note. Marking it is an edit. Submitting it asks for neither, and refuses one whose last revision is a
+  withdrawal.
 - Ratings are checked against the tenant's methodology kind when written. Submitting checks everything publishing
   will: the change kind and default-locale note after the first publish (none before it), a rating and a
   default-locale summary unless withdrawing, and the evidence (a quote, or for "not mentioned" a checked, stored
@@ -695,14 +701,16 @@ ADR-0002 allowlist), does the rest in the same transaction:
    one. If the election requires a second reviewer, the publisher must not be among them; otherwise the revision
    is recorded as `self_reviewed`.
 5. Checks the change kind: `initial` for the first revision only. Every later one carries the draft's
-   `update`, `correction` or `withdrawal`, and a public note with default-locale text.
+   `update`, `correction` or `withdrawal`, and a public note with default-locale text. A draft marked as off the
+   record (PLAN R243) is published by a platform admin alone, as an `update` with no note, marked `unlogged`.
 6. Re-runs the verbatim match for every quote, and the attestation rules, rather than trusting stored statuses.
 7. Checks the evidence requirement (ADR-0002): a rating other than `not_mentioned` needs at least one matched or
    attested quote from an admissible source kind. `not_mentioned` needs at least one checked document that is the
    party's own, of a kind the methodology lists for it, with a stored copy.
 8. Copies the rating, summary, change kind, note, evidence (with the matched units' labels) and checked documents;
    sets `revision_no` and `published_at`; writes `revision_internal`, with the report the draft answers.
-9. Moves the cell to `published`, increments its `generation` and clears the draft change kind, note and report.
+9. Moves the cell to `published`, increments its `generation` and clears the draft change kind, note, report and
+   off-the-record mark.
 
 Nothing here is ever updated or deleted, except through `purge_tenant` or `purge_election`.
 
@@ -730,15 +738,17 @@ create table app.assessment_revisions (                -- public
   rating            app.rating,                        -- null only for a withdrawal
   summary           jsonb,                             -- localized; null only for a withdrawal
   change_kind       app.change_kind not null,
-  public_note       jsonb,                             -- required unless initial or published in preview (R233)
+  public_note       jsonb,                             -- required unless initial, in preview (R233) or unlogged
   published_at      timestamptz not null default now(),
   published_in_preview boolean not null default false, -- before the public saw it (R181): never a correction
+  unlogged          boolean not null default false,    -- off the record, a platform admin's (R243): not logged
   unique (tenant_id, id),
   unique (tenant_id, id, election_id),
   unique (assessment_id, revision_no),
   check ((change_kind = 'withdrawal') = (rating is null)),
   check ((change_kind = 'initial') = (revision_no = 1)),
-  check (change_kind = 'initial' or public_note is not null or published_in_preview),
+  check (change_kind = 'initial' or public_note is not null or published_in_preview or unlogged),
+  check (not unlogged or (change_kind = 'update' and public_note is null and not published_in_preview)),
   -- The copied election, party and criterion must be the cell's own: public visibility follows election_id.
   foreign key (tenant_id, assessment_id, election_id, party_id, criterion_id)
     references app.assessments (tenant_id, id, election_id, party_id, criterion_id)

@@ -40,6 +40,7 @@ const draft = (overrides: Partial<Draft> = {}): Draft => ({
   summary: null,
   changeKind: null,
   publicNote: null,
+  unlogged: false,
   recheckReason: null,
   reportId: null,
   quotes: [],
@@ -190,6 +191,22 @@ describe('submitChecklist (editorial workflow C5.2)', () => {
       quotesMatched: true,
     });
     expect(check(later, 'archived')).toMatchObject({ changeKind: false, publicNote: false });
+  });
+
+  it('asks a change a platform admin marked as off the record for neither, in a live election (R243)', () => {
+    const later = draft({
+      generation: 1,
+      rating: 'meets',
+      summary: { es: 'Resumen' },
+      quotes: [quote('programa')],
+    });
+    expect(check(later)).toMatchObject({ changeKind: false, publicNote: false });
+    expect(check({ ...later, unlogged: true })).toEqual({
+      rating: true,
+      summary: true,
+      quote: true,
+      quotesMatched: true,
+    });
   });
 });
 

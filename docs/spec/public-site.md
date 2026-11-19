@@ -205,7 +205,9 @@ of its own.
 - **Cell:** party and criterion; the rating (or pending); the summary; each quote with its source (title, a link to
   the source, page or section, retrieved on, the archived snapshot, the SHA-256 of our stored copy); for "No lo
   menciona", the documents checked and when; the history of published revisions, newest first, each with its date,
-  rating, change kind and public note. A pending cell says so, with the party's programme status.
+  rating, change kind and public note. A revision a platform admin published off the record (PLAN R243) isn't
+  listed: its content and date show in the place of the revision before it. A pending cell says so, with the
+  party's programme status.
 
 ### 5.3 Methodology
 
@@ -266,7 +268,8 @@ reports per visitor and per site.
 
 Every published revision of a cell after its first, and every approved change to the election's structure, newest
 first, each with its date and public note; a revision links to its cell and shows its rating now. Linked from every
-election page's footer, listed in the sitemap, with a share card of its own.
+election page's footer, listed in the sitemap, with a share card of its own. A revision a platform admin published
+off the record (PLAN R243) is not in it.
 
 ## 6. "Avísame cuando esté listo": the signup list (PLAN R119)
 

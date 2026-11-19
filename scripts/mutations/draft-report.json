@@ -1,7 +1,7 @@
 [
   {
     "name": "publishing doesn't record the report",
-    "file": "db/migrations/20261116181343_free_edits_before_public.sql",
+    "file": "db/migrations/20261119130133_unlogged_changes.sql",
     "old": "              (SELECT a.draft_report_id FROM app.assessments a WHERE a.id = NEW.assessment_id));",
     "new": "              NULL);",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/draft-report.spec.ts",

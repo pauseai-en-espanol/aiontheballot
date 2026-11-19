@@ -579,6 +579,14 @@ _As a reviewer, I check someone else's draft against its sources and publish it.
    lost. A change submitted in preview and published once the election is live needs both then. (PLAN R233, Dani's
    decision: "we can make edits freely until the election is published".) [DB: `assessment_trail`, publish trigger,
    `assessment_revisions` check; UI]
+6. Off the record (PLAN R243, Dani's decision: "it would change and that's it"). In a live election, a platform
+   admin may mark a published cell's change as off the record: it then takes no change kind and no public note, and
+   the form shows neither. It is reviewed like any other change, but only a platform admin publishes it. Its
+   revision is an update marked as unlogged: the corrections log leaves it out, and the public reads it in the
+   place of the revision before it, with that revision's number, kind and note, dated when it was published. The
+   admin's history marks it, with who published it. It is never a withdrawal and never follows one, and the mark
+   ends with its publish: the next change is on the record again. [DB: `assessments.draft_unlogged`,
+   `platform_admin_columns`, `assessment_trail`, publish trigger, `corrections_log`; domain: `publicHistory`; UI]
 
 ### C11. Withdraw a rating
 

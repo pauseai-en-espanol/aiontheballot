@@ -422,6 +422,8 @@ const CELL_BODY = {
     publicNote: { anyOf: [localizedSchema(2000), { type: 'null' }] },
     // Optional, so a form that doesn't offer it (before the first publish, or an older admin) leaves it as it is.
     reportId: { anyOf: [UUID, { type: 'null' }] },
+    // Optional too: only a platform admin's form offers it (C10.6), and the database refuses it from anyone else.
+    unlogged: { type: 'boolean' },
   },
   required: ['version', 'rating', 'summary', 'changeKind', 'publicNote'],
   additionalProperties: false,
@@ -434,6 +436,8 @@ interface CellBody {
   publicNote: Record<string, string> | null;
   /** The right-of-reply report the draft answers (C10.4); absent, unchanged. */
   reportId?: string | null;
+  /** Off the record (C10.6, PLAN R243): a platform admin's mark; absent, unchanged. */
+  unlogged?: boolean;
 }
 /** A source's fields (S1.1): the URL's scheme, a programme only of a party, are the database's to check. */
 const SOURCE_BODY = {
@@ -2476,8 +2480,8 @@ export const adminDataRoutes =
         }),
     );
 
-    // Saves a draft's rating, summary, change kind, public note and the report it answers (C2, C10, C11), at the version
-    // loaded (C14).
+    // Saves a draft's rating, summary, change kind, public note, the report it answers and whether it is off the record
+    // (C2, C10, C11), at the version loaded (C14).
     scope.put<{ Params: { tenant: string; election: string; id: string }; Body: CellBody }>(
       '/t/:tenant/e/:election/cells/:id',
       { schema: { params: ELECTION_ID_PARAMS, body: CELL_BODY } },
@@ -2492,6 +2496,7 @@ export const adminDataRoutes =
                 changeKind: request.body.changeKind,
                 publicNote: optionalLocalizedInput(request.body.publicNote, access),
                 reportId: request.body.reportId,
+                unlogged: request.body.unlogged,
               }),
             );
             // The version it is saved at: what the page sends next, as when it submits right after (R190).

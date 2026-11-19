@@ -41,6 +41,33 @@ describe('a public election', () => {
     });
   });
 
+  it('shows a cell changed off the record as one version, in the place of the one before (PLAN R243)', async () => {
+    await inRolledBackTransaction(async (trx) => {
+      // A second revision, off the record, written directly (the publish flow is packages/db's to test).
+      await sql`SET LOCAL session_replication_role = replica`.execute(trx);
+      await sql`
+        INSERT INTO app.assessment_revisions (tenant_id, assessment_id, election_id, party_id, criterion_id,
+                                              reviewed_version, revision_no, rating, summary, change_kind, public_note,
+                                              unlogged)
+        SELECT a.tenant_id, a.id, a.election_id, a.party_id, a.criterion_id, 1, 2, 'meets',
+               '{"es": "Resumen inventado y cambiado"}', 'update', NULL, true
+          FROM app.assessments a WHERE a.id = ${LIVE_A.cells.published}`.execute(trx);
+      await sql`SET LOCAL session_replication_role = origin`.execute(trx);
+      await asPublic(trx);
+      const data = await createElectionSource(trx)('test-a', LIVE_A.slug);
+      expect(data?.cells).toHaveLength(1);
+      expect(data?.cells[0]?.revisions).toEqual([
+        expect.objectContaining({
+          revisionNo: 1,
+          rating: 'meets',
+          summary: { es: 'Resumen inventado y cambiado' },
+          changeKind: 'initial',
+          publicNote: null,
+        }),
+      ]);
+    });
+  });
+
   it("holds every approved change to its structure, newest first, by its target's name (the corrections log)", async () => {
     await inRolledBackTransaction(async (trx) => {
       const [party] = ELECTIONS_A.live.parties;

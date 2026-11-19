@@ -94,6 +94,13 @@ const CellPage = async ({ params }: CellParams) => {
   // The election's sources in the API, from the browser: each source's text and its live match.
   const matchBase = `/api/t/${encodeURIComponent(tenant.slug)}/e/${encodeURIComponent(election)}/sources`;
   const editable = draft?.state !== 'in_review' && canEdit;
+  // Off the record (C10.6, PLAN R243): a platform admin's choice, for a live election's published cell whose last
+  // revision isn't a withdrawal. The database decides again.
+  const offersUnlogged =
+    cell.platformAdmin &&
+    cell.electionStatus === 'live' &&
+    cell.revisions.length > 0 &&
+    cell.revisions[0]?.changeKind !== 'withdrawal';
   const youContributed = draft?.contributors.includes(cell.you) ?? false;
   // Who may attest a quote (C4.2, PLAN R167): any member, but while four-eyes is on not its author nor a contributor
   // as four-eyes counts them (the draft's editors and uploaders). The database decides again.
@@ -305,6 +312,9 @@ const CellPage = async ({ params }: CellParams) => {
                       </Link>
                     </p>
                   ) : null}
+                  {draft.unlogged ? (
+                    <p className={styles.notice}>{t('admin.cells.unloggedMarked')}</p>
+                  ) : null}
                   {editable ? (
                     <CellForm
                       path={cellApi}
@@ -316,10 +326,12 @@ const CellPage = async ({ params }: CellParams) => {
                         changeKind: draft.changeKind,
                         publicNote: draft.publicNote,
                         reportId: draft.reportId,
+                        unlogged: draft.unlogged,
                       }}
                       locales={localeOptions(tenant, locale)}
                       afterFirstPublish={cell.revisions.length > 0}
                       changeLogged={cell.revisions.length > 0 && changesLogged(cell.electionStatus)}
+                      offersUnlogged={offersUnlogged}
                       reports={reportOptions}
                       text={{
                         rating: t('admin.cells.rating'),
@@ -337,6 +349,8 @@ const CellPage = async ({ params }: CellParams) => {
                         publicNote: t('admin.cells.publicNote'),
                         publicNoteHint: t('admin.cells.publicNoteHint'),
                         changeNotLoggedYet: t('admin.cells.changeNotLoggedYet'),
+                        unlogged: t('admin.cells.unlogged'),
+                        unloggedHint: t('admin.cells.unloggedHint'),
                         report: t('admin.cells.report'),
                         reportHint: t('admin.cells.reportHint'),
                         noReport: t('admin.cells.noReport'),
@@ -758,6 +772,8 @@ const CellPage = async ({ params }: CellParams) => {
                     {draft.state === 'in_review' && canReview ? (
                       !publishable ? (
                         <p className={styles.notice}>{t('admin.cells.publishNotYet')}</p>
+                      ) : draft.unlogged && !cell.platformAdmin ? (
+                        <p className={styles.notice}>{t('admin.cells.cannotPublishUnlogged')}</p>
                       ) : youContributed && cell.requireSecondReviewer ? (
                         <p className={styles.notice}>{t('admin.cells.cannotPublishOwn')}</p>
                       ) : (
@@ -770,9 +786,11 @@ const CellPage = async ({ params }: CellParams) => {
                           text={{
                             button: t('admin.cells.publish'),
                             title: t('admin.cells.publishTitle'),
-                            body: youContributed
-                              ? t('admin.cells.publishSelfBody')
-                              : t('admin.cells.publishBody'),
+                            body: draft.unlogged
+                              ? t('admin.cells.publishUnloggedBody')
+                              : youContributed
+                                ? t('admin.cells.publishSelfBody')
+                                : t('admin.cells.publishBody'),
                             confirm: t('admin.cells.publish'),
                             cancel: t('admin.members.cancel'),
                             done: t('admin.cells.published'),
@@ -932,6 +950,7 @@ const CellPage = async ({ params }: CellParams) => {
                       publisher: nameOf(revision.internal.publisher),
                     })}
                     {revision.internal.selfReviewed ? ` ${t('admin.cells.selfReviewed')}` : null}
+                    {revision.unlogged ? ` ${t('admin.cells.unloggedRevision')}` : null}
                     {revision.internal.reportId ? (
                       <>
                         {' '}

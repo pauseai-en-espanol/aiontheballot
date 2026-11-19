@@ -486,6 +486,21 @@ describe("an election in preview: a published cell's changes (PLAN R233)", () =>
     });
   });
 
+  it('takes no change off the record: nothing of it is public yet (PLAN R243)', async () => {
+    await actingAs(USERS.countryAdminA, async (client) => {
+      const cell = await publishedInPreview(client);
+      await setActor(client, USERS.platformAdmin);
+      expect(
+        await errorCode(
+          client,
+          `UPDATE app.assessments
+              SET draft_summary = '{"es": "Resumen de ejemplo cambiado"}', draft_unlogged = true
+            WHERE id = '${cell}'`,
+        ),
+      ).toBe(RESTRICT_VIOLATION);
+    });
+  });
+
   // Each lacking one of the two, so either requirement alone refuses it.
   const lacking = [
     ['a kind', `, draft_public_note = '{"es": "Nota de ejemplo"}'`],
