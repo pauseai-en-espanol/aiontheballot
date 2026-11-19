@@ -7,12 +7,12 @@ aiontheballot-migrations:
 aiontheballot-api:
   nameOverride: api
   image:
-    tag: '0.38.0.b97886a'
+    tag: '0.39.0.e0065b5'
 aiontheballot-web:
   nameOverride: web
   image:
-    tag: '0.23.1.b97886a'
+    tag: '0.24.0.e0065b5'
 aiontheballot-admin:
   nameOverride: admin
   image:
-    tag: '0.40.0.b97886a'
+    tag: '0.41.0.e0065b5'
