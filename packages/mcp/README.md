@@ -77,5 +77,10 @@ Things to keep in mind:
   source's text as the database matches it (from a PDF or a web page with its text; a quote from anything else is
   attested by a person in the admin), and a change someone made to the cell meanwhile is refused, not overwritten.
   You are recorded as the cell's contributor, as in the admin, and its quotes as the tool's (origin `mcp`).
+- **Reading a programme in full**: Claude Code, opened in this repository's folder, has a `programme-reader` agent
+  (`.claude/agents/programme-reader.md`). Given a party's sources and the criteria, it reads every page with
+  `read_source`, never just a search, and returns verbatim every passage that might bear on each criterion. It only
+  reads: it never rates and never writes. Your session decides. It runs on a lighter model, so ask your session to
+  start one per party when a programme is long or there are several to read.
 - **Never let your tool run `set_party_logo`, `propose_change` or a cell's writes without asking you**, so you see
   each logo, change, rating, summary and quote before it goes.
