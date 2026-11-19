@@ -31,7 +31,7 @@ export interface CellFormText {
   publicNoteHint: string;
   /** Why a change asks for neither, while the election isn't public yet (PLAN R233). */
   changeNotLoggedYet: string;
-  /** A platform admin's choice to publish the change off the record (C10.6, PLAN R243), and what that means. */
+  /** A country admin's or platform admin's choice to publish the change off the record (C10.6), and what it means. */
   unlogged: string;
   unloggedHint: string;
   report: string;
@@ -60,7 +60,8 @@ const BODY_FIELDS: Readonly<Record<string, CellField>> = {
 /**
  * A draft's rating, summary and, after the first publish, its kind of change, public note and the right-of-reply report
  * it answers (editorial workflow C2, C10, C11), saved all at once at the version its fields were loaded at (C14). A
- * platform admin may mark the change as off the record instead (C10.6): it then asks for no kind and no note. When
+ * country admin or a platform admin may mark the change as off the record instead (C10.6): it then asks for no kind
+ * and no note. When
  * the page reloads its data (after any step, a comment included) with a newer version, untouched fields show it;
  * edited ones keep their text and say at once that the cell changed, rather than saving over someone else's change. A
  * change made from this same page (a quote, a checked document) moves the version they count as loaded at instead,
@@ -89,7 +90,7 @@ export const CellForm = ({
     changeKind: ChangeKind | null;
     publicNote: Record<string, string> | null;
     reportId: string | null;
-    /** Whether a platform admin marked the change as off the record (C10.6): it then has no kind and no note. */
+    /** Whether the change is marked as off the record (C10.6): it then has no kind and no note. */
     unlogged: boolean;
   };
   /**
@@ -107,8 +108,9 @@ export const CellForm = ({
    */
   changeLogged: boolean;
   /**
-   * Whether the form offers to publish the change off the record (C10.6, PLAN R243): to a platform admin, for a live
-   * election's published cell whose last revision isn't a withdrawal. The database decides again.
+   * Whether the form offers to publish the change off the record (C10.6, PLAN R243, R244): to a country admin or a
+   * platform admin, for a live election's published cell whose last revision isn't a withdrawal. The database
+   * decides again.
    */
   offersUnlogged: boolean;
   text: CellFormText;

@@ -3540,6 +3540,20 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   which replaces both functions. Spec: editorial workflow C10.6; data model §3; public site §5.2, §5.6; runbook
   corrections §7; ADR-0002 §6 and its data rules.
 
+- **R244. A site's country admins change a published cell off the record too.** R243 gave the choice to platform
+  admins alone, and the 29N site's coordinator, a country admin and editor, didn't see it. Dani: "make the change so
+  that coordinators can see it". It is an editorial choice, and a site's editorial decisions are its country
+  admins': they now mark a published cell's change as off the record, and publish one so marked, as a platform
+  admin does, on every site. An editor still doesn't mark it, a reviewer still doesn't publish it, and a member's
+  token does neither; every other limit of R243 stays. Migration unlogged_by_country_admins: the trigger that keeps
+  `assessments.draft_unlogged` is now `country_admin_columns` (`restrict_columns('country_admin', …)`, in place of
+  `platform_admin_columns`), and `publish_revision` (body only, still on the definer allowlist) takes a country
+  admin of the cell's tenant too. The cell editor offers the choice to both and says so in its texts. Tests first:
+  the database's (a country admin marks, submits and publishes; an editor doesn't mark; a reviewer doesn't publish),
+  the API's and the e2e of the editor's choice, now a country admin's. Mutation list unlogged-changes gains the two
+  rules; the mutations of `publish_revision` in four lists now target this migration. Spec: editorial workflow
+  C10.6; data model §3; runbook corrections §7; ADR-0002 §6 and its data rules.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

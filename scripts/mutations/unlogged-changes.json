@@ -1,9 +1,18 @@
 [
   {
-    "name": "migration: an editor or country admin marks a change as off the record",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
-    "old": "private.restrict_columns('', 'draft_unlogged');",
+    "name": "migration: an editor marks a change as off the record",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
+    "old": "private.restrict_columns('country_admin', 'draft_unlogged');",
     "new": "private.restrict_columns('country_admin,editor', 'draft_unlogged');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "migration: a country admin doesn't mark a change as off the record (R244)",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
+    "old": "private.restrict_columns('country_admin', 'draft_unlogged');",
+    "new": "private.restrict_columns('', 'draft_unlogged');",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
     "cwd": "packages/db",
     "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
@@ -100,16 +109,25 @@
   },
   {
     "name": "migration: anyone who may publish publishes a change off the record",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
-    "old": "    IF cell.draft_unlogged AND NOT private.is_platform_admin() THEN",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
+    "old": "    IF cell.draft_unlogged\n       AND NOT (cell.tenant_id IN (SELECT private.my_tenants('country_admin')) OR private.is_platform_admin()) THEN",
     "new": "    IF false THEN",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
     "cwd": "packages/db",
     "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
   },
   {
+    "name": "migration: a country admin doesn't publish a change off the record (R244)",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
+    "old": "AND NOT (cell.tenant_id IN (SELECT private.my_tenants('country_admin')) OR private.is_platform_admin()) THEN",
+    "new": "AND NOT private.is_platform_admin() THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
     "name": "migration: a change off the record is published only with a kind",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "election.status = 'preview' OR cell.draft_unlogged)",
     "new": "election.status = 'preview')",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
@@ -118,7 +136,7 @@
   },
   {
     "name": "migration: a change off the record is published only with a public note",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "AND election.status <> 'preview' AND NOT cell.draft_unlogged\n",
     "new": "AND election.status <> 'preview'\n",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",
@@ -127,7 +145,7 @@
   },
   {
     "name": "migration: a revision doesn't record that it was published off the record",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "    NEW.unlogged := cell.draft_unlogged;\n",
     "new": "",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/unlogged.spec.ts tests/preview.spec.ts",

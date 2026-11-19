@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { errorCode, inRolledBackTransaction } from './db.js';
 import { CELLS, USERS } from './rls/matrix.js';
 
-// A change off the record (PLAN R243): a platform admin changes what a live election's public already reads with no
+// A change off the record (PLAN R243; a site's country admins too, PLAN R244): a country admin or a platform admin
+// changes what a live election's public already reads with no
 // change kind and no public note. It is published as an update, marked `unlogged`, which the corrections log leaves
 // out; the public sees it in the place of the revision before it (`publicHistory`).
 
@@ -158,16 +159,30 @@ describe("a published cell's change off the record (PLAN R243)", () => {
     });
   });
 
-  it.each([
-    ['an editor', USERS.editorA],
-    ['a country admin', USERS.countryAdminA],
-  ])('is not marked by %s', async (_, member) => {
+  it('is not marked by an editor', async () => {
     await actingAs(USERS.reviewerA, async (client) => {
       await publishedLive(client);
-      await setActor(client, member);
+      await setActor(client, USERS.editorA);
       expect(await errorCode(client, change(`${CHANGED}, draft_unlogged = true`))).toBe(
         INSUFFICIENT_PRIVILEGE,
       );
+    });
+  });
+
+  it("is a country admin's of the site too: marked, submitted and published as a platform admin's (PLAN R244)", async () => {
+    await actingAs(USERS.reviewerA, async (client) => {
+      await publishedLive(client);
+      await setActor(client, USERS.countryAdminA);
+      expect(await errorCode(client, change(`${CHANGED}, draft_unlogged = true`))).toBeNull();
+      expect(await errorCode(client, SUBMIT)).toBeNull();
+      expect(await errorCode(client, PUBLISH)).toBeNull();
+      expect((await revisions(client)).at(-1)).toEqual({
+        revision_no: 2,
+        change_kind: 'update',
+        public_note: null,
+        unlogged: true,
+      });
+      expect(await logged(client)).toEqual([]);
     });
   });
 
@@ -183,14 +198,12 @@ describe("a published cell's change off the record (PLAN R243)", () => {
     });
   });
 
-  it('is published only by a platform admin', async () => {
+  it('is not published by a reviewer, who publishes any other change', async () => {
     await actingAs(USERS.reviewerA, async (client) => {
       await publishedLive(client);
       await client.query(change(`${CHANGED}, draft_unlogged = true`));
       await client.query(SUBMIT);
       await setActor(client, USERS.reviewerA);
-      expect(await errorCode(client, PUBLISH)).toBe(INSUFFICIENT_PRIVILEGE);
-      await setActor(client, USERS.countryAdminA);
       expect(await errorCode(client, PUBLISH)).toBe(INSUFFICIENT_PRIVILEGE);
     });
   });

@@ -70,7 +70,7 @@ export interface CellRevision {
   changeKind: ChangeKind;
   publicNote: Localized | null;
   publishedAt: string;
-  /** Published off the record by a platform admin (PLAN R243): the public is told of no change. */
+  /** Published off the record (PLAN R243, R244), by a country admin or platform admin: the public is told nothing. */
   unlogged: boolean;
   /**
    * Its private record (editorial workflow H1.1), as members see it: who contributed, who published it, whether it was
@@ -93,7 +93,7 @@ export interface CellDraft {
   summary: Localized | null;
   changeKind: ChangeKind | null;
   publicNote: Localized | null;
-  /** A platform admin's mark (C10.6, PLAN R243): published off the record, with no kind, note or log entry. */
+  /** A country admin's or platform admin's mark (C10.6): published off the record, with no kind or note. */
   unlogged: boolean;
   /** The right-of-reply report it answers (C10.4), copied into its revision's private record on publish. */
   reportId: string | null;
@@ -528,8 +528,8 @@ export interface CellFields {
   /** The right-of-reply report it answers (C10.4), or none; undefined leaves it as it is. */
   reportId?: string | null;
   /**
-   * Off the record (C10.6, PLAN R243): a platform admin's mark, which the database refuses from anyone else; undefined
-   * leaves it as it is. A change so marked carries no kind and no note.
+   * Off the record (C10.6, PLAN R243, R244): a country admin's or platform admin's mark, which the database refuses
+   * from anyone else; undefined leaves it as it is. A change so marked carries no kind and no note.
    */
   unlogged?: boolean | undefined;
 }

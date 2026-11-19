@@ -535,7 +535,7 @@ create table app.assessments (
   draft_summary        jsonb,
   draft_change_kind    app.change_kind,                -- null before the first publish (it will be 'initial')
   draft_public_note    jsonb,                          -- required for every change after the first
-  draft_unlogged       boolean not null default false, -- a platform admin's mark: off the record (R243); then
+  draft_unlogged       boolean not null default false, -- a country or platform admin's mark: off the record; then
                                                        -- no kind and no note, and only on a cell published before
   generation           int not null default 0,         -- publishes so far; contributions are counted per generation
   content_version      int not null default 0,         -- bumped by every content change, by trigger
@@ -664,10 +664,10 @@ document):
   at trigger depth > 0. Review events are immutable, so a cell with a review trail is never deleted.
 - In an archived election, no new cell is created, and a cell's content changes only while its draft is a
   correction or a withdrawal (PLAN P16).
-- Off the record (PLAN R243): only a platform admin sets `draft_unlogged` (`platform_admin_columns`; never through
-  a member's token), only on a live election's cell published before, and the draft then carries no change kind
-  and no note. Marking it is an edit. Submitting it asks for neither, and refuses one whose last revision is a
-  withdrawal.
+- Off the record (PLAN R243, R244): only a country admin of the site or a platform admin sets `draft_unlogged`
+  (`country_admin_columns`; never through a member's token), only on a live election's cell published before, and
+  the draft then carries no change kind and no note. Marking it is an edit. Submitting it asks for neither, and
+  refuses one whose last revision is a withdrawal.
 - Ratings are checked against the tenant's methodology kind when written. Submitting checks everything publishing
   will: the change kind and default-locale note after the first publish (none before it), a rating and a
   default-locale summary unless withdrawing, and the evidence (a quote, or for "not mentioned" a checked, stored
@@ -702,7 +702,8 @@ ADR-0002 allowlist), does the rest in the same transaction:
    is recorded as `self_reviewed`.
 5. Checks the change kind: `initial` for the first revision only. Every later one carries the draft's
    `update`, `correction` or `withdrawal`, and a public note with default-locale text. A draft marked as off the
-   record (PLAN R243) is published by a platform admin alone, as an `update` with no note, marked `unlogged`.
+   record (PLAN R243, R244) is published only by a country admin of its site or a platform admin, as an `update`
+   with no note, marked `unlogged`.
 6. Re-runs the verbatim match for every quote, and the attestation rules, rather than trusting stored statuses.
 7. Checks the evidence requirement (ADR-0002): a rating other than `not_mentioned` needs at least one matched or
    attested quote from an admissible source kind. `not_mentioned` needs at least one checked document that is the
@@ -741,7 +742,7 @@ create table app.assessment_revisions (                -- public
   public_note       jsonb,                             -- required unless initial, in preview (R233) or unlogged
   published_at      timestamptz not null default now(),
   published_in_preview boolean not null default false, -- before the public saw it (R181): never a correction
-  unlogged          boolean not null default false,    -- off the record, a platform admin's (R243): not logged
+  unlogged          boolean not null default false,    -- published off the record (R243, R244): not logged
   unique (tenant_id, id),
   unique (tenant_id, id, election_id),
   unique (assessment_id, revision_no),

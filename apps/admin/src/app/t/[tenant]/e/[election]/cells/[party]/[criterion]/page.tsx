@@ -94,10 +94,11 @@ const CellPage = async ({ params }: CellParams) => {
   // The election's sources in the API, from the browser: each source's text and its live match.
   const matchBase = `/api/t/${encodeURIComponent(tenant.slug)}/e/${encodeURIComponent(election)}/sources`;
   const editable = draft?.state !== 'in_review' && canEdit;
-  // Off the record (C10.6, PLAN R243): a platform admin's choice, for a live election's published cell whose last
-  // revision isn't a withdrawal. The database decides again.
+  // Off the record (C10.6, PLAN R243, R244): a country admin's or a platform admin's choice, to mark and to publish,
+  // for a live election's published cell whose last revision isn't a withdrawal. The database decides again.
+  const mayUnlog = can('country_admin');
   const offersUnlogged =
-    cell.platformAdmin &&
+    mayUnlog &&
     cell.electionStatus === 'live' &&
     cell.revisions.length > 0 &&
     cell.revisions[0]?.changeKind !== 'withdrawal';
@@ -772,7 +773,7 @@ const CellPage = async ({ params }: CellParams) => {
                     {draft.state === 'in_review' && canReview ? (
                       !publishable ? (
                         <p className={styles.notice}>{t('admin.cells.publishNotYet')}</p>
-                      ) : draft.unlogged && !cell.platformAdmin ? (
+                      ) : draft.unlogged && !mayUnlog ? (
                         <p className={styles.notice}>{t('admin.cells.cannotPublishUnlogged')}</p>
                       ) : youContributed && cell.requireSecondReviewer ? (
                         <p className={styles.notice}>{t('admin.cells.cannotPublishOwn')}</p>

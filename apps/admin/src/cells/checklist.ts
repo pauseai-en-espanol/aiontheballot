@@ -63,7 +63,7 @@ export const submitChecklist = (cell: ChecklistCell, defaultLocale: string): Sub
   const source = (id: string) => sources.find((s) => s.id === id);
   const items: SubmitItem[] = [];
   // After the first publish, every change says what kind it is and why, in the site's main language: once the public
-  // sees the election, never before (PLAN R233), and not one a platform admin marked as off the record (PLAN R243).
+  // sees the election, never before (PLAN R233), and not one marked as off the record (PLAN R243).
   if (draft.generation > 0 && changesLogged(cell.electionStatus) && !draft.unlogged) {
     items.push(
       {

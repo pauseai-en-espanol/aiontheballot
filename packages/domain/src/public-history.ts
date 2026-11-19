@@ -1,8 +1,8 @@
 import type { PublicRevision } from './public-election.js';
 
 /**
- * A published revision, whether it was published while its election was in preview (PLAN R181), and whether a platform
- * admin published it off the record (PLAN R243).
+ * A published revision, whether it was published while its election was in preview (PLAN R181), and whether it was
+ * published off the record (PLAN R243).
  */
 export interface StagedRevision {
   revision: PublicRevision;

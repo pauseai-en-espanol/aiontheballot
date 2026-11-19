@@ -1,6 +1,6 @@
 import { messages } from '@aiontheballot/i18n/messages';
 
-import { addMembership, asOwner, deleteAccounts } from '../accounts.js';
+import { addMembership, deleteAccounts } from '../accounts.js';
 import { signedInAccount } from '../admin.js';
 import { expectAccessible } from '../axe.js';
 import { ADMIN_URL } from '../servers.js';
@@ -313,7 +313,7 @@ test.describe('cells (editorial workflow §8)', () => {
     await expect(page.getByRole('radio').first()).toBeFocused();
   });
 
-  test('offer a platform admin alone to publish a change off the record, with no kind and no note (PLAN R243)', async ({
+  test('offer a country admin, and no editor, to publish a change off the record, with no kind and no note (PLAN R243, R244)', async ({
     page,
   }) => {
     const { id } = await signedInAccount(page, created, 'Persona que administra');
@@ -333,8 +333,8 @@ test.describe('cells (editorial workflow §8)', () => {
     await expect(page.getByRole('group', { name: cells.changeKind })).toBeVisible();
     await expect(page.getByRole('checkbox', { name: cells.unlogged })).toHaveCount(0);
 
-    // A platform admin's may be off the record: the kind and the note then leave the form.
-    await asOwner('INSERT INTO app.platform_admins (user_id) VALUES ($1)', [id]);
+    // A country admin's may be off the record: the kind and the note then leave the form.
+    await addMembership(id, 'ejemplo-a', 'country_admin');
     await startChange();
     const offTheRecord = page.getByRole('checkbox', { name: cells.unlogged });
     await expect(offTheRecord).not.toBeChecked();

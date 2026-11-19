@@ -2507,11 +2507,12 @@ CREATE FUNCTION private.publish_revision() RETURNS trigger
       RAISE EXCEPTION 'election % is frozen: nothing public changes until the window ends', election.id
         USING ERRCODE = 'restrict_violation';
     END IF;
-    -- Off the record (PLAN R243): only a platform admin publishes it. (Its election is live and its last revision no
-    -- withdrawal: marking it and submitting it were refused otherwise, and an archived election, above, takes no
-    -- change without a kind.)
-    IF cell.draft_unlogged AND NOT private.is_platform_admin() THEN
-      RAISE EXCEPTION 'cell %: only a platform admin publishes a change off the record', cell.id
+    -- Off the record (PLAN R243): only a country admin of its site or a platform admin publishes it (PLAN R244), not
+    -- a reviewer. (Its election is live and its last revision no withdrawal: marking it and submitting it were
+    -- refused otherwise, and an archived election, above, takes no change without a kind.)
+    IF cell.draft_unlogged
+       AND NOT (cell.tenant_id IN (SELECT private.my_tenants('country_admin')) OR private.is_platform_admin()) THEN
+      RAISE EXCEPTION 'cell %: only a country admin or a platform admin publishes a change off the record', cell.id
         USING ERRCODE = 'insufficient_privilege';
     END IF;
 
@@ -3719,7 +3720,7 @@ COMMENT ON COLUMN app.assessment_revisions.published_in_preview IS 'Published wh
 -- Name: COLUMN assessment_revisions.unlogged; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
 --
 
-COMMENT ON COLUMN app.assessment_revisions.unlogged IS 'Published off the record by a platform admin (PLAN R243): no note, and the corrections log leaves it out.';
+COMMENT ON COLUMN app.assessment_revisions.unlogged IS 'Published off the record by a country admin or platform admin (PLAN R243, R244): the corrections log leaves it out.';
 
 
 --
@@ -3761,7 +3762,7 @@ COMMENT ON COLUMN app.assessments.draft_report_id IS 'The right-of-reply report 
 -- Name: COLUMN assessments.draft_unlogged; Type: COMMENT; Schema: app; Owner: aiontheballot_owner
 --
 
-COMMENT ON COLUMN app.assessments.draft_unlogged IS 'A platform admin''s mark (PLAN R243): the change is published off the record, with no kind, note or log entry.';
+COMMENT ON COLUMN app.assessments.draft_unlogged IS 'A country admin''s or platform admin''s mark (PLAN R243, R244): published off the record, with no kind or note.';
 
 
 --
@@ -6745,6 +6746,13 @@ CREATE TRIGGER content AFTER INSERT OR DELETE OR UPDATE ON app.draft_evidence FO
 
 
 --
+-- Name: assessments country_admin_columns; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER country_admin_columns BEFORE UPDATE ON app.assessments FOR EACH ROW EXECUTE FUNCTION private.restrict_columns('country_admin', 'draft_unlogged');
+
+
+--
 -- Name: elections country_admin_columns; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -7617,13 +7625,6 @@ CREATE TRIGGER needs_a_person_to_withdraw BEFORE DELETE ON app.change_requests F
 --
 
 CREATE TRIGGER origin BEFORE INSERT ON app.draft_evidence FOR EACH ROW EXECUTE FUNCTION private.quote_by_token();
-
-
---
--- Name: assessments platform_admin_columns; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
---
-
-CREATE TRIGGER platform_admin_columns BEFORE UPDATE ON app.assessments FOR EACH ROW EXECUTE FUNCTION private.restrict_columns('', 'draft_unlogged');
 
 
 --

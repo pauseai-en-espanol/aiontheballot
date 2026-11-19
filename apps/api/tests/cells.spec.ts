@@ -376,7 +376,7 @@ describe('the workflow (C5–C9, C12, C13)', () => {
     });
   });
 
-  it('is marked as off the record by a platform admin alone, and then carries no kind or note (C10.6)', async () => {
+  it('is marked as off the record by a country admin or a platform admin, never an editor, with no kind or note (C10.6)', async () => {
     await inRolledBackTransaction(async (trx) => {
       const pair = await pairOf(trx, LIVE_A.cells.published);
       const fields = {
@@ -395,8 +395,8 @@ describe('the workflow (C5–C9, C12, C13)', () => {
         }),
       ).rejects.toMatchObject({ code: '42501' });
       await sql`ROLLBACK TO SAVEPOINT attempt`.execute(trx);
-      // A platform admin's is saved with no kind and no note, whatever the form held.
-      await actAs(trx, USERS.platformAdmin);
+      // A country admin's (PLAN R244), as a platform admin's, is saved with no kind and no note, whatever the form held.
+      await actAs(trx, USERS.countryAdminA);
       expect(
         await saveCell(trx, LIVE_A.id, LIVE_A.cells.published, pair.content_version, {
           ...fields,

@@ -422,7 +422,7 @@ const CELL_BODY = {
     publicNote: { anyOf: [localizedSchema(2000), { type: 'null' }] },
     // Optional, so a form that doesn't offer it (before the first publish, or an older admin) leaves it as it is.
     reportId: { anyOf: [UUID, { type: 'null' }] },
-    // Optional too: only a platform admin's form offers it (C10.6), and the database refuses it from anyone else.
+    // Optional too: only a country admin's or platform admin's form offers it (C10.6); the database decides.
     unlogged: { type: 'boolean' },
   },
   required: ['version', 'rating', 'summary', 'changeKind', 'publicNote'],
@@ -436,7 +436,7 @@ interface CellBody {
   publicNote: Record<string, string> | null;
   /** The right-of-reply report the draft answers (C10.4); absent, unchanged. */
   reportId?: string | null;
-  /** Off the record (C10.6, PLAN R243): a platform admin's mark; absent, unchanged. */
+  /** Off the record (C10.6, PLAN R243, R244): a country admin's or platform admin's mark; absent, unchanged. */
   unlogged?: boolean;
 }
 /** A source's fields (S1.1): the URL's scheme, a programme only of a party, are the database's to check. */

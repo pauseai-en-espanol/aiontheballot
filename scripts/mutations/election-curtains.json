@@ -97,7 +97,7 @@
   },
   {
     "name": "migration: nothing is published in preview",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "IF NOT (election.status IN ('preview', 'live')",
     "new": "IF NOT (election.status IN ('live')",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
@@ -105,7 +105,7 @@
   },
   {
     "name": "migration: a revision doesn't record that it was published in preview",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "NEW.published_in_preview := election.status = 'preview';",
     "new": "NEW.published_in_preview := false;",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",
@@ -360,7 +360,7 @@
   },
   {
     "name": "migration: a publish reads the election without waiting for a change of its status",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "    SELECT * INTO election FROM app.elections e WHERE e.id = cell.election_id FOR SHARE;",
     "new": "    SELECT * INTO election FROM app.elections e WHERE e.id = cell.election_id;",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts",

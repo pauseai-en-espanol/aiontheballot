@@ -2,7 +2,7 @@
 
 A published rating, quote or piece of structure is wrong, or someone says it is. Corrections go through the same
 workflow as everything else, in the admin, and leave a public record: the election's corrections log (but for a
-platform admin's change off the record, section 7). **Never fix
+change off the record, section 7). **Never fix
 published content in the database:** the triggers refuse it, and a fix that skipped review would leave no public
 note.
 
@@ -66,18 +66,18 @@ Names, dates, criteria wording, the methodology and its reviewers are change-con
 2. A reporter may ask for their details to be removed: **Anonymize** on the report removes every personal field at
    once. Otherwise they go when the site's retention period ends.
 
-## 7. Change a rating off the record (a platform admin only)
+## 7. Change a rating off the record (a country admin or a platform admin)
 
-The operator's exception to the public record (PLAN R243), for a live election: a change the public is told nothing
+The operator's exception to the public record (PLAN R243, R244), for a live election: a change the public is told nothing
 of. It is for what was published and barely seen. A rating someone may have read, quoted or kept a screenshot of is
 corrected on the record (section 3).
 
 1. Open the cell and edit it as in section 3.
-2. Tick **Publish off the record**: the change kind and the public note leave the form. Only a platform admin sees
-   the box.
+2. Tick **Publish off the record**: the change kind and the public note leave the form. Only the site's country
+   admins and platform admins see the box.
 3. Fix the rating, summary, quotes and checked documents; the verbatim match and the evidence rules apply as ever.
-4. Send it for review and publish it. Only a platform admin can; while the election requires a second reviewer,
-   another platform admin.
+4. Send it for review and publish it. Only a country admin or a platform admin can; while the election requires a
+   second reviewer, another one of them.
 5. The public site shows the new version within seconds, in the place of the one before, with its new date. The
    corrections log lists nothing. The cell's history in the admin keeps the revision, marked as off the record,
    with who published it.

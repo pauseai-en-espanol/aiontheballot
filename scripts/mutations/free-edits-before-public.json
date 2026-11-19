@@ -37,7 +37,7 @@
   },
   {
     "name": "migration: a change in preview is published only with a kind",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               election.status = 'preview' OR cell.draft_unlogged)",
     "new": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               cell.draft_unlogged)",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
@@ -46,7 +46,7 @@
   },
   {
     "name": "migration: a change is published with no kind once live",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               election.status = 'preview' OR cell.draft_unlogged)",
     "new": "cell.draft_change_kind IN ('update', 'correction', 'withdrawal'),\n                                               true)",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
@@ -55,7 +55,7 @@
   },
   {
     "name": "migration: a change in preview is published only with a public note",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "       OR cell.generation > 0 AND election.status <> 'preview' AND NOT cell.draft_unlogged\n          AND NOT coalesce(cell.draft_public_note",
     "new": "       OR cell.generation > 0 AND NOT cell.draft_unlogged\n          AND NOT coalesce(cell.draft_public_note",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
@@ -64,7 +64,7 @@
   },
   {
     "name": "migration: a change is published with no public note once live",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "       OR cell.generation > 0 AND election.status <> 'preview' AND NOT cell.draft_unlogged\n          AND NOT coalesce(cell.draft_public_note",
     "new": "       OR cell.generation > 0 AND false AND NOT cell.draft_unlogged\n          AND NOT coalesce(cell.draft_public_note",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",
@@ -73,7 +73,7 @@
   },
   {
     "name": "migration: a change with no kind is recorded with none",
-    "file": "db/migrations/20261119130133_unlogged_changes.sql",
+    "file": "db/migrations/20261119173955_unlogged_by_country_admins.sql",
     "old": "coalesce(cell.draft_change_kind, 'update') END;",
     "new": "cell.draft_change_kind END;",
     "cmd": "npx vitest run -c vitest.db.config.ts tests/preview.spec.ts tests/publish.spec.ts tests/workflow.spec.ts",

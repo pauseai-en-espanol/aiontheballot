@@ -143,10 +143,10 @@ names the token.
   and a report of another election, and the publish trigger copies it into `revision_internal.report_id`. Amended
   (PLAN D14, R172): `source_documents.replaced_at`, a source's "replaced" mark, is updatable by `aiontheballot_admin`
   (RLS keeps it to editors, country admins and platform admins), set once by the source's trigger, which takes the
-  time itself; never readable by `aiontheballot_web`. Amended (PLAN R243): `assessments.draft_unlogged`, a platform
-  admin's mark that a published cell's change is published off the record, is updatable by `aiontheballot_admin`;
-  `restrict_columns` keeps it to platform admins and `needs_a_person` to a person's session, and only a platform
-  admin publishes a draft so marked.
+  time itself; never readable by `aiontheballot_web`. Amended (PLAN R243, R244): `assessments.draft_unlogged`, the
+  mark that a published cell's change is published off the record, is updatable by `aiontheballot_admin`;
+  `restrict_columns` keeps it to the site's country admins and to platform admins, and `needs_a_person` to a
+  person's session, and only they publish a draft so marked.
 - Helper functions live in a `private` schema.
 - `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, the public-cache trigger
   `bump_public_version` (so no runtime role can write `public_versions`), `submit_report`, the signup list's
@@ -536,10 +536,10 @@ document, stays private.
 - Every publish after the first carries `change_kind` (`update`, `correction` or `withdrawal`) and a public,
   localized note, both written in the draft and reviewed with it. `initial` is only ever the first revision.
 - Each such publish appends to the election's corrections log.
-- Amended (PLAN R243, the operator's decision): a platform admin may publish a change of a live election's cell off
-  the record. It carries no kind and no note, is recorded as an `update` marked `unlogged`, and the corrections log
-  leaves it out; the public reads it in the place of the revision before it. The revision is kept like any other,
-  with who published it. It is never a withdrawal and never follows one.
+- Amended (PLAN R243 and R244, the operator's decisions): a site's country admin, or a platform admin, may publish a
+  change of a live election's cell off the record. It carries no kind and no note, is recorded as an `update`
+  marked `unlogged`, and the corrections log leaves it out; the public reads it in the place of the revision before
+  it. The revision is kept like any other, with who published it. It is never a withdrawal and never follows one.
 - A cell's "last updated" date is the time of its latest revision.
 
 ### "Pending" is not "not mentioned"

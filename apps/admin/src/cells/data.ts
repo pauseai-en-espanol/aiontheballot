@@ -70,7 +70,7 @@ export interface Cell {
     summary: Localized | null;
     changeKind: ChangeKind | null;
     publicNote: Localized | null;
-    /** A platform admin's mark (C10.6, PLAN R243): published off the record, with no kind, note or log entry. */
+    /** A country admin's or platform admin's mark (C10.6): published off the record, with no kind or note. */
     unlogged: boolean;
     /** The right-of-reply report the draft answers (C10.4), copied into its revision's private record on publish. */
     reportId: string | null;
@@ -110,7 +110,7 @@ export interface Cell {
     changeKind: ChangeKind;
     publicNote: Localized | null;
     publishedAt: string;
-    /** Published off the record by a platform admin (PLAN R243): the public was told of no change. */
+    /** Published off the record (PLAN R243, R244): the public was told of no change. */
     unlogged: boolean;
     /** Its private record (H1.1): who contributed and published it, whether self-reviewed, the report it answers. */
     internal: {

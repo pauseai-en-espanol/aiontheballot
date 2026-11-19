@@ -106,7 +106,7 @@ export interface AppAssessmentRevisions {
   summary: Json | null;
   tenant_id: string;
   /**
-   * Published off the record by a platform admin (PLAN R243): no note, and the corrections log leaves it out.
+   * Published off the record by a country admin or platform admin (PLAN R243, R244): the corrections log leaves it out.
    */
   unlogged: Generated<boolean>;
 }
@@ -123,7 +123,7 @@ export interface AppAssessments {
   draft_report_id: string | null;
   draft_summary: Json | null;
   /**
-   * A platform admin's mark (PLAN R243): the change is published off the record, with no kind, note or log entry.
+   * A country admin's or platform admin's mark (PLAN R243, R244): published off the record, with no kind or note.
    */
   draft_unlogged: Generated<boolean>;
   election_id: string;
