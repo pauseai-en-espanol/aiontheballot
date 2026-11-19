@@ -3494,6 +3494,16 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   heading, «Qué pide el criterio», for every member; the API's cell carries it, and so does the MCP's `get_cell`.
   Tests: the API's (an editor and a reviewer both read it) and e2e (a reviewer sees it on the page).
 
+- **R241. An election's page says when its site is still coming soon.** Going live and opening the site are two
+  switches (PLAN R135): an election goes live on its own page, and its site opens to the public in the site's
+  settings, a platform admin's. Dani made 29N live and still saw the coming-soon page, while the election's page said
+  "El público la ve" and going live promised it "muestra en el sitio". Both switches stay; the election's page now
+  says how they meet. On a site still coming soon, going live says the public won't see the election until the site
+  opens, in its hint and in the confirmation; once live, its status says the public doesn't see it yet, with a notice
+  that the site opens separately and a link to its settings for a platform admin (others read that a platform admin
+  opens it). The API's tenant overview carries whether the site is open. Tests: e2e (both texts before going live;
+  the status, the notice and the platform admin's link after).
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

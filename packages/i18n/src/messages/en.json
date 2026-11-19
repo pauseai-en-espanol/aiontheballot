@@ -516,13 +516,17 @@
       "corrections": "Corrections log",
       "previewNotice": "This election is in preview: only the site's members see it, in the site's preview, as the public will. It is edited as a draft, and nothing goes to the corrections log until it is public.",
       "seePreview": "See it in the site's preview",
+      "siteClosedNotice": "The site opens to the public separately, in its settings: until then its addresses show only the coming-soon page.",
+      "openSite": "Open the site",
+      "siteClosedByPlatform": "Only a platform admin can open it.",
       "announceNeedsName": "Announcing it needs the election's name in the site's default language: add it under Details first.",
       "statusTitle": "Status",
       "statusLines": {
         "draft": "Only the site's members see it.",
         "preview": "Its members see it as the public will, in the admin's preview.",
         "live": "The public sees it; its structure changes only through change requests.",
-        "archived": "Read-only, kept for the record."
+        "archived": "Read-only, kept for the record.",
+        "liveSiteClosed": "Live, but the site is still coming soon, so the public doesn't see it yet; its structure changes only through change requests."
       },
       "next": {
         "draft": "Next: open its preview, once everything below is done.",
@@ -699,6 +703,7 @@
     "status": {
       "goLive": "Go live",
       "goLiveIntro": "Going live makes the election, its methodology, parties and criteria public, and every cell without a published rating shows as pending. It can't be undone.",
+      "goLiveSiteClosed": "The site is still coming soon: the election will show once the site opens to the public, in its settings.",
       "needsTitle": "What going live needs",
       "warningsTitle": "Worth checking first",
       "done": "done",
@@ -724,6 +729,7 @@
       "notReady": "Going live is offered once nothing above is missing.",
       "confirmTitle": "Make this election public?",
       "confirmBody": "Its address name, type and territory are fixed from then on, and its structure changes only through change requests, each with a public note. This can't be undone.",
+      "confirmSiteClosed": "The site stays coming soon: the public won't see it until the site opens.",
       "typeSlug": "Type the election's address name, {slug}, to confirm",
       "confirm": "Go live",
       "wentLive": "The election is live.",

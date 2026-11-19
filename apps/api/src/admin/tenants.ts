@@ -49,6 +49,8 @@ export interface TenantOverview {
     liveEditsNeedSecondApprover: boolean;
     /** The site's own colours (T1), those it can draw. */
     theme: SiteTheme;
+    /** Open to the public or still coming soon (PLAN R135): a live election shows only once it is (PLAN R241). */
+    open: boolean;
   };
   roles: TenantRole[];
   platformAdmin: boolean;
@@ -72,6 +74,7 @@ export const tenantOverview = async (
       'report_retention_days',
       'live_edits_need_second_approver',
       'theme',
+      'site_open',
     ])
     .where('id', '=', access.tenantId)
     .executeTakeFirstOrThrow();
@@ -87,6 +90,7 @@ export const tenantOverview = async (
       reportRetentionDays: row.report_retention_days,
       liveEditsNeedSecondApprover: row.live_edits_need_second_approver,
       theme: readTheme(row.theme),
+      open: row.site_open,
     },
     roles: access.roles,
     platformAdmin: access.platformAdmin,

@@ -516,13 +516,17 @@
       "corrections": "Registro de correcciones",
       "previewNotice": "Esta elección está en vista previa: solo la ven los miembros del sitio, en su vista previa, tal como la verá el público. Se edita como un borrador, y nada va al registro de correcciones hasta que sea pública.",
       "seePreview": "Verla en la vista previa del sitio",
+      "siteClosedNotice": "El sitio se abre al público aparte, en sus ajustes: hasta entonces, sus direcciones solo muestran la página de «próximamente».",
+      "openSite": "Abrir el sitio",
+      "siteClosedByPlatform": "Solo la administración de la plataforma puede abrirlo.",
       "announceNeedsName": "Para anunciarla hace falta el nombre de la elección en el idioma principal del sitio: añádelo antes en «Datos».",
       "statusTitle": "Estado",
       "statusLines": {
         "draft": "Solo la ven los miembros del sitio.",
         "preview": "Los miembros la ven como la verá el público, en la vista previa del admin.",
         "live": "El público la ve; su estructura solo cambia mediante solicitudes de cambio.",
-        "archived": "De solo lectura; se conserva como registro."
+        "archived": "De solo lectura; se conserva como registro.",
+        "liveSiteClosed": "Publicada, pero el sitio aún está en «próximamente», así que el público todavía no la ve; su estructura solo cambia mediante solicitudes de cambio."
       },
       "next": {
         "draft": "Siguiente paso: abrir su vista previa, cuando todo lo de abajo esté hecho.",
@@ -699,6 +703,7 @@
     "status": {
       "goLive": "Hacer pública",
       "goLiveIntro": "Hacer pública la elección muestra en el sitio su metodología, sus partidos y sus criterios, y cada celda sin valoración publicada aparece como pendiente. No se puede deshacer.",
+      "goLiveSiteClosed": "El sitio sigue en «próximamente»: la elección se verá en cuanto el sitio se abra al público, en sus ajustes.",
       "needsTitle": "Lo que hace falta para hacerla pública",
       "warningsTitle": "Conviene revisarlo antes",
       "done": "hecho",
@@ -724,6 +729,7 @@
       "notReady": "Podrás hacerla pública cuando no falte nada de lo anterior.",
       "confirmTitle": "¿Hacer pública esta elección?",
       "confirmBody": "Desde entonces su nombre en la dirección, su tipo y su territorio quedan fijos, y su estructura solo cambia mediante solicitudes de cambio, cada una con una nota pública. No se puede deshacer.",
+      "confirmSiteClosed": "El sitio sigue en «próximamente»: el público no la verá hasta que se abra.",
       "typeSlug": "Escribe el nombre en la dirección de la elección, {slug}, para confirmar",
       "confirm": "Hacer pública",
       "wentLive": "La elección es pública.",

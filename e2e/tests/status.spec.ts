@@ -71,7 +71,7 @@ test.describe("an election's status (editorial workflow E5–E7, PLAN R181)", ()
   test('goes to preview once its checklist is complete, then live after its slug is typed', async ({
     page,
   }) => {
-    await withDraftElection(page, async (site, election) => {
+    await withDraftElection(page, async (site, election, admin) => {
       await page.goto(`${ADMIN_URL}/t/${site.slug}/e/${election}`);
       const needs = page.getByRole('list').filter({ hasText: en.admin.status.needs.operator });
       await expect(needs.getByRole('listitem').filter({ hasText: 'short name' })).toContainText(
@@ -123,8 +123,11 @@ test.describe("an election's status (editorial workflow E5–E7, PLAN R181)", ()
       await expect(page.getByRole('button', { name: en.admin.election.saveDetails })).toBeVisible();
       await expectAccessible(page);
 
+      // The site is still coming soon: going live says the public won't see it until the site opens (PLAN R241).
+      await expect(page.getByText(en.admin.status.goLiveSiteClosed)).toBeVisible();
       await page.getByRole('button', { name: en.admin.status.goLive }).click();
       const dialog = page.getByRole('alertdialog', { name: en.admin.status.confirmTitle });
+      await expect(dialog).toContainText(en.admin.status.confirmSiteClosed);
       const confirm = dialog.getByRole('button', { name: en.admin.status.confirm });
       await expect(confirm).toHaveAttribute('aria-disabled', 'true');
       await expectAccessible(page);
@@ -141,6 +144,18 @@ test.describe("an election's status (editorial workflow E5–E7, PLAN R181)", ()
           [site.id],
         ),
       ).toBe(1);
+      // Live on a site still coming soon: the page says the public doesn't see it yet, and who opens the site; a
+      // platform admin gets the way there (PLAN R241).
+      await expect(page.getByText(en.admin.election.statusLines.liveSiteClosed)).toBeVisible();
+      await expect(page.getByText(en.admin.election.siteClosedByPlatform)).toBeVisible();
+      await asOwner('INSERT INTO app.platform_admins (user_id) VALUES ($1)', [admin]);
+      await page.reload();
+      await expect(page.getByRole('link', { name: en.admin.election.openSite })).toHaveAttribute(
+        'href',
+        `/platform/sites/${site.slug}`,
+      );
+      await asOwner('DELETE FROM app.platform_admins WHERE user_id = $1', [admin]);
+      await page.reload();
 
       // Live: a freeze window, behind its own button while there is none, in the reader's time zone, named; then
       // archiving.

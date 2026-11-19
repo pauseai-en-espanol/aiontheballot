@@ -61,6 +61,8 @@ const ElectionPage = async ({ params }: Params) => {
   const rechecks = election.status === 'draft' ? undefined : await getRechecks(slug, electionSlug);
   const { tenant } = overview;
   const draft = election.status === 'draft';
+  // A live election shows only once the site is open, a separate switch (PLAN R135, R241); unknown counts as open.
+  const siteClosed = tenant.open === false;
   const errors = writeErrors(t);
   const path = `/api/t/${tenant.slug}/e/${election.slug}`;
   const base = `/t/${tenant.slug}/e/${election.slug}`;
@@ -89,8 +91,22 @@ const ElectionPage = async ({ params }: Params) => {
         </h2>
         <p className={styles.text}>
           <strong>{t(`admin.elections.statuses.${election.status}`)}.</strong>{' '}
-          {t(`admin.election.statusLines.${election.status}`)}
+          {t(
+            `admin.election.statusLines.${election.status === 'live' && siteClosed ? 'liveSiteClosed' : election.status}`,
+          )}
         </p>
+        {election.status === 'live' && siteClosed ? (
+          <p className={styles.notice}>
+            {t('admin.election.siteClosedNotice')}{' '}
+            {platformAdmin ? (
+              <a className={styles.link} href={`/platform/sites/${tenant.slug}`}>
+                {t('admin.election.openSite')}
+              </a>
+            ) : (
+              t('admin.election.siteClosedByPlatform')
+            )}
+          </p>
+        ) : null}
         {election.status === 'preview' ? (
           <p className={styles.text}>
             <a className={styles.link} href={`/t/${tenant.slug}/preview/${election.slug}`}>
@@ -130,6 +146,9 @@ const ElectionPage = async ({ params }: Params) => {
         {election.status === 'preview' && canAdminister && checklist ? (
           <>
             <p className={styles.hint}>{t('admin.status.goLiveIntro')}</p>
+            {siteClosed ? (
+              <p className={styles.hint}>{t('admin.status.goLiveSiteClosed')}</p>
+            ) : null}
             <GoLivePanel
               path={path}
               slug={election.slug}
@@ -143,7 +162,9 @@ const ElectionPage = async ({ params }: Params) => {
                 button: t('admin.status.goLive'),
                 notReady: t('admin.status.notReady'),
                 confirmTitle: t('admin.status.confirmTitle'),
-                confirmBody: t('admin.status.confirmBody'),
+                confirmBody: siteClosed
+                  ? `${t('admin.status.confirmBody')} ${t('admin.status.confirmSiteClosed')}`
+                  : t('admin.status.confirmBody'),
                 typeSlug: template(t, 'admin.status.typeSlug'),
                 confirm: t('admin.status.confirm'),
                 cancel: t('admin.members.cancel'),

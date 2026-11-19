@@ -34,6 +34,8 @@ export interface TenantOverview {
     liveEditsNeedSecondApprover: boolean;
     /** The site's own colours (T1, PLAN R178); absent from an older API's answer. */
     theme?: SiteTheme;
+    /** Open to the public or still coming soon (PLAN R241); absent from an older API's answer. */
+    open?: boolean;
   };
   roles: TenantRole[];
   platformAdmin: boolean;
