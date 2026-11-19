@@ -1,5 +1,13 @@
 # @aiontheballot/api
 
+## 0.40.2
+
+### Patch Changes
+
+- Updated dependencies [85ab98e]
+  - @aiontheballot/domain@0.18.0
+  - @aiontheballot/db@0.19.1
+
 ## 0.40.1
 
 ### Patch Changes

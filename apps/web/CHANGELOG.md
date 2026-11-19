@@ -1,5 +1,15 @@
 # @aiontheballot/web
 
+## 0.24.3
+
+### Patch Changes
+
+- 85ab98e: Quotes show as they read on the public cell page and in the cell editor: a quote pasted from a PDF no longer shows
+  its line breaks or the hyphens that split words at them. Quotes are stored and matched as before.
+- Updated dependencies [85ab98e]
+  - @aiontheballot/domain@0.18.0
+  - @aiontheballot/og@0.9.4
+
 ## 0.24.2
 
 ### Patch Changes
