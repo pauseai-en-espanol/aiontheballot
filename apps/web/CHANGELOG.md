@@ -1,5 +1,14 @@
 # @aiontheballot/web
 
+## 0.24.2
+
+### Patch Changes
+
+- Updated dependencies [31bf143]
+  - @aiontheballot/domain@0.17.1
+  - @aiontheballot/i18n@0.37.2
+  - @aiontheballot/og@0.9.3
+
 ## 0.24.1
 
 ### Patch Changes

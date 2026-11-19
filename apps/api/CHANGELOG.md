@@ -1,5 +1,16 @@
 # @aiontheballot/api
 
+## 0.40.1
+
+### Patch Changes
+
+- 31bf143: A site's country admins can change a published cell of a live election off the record too, as platform admins can:
+  the cell editor offers them the choice, and they publish a change so marked.
+- Updated dependencies [31bf143]
+  - @aiontheballot/db@0.19.1
+  - @aiontheballot/domain@0.17.1
+  - @aiontheballot/i18n@0.37.2
+
 ## 0.40.0
 
 ### Minor Changes

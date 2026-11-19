@@ -1,5 +1,12 @@
 # @aiontheballot/mcp
 
+## 0.3.6
+
+### Patch Changes
+
+- Updated dependencies [31bf143]
+  - @aiontheballot/domain@0.17.1
+
 ## 0.3.5
 
 ### Patch Changes

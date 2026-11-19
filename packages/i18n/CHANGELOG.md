@@ -1,5 +1,12 @@
 # @aiontheballot/i18n
 
+## 0.37.2
+
+### Patch Changes
+
+- 31bf143: A site's country admins can change a published cell of a live election off the record too, as platform admins can:
+  the cell editor offers them the choice, and they publish a change so marked.
+
 ## 0.37.1
 
 ### Patch Changes
