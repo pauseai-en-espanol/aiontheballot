@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { matchQuote, MAX_QUOTE_LENGTH, MIN_QUOTE_LENGTH, type SourceUnit } from './quote-match.js';
+import { normalizeForMatch } from './matching.js';
+import {
+  matchQuote,
+  MAX_QUOTE_LENGTH,
+  MIN_QUOTE_LENGTH,
+  quoteAsShown,
+  type SourceUnit,
+} from './quote-match.js';
 
 /** A fictional programme, a page per unit. */
 const pages = (...bodies: string[]): SourceUnit[] =>
@@ -124,5 +131,38 @@ describe('the live match of a quote', () => {
       longest: null,
     });
     expect(matchQuote('una moratoria ficticia', [])).toEqual({ kind: 'unmatched', longest: null });
+  });
+});
+
+describe('quoteAsShown (PLAN R245)', () => {
+  /** A quote pasted from a fictional programme's PDF, its layout's line breaks and hyphens kept as stored. */
+  const PASTED =
+    'La moratoria ficticia \nse aplicará a los sistemas de prue-\nba.\nSin embargo, el presupuesto inven-\ntado no basta.';
+
+  it('reads as one passage: a word a line break split joined again, every line break a space', () => {
+    expect(quoteAsShown(PASTED)).toBe(
+      'La moratoria ficticia se aplicará a los sistemas de prueba. Sin embargo, el presupuesto inventado no basta.',
+    );
+  });
+
+  it('keeps a hyphen inside a line', () => {
+    expect(quoteAsShown('Un plan socio-económico de ejemplo.')).toBe(
+      'Un plan socio-económico de ejemplo.',
+    );
+  });
+
+  it('drops the blanks at either end and joins blank lines too, as a picked passage', () => {
+    expect(quoteAsShown('  Una frase de ejemplo.\n\nOtra frase inventada.  ')).toBe(
+      'Una frase de ejemplo. Otra frase inventada.',
+    );
+  });
+
+  it('leaves a quote stored as it reads as it is', () => {
+    const picked = 'También pide crear una agencia de supervisión de ejemplo.';
+    expect(quoteAsShown(picked)).toBe(picked);
+  });
+
+  it('shows what the match compares: the same text once normalised, so it still matches its source', () => {
+    expect(normalizeForMatch(quoteAsShown(PASTED))).toBe(normalizeForMatch(PASTED));
   });
 });

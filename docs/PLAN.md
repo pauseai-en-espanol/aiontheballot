@@ -3554,6 +3554,18 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   rules; the mutations of `publish_revision` in four lists now target this migration. Spec: editorial workflow
   C10.6; data model §3; runbook corrections §7; ADR-0002 §6 and its data rules.
 
+- **R245. A quote shows as it reads.** Feedback on the live 29N site: on Podemos · Empleo, lines broke "de manera
+  rara" in the last two quotes and in the second's first sentence, and an editor can only remove a quote, not edit
+  it. The quotes were pasted from the PDF, which R230's picker would have taken as they read, so they kept its line
+  breaks and the hyphens that split words at them ("arti-⏎ficial"), and the cell page showed them as stored, with
+  `white-space: pre-line`. Both the public cell page and the cell editor now show every quote as it reads
+  (`quoteAsShown`: `asItReads`, trimmed), the two steps the match already takes for line breaks and no other, so a
+  pasted quote reads as a picked one; it is stored unchanged, and still the same quote to the match, so existing and
+  published quotes read right with no data change. Editing a quote stays out (removing and adding one again still
+  works). Tests first: the domain's (the steps, a hyphen inside a line kept, the normalised quote unchanged) and e2e
+  (a quote pasted with a line break and a split word matches and shows as it reads). Spec: editorial workflow C2 rule
+  9; public site §5.2; ADR-0002's data rules.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

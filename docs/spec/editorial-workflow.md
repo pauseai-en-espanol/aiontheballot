@@ -472,7 +472,9 @@ _As an editor, I write a rating backed by verbatim quotes, and see at once wheth
    disagree, the database wins and the difference is reported as an error. [DB: `evidence_rules`; API]
 8. The public sees the matched pages' labels, never a page an editor typed. The page field is a hint only. [DB:
    publish trigger]
-9. Quotes are always shown exactly as stored; normalization is for matching only. [UI]
+9. Quotes are stored exactly as written, and shown as they read (PLAN R245): a word a line break split with a hyphen
+   joined again, and every run of blanks, line breaks included, one space, as a picked passage is stored (10). No
+   other normalization step changes what is shown; the rest are for matching only. [UI]
 10. A passage picked from a source's text is stored as it reads (PLAN R230): a word a line break split with a hyphen
     joined again, and every run of blanks, line breaks included, one space. Those are two of the steps normalization
     takes, and the only ones, so it matches exactly what was selected. [UI]

@@ -30,6 +30,14 @@ export const asItReads = (text: string): string =>
     .replace(/(\p{Alphabetic})-[^\P{White_Space}\n]*\n\p{White_Space}*(\p{Alphabetic})/gu, '$1$2')
     .replace(/\p{White_Space}+/gu, ' ');
 
+/**
+ * A quote as the public and the cell editor show it (PLAN R245): as it reads (`asItReads`), without the blanks at
+ * either end. A picked quote is stored that way already; one pasted or typed keeps the layout's line breaks and hyphens
+ * as stored, which showed as lines broken mid-sentence and words cut in two, and now reads like a picked one. It is
+ * still the same quote to the match, which normalises these steps away too, and it is stored unchanged.
+ */
+export const quoteAsShown = (quote: string): string => asItReads(quote).trim();
+
 /** One extracted unit of a source: a PDF's page or a web page's section. */
 export interface SourceUnit {
   index: number;

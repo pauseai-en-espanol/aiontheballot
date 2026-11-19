@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { RATING_SCALES } from '@aiontheballot/domain/methodology';
+import { quoteAsShown } from '@aiontheballot/domain/quote-match';
 import { getTranslator } from '@aiontheballot/i18n/messages';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -435,7 +436,8 @@ const CellPage = async ({ params }: CellParams) => {
                       {draft.quotes.map((quote) => (
                         <li key={quote.id}>
                           <blockquote className={styles.text} lang={sourceLang(quote.source)}>
-                            {quote.quote}
+                            {/* As the public reads it (PLAN R245). */}
+                            {quoteAsShown(quote.quote)}
                           </blockquote>
                           <p className={styles.hint}>
                             {quote.matchStatus === 'matched'

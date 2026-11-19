@@ -488,7 +488,9 @@ document, stays private.
 
 - Every quote must appear in its source document's stored extracted text, after both are passed through
   `private.normalize_for_match()`.
-- That normalization only affects matching; the quote is always displayed exactly as stored. It:
+- That normalization only affects matching; the quote is stored exactly as written. Amended (PLAN R245): it is
+  displayed as it reads, a word a line break split with a hyphen joined again and every run of blanks one space, two
+  of the steps below and no other, so a quote pasted from a PDF doesn't show its layout. The normalization:
   - applies Unicode NFKC, which expands ligatures such as "ﬁ";
   - removes soft hyphens and byte-order marks (U+FEFF);
   - re-joins words hyphenated across line breaks;

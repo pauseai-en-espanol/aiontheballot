@@ -202,7 +202,8 @@ of its own.
 - **Party:** its name, logo, website, programme status, and a list of every criterion with the party's rating, the
   cell's short summary and a link to the cell.
 - **Criterion:** its title and description, and every party's rating on it, with links to the cells.
-- **Cell:** party and criterion; the rating (or pending); the summary; each quote with its source (title, a link to
+- **Cell:** party and criterion; the rating (or pending); the summary; each quote, as it reads (PLAN R245; editorial
+  workflow C2, rule 9), with its source (title, a link to
   the source, page or section, retrieved on, the archived snapshot, the SHA-256 of our stored copy); for "No lo
   menciona", the documents checked and when; the history of published revisions, newest first, each with its date,
   rating, change kind and public note. A revision published off the record (PLAN R243, R244) isn't

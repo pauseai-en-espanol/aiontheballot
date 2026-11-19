@@ -67,13 +67,21 @@ test.describe('cells (editorial workflow §8)', () => {
       );
       await quote.fill('propone una moratoria inventada sobre los sistemas');
       await expect(page.locator('#quote-live')).toContainText(cells.live.unmatched);
-      await quote.fill('propone una moratoria ficticia sobre los sistemas');
+      // Pasted as a PDF lays it out, a word split at a line break: it matches, and shows as it reads, stored as it was
+      // pasted (PLAN R245).
+      await quote.fill('propone una mora-\ntoria ficticia \nsobre los sistemas');
+      await expect(page.locator('#quote-live')).toHaveText(
+        cells.live.matched.replace('{location}', 'p. 1'),
+      );
       await page.getByRole('button', { name: cells.add }).click();
       await expect(page.getByRole('status').filter({ hasText: cells.added })).toBeVisible();
       const added = page.getByRole('listitem').filter({
         hasText: 'propone una moratoria ficticia sobre los sistemas',
       });
       await expect(added).toContainText(cells.matched.replace('{location}', 'p. 1'));
+      await expect(added.locator('blockquote')).toHaveText(
+        'propone una moratoria ficticia sobre los sistemas',
+      );
 
       // Back as it was: other tests read this cell.
       await added.getByRole('button', { name: new RegExp(cells.removeQuote) }).click();

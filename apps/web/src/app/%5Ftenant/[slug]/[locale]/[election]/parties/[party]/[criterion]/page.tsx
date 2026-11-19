@@ -2,6 +2,7 @@ import type { PublicSource } from '@aiontheballot/domain/public-election';
 import type { Locale } from '@aiontheballot/i18n/messages';
 import type { Metadata } from 'next';
 
+import { quoteAsShown } from '@aiontheballot/domain/quote-match';
 import { getTranslator } from '@aiontheballot/i18n/messages';
 import { css, cx } from '@styled-system/css';
 import { notFound } from 'next/navigation';
@@ -230,10 +231,10 @@ const Cell = async (props: CellProps) => {
                     borderColor: 'border.default',
                     paddingInlineStart: '16px',
                     fontSize: '18px',
-                    whiteSpace: 'pre-line',
                   })}
                 >
-                  {item.quote}
+                  {/* As it reads, not with its document's line breaks and split words (PLAN R245). */}
+                  {quoteAsShown(item.quote)}
                 </blockquote>
                 {item.locationLabel && (
                   <p className={css({ fontSize: '15px', marginTop: '6px' })}>

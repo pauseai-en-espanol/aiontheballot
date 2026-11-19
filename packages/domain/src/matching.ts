@@ -1,6 +1,6 @@
 /**
- * Normalisation for the verbatim quote check (ADR-0002, data rules). Used for matching only: quotes are always shown
- * exactly as stored. Must stay identical to private.normalize_for_match() in the database, which runs its regexes under
+ * Normalisation for the verbatim quote check (ADR-0002, data rules). Used for matching only: a quote is stored as
+ * written and shown as it reads (`quoteAsShown`, PLAN R245), two of these steps and no other. Must stay identical to private.normalize_for_match() in the database, which runs its regexes under
  * `pg_c_utf8`: letters are Unicode's Alphabetic and spaces its White_Space on both sides (PLAN R113). packages/db tests
  * both on the same fixtures.
  */
