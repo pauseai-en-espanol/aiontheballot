@@ -1,5 +1,17 @@
 # @aiontheballot/admin
 
+## 0.40.0
+
+### Minor Changes
+
+- 55898ff: A cell's page says what its criterion asks: the criterion's description, read-only, for whoever writes or reviews the
+  cell. The API's cell and the MCP's get_cell carry it too.
+
+### Patch Changes
+
+- Updated dependencies [55898ff]
+  - @aiontheballot/i18n@0.36.0
+
 ## 0.39.0
 
 ### Minor Changes

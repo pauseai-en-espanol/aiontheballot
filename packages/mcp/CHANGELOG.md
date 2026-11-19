@@ -1,5 +1,12 @@
 # @aiontheballot/mcp
 
+## 0.3.3
+
+### Patch Changes
+
+- 55898ff: A cell's page says what its criterion asks: the criterion's description, read-only, for whoever writes or reviews the
+  cell. The API's cell and the MCP's get_cell carry it too.
+
 ## 0.3.2
 
 ### Patch Changes
