@@ -2,6 +2,7 @@ import { messages } from '@aiontheballot/i18n/messages';
 
 import { expectAccessible } from '../axe.js';
 import { get } from '../fetch-by-host.js';
+import { decodePng } from '../png.js';
 import { PLATFORM_HOST, PORTS, PREVIEW_URL, TENANT_URL } from '../servers.js';
 import { expect, test } from '../test.js';
 
@@ -213,6 +214,61 @@ test.describe('the public site, on the preview host (public-site spec)', () => {
     await page.goto(ELECTION);
     await expect(page.getByRole('region', { name: es.election.summary.region })).toBeVisible();
     await context.close();
+  });
+
+  test('shows a party with a logo by its logo alone in the summary on a phone, its name for screen readers (PLAN R242)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(ELECTION);
+    const [a, b] = [0, 1].map((index) => page.getByRole('rowheader').nth(index));
+    // A's logo stands for its name, which screen readers still read in full.
+    await expect(a?.locator('img')).toBeVisible();
+    await expect(a?.locator('abbr')).toBeHidden();
+    await expect(a?.getByRole('link')).toHaveAccessibleName('PEA (Partido Ejemplo A)');
+    // B has no logo: its name stays in sight.
+    await expect(b?.locator('abbr')).toBeVisible();
+    // From a tablet up, every name is in sight again, read once.
+    await page.setViewportSize({ width: 800, height: 900 });
+    await expect(a?.locator('abbr')).toBeVisible();
+    await expect(a?.getByRole('link')).toHaveAccessibleName('PEA (Partido Ejemplo A)');
+  });
+
+  test('shows that the summary scrolls sideways: a shadow at its end while there is more, one along the party column once scrolled (PLAN R242)', async ({
+    page,
+  }) => {
+    // Narrow enough for the seeded election's two criteria not to fit beside the party column.
+    await page.setViewportSize({ width: 200, height: 800 });
+    await page.goto(ELECTION);
+    const region = page.getByRole('region', { name: es.election.summary.region });
+    // Expressions, not functions: this package's types have no DOM.
+    const summary = "document.querySelector('[data-summary]')";
+    /** How much of the party column's shadow is in sight, from 0 to 1. */
+    const columnShadow = () =>
+      page.evaluate(`getComputedStyle(${summary}.querySelector('thead th'), '::after').opacity`);
+    /** The region's last column of pixels, beside the first row's top, where no icon or title is drawn. */
+    const end = async () => {
+      const box = await region.boundingBox();
+      const row = await region.getByRole('row').nth(1).boundingBox();
+      if (!box || !row) {
+        throw new Error('The summary is not on screen');
+      }
+      const shot = decodePng(
+        await page.screenshot({
+          clip: { x: box.x + box.width - 2, y: row.y + 2, width: 2, height: 2 },
+          scale: 'css',
+        }),
+      );
+      return shot.at(1, 0);
+    };
+    expect(await page.evaluate(`${summary}.scrollWidth > ${summary}.clientWidth`)).toBe(true);
+    // At the start: more to the end, so a shadow there; nothing under the party column yet.
+    await expect.poll(end).not.toBe('#ffffff');
+    await expect.poll(columnShadow).toBe('0');
+    // At the end: the shadow along the party column, none past the table's end.
+    await page.evaluate(`${summary}.scrollLeft = ${summary}.scrollWidth`);
+    await expect.poll(columnShadow).toBe('1');
+    await expect.poll(end).toBe('#ffffff');
   });
 
   test('passes axe on a phone too', async ({ page }) => {

@@ -3504,6 +3504,15 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   opens it). The API's tenant overview carries whether the site is open. Tests: e2e (both texts before going live;
   the status, the notice and the platform admin's link after).
 
+- **R242. On a phone, the summary goes by logos and shows that it scrolls.** Feedback on the live 29N site from a
+  phone: the party column took most of the screen ("un poco innavegable"), and nothing said the table scrolls
+  sideways. Below `md`, a party with a logo shows its logo alone in the summary, its name kept for screen readers; a
+  party without one keeps its name (a colour square doesn't tell parties apart), and the note on a pending programme
+  wraps narrower. The region shows a shadow at its end while there is more to see, covered by the table's own end as
+  it scrolls in (backgrounds, so no script and every browser), and one along the fixed party column once criteria go
+  under it, driven by the scroll where the browser supports scroll-driven animations. Tests: e2e (the logo alone and
+  the accessible name on a phone, both names from a tablet up; both shadows, at the start and at the end).
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

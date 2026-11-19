@@ -178,8 +178,11 @@ of its own.
   ring around its icon under the pointer or the keyboard. The legend, with the methodology link, is right under it. On a
   wide screen (`lg`) the summary takes the text column's width, its columns shared out evenly, each title over the
   middle of its icons, and its parties' marks go without their colour line (PLAN R220). On a phone it scrolls sideways
-  inside its own region (with a visible focus and a label), the party column fixed, never the page. A real `<table>`,
-  with `<th scope>` headers and a caption for screen readers. Below, a link to the detailed table.
+  inside its own region (with a visible focus and a label), the party column fixed, never the page: a shadow at the
+  region's end while there is more to see, and one along the party column once criteria go under it (PLAN R242).
+  There a party with a logo shows its logo alone, its name kept for screen readers, so the party column is no wider
+  than its header; one without a logo keeps its name. A real `<table>`, with `<th scope>` headers and a caption for
+  screen readers. Below, a link to the detailed table.
 - **Detailed table** (`/{election}/tabla`), every rating in words (PLAN R225, after a chapter member found the earlier
   parties × criteria table "a bit overwhelming"): a breadcrumb back to the election, the question, the date of the
   latest change and the methodology link, and no legend. Then an index, "Ir a un criterio", listing the criteria by

@@ -20,6 +20,8 @@ export interface SummaryParty {
   full: InLanguage;
   /** Its mark (PartyMark), when the election's parties have them. */
   mark?: ReactNode;
+  /** Whether its mark is its logo, which then stands for its name on a phone (PLAN R242). */
+  logo?: boolean;
   /**
    * A short note under its name, the long one its tooltip: that its programme isn't published yet, which says why its
    * ratings are pending (public-site spec §5).
@@ -52,6 +54,63 @@ const cellSide = css({
 });
 
 /**
+ * On a phone, a party with a logo goes by its logo alone, the party column then as narrow as its header, so more
+ * criteria fit beside it; its name stays for screen readers, and is in sight again from a tablet up (PLAN R242). A
+ * party without one keeps its name: a colour isn't enough to tell parties apart.
+ */
+const logoOnly = (party: SummaryParty) => Boolean(party.mark) && party.logo === true;
+const nameFromTablet = css({ display: { base: 'none', md: 'inline' } });
+const nameForScreenReadersOnPhone = css({ srOnly: true, display: { md: 'none' } });
+
+/**
+ * That the summary scrolls sideways (PLAN R242): a shadow at the region's end while there is more to see, covered by
+ * the table's own end as it scrolls in (a background that stays put under one that scrolls with the table: no script,
+ * every browser), and none when it all fits.
+ */
+const moreToTheEnd = css({
+  backgroundImage:
+    'linear-gradient(to left, {colors.bg.canvas} 40%, transparent), linear-gradient(to left, color-mix(in srgb, {colors.fg.default} 25%, transparent), transparent)',
+  backgroundPosition: 'right center, right center',
+  backgroundSize: '40px 100%, 16px 100%',
+  backgroundRepeat: 'no-repeat',
+  backgroundAttachment: 'local, scroll',
+});
+
+/**
+ * The party column, fixed at the start while the criteria scroll under it, and a shadow along it once they do (PLAN
+ * R242), brought in by the scroll where the browser runs animations on scrolling; elsewhere, the icons cut at its edge
+ * say it.
+ */
+const fixedColumn = css({
+  position: 'sticky',
+  insetInlineStart: '0',
+  zIndex: '1',
+  bg: 'bg.canvas',
+  _after: {
+    content: '""',
+    position: 'absolute',
+    insetBlock: '0',
+    insetInlineStart: '100%',
+    width: '12px',
+    backgroundImage:
+      'linear-gradient(to right, color-mix(in srgb, {colors.fg.default} 25%, transparent), transparent)',
+    pointerEvents: 'none',
+    opacity: '0',
+  },
+  '@supports (animation-timeline: scroll())': {
+    _after: {
+      animationName: 'scrollReveal',
+      // Any length: on a scroll timeline it spans the range below (some browsers ignore a zero or `auto`).
+      animationDuration: '1ms',
+      animationTimingFunction: 'linear',
+      animationFillMode: 'both',
+      animationTimeline: 'scroll(nearest inline)',
+      animationRange: '0 24px',
+    },
+  },
+});
+
+/**
  * An election's summary (PLAN R218; the chapter's first look at the demo asked for "a summary table with icons, no
  * words, and a legend below"): every party's rating on every criterion as its icon alone, in columns narrow enough for
  * a whole election on one screen, the criteria's short titles over them tilted at 45°, rising to the right from the
@@ -60,8 +119,9 @@ const cellSide = css({
  * are its link's name for screen readers and its tooltip, and each cell opens its page. A real table, with its
  * headers' scopes and a caption. On a wide screen it takes the page's width, its columns shared out evenly, so a short
  * election doesn't sit in a corner; on a phone each column keeps its icon's width and the table scrolls sideways
- * inside its own region, the party column fixed. A title is never cut: the header row is as tall as the longest one
- * rises, and the table leaves free at its end as much as any reaches past its last column (`tiltedHeaderRoom`).
+ * inside its own region, the party column fixed, a shadow at either edge where there is more (PLAN R242). A title is
+ * never cut: the header row is as tall as the longest one rises, and the table leaves free at its end as much as any
+ * reaches past its last column (`tiltedHeaderRoom`).
  */
 export const RatingSummary = ({
   caption,
@@ -92,7 +152,7 @@ export const RatingSummary = ({
       tabIndex={0}
       data-summary=""
       style={tilt}
-      className={cx(focusRing, css({ overflowX: 'auto', maxWidth: '100%' }))}
+      className={cx(focusRing, moreToTheEnd, css({ overflowX: 'auto', maxWidth: '100%' }))}
     >
       {/* The table and, past its last column, the room its last titles reach into; in the region, so it scrolls
           with them on a phone, and the table takes the rest of the width on a wide screen. */}
@@ -120,21 +180,20 @@ export const RatingSummary = ({
             <tr>
               <th
                 scope="col"
-                className={css({
-                  position: 'sticky',
-                  insetInlineStart: '0',
-                  zIndex: '1',
-                  bg: 'bg.canvas',
-                  textAlign: 'start',
-                  verticalAlign: 'bottom',
-                  paddingBlock: '10px',
-                  paddingInlineEnd: '12px',
-                  borderBottom: '3px solid',
-                  borderColor: 'border.default',
-                  fontSize: '15px',
-                  // The fixed layout's party column; the criteria share the rest.
-                  width: { lg: '11rem' },
-                })}
+                className={cx(
+                  fixedColumn,
+                  css({
+                    textAlign: 'start',
+                    verticalAlign: 'bottom',
+                    paddingBlock: '10px',
+                    paddingInlineEnd: '12px',
+                    borderBottom: '3px solid',
+                    borderColor: 'border.default',
+                    fontSize: '15px',
+                    // The fixed layout's party column; the criteria share the rest.
+                    width: { lg: '11rem' },
+                  }),
+                )}
               >
                 {partyHeader}
               </th>
@@ -184,17 +243,16 @@ export const RatingSummary = ({
               <tr key={party.id}>
                 <th
                   scope="row"
-                  className={css({
-                    position: 'sticky',
-                    insetInlineStart: '0',
-                    zIndex: '1',
-                    bg: 'bg.canvas',
-                    textAlign: 'start',
-                    paddingInlineEnd: '12px',
-                    borderBottom: '1px solid',
-                    borderColor: 'border.subtle',
-                    whiteSpace: 'nowrap',
-                  })}
+                  className={cx(
+                    fixedColumn,
+                    css({
+                      textAlign: 'start',
+                      paddingInlineEnd: '12px',
+                      borderBottom: '1px solid',
+                      borderColor: 'border.subtle',
+                      whiteSpace: 'nowrap',
+                    }),
+                  )}
                 >
                   <a
                     href={party.href}
@@ -204,10 +262,18 @@ export const RatingSummary = ({
                     )}
                   >
                     {party.mark}
+                    {logoOnly(party) && (
+                      <span lang={party.short.lang} className={nameForScreenReadersOnPhone}>
+                        {party.short.text}
+                      </span>
+                    )}
                     <abbr
                       title={party.full.text}
                       lang={party.short.lang}
-                      className={css({ textDecoration: 'none' })}
+                      className={cx(
+                        css({ textDecoration: 'none' }),
+                        logoOnly(party) && nameFromTablet,
+                      )}
                     >
                       {party.short.text}
                     </abbr>
@@ -228,9 +294,9 @@ export const RatingSummary = ({
                         fontWeight: '400',
                         lineHeight: '1.3',
                         paddingBlockEnd: '4px',
-                        // On two short lines rather than widening the party column.
+                        // On short lines rather than widening the party column, narrow under a logo alone.
                         whiteSpace: 'normal',
-                        maxWidth: '9rem',
+                        maxWidth: { base: '5.5rem', md: '9rem' },
                       })}
                     >
                       {party.note.text}

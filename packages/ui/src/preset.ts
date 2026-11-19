@@ -40,6 +40,10 @@ export const aiontheballotPreset: Preset = definePreset({
       semanticTokens: {
         colors: asTokens(roles),
       },
+      keyframes: {
+        /** Brings in what a region shows once it has scrolled, such as a shadow, driven by the scroll, not by time. */
+        scrollReveal: { from: { opacity: '0' }, to: { opacity: '1' } },
+      },
     },
   },
 });

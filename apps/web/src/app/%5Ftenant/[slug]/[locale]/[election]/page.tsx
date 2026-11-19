@@ -135,6 +135,8 @@ const ElectionSummary = async (props: ElectionPageParams) => {
                 // No colour line under it here: in a table this tight it reads as a second underline (R184's line
                 // stays on the party's page and in the detailed table).
                 mark: marked ? <PartyMark party={party} root={page.site.root} /> : undefined,
+                // Its logo stands for its name on a phone (PLAN R242).
+                logo: Boolean(party.logo),
                 // Why its row is pending, while its programme isn't out (ProgrammeStatus says it in full elsewhere).
                 note:
                   party.programmeStatus === 'pending' && party.programmeCheckedAt
