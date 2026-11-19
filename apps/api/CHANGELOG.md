@@ -1,5 +1,17 @@
 # @aiontheballot/api
 
+## 0.39.0
+
+### Minor Changes
+
+- 090bc31: An election's page says when its site is still coming soon: going live warns that the public won't see it until the
+  site opens, and a live election on a closed site says so, with a link to open it for platform admins.
+
+### Patch Changes
+
+- Updated dependencies [090bc31]
+  - @aiontheballot/i18n@0.37.0
+
 ## 0.38.0
 
 ### Minor Changes

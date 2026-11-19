@@ -1,5 +1,19 @@
 # @aiontheballot/web
 
+## 0.24.0
+
+### Minor Changes
+
+- 4fad3dd: On a phone, the election summary shows each party with a logo by its logo alone, its name kept for screen readers,
+  and shows that it scrolls sideways: a shadow at its end while there is more to see, and one along the party column
+  once scrolled.
+
+### Patch Changes
+
+- Updated dependencies [090bc31]
+  - @aiontheballot/i18n@0.37.0
+  - @aiontheballot/og@0.9.1
+
 ## 0.23.1
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @aiontheballot/mcp
 
+## 0.3.4
+
+### Patch Changes
+
+- 5cf65f0: A programme-reader agent for Claude Code (`.claude/agents/programme-reader.md`): it reads a party's programme in full
+  through the MCP and returns, verbatim, every passage that might bear on each criterion, without rating or writing.
+
 ## 0.3.3
 
 ### Patch Changes

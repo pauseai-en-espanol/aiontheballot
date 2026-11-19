@@ -1,5 +1,12 @@
 # @aiontheballot/og
 
+## 0.9.1
+
+### Patch Changes
+
+- Updated dependencies [4fad3dd]
+  - @aiontheballot/ui@0.5.1
+
 ## 0.9.0
 
 ### Minor Changes
