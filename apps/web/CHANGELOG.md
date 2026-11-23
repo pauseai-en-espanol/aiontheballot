@@ -1,5 +1,13 @@
 # @aiontheballot/web
 
+## 0.24.5
+
+### Patch Changes
+
+- ba4d56f: A tighter header and footer: less padding, a slightly smaller site name and mark, so the page's content comes first.
+- Updated dependencies [bf8b3b1]
+  - @aiontheballot/i18n@0.37.3
+
 ## 0.24.4
 
 ### Patch Changes
