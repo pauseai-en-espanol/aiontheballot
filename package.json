@@ -49,25 +49,25 @@
     "@slango.configs/oxlint": "0.1.16",
     "@slango.configs/prettier": "1.0.38",
     "@slango.configs/scripts": "1.2.9",
-    "dbmate": "2.38.1",
+    "dbmate": "2.38.2",
     "husky": "9.1.7",
     "kysely-codegen": "0.20.0",
-    "lint-staged": "17.6.0",
+    "lint-staged": "17.6.1",
     "markdownlint-cli2": "0.24.1",
-    "oxlint": "1.93.0",
+    "oxlint": "1.94.0",
     "oxlint-tsgolint": "7.0.2007",
     "prettier": "3.10.1",
-    "turbo": "2.11.11"
+    "turbo": "2.11.13"
   },
   "engines": {
     "node": "^26.13.1",
-    "pnpm": "^12.20.0"
+    "pnpm": "^12.21.0"
   },
-  "packageManager": "pnpm@12.20.0",
+  "packageManager": "pnpm@12.21.0",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
-      "version": "12.20.0",
+      "version": "12.21.0",
       "onFail": "download"
     }
   }
