@@ -1317,6 +1317,17 @@
       "noMail": "Invitations need the platform's email, which isn't set up on this deployment.",
       "actions": "Actions"
     },
+    "correctionsLog": {
+      "remove": "Remove from the public log",
+      "removeTitle": "Remove this entry from the public log?",
+      "removeBody": "The public no longer sees that this changed, nor what it said. The change stays recorded here, the audit log keeps who removed the entry, and it can be put back.",
+      "removed": "Entry removed from the public log.",
+      "restore": "Put back in the public log",
+      "restoreTitle": "Put this entry back in the public log?",
+      "restoreBody": "The public sees it again, with its date and its note.",
+      "restored": "Entry back in the public log.",
+      "mark": "Removed from the public log: only the site's members see it, here."
+    },
     "changes": {
       "title": "Change requests",
       "intro": "Once an election is live, its structure changes only through a change request: someone proposes the change with a public note, and a country admin approves it, someone other than the proposer if the site requires a second approver. The change and its note then appear in the public corrections log.",

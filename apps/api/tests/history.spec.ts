@@ -39,7 +39,10 @@ describe('the records (editorial workflow H1, H3; PLAN R150)', () => {
       const entries = await listCorrections(trx, { id: LIVE_A.id, name: NAME });
       expect(entries[0]).toEqual({
         kind: 'structure',
+        id: expect.any(String),
         at: expect.any(String),
+        removed: false,
+        replaced: false,
         action: 'update',
         targetKind: 'party',
         target: expect.objectContaining({ es: expect.any(String) }),

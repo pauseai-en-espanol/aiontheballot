@@ -95,6 +95,7 @@ afterAll(async () => {
   await owner.transaction().execute(async (trx) => {
     await sql`SET LOCAL session_replication_role = replica`.execute(trx);
     for (const table of [
+      'log_removals',
       'structural_changes',
       'change_requests',
       'parties',
@@ -831,5 +832,90 @@ describe('change requests (editorial workflow CR1)', () => {
       ).statusCode,
     ).toBe(201);
     expect((await upload(retired ?? '', USERS.editorA)).statusCode).toBe(404);
+  });
+});
+
+describe('an entry made by mistake in the corrections log (PLAN R248)', () => {
+  const corrections = `/api/t/test-a/e/${ELECTION.slug}/corrections`;
+  const reword = async (text: string) => {
+    const answer = await send('POST', base, USERS.countryAdminA, {
+      action: 'update',
+      targetKind: 'methodology',
+      targetId: METHODOLOGY.id,
+      field: 'body',
+      value: { es: text },
+      publicNote: NOTE,
+      apply: true,
+    });
+    expect(answer.statusCode).toBe(201);
+  };
+  const logOf = async (as: string) => {
+    const body = (await send('GET', corrections, as)).json<{
+      entries: {
+        kind: string;
+        id: string;
+        field: string | null;
+        newValue: { es?: string } | null;
+        removed: boolean;
+        replaced: boolean;
+      }[];
+      canRemove: boolean;
+    }>();
+    return {
+      canRemove: body.canRemove,
+      entries: body.entries.filter((e) => e.kind === 'structure' && e.field === 'body'),
+    };
+  };
+  const removal = (id: string) => `${corrections}/${id}/removal`;
+
+  it('is taken out and put back by a country admin alone, once a later change replaced it', async () => {
+    await reword('Texto pegado por error.');
+    await reword('Metodología corregida.');
+    const { entries } = await logOf(USERS.countryAdminA);
+    expect(entries.slice(0, 2).map((e) => [e.newValue?.es, e.removed, e.replaced])).toEqual([
+      ['Metodología corregida.', false, false],
+      ['Texto pegado por error.', false, true],
+    ]);
+    const [right, wrong] = entries;
+    if (!right || !wrong) {
+      throw new Error('The log lacks the two changes');
+    }
+
+    for (const who of [USERS.editorA, USERS.reviewerA]) {
+      expect((await logOf(who)).canRemove).toBe(false);
+      expect((await send('POST', removal(wrong.id), who)).statusCode).toBe(403);
+    }
+    expect((await logOf(USERS.countryAdminA)).canRemove).toBe(true);
+    // The change in force stays in the log, whoever asks.
+    expect(
+      (await send('POST', removal(right.id), USERS.countryAdminA)).statusCode,
+    ).toBeGreaterThanOrEqual(400);
+
+    expect((await send('POST', removal(wrong.id), USERS.countryAdminA)).statusCode).toBe(204);
+    expect((await send('POST', removal(wrong.id), USERS.countryAdminA)).statusCode).toBe(404);
+    const after = await logOf(USERS.editorA);
+    expect(after.entries.slice(0, 2).map((e) => [e.newValue?.es, e.removed])).toEqual([
+      ['Metodología corregida.', false],
+      ['Texto pegado por error.', true],
+    ]);
+
+    expect((await send('DELETE', removal(wrong.id), USERS.reviewerA)).statusCode).toBe(403);
+    expect((await send('DELETE', removal(wrong.id), USERS.countryAdminA)).statusCode).toBe(204);
+    expect((await send('DELETE', removal(wrong.id), USERS.countryAdminA)).statusCode).toBe(404);
+    expect((await logOf(USERS.countryAdminA)).entries.some((e) => e.removed)).toBe(false);
+  });
+
+  it("is of the election the path names: another's is not found", async () => {
+    const { entries } = await logOf(USERS.countryAdminA);
+    const id = entries[0]?.id ?? '';
+    expect(
+      (
+        await send(
+          'POST',
+          `/api/t/test-a/e/${ELECTIONS_A.live.slug}/corrections/${id}/removal`,
+          USERS.countryAdminA,
+        )
+      ).statusCode,
+    ).toBe(404);
   });
 });

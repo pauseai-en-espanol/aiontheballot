@@ -18,7 +18,12 @@ export type CorrectionEntry =
     }
   | {
       kind: 'structure';
+      id: string;
       at: string;
+      /** Whether it was taken out of the public log (PLAN R248): shown here, marked, and nowhere in public. */
+      removed: boolean;
+      /** Whether a country admin or platform admin may take it out: a later change replaced it. */
+      replaced: boolean;
       action: 'update' | 'add' | 'retire';
       targetKind: string;
       target: Localized | string | null;
@@ -28,18 +33,24 @@ export type CorrectionEntry =
       publicNote: Localized;
     };
 
+export interface Corrections {
+  entries: CorrectionEntry[];
+  /** Whether the member may take an entry out of the public log, or put it back. */
+  canRemove: boolean;
+}
+
 export const getCorrections = cache(
-  async (tenant: string, election: string): Promise<CorrectionEntry[] | undefined> => {
+  async (tenant: string, election: string): Promise<Corrections | undefined> => {
     const body = await readApi(
       `${tenantPath(tenant)}/e/${encodeURIComponent(election)}/corrections`,
     );
     if (body === undefined) {
       return undefined;
     }
-    const entries = (body as { entries?: unknown }).entries;
+    const { entries, canRemove } = body as { entries?: unknown; canRemove?: unknown };
     if (!Array.isArray(entries)) {
       throw new Error('The API answered something other than a corrections log');
     }
-    return entries as CorrectionEntry[];
+    return { entries: entries as CorrectionEntry[], canRemove: canRemove === true };
   },
 );

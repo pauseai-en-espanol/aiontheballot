@@ -10,7 +10,8 @@ import { sql, type Transaction } from 'kysely';
  * An election's corrections log as the public will see it (editorial workflow H1.4; PLAN R150), read in the member's
  * `withActor` transaction: every published revision after the first its public sees, numbered as its public sees them
  * (what was published while the election was in preview is no correction, `publicHistory`, PLAN R181), and every
- * approved structural change, newest first. The public site builds the same log from its own data.
+ * approved structural change, newest first. The public site builds the same log from its own data. A structural change
+ * taken out of the log (PLAN R248) is listed too, marked, so it can be put back; the public reads nothing of it.
  */
 export type CorrectionEntry =
   | {
@@ -25,7 +26,13 @@ export type CorrectionEntry =
     }
   | {
       kind: 'structure';
+      /** Its public record's id, which a removal from the log names (PLAN R248). */
+      id: string;
       at: string;
+      /** Whether it was taken out of the log: members still see it here, marked; the public doesn't. */
+      removed: boolean;
+      /** Whether it may be: an update whose every field a later one changed again. */
+      replaced: boolean;
       action: 'update' | 'add' | 'retire';
       targetKind: string;
       target: Localized | string | null;
@@ -34,6 +41,88 @@ export type CorrectionEntry =
       newValue: unknown;
       publicNote: Localized;
     };
+
+/** The fields an update changed: its one field, or each of a set's (PLAN R183). */
+export const changedFields = (field: string | null, newValue: unknown): string[] =>
+  field !== null
+    ? [field]
+    : typeof newValue === 'object' && newValue !== null && !Array.isArray(newValue)
+      ? Object.keys(newValue)
+      : [];
+
+/**
+ * Which of an election's structural changes, newest first, may be taken out of its log (PLAN R248): the updates whose
+ * every field was changed again by a later update of the same target, so the log always holds the change in force. It
+ * only says what the page offers: the database decides (`private.log_removal_rules`).
+ */
+export const replacedChanges = (
+  changes: readonly {
+    id: string;
+    action: 'update' | 'add' | 'retire';
+    target: string;
+    fields: readonly string[];
+  }[],
+): Set<string> => {
+  const later = new Map<string, Set<string>>();
+  const replaced = new Set<string>();
+  for (const change of changes) {
+    if (change.action !== 'update') {
+      continue;
+    }
+    const fields = later.get(change.target) ?? new Set<string>();
+    if (change.fields.every((field) => fields.has(field))) {
+      replaced.add(change.id);
+    }
+    later.set(change.target, new Set([...fields, ...change.fields]));
+  }
+  return replaced;
+};
+
+/**
+ * Takes an election's structural change out of its public log (PLAN R248), or puts it back. The database refuses anyone
+ * but the site's country admins and platform admins, a change still in force, and anything inside a freeze window.
+ * False if the election has no such change in the log (to take out) or out of it (to put back).
+ */
+export const setInLog = async (
+  trx: Transaction<DB>,
+  tenantId: string,
+  electionId: string,
+  changeId: string,
+  inLog: boolean,
+): Promise<boolean> => {
+  if (inLog) {
+    const deleted = await trx
+      .deleteFrom('app.log_removals')
+      .where('tenant_id', '=', tenantId)
+      .where('election_id', '=', electionId)
+      .where('structural_change_id', '=', changeId)
+      .executeTakeFirst();
+    return deleted.numDeletedRows > 0n;
+  }
+  const change = await trx
+    .selectFrom('app.structural_changes as s')
+    .select('s.id')
+    .where('s.tenant_id', '=', tenantId)
+    .where('s.election_id', '=', electionId)
+    .where('s.id', '=', changeId)
+    .where((eb) =>
+      eb.not(
+        eb.exists(
+          eb
+            .selectFrom('app.log_removals as x')
+            .select('x.id')
+            .whereRef('x.structural_change_id', '=', 's.id'),
+        ),
+      ),
+    )
+    .executeTakeFirst();
+  if (!change) {
+    return false;
+  }
+  await sql`INSERT INTO app.log_removals (tenant_id, structural_change_id)
+            VALUES (${tenantId}, ${changeId})`.execute(trx);
+  return true;
+};
 
 const instant = (column: string) => sql<string>`to_json(${sql.ref(column)})#>>'{}'`;
 
@@ -75,10 +164,16 @@ export const listCorrections = async (
       .leftJoin('app.parties as p', 'p.id', 's.target_id')
       .leftJoin('app.criteria as c', 'c.id', 's.target_id')
       .leftJoin('app.methodology_reviewers as m', 'm.id', 's.target_id')
+      .leftJoin('app.log_removals as x', (join) =>
+        join.onRef('x.structural_change_id', '=', 's.id').onRef('x.tenant_id', '=', 's.tenant_id'),
+      )
       .select([
+        's.id',
         instant('s.approved_at').as('at'),
+        'x.id as removal_id',
         's.action',
         's.target_kind',
+        's.target_id',
         's.field',
         's.previous_value',
         's.new_value',
@@ -88,6 +183,8 @@ export const listCorrections = async (
         'm.name as reviewer_name',
       ])
       .where('s.election_id', '=', election.id)
+      .orderBy('s.approved_at', 'desc')
+      .orderBy('s.id', 'desc')
       .execute(),
     trx
       .selectFrom('app.elections')
@@ -143,11 +240,22 @@ export const listCorrections = async (
           ],
     );
   });
+  const replaced = replacedChanges(
+    changes.map((s) => ({
+      id: s.id,
+      action: s.action,
+      target: `${s.target_kind} ${s.target_id}`,
+      fields: changedFields(s.field, s.new_value),
+    })),
+  );
   const entries: CorrectionEntry[] = [
     ...corrected,
     ...changes.map((s): CorrectionEntry => ({
       kind: 'structure',
+      id: s.id,
       at: s.at,
+      removed: s.removal_id !== null,
+      replaced: replaced.has(s.id),
       action: s.action,
       targetKind: s.target_kind,
       target:

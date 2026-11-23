@@ -85,6 +85,22 @@ corrected on the record (section 3).
 It can't withdraw a rating, nor follow a withdrawal: those are always on the record. The next change of the cell is
 on the record again unless marked anew.
 
+## 8. Take a mistaken entry out of the public log (a country admin or a platform admin)
+
+For a change to the structure that was wrong and has already been put right (text pasted into the wrong field, say): the
+log would show the slip for good (PLAN R248).
+
+1. Put the mistake right first, with another change to the same field (section 4). Until then the entry can't be
+   removed: the log always keeps the change in force.
+2. In the election's **Corrections log** in the admin, choose **Remove from the public log** on the mistaken entry and
+   confirm. Only country admins and platform admins see the button, and only on an entry a later one replaced.
+3. Within seconds the public log no longer lists it. It stays in the admin's log, marked, and **Put back in the public
+   log** undoes it. The audit log keeps who removed it.
+
+It removes only the entry: the change request and its record keep what was written, for the site's members. Nothing can
+be removed or put back inside a freeze window. A rating's correction is never removed this way (section 7 is for
+changes to come).
+
 ## Special cases
 
 - **Inside a freeze window** nothing public changes, corrections included: drafts and reviews go on and publish once

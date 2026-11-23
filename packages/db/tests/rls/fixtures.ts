@@ -395,6 +395,27 @@ export const loadFixtures = async (client: pg.Client): Promise<void> => {
     await client.query(`UPDATE app.change_requests SET state = 'approved' WHERE id = $1`, [
       rows[0]!.id,
     ]);
+    // Two slips in the same criterion's title and the change that put it right, and the first slip's entry taken out of
+    // the corrections log (PLAN R248).
+    for (const title of ['Error de ejemplo 1', 'Error de ejemplo 2', 'Criterio de ejemplo 1']) {
+      await client.query(`SELECT set_config('app.user_id', $1, true)`, [cells.author]);
+      const proposed = await client.query<{ id: string }>(
+        `INSERT INTO app.change_requests (tenant_id, election_id, action, target_kind, target_id, field,
+                                          proposed_value, public_note)
+         VALUES ($1, $2, 'update', 'criterion', $3, 'title', $4, '{"es": "Nota de ejemplo"}') RETURNING id`,
+        [tenant, e.id, e.criterion, JSON.stringify({ es: title })],
+      );
+      await client.query(`SELECT set_config('app.user_id', $1, true)`, [cells.approver]);
+      await client.query(`UPDATE app.change_requests SET state = 'approved' WHERE id = $1`, [
+        proposed.rows[0]!.id,
+      ]);
+    }
+    await client.query(
+      `INSERT INTO app.log_removals (tenant_id, structural_change_id)
+       SELECT tenant_id, id FROM app.structural_changes
+        WHERE tenant_id = $1 AND field = 'title' AND new_value = '{"es": "Error de ejemplo 1"}'`,
+      [tenant],
+    );
   }
   // Right-of-reply reports, one per tenant about its cell in review, sent as the public through app.submit_report (the
   // inactive tenant takes one only while active).

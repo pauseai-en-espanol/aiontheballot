@@ -3590,6 +3590,24 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   px. The header is 22 px shorter, so on a phone the methodology link now fits on the first screen. Tests: the site's
   unit and e2e tests unchanged.
 
+- **R248. A mistaken entry is taken out of the public corrections log.** Rewording 29N's Empleo criterion, Dani pasted a
+  whole chat into the description, put it right minutes later with another change, and the log kept both entries for
+  good. "i would like to remove the bugged one"; offered leaving it, merging identical entries on the page, or a real
+  hide: "i want to do option 3, i want to be able to delete this kind of errors (only admins)". A country admin of the
+  site or a platform admin may now take a structural change out of the public log, with a recent second factor and
+  never through a member's token, and put it back. Taken out rather than deleted: `structural_changes` stays immutable,
+  as do the change request and its values, which members read; the public and the preview read none of it (their
+  policies on `structural_changes` leave it out, so its values no longer reach the public site's server), the audit
+  log keeps who and when, and the admin's corrections log shows it marked. Two limits, the database's: only an update
+  whose every field later updates of the same target changed again, so the log always holds the change in force and a
+  removal hides nothing the public still reads; and nothing inside a freeze window, removing
+  or putting back. Ratings' corrections are not removed this way. This narrows BRIEF §4's log a second time (R243), by
+  the operator's decision. Migration log_removals: the table, `private.log_removal_rules`, the two read policies of
+  `structural_changes`, `corrections_log`, and both purges (bodies only); the site's export lists the table. Tests
+  first: the database's (`log-removals.spec.ts`, the matrix and its fixtures), the API's and an e2e. Mutation list
+  log-removals. Spec: data model §3.7; editorial workflow CR1.9, H1.4; public site §5.6; runbook corrections §8;
+  ADR-0002 §6, §12, §14.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,

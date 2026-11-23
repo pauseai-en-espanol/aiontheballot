@@ -382,6 +382,14 @@ export interface AppLlmSuggestions {
   tenant_id: string;
 }
 
+export interface AppLogRemovals {
+  created_at: Generated<Timestamp>;
+  election_id: string;
+  id: Generated<string>;
+  structural_change_id: string;
+  tenant_id: string;
+}
+
 export interface AppMemberships {
   created_at: Generated<Timestamp>;
   created_by: string;
@@ -723,6 +731,7 @@ export interface DB {
   'app.job_requests': AppJobRequests;
   'app.llm_runs': AppLlmRuns;
   'app.llm_suggestions': AppLlmSuggestions;
+  'app.log_removals': AppLogRemovals;
   'app.memberships': AppMemberships;
   'app.methodologies': AppMethodologies;
   'app.methodology_reviewers': AppMethodologyReviewers;

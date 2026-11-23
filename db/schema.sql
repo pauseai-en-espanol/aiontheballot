@@ -2132,6 +2132,74 @@ CREATE FUNCTION private.llm_suggestion_rules() RETURNS trigger
 ALTER FUNCTION private.llm_suggestion_rules() OWNER TO aiontheballot_owner;
 
 --
+-- Name: log_removal_rules(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
+--
+
+CREATE FUNCTION private.log_removal_rules() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+  DECLARE
+    subject app.log_removals := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    change app.structural_changes;
+    election record;
+    changed text[];
+    replaced text[];
+  BEGIN
+    -- A purge deletes as the owner, whatever the window (the admin role may not call private.purging, so it is asked
+    -- in a statement of its own, reached only as the owner).
+    IF TG_OP = 'DELETE' THEN
+      IF (SELECT c.relowner FROM pg_catalog.pg_class c WHERE c.oid = TG_RELID)
+         = (SELECT r.oid FROM pg_catalog.pg_roles r WHERE r.rolname = current_user) THEN
+        IF private.purging(TG_RELID) THEN
+          RETURN OLD;
+        END IF;
+      END IF;
+    END IF;
+    SELECT * INTO change FROM app.structural_changes s
+     WHERE s.id = subject.structural_change_id AND s.tenant_id = subject.tenant_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'no structural change % of tenant % that the writer may see', subject.structural_change_id,
+        subject.tenant_id USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    SELECT e.frozen_from, e.frozen_until INTO election FROM app.elections e WHERE e.id = change.election_id;
+    IF election.frozen_from <= now() AND (election.frozen_until IS NULL OR now() < election.frozen_until) THEN
+      RAISE EXCEPTION 'election % is frozen: nothing public changes until the window ends', change.election_id
+        USING ERRCODE = 'restrict_violation';
+    END IF;
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+
+    IF change.action <> 'update' THEN
+      RAISE EXCEPTION 'only an update is taken out of the corrections log, not % %', change.action, change.id
+        USING ERRCODE = 'check_violation';
+    END IF;
+    -- Every field changed again by a later update of the same target.
+    changed := CASE WHEN change.field IS NOT NULL THEN ARRAY[change.field]
+                    ELSE ARRAY(SELECT jsonb_object_keys(change.new_value)) END;
+    SELECT coalesce(array_agg(DISTINCT f), '{}') INTO replaced
+      FROM app.structural_changes s
+     CROSS JOIN LATERAL unnest(CASE WHEN s.field IS NOT NULL THEN ARRAY[s.field]
+                                    WHEN jsonb_typeof(s.new_value) = 'object'
+                                      THEN ARRAY(SELECT jsonb_object_keys(s.new_value)) END) f
+     WHERE s.election_id = change.election_id AND s.target_kind = change.target_kind
+       AND s.target_id = change.target_id AND s.action = 'update'
+       AND (s.approved_at, s.id) > (change.approved_at, change.id);
+    -- A set's fields, or its one field (PLAN R183).
+    IF NOT changed <@ replaced THEN
+      RAISE EXCEPTION 'structural change % is in force: the corrections log keeps it until a later one replaces it',
+        change.id USING ERRCODE = 'check_violation';
+    END IF;
+    NEW.election_id := change.election_id;
+    RETURN NEW;
+  END
+  $$;
+
+
+ALTER FUNCTION private.log_removal_rules() OWNER TO aiontheballot_owner;
+
+--
 -- Name: member_token_changes(); Type: FUNCTION; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -2609,6 +2677,7 @@ CREATE FUNCTION private.purge_election(tenant uuid, election uuid, confirmation 
        OR r.report_id IN (SELECT x.id FROM app.reports x WHERE x.tenant_id = $1 AND x.election_id = $2)',
       'revision_evidence', 'r.election_id = $2',
       'revision_checked_documents', 'r.election_id = $2',
+      'log_removals', 'r.election_id = $2',
       'structural_changes', 'r.election_id = $2',
       'change_requests', 'r.election_id = $2',
       'assessment_revisions', 'r.election_id = $2',
@@ -2794,7 +2863,8 @@ CREATE FUNCTION private.purge_tenant(tenant uuid) RETURNS bigint
   DECLARE
     -- Children before parents. Cells take their drafts and contributors with them.
     tables text[] := ARRAY[
-      'revision_internal', 'revision_evidence', 'revision_checked_documents', 'structural_changes', 'change_requests',
+      'revision_internal', 'revision_evidence', 'revision_checked_documents', 'log_removals', 'structural_changes',
+      'change_requests',
       'assessment_revisions', 'review_events', 'reports', 'report_daily_counts', 'signups', 'signup_daily_counts',
       'share_counts', 'assessment_contributors',
       'draft_checked_documents', 'draft_evidence', 'assessments', 'job_requests', 'llm_suggestions', 'llm_runs',
@@ -3894,6 +3964,21 @@ CREATE TABLE app.core_criteria (
 ALTER TABLE app.core_criteria OWNER TO aiontheballot_owner;
 
 --
+-- Name: log_removals; Type: TABLE; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TABLE app.log_removals (
+    id uuid DEFAULT uuidv7() NOT NULL,
+    tenant_id uuid NOT NULL,
+    election_id uuid NOT NULL,
+    structural_change_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE app.log_removals OWNER TO aiontheballot_owner;
+
+--
 -- Name: structural_changes; Type: TABLE; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -3966,6 +4051,9 @@ UNION ALL
     s.new_value,
     s.public_note
    FROM app.structural_changes s
+  WHERE (NOT (EXISTS ( SELECT 1
+           FROM app.log_removals x
+          WHERE ((x.tenant_id = s.tenant_id) AND (x.structural_change_id = s.id)))))
   ORDER BY 5 DESC;
 
 
@@ -5420,6 +5508,30 @@ ALTER TABLE ONLY app.llm_suggestions
 
 
 --
+-- Name: log_removals log_removals_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.log_removals
+    ADD CONSTRAINT log_removals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: log_removals log_removals_tenant_id_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.log_removals
+    ADD CONSTRAINT log_removals_tenant_id_id_key UNIQUE (tenant_id, id);
+
+
+--
+-- Name: log_removals log_removals_tenant_id_structural_change_id_key; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.log_removals
+    ADD CONSTRAINT log_removals_tenant_id_structural_change_id_key UNIQUE (tenant_id, structural_change_id);
+
+
+--
 -- Name: memberships memberships_pkey; Type: CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -6039,6 +6151,13 @@ CREATE INDEX llm_suggestions_run_id_idx ON app.llm_suggestions USING btree (run_
 
 
 --
+-- Name: log_removals_election_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE INDEX log_removals_election_idx ON app.log_removals USING btree (election_id);
+
+
+--
 -- Name: memberships_tenant_id_idx; Type: INDEX; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -6417,6 +6536,13 @@ CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.llm_suggestions FOR
 
 
 --
+-- Name: log_removals audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER audit AFTER INSERT OR DELETE OR UPDATE ON app.log_removals FOR EACH ROW EXECUTE FUNCTION private.audit();
+
+
+--
 -- Name: memberships audit; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -6603,6 +6729,13 @@ CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.elect
 --
 
 CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.files FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
+
+
+--
+-- Name: log_removals bump_public_version; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER bump_public_version AFTER INSERT OR DELETE OR UPDATE ON app.log_removals FOR EACH ROW EXECUTE FUNCTION private.bump_public_version();
 
 
 --
@@ -6960,6 +7093,13 @@ CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.llm_runs FOR EACH ROW E
 --
 
 CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.llm_suggestions FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
+
+
+--
+-- Name: log_removals forbid_tenant_change; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER forbid_tenant_change BEFORE UPDATE ON app.log_removals FOR EACH ROW EXECUTE FUNCTION private.forbid_tenant_change();
 
 
 --
@@ -7369,6 +7509,13 @@ CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.llm_sugge
 
 
 --
+-- Name: log_removals needs_a_person; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER needs_a_person BEFORE INSERT OR DELETE OR UPDATE ON app.log_removals FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change log_removals');
+
+
+--
 -- Name: memberships needs_a_person; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -7768,6 +7915,13 @@ CREATE TRIGGER rules BEFORE INSERT OR UPDATE ON app.llm_suggestions FOR EACH ROW
 
 
 --
+-- Name: log_removals rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER rules BEFORE INSERT OR DELETE ON app.log_removals FOR EACH ROW EXECUTE FUNCTION private.log_removal_rules();
+
+
+--
 -- Name: methodologies rules; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -7961,6 +8115,13 @@ CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.job_requests FOR EACH ROW EX
 --
 
 CREATE TRIGGER stamp BEFORE INSERT OR UPDATE ON app.llm_runs FOR EACH ROW EXECUTE FUNCTION private.stamp('requested_by', 'created_at');
+
+
+--
+-- Name: log_removals stamp; Type: TRIGGER; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE TRIGGER stamp BEFORE INSERT ON app.log_removals FOR EACH ROW EXECUTE FUNCTION private.stamp('created_at');
 
 
 --
@@ -8379,6 +8540,30 @@ ALTER TABLE ONLY app.llm_suggestions
 
 
 --
+-- Name: log_removals log_removals_tenant_id_election_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.log_removals
+    ADD CONSTRAINT log_removals_tenant_id_election_id_fkey FOREIGN KEY (tenant_id, election_id) REFERENCES app.elections(tenant_id, id);
+
+
+--
+-- Name: log_removals log_removals_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.log_removals
+    ADD CONSTRAINT log_removals_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES app.tenants(id);
+
+
+--
+-- Name: log_removals log_removals_tenant_id_structural_change_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE ONLY app.log_removals
+    ADD CONSTRAINT log_removals_tenant_id_structural_change_id_fkey FOREIGN KEY (tenant_id, structural_change_id) REFERENCES app.structural_changes(tenant_id, id);
+
+
+--
 -- Name: memberships memberships_tenant_id_fkey; Type: FK CONSTRAINT; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -8712,6 +8897,20 @@ ALTER TABLE ONLY auth.sessions
 
 ALTER TABLE ONLY auth.two_factors
     ADD CONSTRAINT two_factors_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: log_removals admin_delete; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY admin_delete ON app.log_removals FOR DELETE TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: log_removals admin_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY admin_insert ON app.log_removals FOR INSERT TO aiontheballot_admin WITH CHECK (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -9160,6 +9359,12 @@ ALTER TABLE app.llm_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.llm_suggestions ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: log_removals; Type: ROW SECURITY; Schema: app; Owner: aiontheballot_owner
+--
+
+ALTER TABLE app.log_removals ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: review_events member_insert; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -9273,6 +9478,13 @@ CREATE POLICY member_read ON app.llm_runs FOR SELECT TO aiontheballot_admin USIN
 --
 
 CREATE POLICY member_read ON app.llm_suggestions FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
+
+
+--
+-- Name: log_removals member_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY member_read ON app.log_removals FOR SELECT TO aiontheballot_admin USING (((tenant_id IN ( SELECT private.my_tenants(VARIADIC ARRAY['country_admin'::app.tenant_role, 'editor'::app.tenant_role, 'reviewer'::app.tenant_role]) AS my_tenants)) OR ( SELECT private.is_platform_admin() AS is_platform_admin)));
 
 
 --
@@ -9704,6 +9916,15 @@ CREATE POLICY preview_read ON app.files FOR SELECT TO aiontheballot_preview USIN
 
 
 --
+-- Name: log_removals preview_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY preview_read ON app.log_removals FOR SELECT TO aiontheballot_preview USING ((EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = log_removals.election_id) AND (e.status = ANY (ARRAY['preview'::app.election_status, 'live'::app.election_status, 'archived'::app.election_status]))))));
+
+
+--
 -- Name: methodologies preview_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -9783,9 +10004,11 @@ CREATE POLICY preview_read ON app.source_documents FOR SELECT TO aiontheballot_p
 -- Name: structural_changes preview_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE POLICY preview_read ON app.structural_changes FOR SELECT TO aiontheballot_preview USING ((EXISTS ( SELECT 1
+CREATE POLICY preview_read ON app.structural_changes FOR SELECT TO aiontheballot_preview USING (((EXISTS ( SELECT 1
    FROM app.elections e
-  WHERE ((e.id = structural_changes.election_id) AND (e.status = ANY (ARRAY['preview'::app.election_status, 'live'::app.election_status, 'archived'::app.election_status]))))));
+  WHERE ((e.id = structural_changes.election_id) AND (e.status = ANY (ARRAY['preview'::app.election_status, 'live'::app.election_status, 'archived'::app.election_status]))))) AND (NOT (EXISTS ( SELECT 1
+   FROM app.log_removals x
+  WHERE ((x.tenant_id = structural_changes.tenant_id) AND (x.structural_change_id = structural_changes.id)))))));
 
 
 --
@@ -9901,6 +10124,15 @@ CREATE POLICY public_read ON app.files FOR SELECT TO aiontheballot_web USING (((
 
 
 --
+-- Name: log_removals public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
+--
+
+CREATE POLICY public_read ON app.log_removals FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+   FROM app.elections e
+  WHERE ((e.id = log_removals.election_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))));
+
+
+--
 -- Name: methodologies public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
@@ -9980,9 +10212,11 @@ CREATE POLICY public_read ON app.source_documents FOR SELECT TO aiontheballot_we
 -- Name: structural_changes public_read; Type: POLICY; Schema: app; Owner: aiontheballot_owner
 --
 
-CREATE POLICY public_read ON app.structural_changes FOR SELECT TO aiontheballot_web USING ((EXISTS ( SELECT 1
+CREATE POLICY public_read ON app.structural_changes FOR SELECT TO aiontheballot_web USING (((EXISTS ( SELECT 1
    FROM app.elections e
-  WHERE ((e.id = structural_changes.election_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))));
+  WHERE ((e.id = structural_changes.election_id) AND (e.status = ANY (ARRAY['live'::app.election_status, 'archived'::app.election_status]))))) AND (NOT (EXISTS ( SELECT 1
+   FROM app.log_removals x
+  WHERE ((x.tenant_id = structural_changes.tenant_id) AND (x.structural_change_id = structural_changes.id)))))));
 
 
 --
@@ -10769,6 +11003,13 @@ REVOKE ALL ON FUNCTION private.llm_suggestion_rules() FROM PUBLIC;
 
 
 --
+-- Name: FUNCTION log_removal_rules(); Type: ACL; Schema: private; Owner: aiontheballot_owner
+--
+
+REVOKE ALL ON FUNCTION private.log_removal_rules() FROM PUBLIC;
+
+
+--
 -- Name: FUNCTION member_token_changes(); Type: ACL; Schema: private; Owner: aiontheballot_owner
 --
 
@@ -11372,6 +11613,29 @@ GRANT INSERT(title),UPDATE(title) ON TABLE app.core_criteria TO aiontheballot_ad
 --
 
 GRANT INSERT(description),UPDATE(description) ON TABLE app.core_criteria TO aiontheballot_admin;
+
+
+--
+-- Name: TABLE log_removals; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT SELECT ON TABLE app.log_removals TO aiontheballot_web;
+GRANT SELECT,DELETE ON TABLE app.log_removals TO aiontheballot_admin;
+GRANT SELECT ON TABLE app.log_removals TO aiontheballot_preview;
+
+
+--
+-- Name: COLUMN log_removals.tenant_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(tenant_id) ON TABLE app.log_removals TO aiontheballot_admin;
+
+
+--
+-- Name: COLUMN log_removals.structural_change_id; Type: ACL; Schema: app; Owner: aiontheballot_owner
+--
+
+GRANT INSERT(structural_change_id) ON TABLE app.log_removals TO aiontheballot_admin;
 
 
 --

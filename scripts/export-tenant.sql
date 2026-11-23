@@ -87,83 +87,86 @@ lines AS (
   SELECT 17, json_build_object('table', 'app.llm_suggestions', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.llm_suggestions x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 18, json_build_object('table', 'app.memberships', 'rows',
+  SELECT 18, json_build_object('table', 'app.log_removals', 'rows',
+    (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.log_removals x WHERE x.tenant_id = (SELECT id FROM site)))::text
+  UNION ALL
+  SELECT 19, json_build_object('table', 'app.memberships', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.memberships x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 19, json_build_object('table', 'app.methodologies', 'rows',
+  SELECT 20, json_build_object('table', 'app.methodologies', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.methodologies x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 20, json_build_object('table', 'app.methodology_reviewers', 'rows',
+  SELECT 21, json_build_object('table', 'app.methodology_reviewers', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.methodology_reviewers x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 21, json_build_object('table', 'app.parties', 'rows',
+  SELECT 22, json_build_object('table', 'app.parties', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.parties x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 22, json_build_object('table', 'app.public_versions', 'rows',
+  SELECT 23, json_build_object('table', 'app.public_versions', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.public_versions x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 23, json_build_object('table', 'app.report_daily_counts', 'rows',
+  SELECT 24, json_build_object('table', 'app.report_daily_counts', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.report_daily_counts x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 24, json_build_object('table', 'app.reports', 'rows',
+  SELECT 25, json_build_object('table', 'app.reports', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.reports x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 25, json_build_object('table', 'app.review_events', 'rows',
+  SELECT 26, json_build_object('table', 'app.review_events', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.review_events x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 26, json_build_object('table', 'app.revision_checked_documents', 'rows',
+  SELECT 27, json_build_object('table', 'app.revision_checked_documents', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.revision_checked_documents x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 27, json_build_object('table', 'app.revision_evidence', 'rows',
+  SELECT 28, json_build_object('table', 'app.revision_evidence', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.revision_evidence x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 28, json_build_object('table', 'app.revision_internal', 'rows',
+  SELECT 29, json_build_object('table', 'app.revision_internal', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.revision_internal x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
   SELECT 28.5, json_build_object('table', 'app.share_counts', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.share_counts x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 29, json_build_object('table', 'app.signup_daily_counts', 'rows',
+  SELECT 30, json_build_object('table', 'app.signup_daily_counts', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.signup_daily_counts x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 30, json_build_object('table', 'app.signups', 'rows',
+  SELECT 31, json_build_object('table', 'app.signups', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.signups x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 31, json_build_object('table', 'app.source_documents', 'rows',
+  SELECT 32, json_build_object('table', 'app.source_documents', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.source_documents x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 32, json_build_object('table', 'app.source_texts', 'rows',
+  SELECT 33, json_build_object('table', 'app.source_texts', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.source_texts x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 33, json_build_object('table', 'app.structural_changes', 'rows',
+  SELECT 34, json_build_object('table', 'app.structural_changes', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.structural_changes x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 34, json_build_object('table', 'app.tenant_brand_selections', 'rows',
+  SELECT 35, json_build_object('table', 'app.tenant_brand_selections', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.tenant_brand_selections x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 35, json_build_object('table', 'app.tenant_documents', 'rows',
+  SELECT 36, json_build_object('table', 'app.tenant_documents', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.tenant_documents x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 36, json_build_object('table', 'app.tenant_hostnames', 'rows',
+  SELECT 37, json_build_object('table', 'app.tenant_hostnames', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.tenant_hostnames x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 37, json_build_object('table', 'app.tenant_organizations', 'rows',
+  SELECT 38, json_build_object('table', 'app.tenant_organizations', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) - '{token_hash}'::text[] ORDER BY to_jsonb(x)::text), '[]') FROM app.tenant_organizations x WHERE x.tenant_id = (SELECT id FROM site)))::text
   UNION ALL
-  SELECT 38, json_build_object('table', 'app.organizations', 'rows',
+  SELECT 39, json_build_object('table', 'app.organizations', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) ORDER BY x.id), '[]') FROM app.organizations x
       WHERE x.id IN (SELECT o.organization_id FROM app.tenant_organizations o WHERE o.tenant_id = (SELECT id FROM site))))::text
   UNION ALL
-  SELECT 39, json_build_object('table', 'app.brand_assets', 'rows',
+  SELECT 40, json_build_object('table', 'app.brand_assets', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) ORDER BY x.id), '[]') FROM app.brand_assets x
       WHERE x.id IN (SELECT s.brand_asset_id FROM app.tenant_brand_selections s WHERE s.tenant_id = (SELECT id FROM site))
          OR x.id IN (SELECT g.brand_asset_id FROM app.brand_asset_grants g WHERE g.tenant_id = (SELECT id FROM site))))::text
   UNION ALL
-  SELECT 40, json_build_object('table', 'app.core_criteria', 'rows',
+  SELECT 41, json_build_object('table', 'app.core_criteria', 'rows',
     (SELECT coalesce(json_agg(to_jsonb(x) ORDER BY x.id), '[]') FROM app.core_criteria x
       WHERE x.id IN (SELECT c.core_criterion_id FROM app.criteria c WHERE c.tenant_id = (SELECT id FROM site))))::text
   UNION ALL
-  SELECT 41, json_build_object('table', 'auth.users', 'rows',
+  SELECT 42, json_build_object('table', 'auth.users', 'rows',
     (SELECT coalesce(json_agg(json_build_object('id', u.id, 'name', u.name, 'email', u.email) ORDER BY u.id), '[]')
        FROM auth.users u
       WHERE u.id IN (SELECT m.user_id FROM app.memberships m WHERE m.tenant_id = (SELECT id FROM site))))::text

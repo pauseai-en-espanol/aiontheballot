@@ -199,6 +199,12 @@ const RISKIEST: readonly { route: string; method: Method; path: string; body?: o
     path: `${ELECTION}/changes`,
     body: { apply: true },
   },
+  // Taking an entry out of the public corrections log, and putting it back (PLAN R248).
+  ...(['POST', 'DELETE'] as const).map((method) => ({
+    route: `${method} /api/t/:tenant/e/:election/corrections/:id/removal`,
+    method,
+    path: `${ELECTION}/corrections/${ID}/removal`,
+  })),
   // Erasure.
   { route: 'POST /api/t/:tenant/e/:election/purge', method: 'POST', path: `${ELECTION}/purge` },
   { route: 'DELETE /api/t/:tenant/e/:election', method: 'DELETE', path: ELECTION },

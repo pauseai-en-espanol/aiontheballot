@@ -116,7 +116,7 @@ Evidence items per assessment:
 - **Evidence requirement:** a published rating other than "not mentioned" requires at least one evidence item with a verbatim quote. "Not mentioned" requires a record of which documents were checked, and when.
 - **Four-eyes rule:** reviewer ≠ author to publish.
 - **Full history:** every change to a published assessment is versioned.
-- **Public corrections log:** a changelog per election, plus "last updated" on every cell. By the operator's decision (PLAN R243, R244), a site's country admin or a platform admin may publish a change off the record: it is not logged, and only the cell's date says it changed.
+- **Public corrections log:** a changelog per election, plus "last updated" on every cell. By the operator's decision (PLAN R243, R244), a site's country admin or a platform admin may publish a change off the record: it is not logged, and only the cell's date says it changed. They may also take out of the log an entry about the structure that a later one replaced (PLAN R248).
 - **Right of reply:** a public "report an error / party response" form feeds an editorial queue, with rate limiting and anti-spam. Accepted corrections appear in the corrections log.
 
 ---

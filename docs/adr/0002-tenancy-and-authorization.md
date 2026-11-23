@@ -146,7 +146,10 @@ names the token.
   time itself; never readable by `aiontheballot_web`. Amended (PLAN R243, R244): `assessments.draft_unlogged`, the
   mark that a published cell's change is published off the record, is updatable by `aiontheballot_admin`;
   `restrict_columns` keeps it to the site's country admins and to platform admins, and `needs_a_person` to a
-  person's session, and only they publish a draft so marked.
+  person's session, and only they publish a draft so marked. Amended (PLAN R248): `log_removals`, which structural
+  changes were taken out of the public corrections log, is readable by `aiontheballot_web`, `aiontheballot_preview` and
+  `aiontheballot_admin`, and inserted (its tenant and change only) and deleted by `aiontheballot_admin`; RLS keeps
+  that to the site's country admins and platform admins, and `needs_a_person` to a person's session.
 - Helper functions live in a `private` schema.
 - `SECURITY DEFINER` functions are limited to an allowlist: policy helpers, audit triggers, the public-cache trigger
   `bump_public_version` (so no runtime role can write `public_versions`), `submit_report`, the signup list's
@@ -342,6 +345,11 @@ expires_at)`, under RLS.
   that turns the rule off.
 - Each approved change writes an immutable public record (`structural_changes`) that the corrections log reads, so
   live changes are public whichever setting applies.
+- Amended (PLAN R248, the operator's decision): a site's country admin, or a platform admin, may take the record of an
+  update made by mistake out of the public log (`log_removals`), and put it back. Only once later updates of the same
+  target changed again every field it changed, so the log always holds the change in force; never inside a freeze
+  window. The record itself doesn't change: members read it, and the public and the preview read
+  none of it, values included. Who removed it, and when, is in the audit log.
 - The approver applies the change with their own rights, in the approving transaction; the public record is inserted
   by the same trigger (its insert policy admits only writes at trigger depth > 0).
 - Programme-status updates need only one person, but are audited and shown publicly with their check date.
@@ -361,7 +369,8 @@ cell without a rating (_withdrawn_, distinct from _pending_) and logs a correcti
 
 - Triggers reject `UPDATE`, `DELETE` and `TRUNCATE` on revisions and their child tables, `structural_changes`,
   `review_events`, `audit_log` and `purge_log`. These triggers fire even for the owner role. The corrections log is
-  a view over revisions and `structural_changes`, so it can't be edited either.
+  a view over revisions and `structural_changes`, so it can't be edited either; `log_removals` leaves a structural
+  change out of it without touching the record (§12, PLAN R248).
 - Stored files are immutable, and deletable only while nothing references them. A purge deletes the tenant's bytes
   from the file volume with `purge-tenant-files`, after the rows (ADR-0004).
 - The first exception is `private.purge_tenant(tenant_id)`:

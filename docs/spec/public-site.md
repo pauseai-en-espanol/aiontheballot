@@ -272,7 +272,8 @@ reports per visitor and per site.
 Every published revision of a cell after its first, and every approved change to the election's structure, newest
 first, each with its date and public note; a revision links to its cell and shows its rating now. Linked from every
 election page's footer, listed in the sitemap, with a share card of its own. A revision published off the record
-(PLAN R243, R244) is not in it.
+(PLAN R243, R244) is not in it, nor is a structural change taken out of it by a country admin or platform admin, whose
+record the public doesn't read at all (PLAN R248).
 
 ## 6. "Avísame cuando esté listo": the signup list (PLAN R119)
 

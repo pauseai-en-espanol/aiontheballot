@@ -659,6 +659,11 @@ _As an editor, I propose a fix to a live election's structure; the change and it
    freeze window, or without default-locale text in the note and in any new text. [DB]
 7. A decided request never changes. A pending one may be withdrawn by an editor or country admin. [DB: PLAN R28]
 8. Each approved change appears in the corrections log. A request prompted by a report may link it. [DB]
+9. An entry made by mistake can be taken out of the public log (PLAN R248, Dani's decision: "i want to be able to
+   delete this kind of errors (only admins)"): by a country admin or a platform admin, with a recent second factor,
+   from the admin's corrections log, once later changes replaced everything it changed. The public
+   then sees nothing of it; members see it there, marked, and the same people may put it back. Not inside a freeze
+   window. [DB: `log_removals`; API: step-up; audited]
 
 ## 11. Records
 
@@ -670,7 +675,8 @@ _As an editor, I propose a fix to a live election's structure; the change and it
    `review_events`]
 3. A diff between the draft and the published revision, or between two revisions. It is admin polish, on the cut
    list (PLAN, item 5). [UI]
-4. The election's corrections log, as the public will see it. [DB: `app.corrections_log`]
+4. The election's corrections log, as the public will see it, plus the entries taken out of it, marked (CR1.9).
+   [DB: `app.corrections_log`]
 
 ### H2. Right-of-reply reports
 

@@ -2048,7 +2048,7 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
         id: `approved change of ${key}`,
         tenant: key,
         public: false,
-        where: `tenant_id = '${TENANTS[key].id}' AND state = 'approved'`,
+        where: `tenant_id = '${TENANTS[key].id}' AND state = 'approved' AND field = 'description'`,
         // Decided: it never changes, and it is never deleted.
         rules: { delete: NOBODY, 'update:state (approve)': REVIEWERS },
         blocked: { update: '23001', 'update:state (approve)': '23001' },
@@ -2090,12 +2090,21 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
   },
 
   'app.structural_changes': {
-    rows: TENANT_KEYS.map((key) => ({
-      id: `structural change of ${key}`,
-      tenant: key,
-      public: isPublic(CELLS[key].election),
-      where: `tenant_id = '${TENANTS[key].id}'`,
-    })),
+    rows: TENANT_KEYS.flatMap((key) => [
+      {
+        id: `structural change of ${key}`,
+        tenant: key,
+        public: isPublic(CELLS[key].election),
+        where: `tenant_id = '${TENANTS[key].id}' AND field = 'description'`,
+      },
+      {
+        // Taken out of the log (PLAN R248): its site's members read it, its public doesn't.
+        id: `structural change of ${key} out of the log`,
+        tenant: key,
+        public: false,
+        where: `tenant_id = '${TENANTS[key].id}' AND field = 'title' AND new_value = '{"es": "Error de ejemplo 1"}'`,
+      },
+    ]),
     // Written only by the approval trigger.
     inserts: TENANT_KEYS.map((key) => ({
       id: `record of the pending change of ${key}`,
@@ -2112,13 +2121,35 @@ export const RELATIONS: Readonly<Record<string, Relation>> = {
     delete: NOBODY,
   },
 
+  'app.log_removals': {
+    // The superseded wording of each live election's criterion (fixtures), taken out of its log.
+    rows: TENANT_KEYS.map((key) => ({
+      id: `removal of ${key}`,
+      tenant: key,
+      public: isPublic(CELLS[key].election),
+      where: `tenant_id = '${TENANTS[key].id}'`,
+    })),
+    inserts: TENANT_KEYS.map((key) => ({
+      id: `removal of another superseded change of ${key}`,
+      tenant: key,
+      sql: `INSERT INTO app.log_removals (tenant_id, structural_change_id)
+            SELECT tenant_id, id FROM app.structural_changes
+             WHERE tenant_id = '${TENANTS[key].id}' AND field = 'title' AND new_value = '{"es": "Error de ejemplo 2"}'`,
+    })),
+    set: 'created_at = created_at',
+    select: { public: true, ...MEMBERS },
+    insert: COUNTRY_ADMINS,
+    update: NOBODY,
+    delete: COUNTRY_ADMINS,
+  },
+
   'app.corrections_log': {
     view: true,
     rows: TENANT_KEYS.map((key) => ({
       id: `logged structural change of ${key}`,
       tenant: key,
       public: isPublic(CELLS[key].election),
-      where: `tenant_id = '${TENANTS[key].id}' AND entry_kind = 'structural_change'`,
+      where: `tenant_id = '${TENANTS[key].id}' AND entry_kind = 'structural_change' AND field = 'description'`,
     })),
     inserts: [],
     set: 'field = field',

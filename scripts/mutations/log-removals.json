@@ -1,0 +1,179 @@
+[
+  {
+    "name": "an editor removes an entry",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "  WITH CHECK (tenant_id IN (SELECT private.my_tenants('country_admin')) OR (SELECT private.is_platform_admin()));",
+    "new": "  WITH CHECK (tenant_id IN (SELECT private.my_tenants('country_admin', 'editor')) OR (SELECT private.is_platform_admin()));",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "a platform admin can't remove an entry",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "  WITH CHECK (tenant_id IN (SELECT private.my_tenants('country_admin')) OR (SELECT private.is_platform_admin()));",
+    "new": "  WITH CHECK (tenant_id IN (SELECT private.my_tenants('country_admin')));",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "a reviewer puts an entry back",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "CREATE POLICY admin_delete ON app.log_removals FOR DELETE TO aiontheballot_admin\n  USING (tenant_id IN (SELECT private.my_tenants('country_admin'))",
+    "new": "CREATE POLICY admin_delete ON app.log_removals FOR DELETE TO aiontheballot_admin\n  USING (tenant_id IN (SELECT private.my_tenants('country_admin', 'reviewer'))",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "a member's token removes an entry",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "  FOR EACH ROW EXECUTE FUNCTION private.needs_a_person('change log_removals');",
+    "new": "  FOR EACH ROW WHEN (false) EXECUTE FUNCTION private.needs_a_person('change log_removals');",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "a removal inside a freeze window",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "    IF election.frozen_from <= now() AND (election.frozen_until IS NULL OR now() < election.frozen_until) THEN",
+    "new": "    IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "the change in force is removed",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "    IF NOT changed <@ replaced THEN",
+    "new": "    IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "a change is replaced by one of another target",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "       AND s.target_id = change.target_id AND s.action = 'update'",
+    "new": "       AND s.action = 'update'",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "a change is replaced by an earlier one",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "       AND (s.approved_at, s.id) > (change.approved_at, change.id)",
+    "new": "       AND s.id <> change.id",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "a set counts as replaced by any of its fields",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "    IF NOT changed <@ replaced THEN",
+    "new": "    IF NOT changed && replaced THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "an addition or retirement is removed",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "    IF change.action <> 'update' THEN",
+    "new": "    IF false THEN",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "the public still reads a removed change",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "                  WHERE e.id = structural_changes.election_id AND e.status IN ('live', 'archived'))\n         AND NOT EXISTS (SELECT 1 FROM app.log_removals x\n                          WHERE x.tenant_id = structural_changes.tenant_id\n                            AND x.structural_change_id = structural_changes.id));",
+    "new": "                  WHERE e.id = structural_changes.election_id AND e.status IN ('live', 'archived')));",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "the preview still reads a removed change",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "                  WHERE e.id = structural_changes.election_id AND e.status IN ('preview', 'live', 'archived'))\n         AND NOT EXISTS (SELECT 1 FROM app.log_removals x\n                          WHERE x.tenant_id = structural_changes.tenant_id\n                            AND x.structural_change_id = structural_changes.id));",
+    "new": "                  WHERE e.id = structural_changes.election_id AND e.status IN ('preview', 'live', 'archived')));",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "the log still shows members a removed change",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "  WHERE (NOT (EXISTS ( SELECT 1\n           FROM app.log_removals x\n          WHERE ((x.tenant_id = s.tenant_id) AND (x.structural_change_id = s.id)))))\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "a removal isn't audited",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "CREATE TRIGGER audit AFTER INSERT OR UPDATE OR DELETE ON app.log_removals",
+    "new": "CREATE TRIGGER audit AFTER UPDATE ON app.log_removals",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "a removal doesn't move the public version",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "CREATE TRIGGER bump_public_version AFTER INSERT OR UPDATE OR DELETE ON app.log_removals",
+    "new": "CREATE TRIGGER bump_public_version AFTER UPDATE ON app.log_removals",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "an entry is removed twice",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "  UNIQUE (tenant_id, structural_change_id),\n",
+    "new": "",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "the caller names the election",
+    "file": "db/migrations/20261123194846_log_removals.sql",
+    "old": "GRANT INSERT (tenant_id, structural_change_id), DELETE ON",
+    "new": "GRANT INSERT (tenant_id, election_id, structural_change_id), DELETE ON",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/log-removals.spec.ts",
+    "cwd": "packages/db",
+    "after": "cd packages/db && npx vitest run -c vitest.db.config.ts tests/catalog.spec.ts"
+  },
+  {
+    "name": "api: removing asks for no recent second factor",
+    "file": "apps/api/src/admin/routes.ts",
+    "old": "        url: '/t/:tenant/e/:election/corrections/:id/removal',\n        config: RECENT_SECOND_FACTOR,\n",
+    "new": "        url: '/t/:tenant/e/:election/corrections/:id/removal',\n",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: the page offers to remove what one of a set's fields replaced",
+    "file": "apps/api/src/admin/corrections.ts",
+    "old": "    if (change.fields.every((field) => fields.has(field))) {",
+    "new": "    if (change.fields.some((field) => fields.has(field))) {",
+    "cmd": "npx vitest run src/admin/corrections.spec.ts",
+    "cwd": "apps/api"
+  },
+  {
+    "name": "api: an entry is removed through another election's address",
+    "file": "apps/api/src/admin/corrections.ts",
+    "old": "    .where('s.election_id', '=', electionId)\n    .where('s.id', '=', changeId)",
+    "new": "    .where('s.id', '=', changeId)",
+    "cmd": "npx vitest run -c vitest.db.config.ts tests/changes.spec.ts tests/step-up.spec.ts",
+    "cwd": "apps/api"
+  }
+]

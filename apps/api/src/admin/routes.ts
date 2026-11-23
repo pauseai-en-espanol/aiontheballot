@@ -91,7 +91,7 @@ import {
   withdrawChange,
 } from './changes.js';
 import { goLiveChecklist } from './checklist.js';
-import { listCorrections } from './corrections.js';
+import { listCorrections, setInLog } from './corrections.js';
 import {
   createElection,
   deleteElection,
@@ -4495,11 +4495,45 @@ export const adminDataRoutes =
       async (request, reply) =>
         signedIn(request, reply, (db, actor) =>
           withActor(db, actor, async (trx) => {
-            const { election } = await electionFor(trx, actor, request.params);
-            return { entries: await listCorrections(trx, election) };
+            const { access, election } = await electionFor(trx, actor, request.params);
+            return {
+              entries: await listCorrections(trx, election),
+              canRemove: holds(access, 'country_admin'),
+            };
           }),
         ),
     );
+
+    // Takes the entry of a structural change made by mistake out of the public log, or puts it back (PLAN R248): the
+    // site's country admins and platform admins, with a recent second factor, never a member's token.
+    for (const method of ['POST', 'DELETE'] as const) {
+      scope.route<{ Params: { tenant: string; election: string; id: string } }>({
+        method,
+        url: '/t/:tenant/e/:election/corrections/:id/removal',
+        config: RECENT_SECOND_FACTOR,
+        schema: { params: ELECTION_ID_PARAMS },
+        handler: async (request, reply) =>
+          signedIn(request, reply, async (db, actor) => {
+            await withActor(db, actor, async (trx) => {
+              const { access, election } = await electionFor(trx, actor, request.params);
+              if (!holds(access, 'country_admin')) {
+                throw new Refusal(403, 'forbidden');
+              }
+              const done = await setInLog(
+                trx,
+                access.tenantId,
+                election.id,
+                request.params.id,
+                method === 'DELETE',
+              );
+              if (!done) {
+                throw new Refusal(404, 'notFound');
+              }
+            });
+            return reply.code(204).send();
+          }),
+      });
+    }
 
     // How an election's pages are shared (PLAN R239): every member reads its counts.
     scope.get<{ Params: { tenant: string; election: string } }>(

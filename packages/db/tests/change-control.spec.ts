@@ -682,7 +682,7 @@ describe('structural changes', () => {
 describe('the corrections log', () => {
   it('shows the public every structural change and later revision of an election, newest first', async () => {
     await actingAs(USERS.countryAdminA, async (client) => {
-      // A correction of the published cell, after the fixture's approved change.
+      // A correction of the published cell, after the fixture's approved changes.
       const cell = CELLS.A.published;
       await client.query(
         `UPDATE app.assessments SET draft_change_kind = 'correction', draft_public_note = ${NOTE} WHERE id = $1`,
@@ -702,6 +702,9 @@ describe('the corrections log', () => {
       );
       expect(rows).toEqual([
         { entry_kind: 'revision', change: 'correction' },
+        // The fixture's: the title put right, its second slip (the first was taken out, PLAN R248), the description.
+        { entry_kind: 'structural_change', change: 'update' },
+        { entry_kind: 'structural_change', change: 'update' },
         { entry_kind: 'structural_change', change: 'update' },
       ]);
     });

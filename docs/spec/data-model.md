@@ -803,8 +803,8 @@ create table app.revision_internal (                   -- private: who did what;
 - `app.current_revisions`: the latest revision per assessment (`distinct on (assessment_id) … order by revision_no
 desc`). A cell with no revision is _pending_; one whose latest revision is a withdrawal is _withdrawn_. Neither
   shows a rating; their public wording is PLAN P7's.
-- `app.corrections_log`: per election, every non-initial revision plus every `structural_changes` row (§3.7),
-  newest first. It is derived and never written to directly, and it reads only public tables.
+- `app.corrections_log`: per election, every non-initial revision plus every `structural_changes` row (§3.7) not taken
+  out of the log (`log_removals`), newest first. It is derived and never written to directly, and it reads only public tables.
 
 ### 3.7 Change control for live elections
 
@@ -862,6 +862,20 @@ create table app.structural_changes (
   foreign key (tenant_id, election_id)       references app.elections (tenant_id, id),
   foreign key (tenant_id, change_request_id) references app.change_requests (tenant_id, id)
 );
+
+-- Which structural changes were taken out of the public log (PLAN R248). Who did it is the audit log's: the public
+-- reads this table, through its reads of the changes.
+create table app.log_removals (
+  id                    uuid primary key default uuidv7(),
+  tenant_id             uuid not null references app.tenants,
+  election_id           uuid not null,                 -- the change's, set by trigger
+  structural_change_id  uuid not null,
+  created_at            timestamptz not null default now(),
+  unique (tenant_id, id),
+  unique (tenant_id, structural_change_id),
+  foreign key (tenant_id, election_id)          references app.elections (tenant_id, id),
+  foreign key (tenant_id, structural_change_id) references app.structural_changes (tenant_id, id)
+);
 ```
 
 **After insert,** a change request can change only once: `state` from `pending` to `approved` or `rejected`, with
@@ -902,6 +916,11 @@ approval; `private.change_control()` after any write to the five structure table
   request authorizes nothing more.
 - `proposed_value`, `previous_value` and `new_value` can hold an external reviewer's name, so they are commented
   `personal data` and never audited; `structural_changes` is itself the public record.
+- Out of the log (PLAN R248): a `log_removals` row takes a structural change out of `app.corrections_log` and out of
+  what the public and the preview read of `structural_changes`. `private.log_removal_rules()` admits it for an update
+  whose every field later updates of the same target changed again (so the change in force is always logged), sets
+  its election from the change, and refuses a removal or its undoing (a delete) inside the freeze window. RLS: the
+  site's country admins and platform admins; never through a member's token. A removal is never updated.
 - `app.corrections_log` has one row per entry: `entry_kind` (`revision` or `structural_change`), `entry_id`, `at`,
   `change` (the change kind or action), the cell, or the target kind, id and field with the previous and new values,
   and the public note.
@@ -1237,7 +1256,8 @@ purge moves it to `hostname_tombstones`.
 | `public_versions`                                                            | Active tenants                                                                     |
 | `elections`, `methodologies`, `methodology_reviewers`, `parties`, `criteria` | Rows of `live` or `archived` elections of active tenants                           |
 | `assessment_revisions`, `revision_evidence`, `revision_checked_documents`    | Same; the full revision history is public                                          |
-| `structural_changes`                                                         | Same                                                                               |
+| `structural_changes`                                                         | Same, but for those taken out of the log (PLAN R248)                               |
+| `log_removals`                                                               | Same                                                                               |
 | `source_documents`                                                           | Cited by a public revision; public columns only (below)                            |
 | `files` (their bytes are on the file volume)                                 | `public_assets` images a public row shows (a party logo, a brand selection)        |
 | `current_revisions`, `corrections_log`                                       | Through the rules above (`security_invoker`)                                       |

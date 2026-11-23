@@ -175,3 +175,64 @@ test.describe('change requests (editorial workflow CR1)', () => {
     }
   });
 });
+
+test.describe('the corrections log (PLAN R248)', () => {
+  test('a country admin takes an entry made by mistake out of the public log, and puts it back', async ({
+    page,
+  }) => {
+    const site = await createTenant({ operator: true, active: true });
+    try {
+      const { id } = await signedInAccount(page, created);
+      await addMembership(id, site.slug, 'country_admin');
+      await makeLiveElection(site, id);
+      // A slip in the criterion's wording, then the change that put it right.
+      for (const text of ['Texto pegado por error.', 'Descripción corregida.']) {
+        await asOwner(
+          `DO $$ DECLARE request uuid; BEGIN
+             PERFORM set_config('app.user_id', '${id}', true), set_config('app.aal', '2', true);
+             INSERT INTO app.change_requests (tenant_id, election_id, action, target_kind, target_id, field,
+                                              proposed_value, public_note)
+             SELECT c.tenant_id, c.election_id, 'update', 'criterion', c.id, 'description', '{"es": "${text}"}',
+                    '{"es": "Nota inventada del cambio."}'
+               FROM app.criteria c WHERE c.tenant_id = '${site.id}' RETURNING id INTO request;
+             UPDATE app.change_requests SET state = 'approved' WHERE id = request;
+           END $$`,
+        );
+      }
+      const log = `${ADMIN_URL}/t/${site.slug}/e/elecciones-de-prueba/corrections`;
+      await page.goto(log);
+      const entries = page.locator('ol > li').filter({ hasText: 'Nota inventada del cambio.' });
+      await expect(entries).toHaveCount(2);
+      const remove = new RegExp(`^${en.admin.correctionsLog.remove}:`, 'u');
+      const restore = new RegExp(`^${en.admin.correctionsLog.restore}:`, 'u');
+      // Offered for the slip alone: the change in force stays in the log.
+      await expect(page.getByRole('button', { name: remove })).toHaveCount(1);
+      await expect(entries.nth(1).getByRole('button', { name: remove })).toBeVisible();
+      await entries.nth(1).getByRole('button', { name: remove }).click();
+      const dialog = page.getByRole('alertdialog');
+      await expect(dialog).toContainText(en.admin.correctionsLog.removeBody);
+      await expectAccessible(page);
+      await dialog
+        .getByRole('button', { name: en.admin.correctionsLog.remove, exact: true })
+        .click();
+      await expect(page.locator('#page-announcer')).toHaveText(en.admin.correctionsLog.removed);
+      await expect(entries.nth(1)).toContainText(en.admin.correctionsLog.mark);
+      const inPublic = () =>
+        asOwner(
+          `SELECT 1 FROM app.corrections_log WHERE tenant_id = $1 AND entry_kind = 'structural_change'`,
+          [site.id],
+        );
+      expect(await inPublic()).toBe(1);
+      await expectAccessible(page);
+      await entries.nth(1).getByRole('button', { name: restore }).click();
+      await dialog
+        .getByRole('button', { name: en.admin.correctionsLog.restore, exact: true })
+        .click();
+      await expect(page.locator('#page-announcer')).toHaveText(en.admin.correctionsLog.restored);
+      await expect(page.getByText(en.admin.correctionsLog.mark)).toHaveCount(0);
+      expect(await inPublic()).toBe(2);
+    } finally {
+      await purgeTenant(site.id, site.operatorId);
+    }
+  });
+});

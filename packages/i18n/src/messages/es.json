@@ -1317,6 +1317,17 @@
       "noMail": "Las invitaciones necesitan el correo de la plataforma, que no está configurado en este despliegue.",
       "actions": "Acciones"
     },
+    "correctionsLog": {
+      "remove": "Quitar del registro público",
+      "removeTitle": "¿Quitar esta entrada del registro público?",
+      "removeBody": "El público deja de ver que esto cambió y lo que decía. El cambio queda guardado aquí, el registro de auditoría guarda quién quitó la entrada y se puede volver a poner.",
+      "removed": "Entrada quitada del registro público.",
+      "restore": "Volver a poner en el registro público",
+      "restoreTitle": "¿Volver a poner esta entrada en el registro público?",
+      "restoreBody": "El público la vuelve a ver, con su fecha y su nota.",
+      "restored": "Entrada de nuevo en el registro público.",
+      "mark": "Quitada del registro público: solo la ven aquí los miembros del sitio."
+    },
     "changes": {
       "title": "Solicitudes de cambio",
       "intro": "Cuando una elección está en marcha, su estructura solo cambia mediante una solicitud de cambio: alguien propone el cambio con una nota pública y una persona administradora del país lo aprueba, distinta de quien lo propuso si el sitio exige una segunda aprobación. El cambio y su nota aparecen entonces en el registro público de correcciones.",
