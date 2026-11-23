@@ -74,7 +74,7 @@ export const SiteFooter = ({ home, locale, logo, links, languages }: SiteFooterP
         color: 'fg.default',
         borderTop: '3px solid',
         borderColor: 'border.default',
-        marginTop: '48px',
+        marginTop: '32px',
       })}
     >
       <div
@@ -83,10 +83,10 @@ export const SiteFooter = ({ home, locale, logo, links, languages }: SiteFooterP
           maxWidth: '1200px',
           marginInline: 'auto',
           paddingInline: 'clamp(16px, 4vw, 56px)',
-          paddingBlock: '40px 48px',
+          paddingBlock: '24px 32px',
           display: 'grid',
           gridTemplateColumns: { base: '1fr', md: 'minmax(0, 1fr) minmax(0, 1fr)' },
-          gap: '28px 48px',
+          gap: '20px 48px',
           fontSize: '16px',
           '& a': { textDecoration: 'underline', textUnderlineOffset: '3px' },
         })}
@@ -133,7 +133,7 @@ export const SiteFooter = ({ home, locale, logo, links, languages }: SiteFooterP
             aria-label={t('layout.language')}
             className={css({
               gridColumn: '1 / -1',
-              paddingTop: '20px',
+              paddingTop: '16px',
               borderTop: '1px solid',
               borderColor: 'border.subtle',
             })}

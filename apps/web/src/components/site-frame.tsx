@@ -68,7 +68,7 @@ export const SiteFrame = ({
         {t('layout.skipToContent')}
       </a>
       <header className={css({ bg: 'bg.accent', color: 'fg.onAccent' })}>
-        <div className={cx(wrap, css({ paddingBlock: '20px' }))}>
+        <div className={cx(wrap, css({ paddingBlock: '12px' }))}>
           <a
             href={href({ page: 'home' })}
             className={cx(
@@ -77,8 +77,8 @@ export const SiteFrame = ({
               css({
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '12px',
-                fontSize: '26px',
+                gap: '10px',
+                fontSize: '22px',
                 letterSpacing: '0.02em',
               }),
             )}
@@ -87,7 +87,7 @@ export const SiteFrame = ({
             <BallotBox
               variant="compact"
               letters={markLetters(locale)}
-              className={css({ height: '40px', width: 'auto', flexShrink: '0' })}
+              className={css({ height: '34px', width: 'auto', flexShrink: '0' })}
             />
             {name}
           </a>

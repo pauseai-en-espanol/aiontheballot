@@ -3583,6 +3583,13 @@ packages/db/demo/print.ts fill <site> <election>` prints one `DO` block that fil
   to them. A probe of 29N's shape (`tilted`, fictional) joins the references; the data cards' references were
   accepted again, no link preview's among them. Spec: public site §5.4.
 
+- **R247. A tighter header and footer, so the page's content comes first.** Dani found the site's header and footer
+  took room from the content. The header's padding goes from 20 to 12 px, the site's name from 26 to 22 px and its
+  mark from 40 to 34 px (the link stays well over the 24 px target size); the footer's space above it goes from 48 to
+  32 px, its padding from 40/48 to 24/32 px and the gap between its blocks from 28 to 20 px, its text staying at 16
+  px. The header is 22 px shorter, so on a phone the methodology link now fits on the first screen. Tests: the site's
+  unit and e2e tests unchanged.
+
 ## Queued work
 
 Approved by Dani and not built yet, in this order. A new session starts here. The drawings are on a private canvas,
